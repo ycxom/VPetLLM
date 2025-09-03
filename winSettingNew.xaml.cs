@@ -178,5 +178,27 @@ namespace VPetLLM
                 Logger.Log("Cannot refresh Gemini models: chat core is not Gemini.");
             }
         }
+
+        private void Button_RestoreDefaults_Click(object sender, RoutedEventArgs e)
+        {
+            if (ComboBox_Provider.SelectedItem == null) return;
+
+            switch ((Setting.LLMType)ComboBox_Provider.SelectedItem)
+            {
+                case Setting.LLMType.Ollama:
+                    _plugin.Settings.Ollama = new Setting.OllamaSetting();
+                    Logger.Log("Ollama settings restored to defaults.");
+                    break;
+                case Setting.LLMType.OpenAI:
+                    _plugin.Settings.OpenAI = new Setting.OpenAISetting();
+                    Logger.Log("OpenAI settings restored to defaults.");
+                    break;
+                case Setting.LLMType.Gemini:
+                    _plugin.Settings.Gemini = new Setting.GeminiSetting();
+                    Logger.Log("Gemini settings restored to defaults.");
+                    break;
+            }
+            LoadSettings();
+        }
     }
 }

@@ -15,7 +15,8 @@
         <StackPanel Grid.Column="0" Margin="0,0,10,0">
             <Label Content="LLM Provider"/>
             <ComboBox x:Name="ComboBox_Provider" Margin="0,0,0,10" SelectionChanged="ComboBox_Provider_SelectionChanged"/>
-            <Button Content="Save" HorizontalAlignment="Right" Click="Button_Save_Click"/>
+            <Button Content="Save" HorizontalAlignment="Right" Click="Button_Save_Click" Margin="0,0,5,0"/>
+            <Button Content="Restore Defaults" HorizontalAlignment="Right" Click="Button_RestoreDefaults_Click"/>
         </StackPanel>
 
         <Grid Grid.Column="1">
