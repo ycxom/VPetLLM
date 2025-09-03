@@ -11,7 +11,7 @@ namespace VPetLLM
     public class VPetLLM : MainPlugin
     {
         public Setting Settings;
-        public IChatCore ChatCore;
+        public IChatCore? ChatCore;
         public readonly TalkBox TalkBox;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
@@ -20,13 +20,13 @@ namespace VPetLLM
             TalkBox = new TalkBox(this);
             switch (Settings.Provider)
             {
-                case Setting.LLMType.Ollama:
+                case global::VPetLLM.Setting.LLMType.Ollama:
                     ChatCore = new OllamaChatCore(Settings.Ollama);
                     break;
-                case Setting.LLMType.OpenAI:
+                case global::VPetLLM.Setting.LLMType.OpenAI:
                     ChatCore = new OpenAIChatCore(Settings.OpenAI);
                     break;
-                case Setting.LLMType.Gemini:
+                case global::VPetLLM.Setting.LLMType.Gemini:
                     ChatCore = new GeminiChatCore(Settings.Gemini);
                     break;
             }

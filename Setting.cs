@@ -31,19 +31,19 @@ namespace VPetLLM
         public class OllamaSetting
         {
             public string Url { get; set; } = "http://localhost:11434";
-            public string Model { get; set; }
+            public string? Model { get; set; }
         }
 
         public class OpenAISetting
         {
-            public string ApiKey { get; set; }
-            public string Model { get; set; }
+            public string? ApiKey { get; set; }
+            public string? Model { get; set; }
             public string Url { get; set; } = "https://api.openai.com/v1/chat/completions";
         }
 
         public class GeminiSetting
         {
-            public string ApiKey { get; set; }
+            public string? ApiKey { get; set; }
             public string Model { get; set; } = "gemini-pro";
         }
 
