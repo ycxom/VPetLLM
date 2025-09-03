@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="VPet-Simulator.Core">
+      <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VPet\VPet-Simulator.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="VPet-Simulator.Windows.Interface">
+      <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VPet\VPet-Simulator.Windows.Interface.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>
