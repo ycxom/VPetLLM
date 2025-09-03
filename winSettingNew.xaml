@@ -22,7 +22,10 @@
             
             <Label Content="上下文控制" Margin="0,10,0,0"/>
             <CheckBox x:Name="CheckBox_KeepContext" Content="保持聊天上下文" Margin="0,0,0,5" IsChecked="True"/>
-            <Button x:Name="Button_ClearContext" Content="清除上下文" HorizontalAlignment="Right" Click="Button_ClearContext_Click" Margin="0,0,0,10"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
+                <Button x:Name="Button_ClearContext" Content="清除上下文" Click="Button_ClearContext_Click" Margin="0,0,5,0"/>
+                <Button x:Name="Button_EditContext" Content="编辑上下文" Click="Button_EditContext_Click"/>
+            </StackPanel>
             
             <Button Content="保存" HorizontalAlignment="Right" Click="Button_Save_Click" Margin="0,0,5,0"/>
             <Button Content="恢复默认设置" HorizontalAlignment="Right" Click="Button_RestoreDefaults_Click"/>

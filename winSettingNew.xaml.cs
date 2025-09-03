@@ -355,5 +355,20 @@ namespace VPetLLM
                 Logger.Log("No active chat core to clear context.");
             }
         }
+
+        private void Button_EditContext_Click(object sender, RoutedEventArgs e)
+        {
+            if (_plugin.ChatCore != null)
+            {
+                // 打开上下文编辑窗口
+                var contextEditor = new ContextEditorWindow(_plugin.ChatCore);
+                contextEditor.ShowDialog();
+                Logger.Log("Context editor opened.");
+            }
+            else
+            {
+                Logger.Log("No active chat core to edit context.");
+            }
+        }
     }
 }
