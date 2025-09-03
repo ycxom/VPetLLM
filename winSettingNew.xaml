@@ -40,6 +40,22 @@
                             <ComboBox x:Name="ComboBox_OllamaModel" Grid.Column="0" IsEditable="True"/>
                             <Button x:Name="Button_RefreshOllamaModels" Grid.Column="1" Content="刷新" Click="Button_RefreshOllamaModels_Click" Margin="5,0,0,0"/>
                         </Grid>
+                        
+                        <!-- Ollama高级配置 -->
+                        <CheckBox x:Name="CheckBox_Ollama_EnableAdvanced" Content="启用高级配置" Margin="0,10,0,5"/>
+                        
+                        <StackPanel x:Name="StackPanel_Ollama_Advanced" IsEnabled="{Binding ElementName=CheckBox_Ollama_EnableAdvanced, Path=IsChecked}">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <TextBlock Text="温度:" Width="60" VerticalAlignment="Center"/>
+                                <Slider x:Name="Slider_Ollama_Temperature" Minimum="0" Maximum="2" Width="100" Margin="5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TextBlock_Ollama_TemperatureValue" Width="30" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <TextBlock Text="最大Token:" Width="60" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TextBox_Ollama_MaxTokens" Width="80" Margin="5,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
                 </GroupBox>
 
@@ -58,6 +74,22 @@
                         </Grid>
                         <Label Content="API 地址"/>
                         <TextBox x:Name="TextBox_OpenAIUrl"/>
+                        
+                        <!-- OpenAI高级配置 -->
+                        <CheckBox x:Name="CheckBox_OpenAI_EnableAdvanced" Content="启用高级配置" Margin="0,10,0,5"/>
+                        
+                        <StackPanel x:Name="StackPanel_OpenAI_Advanced" IsEnabled="{Binding ElementName=CheckBox_OpenAI_EnableAdvanced, Path=IsChecked}">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <TextBlock Text="温度:" Width="60" VerticalAlignment="Center"/>
+                                <Slider x:Name="Slider_OpenAI_Temperature" Minimum="0" Maximum="2" Width="100" Margin="5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TextBlock_OpenAI_TemperatureValue" Width="30" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <TextBlock Text="最大Token:" Width="60" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TextBox_OpenAI_MaxTokens" Width="80" Margin="5,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
                 </GroupBox>
 
@@ -77,6 +109,22 @@
                         <Label Content="API 地址"/>
                         <TextBox x:Name="TextBox_GeminiUrl"/>
                         <TextBlock Text="注意：请提供正确的 API 端点 URL。" TextWrapping="Wrap" Foreground="Gray"/>
+                        
+                        <!-- Gemini高级配置 -->
+                        <CheckBox x:Name="CheckBox_Gemini_EnableAdvanced" Content="启用高级配置" Margin="0,10,0,5"/>
+                        
+                        <StackPanel x:Name="StackPanel_Gemini_Advanced" IsEnabled="{Binding ElementName=CheckBox_Gemini_EnableAdvanced, Path=IsChecked}">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <TextBlock Text="温度:" Width="60" VerticalAlignment="Center"/>
+                                <Slider x:Name="Slider_Gemini_Temperature" Minimum="0" Maximum="2" Width="100" Margin="5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TextBlock_Gemini_TemperatureValue" Width="30" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <TextBlock Text="最大Token:" Width="60" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TextBox_Gemini_MaxTokens" Width="80" Margin="5,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
                 </GroupBox>
             </StackPanel>

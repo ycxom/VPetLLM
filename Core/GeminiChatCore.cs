@@ -23,25 +23,30 @@ namespace VPetLLM.Core
             History.Add(new Message { Role = "user", Content = prompt });
             var data = new
             {
-                contents = History.Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } })
+                contents = History.Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
+                generationConfig = new
+                {
+                    maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
+                    temperature = _geminiSetting.EnableAdvanced ? _geminiSetting.Temperature : 0.8
+                }
             };
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
             
-            // 处理URL后缀：如果URL不包含v1或v1beta后缀，自动添加/v1beta
-            var url = _geminiSetting.Url.TrimEnd('/');
-            if (!url.Contains("/v1") && !url.Contains("/v1beta"))
+            // 构建正确的Gemini API端点：使用模型名称和generateContent方法
+            var baseUrl = _geminiSetting.Url.TrimEnd('/');
+            
+            // 如果URL不包含v1或v1beta后缀，自动添加/v1beta
+            if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
             {
-                url += "/v1beta";
+                baseUrl += "/v1beta";
             }
             
-            // 确保URL以斜杠结尾，避免路径拼接问题
-            if (!url.EndsWith("/"))
-            {
-                url += "/";
-            }
+            // 构建完整的API端点：/v1beta/models/{modelName}:generateContent
+            var modelName = _geminiSetting.Model; // 使用用户配置的模型名称
+            var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
             
             // 创建HTTP请求并添加必要的头信息
-            var request = new HttpRequestMessage(HttpMethod.Post, url);
+            var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
             request.Content = content;
             request.Headers.Add("User-Agent", "Lolisi_VPet_LLMAPI");
             request.Headers.Add("Connection", "keep-alive");

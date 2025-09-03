@@ -18,6 +18,11 @@ namespace VPetLLM
             // 跟随VPet的语言设置
             // LocalizeCore 方法需要进一步调查正确用法
             
+            // 注册温度滑块值变化事件
+            Slider_OpenAI_Temperature.ValueChanged += Slider_OpenAI_Temperature_ValueChanged;
+            Slider_Gemini_Temperature.ValueChanged += Slider_Gemini_Temperature_ValueChanged;
+            Slider_Ollama_Temperature.ValueChanged += Slider_Ollama_Temperature_ValueChanged;
+            
             Logger.Log("Setting window opened.");
             ComboBox_Provider.ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
             LogBox.ItemsSource = Logger.Logs;
@@ -37,9 +42,43 @@ namespace VPetLLM
             TextBox_OpenAIApiKey.Text = _plugin.Settings.OpenAI.ApiKey;
             ComboBox_OpenAIModel.Text = _plugin.Settings.OpenAI.Model;
             TextBox_OpenAIUrl.Text = _plugin.Settings.OpenAI.Url;
+            
+            // 初始化OpenAI高级配置
+            CheckBox_OpenAI_EnableAdvanced.IsChecked = _plugin.Settings.OpenAI.EnableAdvanced;
+            Slider_OpenAI_Temperature.Value = _plugin.Settings.OpenAI.Temperature;
+            TextBlock_OpenAI_TemperatureValue.Text = _plugin.Settings.OpenAI.Temperature.ToString("F2");
+            TextBox_OpenAI_MaxTokens.Text = _plugin.Settings.OpenAI.MaxTokens.ToString();
             TextBox_GeminiApiKey.Text = _plugin.Settings.Gemini.ApiKey;
             ComboBox_GeminiModel.Text = _plugin.Settings.Gemini.Model;
             TextBox_GeminiUrl.Text = _plugin.Settings.Gemini.Url;
+            
+            // 初始化Gemini高级配置
+            CheckBox_Gemini_EnableAdvanced.IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
+            Slider_Gemini_Temperature.Value = _plugin.Settings.Gemini.Temperature;
+            TextBlock_Gemini_TemperatureValue.Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
+            TextBox_Gemini_MaxTokens.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
+            
+            // 初始化Ollama高级配置
+            CheckBox_Ollama_EnableAdvanced.IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
+            Slider_Ollama_Temperature.Value = _plugin.Settings.Ollama.Temperature;
+            TextBlock_Ollama_TemperatureValue.Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
+            TextBox_Ollama_MaxTokens.Text = _plugin.Settings.Ollama.MaxTokens.ToString();
+            
+            // 尝试自动刷新Gemini模型列表
+            try
+            {
+                var geminiSettings = new Setting.GeminiSetting
+                {
+                    ApiKey = TextBox_GeminiApiKey.Text,
+                    Url = TextBox_GeminiUrl.Text
+                };
+                var geminiCore = new Core.GeminiChatCore(geminiSettings);
+                ComboBox_GeminiModel.ItemsSource = geminiCore.GetModels();
+            }
+            catch
+            {
+                // 如果刷新失败，静默忽略，用户仍然可以手动刷新
+            }
             UpdateProviderVisibility();
             Logger.Log("Settings loaded.");
         }
@@ -53,9 +92,34 @@ namespace VPetLLM
             _plugin.Settings.OpenAI.ApiKey = TextBox_OpenAIApiKey.Text;
             _plugin.Settings.OpenAI.Model = ComboBox_OpenAIModel.Text;
             _plugin.Settings.OpenAI.Url = TextBox_OpenAIUrl.Text;
+            
+            // 保存OpenAI高级配置
+            _plugin.Settings.OpenAI.EnableAdvanced = CheckBox_OpenAI_EnableAdvanced.IsChecked ?? false;
+            _plugin.Settings.OpenAI.Temperature = Slider_OpenAI_Temperature.Value;
+            if (int.TryParse(TextBox_OpenAI_MaxTokens.Text, out int maxTokens))
+            {
+                _plugin.Settings.OpenAI.MaxTokens = maxTokens;
+            }
             _plugin.Settings.Gemini.ApiKey = TextBox_GeminiApiKey.Text;
             _plugin.Settings.Gemini.Model = ComboBox_GeminiModel.Text;
             _plugin.Settings.Gemini.Url = TextBox_GeminiUrl.Text;
+            
+            // 保存Gemini高级配置
+            _plugin.Settings.Gemini.EnableAdvanced = CheckBox_Gemini_EnableAdvanced.IsChecked ?? false;
+            _plugin.Settings.Gemini.Temperature = Slider_Gemini_Temperature.Value;
+            if (int.TryParse(TextBox_Gemini_MaxTokens.Text, out int geminiMaxTokens))
+            {
+                _plugin.Settings.Gemini.MaxTokens = geminiMaxTokens;
+            }
+            
+            // 保存Ollama高级配置
+            _plugin.Settings.Ollama.EnableAdvanced = CheckBox_Ollama_EnableAdvanced.IsChecked ?? false;
+            _plugin.Settings.Ollama.Temperature = Slider_Ollama_Temperature.Value;
+            if (int.TryParse(TextBox_Ollama_MaxTokens.Text, out int ollamaMaxTokens))
+            {
+                _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
+            }
+            
             _plugin.Settings.Save();
             Logger.Log("Settings saved to file.");
             _plugin.ChatCore = null;
@@ -227,14 +291,47 @@ namespace VPetLLM
             ComboBox_OpenAIModel.Text = _plugin.Settings.OpenAI.Model;
             TextBox_OpenAIUrl.Text = _plugin.Settings.OpenAI.Url;
             
+            // 初始化OpenAI高级配置
+            CheckBox_OpenAI_EnableAdvanced.IsChecked = _plugin.Settings.OpenAI.EnableAdvanced;
+            Slider_OpenAI_Temperature.Value = _plugin.Settings.OpenAI.Temperature;
+            TextBlock_OpenAI_TemperatureValue.Text = _plugin.Settings.OpenAI.Temperature.ToString("F2");
+            TextBox_OpenAI_MaxTokens.Text = _plugin.Settings.OpenAI.MaxTokens.ToString();
+            
             TextBox_GeminiApiKey.Text = _plugin.Settings.Gemini.ApiKey;
             ComboBox_GeminiModel.Text = _plugin.Settings.Gemini.Model;
             TextBox_GeminiUrl.Text = _plugin.Settings.Gemini.Url;
+            
+            // 初始化Gemini高级配置
+            CheckBox_Gemini_EnableAdvanced.IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
+            Slider_Gemini_Temperature.Value = _plugin.Settings.Gemini.Temperature;
+            TextBlock_Gemini_TemperatureValue.Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
+            TextBox_Gemini_MaxTokens.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
+            
+            // 初始化Ollama高级配置
+            CheckBox_Ollama_EnableAdvanced.IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
+            Slider_Ollama_Temperature.Value = _plugin.Settings.Ollama.Temperature;
+            TextBlock_Ollama_TemperatureValue.Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
+            TextBox_Ollama_MaxTokens.Text = _plugin.Settings.Ollama.MaxTokens.ToString();
             
             // 保持当前选择的提供商不变
             ComboBox_Provider.SelectedItem = currentProvider;
             UpdateProviderVisibility();
             Logger.Log("Settings loaded without changing provider.");
+        }
+
+        private void Slider_OpenAI_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            TextBlock_OpenAI_TemperatureValue.Text = Slider_OpenAI_Temperature.Value.ToString("F2");
+        }
+
+        private void Slider_Gemini_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            TextBlock_Gemini_TemperatureValue.Text = Slider_Gemini_Temperature.Value.ToString("F2");
+        }
+
+        private void Slider_Ollama_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            TextBlock_Ollama_TemperatureValue.Text = Slider_Ollama_Temperature.Value.ToString("F2");
         }
     }
 }

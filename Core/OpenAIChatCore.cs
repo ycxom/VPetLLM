@@ -22,13 +22,42 @@ namespace VPetLLM.Core
         public override async Task<string> Chat(string prompt)
         {
             History.Add(new Message { Role = "user", Content = prompt });
-            var data = new
+            // 构建请求数据，根据启用开关决定是否包含高级参数
+            object data;
+            if (_openAISetting.EnableAdvanced)
             {
-                model = _openAISetting.Model,
-                messages = History
-            };
+                data = new
+                {
+                    model = _openAISetting.Model,
+                    messages = History,
+                    temperature = _openAISetting.Temperature,
+                    max_tokens = _openAISetting.MaxTokens
+                };
+            }
+            else
+            {
+                data = new
+                {
+                    model = _openAISetting.Model,
+                    messages = History
+                };
+            }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(_openAISetting.Url, content);
+            
+            // 处理OpenAI URL兼容性：自动补全后缀
+            string apiUrl = _openAISetting.Url;
+            if (!apiUrl.Contains("/chat/completions"))
+            {
+                // 如果URL不包含完整端点，自动补全
+                var baseUrl = apiUrl.TrimEnd('/');
+                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
+                {
+                    baseUrl += "/v1";
+                }
+                apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
+            }
+            
+            var response = await _httpClient.PostAsync(apiUrl, content);
             response.EnsureSuccessStatusCode();
             var responseString = await response.Content.ReadAsStringAsync();
             var responseObject = JObject.Parse(responseString);
@@ -39,7 +68,25 @@ namespace VPetLLM.Core
 
         public override List<string> GetModels()
         {
-            var url = new System.Uri(new System.Uri(_openAISetting.Url), "/v1/models");
+            // 处理OpenAI URL兼容性：自动补全到/models端点
+            string apiUrl = _openAISetting.Url;
+            if (apiUrl.Contains("/chat/completions"))
+            {
+                // 如果URL包含完整端点，替换为/models
+                apiUrl = apiUrl.Replace("/chat/completions", "/models");
+            }
+            else
+            {
+                // 如果URL不包含完整端点，自动补全
+                var baseUrl = apiUrl.TrimEnd('/');
+                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
+                {
+                    baseUrl += "/v1";
+                }
+                apiUrl = baseUrl.TrimEnd('/') + "/models";
+            }
+            
+            var url = new System.Uri(new System.Uri(apiUrl), "");
             var response = _httpClient.GetAsync(url).Result;
             response.EnsureSuccessStatusCode();
             var responseString = response.Content.ReadAsStringAsync().Result;

@@ -32,6 +32,11 @@ namespace VPetLLM.Core
                 model = _ollamaSetting.Model,
                 messages = History,
                 stream = false,
+                options = _ollamaSetting.EnableAdvanced ? new
+                {
+                    temperature = _ollamaSetting.Temperature,
+                    num_predict = _ollamaSetting.MaxTokens
+                } : null
             };
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync("/api/chat", content);

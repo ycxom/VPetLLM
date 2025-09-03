@@ -32,13 +32,19 @@ namespace VPetLLM
         {
             public string Url { get; set; } = "http://localhost:11434";
             public string? Model { get; set; }
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
         }
 
         public class OpenAISetting
         {
             public string? ApiKey { get; set; }
             public string? Model { get; set; }
-            public string Url { get; set; } = "https://api.openai.com/v1/chat/completions";
+            public string Url { get; set; } = "https://api.openai.com/v1";
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
         }
 
         public class GeminiSetting
@@ -46,6 +52,9 @@ namespace VPetLLM
             public string? ApiKey { get; set; }
             public string Model { get; set; } = "gemini-pro";
             public string Url { get; set; } = "https://generativelanguage.googleapis.com/v1beta";
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
         }
 
         public enum LLMType
