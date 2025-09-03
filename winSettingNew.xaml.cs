@@ -113,21 +113,20 @@ namespace VPetLLM
 
         private void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
         {
-            if (_plugin.ChatCore is Core.OllamaChatCore ollamaCore)
+            try
             {
-                try
+                // 创建临时的OllamaChatCore实例来获取模型列表
+                var ollamaSettings = new Setting.OllamaSetting
                 {
-                    ComboBox_OllamaModel.ItemsSource = ollamaCore.GetModels();
-                    Logger.Log("Ollama models refreshed.");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Failed to refresh Ollama models: {ex.Message}");
-                }
+                    Url = TextBox_OllamaUrl.Text
+                };
+                var ollamaCore = new Core.OllamaChatCore(ollamaSettings);
+                ComboBox_OllamaModel.ItemsSource = ollamaCore.GetModels();
+                Logger.Log("Ollama models refreshed.");
             }
-            else
+            catch (Exception ex)
             {
-                Logger.Log("Cannot refresh Ollama models: chat core is not Ollama.");
+                Logger.Log($"Failed to refresh Ollama models: {ex.Message}");
             }
         }
 
@@ -146,41 +145,41 @@ namespace VPetLLM
 
         private void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e)
         {
-            if (_plugin.ChatCore is Core.OpenAIChatCore openAICore)
+            try
             {
-                try
+                // 创建临时的OpenAIChatCore实例来获取模型列表
+                var openAISettings = new Setting.OpenAISetting
                 {
-                    ComboBox_OpenAIModel.ItemsSource = openAICore.GetModels();
-                    Logger.Log("OpenAI models refreshed.");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Failed to refresh OpenAI models: {ex.Message}");
-                }
+                    ApiKey = TextBox_OpenAIApiKey.Text,
+                    Url = TextBox_OpenAIUrl.Text
+                };
+                var openAICore = new Core.OpenAIChatCore(openAISettings);
+                ComboBox_OpenAIModel.ItemsSource = openAICore.GetModels();
+                Logger.Log("OpenAI models refreshed.");
             }
-            else
+            catch (Exception ex)
             {
-                Logger.Log("Cannot refresh OpenAI models: chat core is not OpenAI.");
+                Logger.Log($"Failed to refresh OpenAI models: {ex.Message}");
             }
         }
 
         private void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
         {
-            if (_plugin.ChatCore is Core.GeminiChatCore geminiCore)
+            try
             {
-                try
+                // 创建临时的GeminiChatCore实例来获取模型列表
+                var geminiSettings = new Setting.GeminiSetting
                 {
-                    ComboBox_GeminiModel.ItemsSource = geminiCore.GetModels();
-                    Logger.Log("Gemini models refreshed.");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Failed to refresh Gemini models: {ex.Message}");
-                }
+                    ApiKey = TextBox_GeminiApiKey.Text,
+                    Url = TextBox_GeminiUrl.Text
+                };
+                var geminiCore = new Core.GeminiChatCore(geminiSettings);
+                ComboBox_GeminiModel.ItemsSource = geminiCore.GetModels();
+                Logger.Log("Gemini models refreshed.");
             }
-            else
+            catch (Exception ex)
             {
-                Logger.Log("Cannot refresh Gemini models: chat core is not Gemini.");
+                Logger.Log($"Failed to refresh Gemini models: {ex.Message}");
             }
         }
 
