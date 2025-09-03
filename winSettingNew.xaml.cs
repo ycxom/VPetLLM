@@ -74,7 +74,8 @@ namespace VPetLLM
                     Logger.Log("Chat core set to Gemini.");
                     break;
             }
-            Close();
+            // 保存后不关闭界面，方便调试
+            Logger.Log("Settings saved successfully. Window remains open for debugging.");
         }
 
         private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e)
