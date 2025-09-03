@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
-namespace VPetLLM
+namespace VPetLLM.Core
 {
     public class OllamaChatCore : ChatCoreBase
     {

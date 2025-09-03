@@ -16,21 +16,22 @@ namespace VPetLLM
         public TalkBox(VPetLLM plugin) : base(plugin)
         {
             _plugin = plugin;
+            Logger.Log("TalkBox created.");
         }
 
-        public override void Responded(string text)
+        public override async void Responded(string text)
         {
+            Logger.Log($"Responded called with text: {text}");
             try
             {
-                Task.Run(async () =>
-                {
-                    var response = await _plugin.ChatCore.Chat(text);
-                    Application.Current.Dispatcher.Invoke(() => _plugin.MW.Main.Say(response));
-                });
+                var response = await Task.Run(() => _plugin.ChatCore.Chat(text));
+                Logger.Log($"Chat core responded: {response}");
+                Application.Current.Dispatcher.Invoke(() => _plugin.MW.Main.Say(response));
             }
             catch (Exception e)
             {
-                Application.Current.Dispatcher.Invoke(() => _plugin.MW.Main.Say(e.Message));
+                Logger.Log($"An error occurred in Responded: {e}");
+                Application.Current.Dispatcher.Invoke(() => _plugin.MW.Main.Say(e.ToString()));
             }
         }
 
