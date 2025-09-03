@@ -30,6 +30,7 @@ namespace VPetLLM
             TextBox_OpenAIUrl.Text = _plugin.Settings.OpenAI.Url;
             TextBox_GeminiApiKey.Text = _plugin.Settings.Gemini.ApiKey;
             TextBox_GeminiModel.Text = _plugin.Settings.Gemini.Model;
+            TextBox_GeminiUrl.Text = _plugin.Settings.Gemini.Url;
             UpdateProviderVisibility();
             Logger.Log("Settings loaded.");
         }
@@ -45,6 +46,7 @@ namespace VPetLLM
             _plugin.Settings.OpenAI.Url = TextBox_OpenAIUrl.Text;
             _plugin.Settings.Gemini.ApiKey = TextBox_GeminiApiKey.Text;
             _plugin.Settings.Gemini.Model = TextBox_GeminiModel.Text;
+            _plugin.Settings.Gemini.Url = TextBox_GeminiUrl.Text;
             _plugin.Settings.Save();
             Logger.Log("Settings saved to file.");
             _plugin.ChatCore = null;

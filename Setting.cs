@@ -45,6 +45,7 @@ namespace VPetLLM
         {
             public string? ApiKey { get; set; }
             public string Model { get; set; } = "gemini-pro";
+            public string Url { get; set; } = "https://generativelanguage.googleapis.com";
         }
 
         public enum LLMType

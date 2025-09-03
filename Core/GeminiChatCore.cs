@@ -26,7 +26,7 @@ namespace VPetLLM.Core
                 contents = History.Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } })
             };
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{_geminiSetting.Model}:generateContent?key={_geminiSetting.ApiKey}";
+            var url = $"{_geminiSetting.Url}/v1beta/models/{_geminiSetting.Model}:generateContent?key={_geminiSetting.ApiKey}";
             var response = await _httpClient.PostAsync(url, content);
             response.EnsureSuccessStatusCode();
             var responseString = await response.Content.ReadAsStringAsync();
