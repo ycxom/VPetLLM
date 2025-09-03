@@ -183,7 +183,10 @@ namespace VPetLLM
         {
             if (ComboBox_Provider.SelectedItem == null) return;
 
-            switch ((Setting.LLMType)ComboBox_Provider.SelectedItem)
+            // 保存当前选择的提供商
+            var currentProvider = (Setting.LLMType)ComboBox_Provider.SelectedItem;
+
+            switch (currentProvider)
             {
                 case Setting.LLMType.Ollama:
                     _plugin.Settings.Ollama = new Setting.OllamaSetting();
@@ -198,7 +201,35 @@ namespace VPetLLM
                     Logger.Log("Gemini settings restored to defaults.");
                     break;
             }
-            LoadSettings();
+            
+            // 重新加载设置但不重新设置提供商选择
+            LoadSettingsWithoutChangingProvider(currentProvider);
+        }
+
+        private void LoadSettingsWithoutChangingProvider(Setting.LLMType currentProvider)
+        {
+            Logger.Log("Loading settings without changing provider.");
+            
+            // 只更新特定提供商的设置，不改变当前选择的提供商
+            TextBox_OllamaUrl.Text = _plugin.Settings.Ollama.Url;
+            ComboBox_OllamaModel.Text = _plugin.Settings.Ollama.Model;
+            if (_plugin.ChatCore is Core.OllamaChatCore ollamaCore)
+            {
+                ComboBox_OllamaModel.ItemsSource = ollamaCore.GetModels();
+            }
+            
+            TextBox_OpenAIApiKey.Text = _plugin.Settings.OpenAI.ApiKey;
+            ComboBox_OpenAIModel.Text = _plugin.Settings.OpenAI.Model;
+            TextBox_OpenAIUrl.Text = _plugin.Settings.OpenAI.Url;
+            
+            TextBox_GeminiApiKey.Text = _plugin.Settings.Gemini.ApiKey;
+            ComboBox_GeminiModel.Text = _plugin.Settings.Gemini.Model;
+            TextBox_GeminiUrl.Text = _plugin.Settings.Gemini.Url;
+            
+            // 保持当前选择的提供商不变
+            ComboBox_Provider.SelectedItem = currentProvider;
+            UpdateProviderVisibility();
+            Logger.Log("Settings loaded without changing provider.");
         }
     }
 }
