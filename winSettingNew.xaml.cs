@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using LinePutScript.Localization.WPF;
 using VPetLLM.Core;
 
 namespace VPetLLM
@@ -13,6 +14,10 @@ namespace VPetLLM
         {
             _plugin = plugin;
             InitializeComponent();
+            
+            // 跟随VPet的语言设置
+            // LocalizeCore 方法需要进一步调查正确用法
+            
             Logger.Log("Setting window opened.");
             ComboBox_Provider.ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
             LogBox.ItemsSource = Logger.Logs;

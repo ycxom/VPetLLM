@@ -4,8 +4,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VPetLLM"
+
         mc:Ignorable="d"
-        Title="VPetLLM Settings" Height="450" Width="800">
+        Title="VPetLLM" Height="450" Width="800">
     <Grid Margin="10">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -13,10 +14,10 @@
         </Grid.ColumnDefinitions>
 
         <StackPanel Grid.Column="0" Margin="0,0,10,0">
-            <Label Content="LLM Provider"/>
+            <Label Content="LLM 提供商"/>
             <ComboBox x:Name="ComboBox_Provider" Margin="0,0,0,10" SelectionChanged="ComboBox_Provider_SelectionChanged"/>
-            <Button Content="Save" HorizontalAlignment="Right" Click="Button_Save_Click" Margin="0,0,5,0"/>
-            <Button Content="Restore Defaults" HorizontalAlignment="Right" Click="Button_RestoreDefaults_Click"/>
+            <Button Content="保存" HorizontalAlignment="Right" Click="Button_Save_Click" Margin="0,0,5,0"/>
+            <Button Content="恢复默认设置" HorizontalAlignment="Right" Click="Button_RestoreDefaults_Click"/>
         </StackPanel>
 
         <Grid Grid.Column="1">
@@ -26,65 +27,65 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0">
-                <GroupBox x:Name="Grid_Ollama" Header="Ollama Settings" Visibility="Collapsed">
+                <GroupBox x:Name="Grid_Ollama" Header="Ollama 设置" Visibility="Collapsed">
                     <StackPanel>
                         <Label Content="URL"/>
                         <TextBox x:Name="TextBox_OllamaUrl"/>
-                        <Label Content="Model"/>
+                        <Label Content="模型"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="ComboBox_OllamaModel" Grid.Column="0" IsEditable="True"/>
-                            <Button x:Name="Button_RefreshOllamaModels" Grid.Column="1" Content="Refresh" Click="Button_RefreshOllamaModels_Click" Margin="5,0,0,0"/>
+                            <Button x:Name="Button_RefreshOllamaModels" Grid.Column="1" Content="刷新" Click="Button_RefreshOllamaModels_Click" Margin="5,0,0,0"/>
                         </Grid>
                     </StackPanel>
                 </GroupBox>
 
-                <GroupBox x:Name="Grid_OpenAI" Header="OpenAI Settings" Visibility="Collapsed">
+                <GroupBox x:Name="Grid_OpenAI" Header="OpenAI 设置" Visibility="Collapsed">
                     <StackPanel>
-                        <Label Content="API Key"/>
+                        <Label Content="API 密钥"/>
                         <TextBox x:Name="TextBox_OpenAIApiKey"/>
-                        <Label Content="Model"/>
+                        <Label Content="模型"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="ComboBox_OpenAIModel" Grid.Column="0" IsEditable="True"/>
-                            <Button x:Name="Button_RefreshOpenAIModels" Grid.Column="1" Content="Refresh" Click="Button_RefreshOpenAIModels_Click" Margin="5,0,0,0"/>
+                            <Button x:Name="Button_RefreshOpenAIModels" Grid.Column="1" Content="刷新" Click="Button_RefreshOpenAIModels_Click" Margin="5,0,0,0"/>
                         </Grid>
-                        <Label Content="API Url"/>
+                        <Label Content="API 地址"/>
                         <TextBox x:Name="TextBox_OpenAIUrl"/>
                     </StackPanel>
                 </GroupBox>
 
-                <GroupBox x:Name="Grid_Gemini" Header="Gemini Settings" Visibility="Collapsed">
+                <GroupBox x:Name="Grid_Gemini" Header="Gemini 设置" Visibility="Collapsed">
                     <StackPanel>
-                        <Label Content="API Key"/>
+                        <Label Content="API 密钥"/>
                         <TextBox x:Name="TextBox_GeminiApiKey"/>
-                        <Label Content="Model"/>
+                        <Label Content="模型"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="ComboBox_GeminiModel" Grid.Column="0" IsEditable="True"/>
-                            <Button x:Name="Button_RefreshGeminiModels" Grid.Column="1" Content="Refresh" Click="Button_RefreshGeminiModels_Click" Margin="5,0,0,0"/>
+                            <Button x:Name="Button_RefreshGeminiModels" Grid.Column="1" Content="刷新" Click="Button_RefreshGeminiModels_Click" Margin="5,0,0,0"/>
                         </Grid>
-                        <Label Content="API Url"/>
+                        <Label Content="API 地址"/>
                         <TextBox x:Name="TextBox_GeminiUrl"/>
-                        <TextBlock Text="Note: Please provide the full API endpoint URL, including the model and API key." TextWrapping="Wrap" Foreground="Gray"/>
+                        <TextBlock Text="注意：请提供正确的 API 端点 URL。" TextWrapping="Wrap" Foreground="Gray"/>
                     </StackPanel>
                 </GroupBox>
             </StackPanel>
 
-            <GroupBox Header="Logs" Grid.Row="1" Margin="0,10,0,0">
+            <GroupBox Header="日志" Grid.Row="1" Margin="0,10,0,0">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button x:Name="Button_CopyLog" Content="Copy" Click="Button_CopyLog_Click" Margin="5"/>
-                        <Button x:Name="Button_ClearLog" Content="Clear" Click="Button_ClearLog_Click" Margin="5"/>
+                        <Button x:Name="Button_CopyLog" Content="复制" Click="Button_CopyLog_Click" Margin="5"/>
+                        <Button x:Name="Button_ClearLog" Content="清空" Click="Button_ClearLog_Click" Margin="5"/>
                     </StackPanel>
                     <ListBox x:Name="LogBox"/>
                 </DockPanel>

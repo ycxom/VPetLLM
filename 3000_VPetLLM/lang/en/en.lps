@@ -1,2 +1,14 @@
 VPetLLM#VPetLLM:|
 VPetLLM_Description#VPetLLM_Description:|
+Settings#Settings:|
+API_Provider#API Provider:|
+API_Key#API Key:|
+API_Endpoint#API Endpoint:|
+Model#Model:|
+Temperature#Temperature:|
+Max_Tokens#Max Tokens:|
+Top_P#Top P:|
+Frequency_Penalty#Frequency Penalty:|
+Presence_Penalty#Presence Penalty:|
+Save#Save:|
+Restore_Defaults#Restore Defaults:|
