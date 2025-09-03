@@ -12,6 +12,7 @@ namespace VPetLLM.Core
         private readonly HttpClient _httpClient;
         private readonly Setting.GeminiSetting _geminiSetting;
         private readonly Setting _setting;
+        private bool _keepContext = true; // 默认保持上下文
 
         public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting)
         {
@@ -20,8 +21,23 @@ namespace VPetLLM.Core
             _httpClient = new HttpClient();
         }
 
+        /// <summary>
+        /// 设置是否保持上下文
+        /// </summary>
+        public void SetContextMode(bool keepContext)
+        {
+            _keepContext = keepContext;
+        }
+
+
+
         public override async Task<string> Chat(string prompt)
         {
+            // 根据上下文设置决定是否保留历史
+            if (!_keepContext)
+            {
+                ClearContext();
+            }
             History.Add(new Message { Role = "user", Content = prompt });
             
             // 使用dynamic类型来构建请求数据，避免匿名类型转换问题
@@ -94,7 +110,12 @@ namespace VPetLLM.Core
             var responseString = await response.Content.ReadAsStringAsync();
             var responseObject = JObject.Parse(responseString);
             var message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
-            History.Add(new Message { Role = "model", Content = message });
+            
+            // 根据上下文设置决定是否保留历史
+            if (_keepContext)
+            {
+                History.Add(new Message { Role = "model", Content = message });
+            }
             return message;
         }
 

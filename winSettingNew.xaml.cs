@@ -342,5 +342,18 @@ namespace VPetLLM
         {
             TextBlock_Ollama_TemperatureValue.Text = Slider_Ollama_Temperature.Value.ToString("F2");
         }
+
+        private void Button_ClearContext_Click(object sender, RoutedEventArgs e)
+        {
+            if (_plugin.ChatCore != null)
+            {
+                _plugin.ChatCore.ClearContext();
+                Logger.Log("Context cleared.");
+            }
+            else
+            {
+                Logger.Log("No active chat core to clear context.");
+            }
+        }
     }
 }

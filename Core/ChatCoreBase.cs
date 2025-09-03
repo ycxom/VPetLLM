@@ -25,6 +25,14 @@ namespace VPetLLM.Core
         {
             return new List<string>();
         }
+
+        /// <summary>
+        /// 清除聊天历史上下文
+        /// </summary>
+        public virtual void ClearContext()
+        {
+            History.RemoveAll(m => m.Role != "system"); // 保留系统角色消息
+        }
     }
 
     public class Message

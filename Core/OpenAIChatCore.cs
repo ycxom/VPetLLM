@@ -12,6 +12,7 @@ namespace VPetLLM.Core
         private readonly HttpClient _httpClient;
         private readonly Setting.OpenAISetting _openAISetting;
         private readonly Setting _setting;
+        private bool _keepContext = true; // 默认保持上下文
 
         public OpenAIChatCore(Setting.OpenAISetting openAISetting, Setting setting)
         {
@@ -21,6 +22,16 @@ namespace VPetLLM.Core
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {openAISetting.ApiKey}");
         }
 
+        /// <summary>
+        /// 设置是否保持上下文
+        /// </summary>
+        public void SetContextMode(bool keepContext)
+        {
+            _keepContext = keepContext;
+        }
+
+
+
         public override async Task<string> Chat(string prompt)
         {
             // 如果有角色设定，先添加系统消息
@@ -29,6 +40,11 @@ namespace VPetLLM.Core
                 History.Insert(0, new Message { Role = "system", Content = _setting.Role });
             }
             
+            // 根据上下文设置决定是否保留历史
+            if (!_keepContext)
+            {
+                ClearContext();
+            }
             History.Add(new Message { Role = "user", Content = prompt });
             // 构建请求数据，根据启用开关决定是否包含高级参数
             object data;
@@ -70,7 +86,11 @@ namespace VPetLLM.Core
             var responseString = await response.Content.ReadAsStringAsync();
             var responseObject = JObject.Parse(responseString);
             var message = responseObject["choices"][0]["message"]["content"].ToString();
-            History.Add(new Message { Role = "assistant", Content = message });
+            // 根据上下文设置决定是否保留历史
+            if (_keepContext)
+            {
+                History.Add(new Message { Role = "assistant", Content = message });
+            }
             return message;
         }
 

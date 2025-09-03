@@ -15,6 +15,7 @@ namespace VPetLLM.Core
         private readonly HttpClient _httpClient;
         private readonly Setting.OllamaSetting _ollamaSetting;
         private readonly Setting _setting;
+        private bool _keepContext = true; // 默认保持上下文
 
         public OllamaChatCore(Setting.OllamaSetting ollamaSetting, Setting setting)
         {
@@ -26,6 +27,16 @@ namespace VPetLLM.Core
             };
         }
 
+        /// <summary>
+        /// 设置是否保持上下文
+        /// </summary>
+        public void SetContextMode(bool keepContext)
+        {
+            _keepContext = keepContext;
+        }
+
+
+
         public override async Task<string> Chat(string prompt)
         {
             // 检查并添加系统角色消息
@@ -34,6 +45,11 @@ namespace VPetLLM.Core
                 History.Insert(0, new Message { Role = "system", Content = _setting.Role });
             }
             
+            // 根据上下文设置决定是否保留历史
+            if (!_keepContext)
+            {
+                ClearContext();
+            }
             History.Add(new Message { Role = "user", Content = prompt });
             var data = new
             {
@@ -52,7 +68,11 @@ namespace VPetLLM.Core
             var responseString = await response.Content.ReadAsStringAsync();
             var responseObject = JObject.Parse(responseString);
             var message = responseObject["message"]["content"].ToString();
-            History.Add(new Message { Role = "assistant", Content = message });
+            // 根据上下文设置决定是否保留历史
+            if (_keepContext)
+            {
+                History.Add(new Message { Role = "assistant", Content = message });
+            }
             return message;
         }
 

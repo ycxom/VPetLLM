@@ -11,5 +11,9 @@ namespace VPetLLM
         void SaveHistory();
         void LoadHistory();
         List<string> GetModels();
+        /// <summary>
+        /// 清除聊天历史上下文
+        /// </summary>
+        void ClearContext();
     }
 }
