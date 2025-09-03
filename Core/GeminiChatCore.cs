@@ -11,26 +11,58 @@ namespace VPetLLM.Core
         public override string Name => "Gemini";
         private readonly HttpClient _httpClient;
         private readonly Setting.GeminiSetting _geminiSetting;
+        private readonly Setting _setting;
 
-        public GeminiChatCore(Setting.GeminiSetting geminiSetting)
+        public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting)
         {
             _geminiSetting = geminiSetting;
+            _setting = setting;
             _httpClient = new HttpClient();
         }
 
         public override async Task<string> Chat(string prompt)
         {
             History.Add(new Message { Role = "user", Content = prompt });
-            var data = new
+            
+            // 使用dynamic类型来构建请求数据，避免匿名类型转换问题
+            dynamic requestData;
+            
+            if (!string.IsNullOrEmpty(_setting.Role))
             {
-                contents = History.Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
-                generationConfig = new
+                // 有角色设置时，包含systemInstruction字段
+                requestData = new
                 {
-                    maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
-                    temperature = _geminiSetting.EnableAdvanced ? _geminiSetting.Temperature : 0.8
-                }
-            };
-            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                    contents = History
+                        .Where(m => m.Role != "system")
+                        .Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
+                    generationConfig = new
+                    {
+                        maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
+                        temperature = _geminiSetting.EnableAdvanced ? _geminiSetting.Temperature : 0.8
+                    },
+                    systemInstruction = new
+                    {
+                        parts = new[] { new { text = _setting.Role } }
+                    }
+                };
+            }
+            else
+            {
+                // 没有角色设置时，不包含systemInstruction字段
+                requestData = new
+                {
+                    contents = History
+                        .Where(m => m.Role != "system")
+                        .Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
+                    generationConfig = new
+                    {
+                        maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
+                        temperature = _geminiSetting.EnableAdvanced ? _geminiSetting.Temperature : 0.8
+                    }
+                };
+            }
+            
+            var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
             
             // 构建正确的Gemini API端点：使用模型名称和generateContent方法
             var baseUrl = _geminiSetting.Url.TrimEnd('/');

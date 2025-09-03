@@ -11,16 +11,24 @@ namespace VPetLLM.Core
         public override string Name => "OpenAI";
         private readonly HttpClient _httpClient;
         private readonly Setting.OpenAISetting _openAISetting;
+        private readonly Setting _setting;
 
-        public OpenAIChatCore(Setting.OpenAISetting openAISetting)
+        public OpenAIChatCore(Setting.OpenAISetting openAISetting, Setting setting)
         {
             _openAISetting = openAISetting;
+            _setting = setting;
             _httpClient = new HttpClient();
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {openAISetting.ApiKey}");
         }
 
         public override async Task<string> Chat(string prompt)
         {
+            // 如果有角色设定，先添加系统消息
+            if (!string.IsNullOrEmpty(_setting.Role) && !History.Any(m => m.Role == "system"))
+            {
+                History.Insert(0, new Message { Role = "system", Content = _setting.Role });
+            }
+            
             History.Add(new Message { Role = "user", Content = prompt });
             // 构建请求数据，根据启用开关决定是否包含高级参数
             object data;

@@ -14,10 +14,12 @@ namespace VPetLLM.Core
         public override string Name => "Ollama";
         private readonly HttpClient _httpClient;
         private readonly Setting.OllamaSetting _ollamaSetting;
+        private readonly Setting _setting;
 
-        public OllamaChatCore(Setting.OllamaSetting ollamaSetting)
+        public OllamaChatCore(Setting.OllamaSetting ollamaSetting, Setting setting)
         {
             _ollamaSetting = ollamaSetting;
+            _setting = setting;
             _httpClient = new HttpClient()
             {
                 BaseAddress = new System.Uri(ollamaSetting.Url)
@@ -26,6 +28,12 @@ namespace VPetLLM.Core
 
         public override async Task<string> Chat(string prompt)
         {
+            // 检查并添加系统角色消息
+            if (!string.IsNullOrEmpty(_setting.Role) && !History.Any(m => m.Role == "system"))
+            {
+                History.Insert(0, new Message { Role = "system", Content = _setting.Role });
+            }
+            
             History.Add(new Message { Role = "user", Content = prompt });
             var data = new
             {

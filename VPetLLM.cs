@@ -23,15 +23,15 @@ namespace VPetLLM
             switch (Settings.Provider)
             {
                 case global::VPetLLM.Setting.LLMType.Ollama:
-                    ChatCore = new OllamaChatCore(Settings.Ollama);
+                    ChatCore = new OllamaChatCore(Settings.Ollama, Settings);
                     Logger.Log("Chat core set to Ollama.");
                     break;
                 case global::VPetLLM.Setting.LLMType.OpenAI:
-                    ChatCore = new OpenAIChatCore(Settings.OpenAI);
+                    ChatCore = new OpenAIChatCore(Settings.OpenAI, Settings);
                     Logger.Log("Chat core set to OpenAI.");
                     break;
                 case global::VPetLLM.Setting.LLMType.Gemini:
-                    ChatCore = new GeminiChatCore(Settings.Gemini);
+                    ChatCore = new GeminiChatCore(Settings.Gemini, Settings);
                     Logger.Log("Chat core set to Gemini.");
                     break;
             }

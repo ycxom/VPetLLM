@@ -58,11 +58,17 @@ namespace VPetLLM
             TextBlock_Gemini_TemperatureValue.Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
             TextBox_Gemini_MaxTokens.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
             
+            // 加载角色设定
+            TextBox_Role.Text = _plugin.Settings.Role;
+            
             // 初始化Ollama高级配置
             CheckBox_Ollama_EnableAdvanced.IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
             Slider_Ollama_Temperature.Value = _plugin.Settings.Ollama.Temperature;
             TextBlock_Ollama_TemperatureValue.Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
             TextBox_Ollama_MaxTokens.Text = _plugin.Settings.Ollama.MaxTokens.ToString();
+            
+            // 加载角色设定
+            TextBox_Role.Text = _plugin.Settings.Role;
             
             // 尝试自动刷新Gemini模型列表
             try
@@ -72,7 +78,7 @@ namespace VPetLLM
                     ApiKey = TextBox_GeminiApiKey.Text,
                     Url = TextBox_GeminiUrl.Text
                 };
-                var geminiCore = new Core.GeminiChatCore(geminiSettings);
+                var geminiCore = new Core.GeminiChatCore(geminiSettings, _plugin.Settings);
                 ComboBox_GeminiModel.ItemsSource = geminiCore.GetModels();
             }
             catch
@@ -120,21 +126,24 @@ namespace VPetLLM
                 _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
             }
             
+            // 保存角色设定
+            _plugin.Settings.Role = TextBox_Role.Text;
+            
             _plugin.Settings.Save();
             Logger.Log("Settings saved to file.");
             _plugin.ChatCore = null;
             switch (_plugin.Settings.Provider)
             {
                 case Setting.LLMType.Ollama:
-                    _plugin.ChatCore = new Core.OllamaChatCore(_plugin.Settings.Ollama);
+                    _plugin.ChatCore = new Core.OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings);
                     Logger.Log("Chat core set to Ollama.");
                     break;
                 case Setting.LLMType.OpenAI:
-                    _plugin.ChatCore = new Core.OpenAIChatCore(_plugin.Settings.OpenAI);
+                    _plugin.ChatCore = new Core.OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings);
                     Logger.Log("Chat core set to OpenAI.");
                     break;
                 case Setting.LLMType.Gemini:
-                    _plugin.ChatCore = new Core.GeminiChatCore(_plugin.Settings.Gemini);
+                    _plugin.ChatCore = new Core.GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings);
                     Logger.Log("Chat core set to Gemini.");
                     break;
             }
@@ -185,7 +194,7 @@ namespace VPetLLM
                 {
                     Url = TextBox_OllamaUrl.Text
                 };
-                var ollamaCore = new Core.OllamaChatCore(ollamaSettings);
+                var ollamaCore = new Core.OllamaChatCore(ollamaSettings, _plugin.Settings);
                 ComboBox_OllamaModel.ItemsSource = ollamaCore.GetModels();
                 Logger.Log("Ollama models refreshed.");
             }
@@ -218,7 +227,7 @@ namespace VPetLLM
                     ApiKey = TextBox_OpenAIApiKey.Text,
                     Url = TextBox_OpenAIUrl.Text
                 };
-                var openAICore = new Core.OpenAIChatCore(openAISettings);
+                var openAICore = new Core.OpenAIChatCore(openAISettings, _plugin.Settings);
                 ComboBox_OpenAIModel.ItemsSource = openAICore.GetModels();
                 Logger.Log("OpenAI models refreshed.");
             }
@@ -238,7 +247,7 @@ namespace VPetLLM
                     ApiKey = TextBox_GeminiApiKey.Text,
                     Url = TextBox_GeminiUrl.Text
                 };
-                var geminiCore = new Core.GeminiChatCore(geminiSettings);
+                var geminiCore = new Core.GeminiChatCore(geminiSettings, _plugin.Settings);
                 ComboBox_GeminiModel.ItemsSource = geminiCore.GetModels();
                 Logger.Log("Gemini models refreshed.");
             }
