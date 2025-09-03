@@ -38,8 +38,37 @@ namespace VPetLLM.Core
 
         public override List<string> GetModels()
         {
-            var url = new System.Uri(new System.Uri(_geminiSetting.Url), $"/v1beta/models?key={_geminiSetting.ApiKey}");
-            var response = _httpClient.GetAsync(url).Result;
+            // 处理反向代理地址：如果URL已经是完整的端点，直接使用；否则添加标准路径
+            string requestUrl;
+            if (_geminiSetting.Url.Contains("/models") || _geminiSetting.Url.Contains("key="))
+            {
+                // URL已经是完整的请求地址
+                requestUrl = _geminiSetting.Url;
+                if (!requestUrl.Contains("key=") && !string.IsNullOrEmpty(_geminiSetting.ApiKey))
+                {
+                    requestUrl += requestUrl.Contains("?") ? "&" : "?";
+                    requestUrl += $"key={_geminiSetting.ApiKey}";
+                }
+            }
+            else
+            {
+                // 标准Google Gemini API路径
+                var baseUrl = _geminiSetting.Url.TrimEnd('/');
+                
+                // 如果URL不包含v1或v1beta后缀，自动添加/v1beta
+                if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
+                {
+                    baseUrl += "/v1beta";
+                }
+                
+                requestUrl = $"{baseUrl}/models";
+                if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
+                {
+                    requestUrl += $"?key={_geminiSetting.ApiKey}";
+                }
+            }
+            
+            var response = _httpClient.GetAsync(requestUrl).Result;
             response.EnsureSuccessStatusCode();
             var responseString = response.Content.ReadAsStringAsync().Result;
             JObject responseObject;
