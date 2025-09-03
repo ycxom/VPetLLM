@@ -36,5 +36,28 @@ namespace VPetLLM.Core
             History.Add(new Message { Role = "assistant", Content = message });
             return message;
         }
+
+        public override List<string> GetModels()
+        {
+            var url = new System.Uri(new System.Uri(_openAISetting.Url), "/v1/models");
+            var response = _httpClient.GetAsync(url).Result;
+            response.EnsureSuccessStatusCode();
+            var responseString = response.Content.ReadAsStringAsync().Result;
+            JObject responseObject;
+            try
+            {
+                responseObject = JObject.Parse(responseString);
+            }
+            catch (JsonReaderException)
+            {
+                throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
+            }
+            var models = new List<string>();
+            foreach (var model in responseObject["data"])
+            {
+                models.Add(model["id"].ToString());
+            }
+            return models;
+        }
     }
 }

@@ -48,7 +48,15 @@ namespace VPetLLM.Core
             var response = _httpClient.GetAsync("/api/tags").Result;
             response.EnsureSuccessStatusCode();
             var responseString = response.Content.ReadAsStringAsync().Result;
-            var responseObject = JObject.Parse(responseString);
+            JObject responseObject;
+            try
+            {
+                responseObject = JObject.Parse(responseString);
+            }
+            catch (JsonReaderException)
+            {
+                throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
+            }
             var models = new List<string>();
             foreach (var model in responseObject["models"])
             {

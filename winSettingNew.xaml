@@ -30,7 +30,14 @@
                         <Label Content="URL"/>
                         <TextBox x:Name="TextBox_OllamaUrl"/>
                         <Label Content="Model"/>
-                        <ComboBox x:Name="ComboBox_OllamaModel"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="ComboBox_OllamaModel" Grid.Column="0" IsEditable="True"/>
+                            <Button x:Name="Button_RefreshOllamaModels" Grid.Column="1" Content="Refresh" Click="Button_RefreshOllamaModels_Click" Margin="5,0,0,0"/>
+                        </Grid>
                     </StackPanel>
                 </GroupBox>
 
@@ -39,7 +46,14 @@
                         <Label Content="API Key"/>
                         <TextBox x:Name="TextBox_OpenAIApiKey"/>
                         <Label Content="Model"/>
-                        <TextBox x:Name="TextBox_OpenAIModel"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="ComboBox_OpenAIModel" Grid.Column="0" IsEditable="True"/>
+                            <Button x:Name="Button_RefreshOpenAIModels" Grid.Column="1" Content="Refresh" Click="Button_RefreshOpenAIModels_Click" Margin="5,0,0,0"/>
+                        </Grid>
                         <Label Content="API Url"/>
                         <TextBox x:Name="TextBox_OpenAIUrl"/>
                     </StackPanel>
@@ -50,15 +64,29 @@
                         <Label Content="API Key"/>
                         <TextBox x:Name="TextBox_GeminiApiKey"/>
                         <Label Content="Model"/>
-                        <TextBox x:Name="TextBox_GeminiModel"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="ComboBox_GeminiModel" Grid.Column="0" IsEditable="True"/>
+                            <Button x:Name="Button_RefreshGeminiModels" Grid.Column="1" Content="Refresh" Click="Button_RefreshGeminiModels_Click" Margin="5,0,0,0"/>
+                        </Grid>
                         <Label Content="API Url"/>
                         <TextBox x:Name="TextBox_GeminiUrl"/>
+                        <TextBlock Text="Note: Please provide the full API endpoint URL, including the model and API key." TextWrapping="Wrap" Foreground="Gray"/>
                     </StackPanel>
                 </GroupBox>
             </StackPanel>
 
             <GroupBox Header="Logs" Grid.Row="1" Margin="0,10,0,0">
-                <ListBox x:Name="LogBox"/>
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="Button_CopyLog" Content="Copy" Click="Button_CopyLog_Click" Margin="5"/>
+                        <Button x:Name="Button_ClearLog" Content="Clear" Click="Button_ClearLog_Click" Margin="5"/>
+                    </StackPanel>
+                    <ListBox x:Name="LogBox"/>
+                </DockPanel>
             </GroupBox>
         </Grid>
     </Grid>
