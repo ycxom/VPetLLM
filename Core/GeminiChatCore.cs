@@ -15,6 +15,7 @@ namespace VPetLLM.Core
         private bool _keepContext = true; // 默认保持上下文
 
         public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting)
+            : base(setting)
         {
             _geminiSetting = geminiSetting;
             _setting = setting;
@@ -38,7 +39,10 @@ namespace VPetLLM.Core
             {
                 ClearContext();
             }
-            History.Add(new Message { Role = "user", Content = prompt });
+            else
+            {
+                History.Add(new Message { Role = "user", Content = prompt });
+            }
             
             // 使用dynamic类型来构建请求数据，避免匿名类型转换问题
             dynamic requestData;
@@ -114,7 +118,8 @@ namespace VPetLLM.Core
             // 根据上下文设置决定是否保留历史
             if (_keepContext)
             {
-                History.Add(new Message { Role = "model", Content = message });
+                // 使用标准化角色名称，而不是Gemini特有的"model"
+                History.Add(new Message { Role = "assistant", Content = message });
             }
             // 只有在保持上下文模式时才保存历史记录
             if (_keepContext)

@@ -18,6 +18,7 @@ namespace VPetLLM.Core
         private bool _keepContext = true; // 默认保持上下文
 
         public OllamaChatCore(Setting.OllamaSetting ollamaSetting, Setting setting)
+            : base(setting)
         {
             _ollamaSetting = ollamaSetting;
             _setting = setting;
@@ -50,7 +51,10 @@ namespace VPetLLM.Core
             {
                 ClearContext();
             }
-            History.Add(new Message { Role = "user", Content = prompt });
+            else
+            {
+                History.Add(new Message { Role = "user", Content = prompt });
+            }
             var data = new
             {
                 model = _ollamaSetting.Model,

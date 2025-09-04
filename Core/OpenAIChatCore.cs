@@ -15,11 +15,15 @@ namespace VPetLLM.Core
         private bool _keepContext = true; // 默认保持上下文
 
         public OpenAIChatCore(Setting.OpenAISetting openAISetting, Setting setting)
+            : base(setting)
         {
             _openAISetting = openAISetting;
             _setting = setting;
             _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {openAISetting.ApiKey}");
+            if (!string.IsNullOrEmpty(openAISetting.ApiKey))
+            {
+                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {openAISetting.ApiKey}");
+            }
         }
 
         /// <summary>
@@ -45,7 +49,10 @@ namespace VPetLLM.Core
             {
                 ClearContext();
             }
-            History.Add(new Message { Role = "user", Content = prompt });
+            else
+            {
+                History.Add(new Message { Role = "user", Content = prompt });
+            }
             // 构建请求数据，根据启用开关决定是否包含高级参数
             object data;
             if (_openAISetting.EnableAdvanced)

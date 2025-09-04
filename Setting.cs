@@ -10,6 +10,8 @@ namespace VPetLLM
         public OpenAISetting OpenAI { get; set; } = new OpenAISetting();
         public GeminiSetting Gemini { get; set; } = new GeminiSetting();
         public string Role { get; set; } = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回答用户的问题。";
+        public bool EnableChatHistory { get; set; } = true;
+        public bool SeparateChatByProvider { get; set; } = false;
 
         private readonly string _path;
 

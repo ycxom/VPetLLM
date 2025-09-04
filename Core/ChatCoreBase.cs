@@ -12,7 +12,13 @@ namespace VPetLLM.Core
     {
         public abstract string Name { get; }
         protected List<Message> History { get; } = new List<Message>();
+        protected Setting? Settings { get; }
         public abstract Task<string> Chat(string prompt);
+
+        protected ChatCoreBase(Setting? settings = null)
+        {
+            Settings = settings;
+        }
 
         public virtual void LoadHistory()
         {
@@ -22,16 +28,29 @@ namespace VPetLLM.Core
                 if (File.Exists(historyFile))
                 {
                     var json = File.ReadAllText(historyFile);
-                    var historyData = JsonConvert.DeserializeObject<Dictionary<string, List<Message>>>(json);
-                    if (historyData != null && historyData.TryGetValue(Name, out var messages) && messages != null)
+                    var messages = JsonConvert.DeserializeObject<List<Message>>(json);
+                    if (messages != null && messages.Count > 0)
                     {
                         // 先备份当前历史，防止加载失败时数据丢失
                         var backupHistory = new List<Message>(History);
                         try
                         {
+                            // 先创建新列表，验证数据有效性后再替换
+                            var newHistory = new List<Message>();
+                            var normalizedMessages = ChatHistoryCompatibility.NormalizeRoles(messages);
+                            newHistory.AddRange(normalizedMessages);
+                            
+                            // 验证通过后替换原历史记录
                             History.Clear();
-                            History.AddRange(messages);
-                            Logger.Log($"成功加载 {messages.Count} 条历史消息");
+                            History.AddRange(newHistory);
+                            
+                            Console.WriteLine($"成功加载 {messages.Count} 条历史消息（已标准化角色名称）");
+                            
+                            // 如果检测到角色不一致，自动修复历史文件
+                            if (ChatHistoryCompatibility.HasRoleInconsistencies(messages))
+                            {
+                                ChatHistoryCompatibility.FixRoleInconsistencies(historyFile);
+                            }
                         }
                         catch
                         {
@@ -43,22 +62,29 @@ namespace VPetLLM.Core
                     }
                     else
                     {
-                        Logger.Log($"未找到 {Name} 的历史记录或历史记录为空");
+                        Console.WriteLine("历史记录为空或格式不正确");
                     }
                 }
                 else
                 {
-                    Logger.Log($"历史文件不存在: {historyFile}");
+                    Console.WriteLine($"历史文件不存在: {historyFile}");
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"加载聊天历史失败: {ex.Message}");
+                Console.WriteLine($"加载聊天历史失败: {ex.Message}");
             }
         }
 
         public virtual void SaveHistory()
         {
+            // 检查是否启用了聊天历史保存功能
+            if (Settings != null && !Settings.EnableChatHistory)
+            {
+                Console.WriteLine("聊天历史保存功能已禁用，跳过保存");
+                return;
+            }
+            
             try
             {
                 var historyFile = GetHistoryFilePath();
@@ -68,54 +94,8 @@ namespace VPetLLM.Core
                     Directory.CreateDirectory(directory);
                 }
                 
-                // 首先确保完整读取现有文件内容
-                Dictionary<string, List<Message>> existingData = new Dictionary<string, List<Message>>();
-                if (File.Exists(historyFile))
-                {
-                    try
-                    {
-                        string fileContent = File.ReadAllText(historyFile);
-                        if (!string.IsNullOrWhiteSpace(fileContent))
-                        {
-                            var deserialized = JsonConvert.DeserializeObject<Dictionary<string, List<Message>>>(fileContent);
-                            if (deserialized != null)
-                            {
-                                existingData = deserialized;
-                            }
-                        }
-                    }
-                    catch (Exception readEx)
-                    {
-                        Logger.Log($"读取现有历史文件失败，将创建新文件: {readEx.Message}");
-                        // 继续使用空字典，不抛出异常
-                    }
-                }
-                
-                // 创建要保存的数据副本，确保不修改原始数据
-                var dataToSave = new Dictionary<string, List<Message>>();
-                
-                // 复制所有现有的提供商数据（除了当前要更新的）
-                foreach (var kvp in existingData)
-                {
-                    if (kvp.Key != Name && kvp.Value != null && kvp.Value.Count > 0)
-                    {
-                        dataToSave[kvp.Key] = new List<Message>(kvp.Value);
-                    }
-                }
-                
-                // 添加或更新当前提供商的数据
-                if (History.Count > 0)
-                {
-                    dataToSave[Name] = new List<Message>(History);
-                }
-                else
-                {
-                    // 如果当前历史为空，不保存该提供商的数据
-                    dataToSave.Remove(Name);
-                }
-                
-                // 序列化并保存
-                var json = JsonConvert.SerializeObject(dataToSave, Formatting.Indented);
+                // 直接保存当前历史列表
+                var json = JsonConvert.SerializeObject(History, Formatting.Indented);
                 
                 // 使用临时文件确保写入完整性
                 var tempFile = historyFile + ".tmp";
@@ -131,12 +111,12 @@ namespace VPetLLM.Core
                     File.Move(tempFile, historyFile);
                 }
                 
-                Logger.Log($"成功保存聊天历史到: {historyFile}");
-                Logger.Log($"保存了 {History.Count} 条消息，总共 {dataToSave.Count} 个提供商");
+                Console.WriteLine($"成功保存聊天历史到: {historyFile}");
+                Console.WriteLine($"保存了{History.Count} 条消息");
             }
             catch (Exception ex)
             {
-                Logger.Log($"保存聊天历史失败: {ex.Message}");
+                Console.WriteLine($"保存聊天历史失败: {ex.Message}");
             }
         }
 
@@ -150,7 +130,17 @@ namespace VPetLLM.Core
             // 向上查找包含data文件夹的Mod目录
             var modDataPath = FindModDataDirectory(currentDirectory);
             
-            return Path.Combine(modDataPath, "chat_history.json");
+            // 根据配置决定是否按提供商分离聊天记录
+            if (Settings != null && Settings.SeparateChatByProvider)
+            {
+                // 分离模式：每个提供商使用独立的文件
+                return Path.Combine(modDataPath, $"chat_history_{Name.ToLower()}.json");
+            }
+            else
+            {
+                // 统一模式：所有提供商使用同一个文件
+                return Path.Combine(modDataPath, "chat_history.json");
+            }
         }
         
         private string FindModDataDirectory(string startDirectory)
@@ -217,5 +207,94 @@ namespace VPetLLM.Core
     {
         public string? Role { get; set; }
         public string? Content { get; set; }
+        
+        /// <summary>
+        /// 标准化角色名称，确保不同提供商API的角色名称一致
+        /// </summary>
+        public string NormalizedRole 
+        { 
+            get 
+            {
+                return Role?.ToLower() switch
+                {
+                    "model" => "assistant",  // Gemini使用"model"，标准化为"assistant"
+                    _ => Role ?? "user"
+                };
+            }
+        }
+    }
+}
+
+// 聊天历史兼容化处理器（移到ChatCoreBase类外部）
+namespace VPetLLM.Core
+{
+    /// <summary>
+    /// 聊天历史兼容化处理器
+    /// </summary>
+    public static class ChatHistoryCompatibility
+    {
+        /// <summary>
+        /// 标准化消息角色，确保不同提供商API的角色名称一致
+        /// </summary>
+        public static List<Message> NormalizeRoles(List<Message> messages)
+        {
+            if (messages == null) return new List<Message>();
+            
+            return messages.Select(m => new Message 
+            { 
+                Role = m.Role?.ToLower() switch
+                {
+                    "model" => "assistant",  // Gemini使用"model"，标准化为"assistant"
+                    _ => m.Role
+                },
+                Content = m.Content
+            }).ToList();
+        }
+        
+        /// <summary>
+        /// 修复历史文件中的角色名称不一致问题
+        /// </summary>
+        public static void FixRoleInconsistencies(string historyFile)
+        {
+            if (!File.Exists(historyFile)) return;
+            
+            try
+            {
+                var json = File.ReadAllText(historyFile);
+                var messages = JsonConvert.DeserializeObject<List<Message>>(json);
+                
+                if (messages != null && messages.Count > 0)
+                {
+                    var normalizedMessages = NormalizeRoles(messages);
+                    
+                    // 只有在确实需要修复时才重写文件
+                    if (HasRoleInconsistencies(messages))
+                    {
+                        var normalizedJson = JsonConvert.SerializeObject(normalizedMessages, Formatting.Indented);
+                        
+                        // 使用临时文件确保写入完整性
+                        var tempFile = historyFile + ".fix.tmp";
+                        File.WriteAllText(tempFile, normalizedJson);
+                        
+                        // 原子替换
+                        File.Replace(tempFile, historyFile, null);
+                        
+                        Console.WriteLine($"已修复聊天历史文件中的角色不一致问题: {Path.GetFileName(historyFile)}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"修复角色不一致失败: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 检查是否存在角色名称不一致
+        /// </summary>
+        public static bool HasRoleInconsistencies(List<Message> messages)
+        {
+            return messages.Any(m => m.Role?.ToLower() == "model");
+        }
     }
 }

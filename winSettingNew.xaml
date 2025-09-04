@@ -22,6 +22,8 @@
             
             <Label Content="上下文控制" Margin="0,10,0,0"/>
             <CheckBox x:Name="CheckBox_KeepContext" Content="保持聊天上下文" Margin="0,0,0,5" IsChecked="True"/>
+            <CheckBox x:Name="CheckBox_EnableChatHistory" Content="保存聊天历史" Margin="0,0,0,5" IsChecked="True"/>
+            <CheckBox x:Name="CheckBox_SeparateChatByProvider" Content="按提供商分离聊天记录" Margin="0,0,0,5" IsChecked="True"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
                 <Button x:Name="Button_ClearContext" Content="清除上下文" Click="Button_ClearContext_Click" Margin="0,0,5,0"/>
                 <Button x:Name="Button_EditContext" Content="编辑上下文" Click="Button_EditContext_Click"/>

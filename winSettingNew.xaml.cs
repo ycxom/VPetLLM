@@ -63,14 +63,15 @@ namespace VPetLLM
             // 加载角色设定
             TextBox_Role.Text = _plugin.Settings.Role;
             
+            // 加载聊天历史保存设置
+            CheckBox_EnableChatHistory.IsChecked = _plugin.Settings.EnableChatHistory;
+            CheckBox_SeparateChatByProvider.IsChecked = _plugin.Settings.SeparateChatByProvider;
+            
             // 初始化Ollama高级配置
             CheckBox_Ollama_EnableAdvanced.IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
             Slider_Ollama_Temperature.Value = _plugin.Settings.Ollama.Temperature;
             TextBlock_Ollama_TemperatureValue.Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
             TextBox_Ollama_MaxTokens.Text = _plugin.Settings.Ollama.MaxTokens.ToString();
-            
-            // 加载角色设定
-            TextBox_Role.Text = _plugin.Settings.Role;
             
             // 不再自动刷新模型列表，改为用户手动刷新
             // 初始化时只显示空列表，用户需要手动点击刷新按钮
@@ -118,6 +119,11 @@ namespace VPetLLM
             
             // 保存角色设定
             _plugin.Settings.Role = TextBox_Role.Text;
+            
+            // 保存聊天历史保存设置
+            _plugin.Settings.EnableChatHistory = CheckBox_EnableChatHistory.IsChecked ?? true;
+            _plugin.Settings.SeparateChatByProvider = CheckBox_SeparateChatByProvider.IsChecked ?? true;
+
             
             _plugin.Settings.Save();
             Logger.Log("Settings saved to file.");
@@ -315,6 +321,10 @@ namespace VPetLLM
             Slider_Ollama_Temperature.Value = _plugin.Settings.Ollama.Temperature;
             TextBlock_Ollama_TemperatureValue.Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
             TextBox_Ollama_MaxTokens.Text = _plugin.Settings.Ollama.MaxTokens.ToString();
+            
+            // 加载聊天历史保存设置
+            CheckBox_EnableChatHistory.IsChecked = _plugin.Settings.EnableChatHistory;
+            CheckBox_SeparateChatByProvider.IsChecked = _plugin.Settings.SeparateChatByProvider;
             
             // 保持当前选择的提供商不变
             ComboBox_Provider.SelectedItem = currentProvider;
