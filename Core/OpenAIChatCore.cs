@@ -91,8 +91,11 @@ namespace VPetLLM.Core
             {
                 History.Add(new Message { Role = "assistant", Content = message });
             }
-            // 始终保存历史记录，无论上下文设置如何
-            SaveHistory();
+            // 只有在保持上下文模式时才保存历史记录
+            if (_keepContext)
+            {
+                SaveHistory();
+            }
             return message;
         }
 

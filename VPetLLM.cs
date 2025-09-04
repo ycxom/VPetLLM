@@ -35,6 +35,8 @@ namespace VPetLLM
                     Logger.Log("Chat core set to Gemini.");
                     break;
             }
+            // 加载聊天历史记录
+            ChatCore?.LoadHistory();
             Logger.Log("VPetLLM plugin constructor finished.");
         }
 
