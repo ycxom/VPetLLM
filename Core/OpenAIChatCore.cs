@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
+using VPet_Simulator.Windows.Interface;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,8 +13,8 @@ namespace VPetLLM.Core
         private readonly HttpClient _httpClient;
         private readonly Setting.OpenAISetting _openAISetting;
         private readonly Setting _setting;
-        public OpenAIChatCore(Setting.OpenAISetting openAISetting, Setting setting)
-            : base(setting)
+        public OpenAIChatCore(Setting.OpenAISetting openAISetting, Setting setting, IMainWindow mainWindow)
+            : base(setting, mainWindow)
         {
             _openAISetting = openAISetting;
             _setting = setting;
@@ -31,7 +32,7 @@ namespace VPetLLM.Core
             // 如果有角色设定，先添加系统消息
             if (!string.IsNullOrEmpty(_setting.Role) && !History.Any(m => m.Role == "system"))
             {
-                History.Insert(0, new Message { Role = "system", Content = _setting.Role });
+                History.Insert(0, new Message { Role = "system", Content = GetSystemMessage() });
             }
             
             // 根据上下文设置决定是否保留历史（使用基类的统一状态）

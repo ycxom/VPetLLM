@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.IO;
+using VPet_Simulator.Windows.Interface;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -15,8 +16,8 @@ namespace VPetLLM.Core
         private readonly HttpClient _httpClient;
         private readonly Setting.OllamaSetting _ollamaSetting;
         private readonly Setting _setting;
-        public OllamaChatCore(Setting.OllamaSetting ollamaSetting, Setting setting)
-            : base(setting)
+        public OllamaChatCore(Setting.OllamaSetting ollamaSetting, Setting setting, IMainWindow mainWindow)
+            : base(setting, mainWindow)
         {
             _ollamaSetting = ollamaSetting;
             _setting = setting;
@@ -33,7 +34,7 @@ namespace VPetLLM.Core
             // 检查并添加系统角色消息
             if (!string.IsNullOrEmpty(_setting.Role) && !History.Any(m => m.Role == "system"))
             {
-                History.Insert(0, new Message { Role = "system", Content = _setting.Role });
+                History.Insert(0, new Message { Role = "system", Content = GetSystemMessage() });
             }
             
             // 根据上下文设置决定是否保留历史（使用基类的统一状态）

@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
+using VPet_Simulator.Windows.Interface;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,8 +13,8 @@ namespace VPetLLM.Core
         private readonly HttpClient _httpClient;
         private readonly Setting.GeminiSetting _geminiSetting;
         private readonly Setting _setting;
-        public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting)
-            : base(setting)
+        public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting, IMainWindow mainWindow)
+            : base(setting, mainWindow)
         {
             _geminiSetting = geminiSetting;
             _setting = setting;
@@ -52,7 +53,7 @@ namespace VPetLLM.Core
                     },
                     systemInstruction = new
                     {
-                        parts = new[] { new { text = _setting.Role } }
+                        parts = new[] { new { text = GetSystemMessage() } }
                     }
                 };
             }

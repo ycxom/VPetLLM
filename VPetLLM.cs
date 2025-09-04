@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
+using VPetLLM.Handlers;
 
 namespace VPetLLM
 {
@@ -15,6 +16,7 @@ namespace VPetLLM
         public Setting Settings;
         public IChatCore? ChatCore;
         public TalkBox? TalkBox;
+        public ActionProcessor? ActionProcessor;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -25,15 +27,15 @@ namespace VPetLLM
             switch (Settings.Provider)
             {
                 case global::VPetLLM.Setting.LLMType.Ollama:
-                    ChatCore = new OllamaChatCore(Settings.Ollama, Settings);
+                    ChatCore = new OllamaChatCore(Settings.Ollama, Settings, mainwin);
                     Logger.Log("Chat core set to Ollama.");
                     break;
                 case global::VPetLLM.Setting.LLMType.OpenAI:
-                    ChatCore = new OpenAIChatCore(Settings.OpenAI, Settings);
+                    ChatCore = new OpenAIChatCore(Settings.OpenAI, Settings, mainwin);
                     Logger.Log("Chat core set to OpenAI.");
                     break;
                 case global::VPetLLM.Setting.LLMType.Gemini:
-                    ChatCore = new GeminiChatCore(Settings.Gemini, Settings);
+                    ChatCore = new GeminiChatCore(Settings.Gemini, Settings, mainwin);
                     Logger.Log("Chat core set to Gemini.");
                     break;
             }
@@ -45,6 +47,7 @@ namespace VPetLLM
         public override void LoadPlugin()
         {
             Logger.Log("LoadPlugin started.");
+            ActionProcessor = new ActionProcessor(MW);
             Application.Current.Dispatcher.Invoke(() =>
             {
                 Logger.Log("Dispatcher.Invoke started.");
@@ -105,7 +108,7 @@ namespace VPetLLM
         }
 
         public override string PluginName => "VPetLLM";
-
+        
         // 测试方法：验证当前ChatCore实例类型
         public string GetCurrentChatCoreInfo()
         {
