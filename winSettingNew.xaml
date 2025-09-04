@@ -143,6 +143,8 @@
                     <StackPanel Margin="20,0,0,0">
                         <CheckBox x:Name="CheckBox_EnableBuy" Content="允许宠物购买东西" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
                         <CheckBox x:Name="CheckBox_EnableState" Content="允许获取宠物状态" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
+                        <CheckBox x:Name="CheckBox_EnableActionExecution" Content="允许宠物执行动作" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
+                        <CheckBox x:Name="CheckBox_EnableMove" Content="允许宠物移动" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
                     </StackPanel>
                 </StackPanel>
             </TabItem>

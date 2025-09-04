@@ -19,6 +19,8 @@ namespace VPetLLM
         public bool EnableAction { get; set; } = true;
         public bool EnableBuy { get; set; } = true;
         public bool EnableState { get; set; } = true;
+        public bool EnableActionExecution { get; set; } = true;
+        public bool EnableMove { get; set; } = true;
 
         private readonly string _path;
 

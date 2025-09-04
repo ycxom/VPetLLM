@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using VPet_Simulator.Windows.Interface;
 using System.Linq;
+using System.Windows;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -31,11 +32,13 @@ namespace VPetLLM.Core
             }
 
             var instructions = new List<string>();
-            if (Settings.EnableAction)
+            if (Settings.EnableActionExecution)
             {
-                instructions.Add("Happy");
-                instructions.Add("Health");
-                instructions.Add("Exp");
+                instructions.Add("Action");
+            }
+            if (Settings.EnableMove)
+            {
+                instructions.Add("Move");
             }
             if (Settings.EnableBuy)
             {
@@ -46,7 +49,7 @@ namespace VPetLLM.Core
 
             if (instructions.Any())
             {
-                parts.Add($"可以在回答中通过特定指令来影响自身的状态，格式为[:指令(参数)]。可用指令:{string.Join(",", instructions)}。");
+                parts.Add($"你可以在回答中通过特定指令来影响我的状态，格式为[:指令(参数)]。可用指令:{string.Join(",", instructions)}。可用动作:TouchHead,TouchBody,Move,Sleep,Idel。");
             }
 
             return string.Join("\n", parts);

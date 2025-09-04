@@ -44,6 +44,8 @@ namespace VPetLLM
             CheckBox_EnableAction.IsChecked = _plugin.Settings.EnableAction;
             CheckBox_EnableBuy.IsChecked = _plugin.Settings.EnableBuy;
             CheckBox_EnableState.IsChecked = _plugin.Settings.EnableState;
+            CheckBox_EnableActionExecution.IsChecked = _plugin.Settings.EnableActionExecution;
+            CheckBox_EnableMove.IsChecked = _plugin.Settings.EnableMove;
             CheckBox_LogAutoScroll.IsChecked = _plugin.Settings.LogAutoScroll;
             TextBox_MaxLogCount.Text = _plugin.Settings.MaxLogCount.ToString();
             
@@ -89,6 +91,8 @@ namespace VPetLLM
             _plugin.Settings.EnableAction = CheckBox_EnableAction.IsChecked ?? true;
             _plugin.Settings.EnableBuy = CheckBox_EnableBuy.IsChecked ?? true;
             _plugin.Settings.EnableState = CheckBox_EnableState.IsChecked ?? true;
+            _plugin.Settings.EnableActionExecution = CheckBox_EnableActionExecution.IsChecked ?? true;
+            _plugin.Settings.EnableMove = CheckBox_EnableMove.IsChecked ?? true;
             _plugin.Settings.LogAutoScroll = CheckBox_LogAutoScroll.IsChecked ?? true;
             if (int.TryParse(TextBox_MaxLogCount.Text, out int maxLogCount))
                 _plugin.Settings.MaxLogCount = maxLogCount;

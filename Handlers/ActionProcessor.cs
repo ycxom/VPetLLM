@@ -23,6 +23,8 @@ namespace VPetLLM.Handlers
             _handlers.Add(new HealthHandler());
             _handlers.Add(new ExpHandler());
             _handlers.Add(new BuyHandler());
+            _handlers.Add(new ActionHandler());
+            _handlers.Add(new MoveHandler());
         }
 
         public string Process(string response, Setting settings)
@@ -43,7 +45,9 @@ namespace VPetLLM.Handlers
                     if (handler != null)
                     {
                         if (handler.Keyword == "buy" && !settings.EnableBuy) continue;
-                        
+                        if (handler.Keyword == "action" && !settings.EnableActionExecution) continue;
+                        if (handler.Keyword == "move" && !settings.EnableMove) continue;
+
                         if (int.TryParse(valueStr, out int intValue))
                         {
                             handler.Execute(intValue, _mainWindow);
