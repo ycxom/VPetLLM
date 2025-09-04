@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace VPetLLM.Core
 {
@@ -21,8 +22,8 @@ namespace VPetLLM.Core
                 if (File.Exists(historyFile))
                 {
                     var json = File.ReadAllText(historyFile);
-                    var messages = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Message>>(json);
-                    if (messages != null)
+                    var historyData = JsonConvert.DeserializeObject<Dictionary<string, List<Message>>>(json);
+                    if (historyData != null && historyData.TryGetValue(Name, out var messages))
                     {
                         History.Clear();
                         History.AddRange(messages);
@@ -46,8 +47,25 @@ namespace VPetLLM.Core
                     Directory.CreateDirectory(directory);
                 }
                 
-                var json = Newtonsoft.Json.JsonConvert.SerializeObject(History, Newtonsoft.Json.Formatting.Indented);
+                // 读取现有历史数据
+                Dictionary<string, List<Message>> historyData = new Dictionary<string, List<Message>>();
+                if (File.Exists(historyFile))
+                {
+                    var existingJson = File.ReadAllText(historyFile);
+                    historyData = JsonConvert.DeserializeObject<Dictionary<string, List<Message>>>(existingJson) 
+                        ?? new Dictionary<string, List<Message>>();
+                }
+                
+                // 更新当前提供商的历史
+                historyData[Name] = new List<Message>(History);
+                
+                // 保存所有提供商的历史
+                var json = JsonConvert.SerializeObject(historyData, Formatting.Indented);
                 File.WriteAllText(historyFile, json);
+                
+                // 添加调试日志
+                Logger.Log($"成功保存聊天历史到: {historyFile}");
+                Logger.Log($"保存了 {History.Count} 条消息");
             }
             catch (Exception ex)
             {

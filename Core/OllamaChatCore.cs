@@ -73,10 +73,15 @@ namespace VPetLLM.Core
             {
                 History.Add(new Message { Role = "assistant", Content = message });
             }
+            // 始终保存历史记录，无论上下文设置如何
+            SaveHistory();
             return message;
         }
 
-        public override List<string> GetModels()
+        /// <summary>
+        /// 手动刷新可用模型列表
+        /// </summary>
+        public List<string> RefreshModels()
         {
             var response = _httpClient.GetAsync("/api/tags").Result;
             response.EnsureSuccessStatusCode();
@@ -96,6 +101,12 @@ namespace VPetLLM.Core
                 models.Add(model["name"].ToString());
             }
             return models;
+        }
+
+        public override List<string> GetModels()
+        {
+            // 返回空列表，避免启动时自动扫描
+            return new List<string>();
         }
     }
 }

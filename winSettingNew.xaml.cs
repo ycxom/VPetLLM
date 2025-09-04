@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using LinePutScript.Localization.WPF;
@@ -37,7 +38,8 @@ namespace VPetLLM
             ComboBox_OllamaModel.Text = _plugin.Settings.Ollama.Model;
             if (_plugin.ChatCore is Core.OllamaChatCore ollamaCore)
             {
-                ComboBox_OllamaModel.ItemsSource = ollamaCore.GetModels();
+                // 不再自动获取模型列表，改为用户手动刷新
+                ComboBox_OllamaModel.ItemsSource = new List<string>();
             }
             TextBox_OpenAIApiKey.Text = _plugin.Settings.OpenAI.ApiKey;
             ComboBox_OpenAIModel.Text = _plugin.Settings.OpenAI.Model;
@@ -70,21 +72,9 @@ namespace VPetLLM
             // 加载角色设定
             TextBox_Role.Text = _plugin.Settings.Role;
             
-            // 尝试自动刷新Gemini模型列表
-            try
-            {
-                var geminiSettings = new Setting.GeminiSetting
-                {
-                    ApiKey = TextBox_GeminiApiKey.Text,
-                    Url = TextBox_GeminiUrl.Text
-                };
-                var geminiCore = new Core.GeminiChatCore(geminiSettings, _plugin.Settings);
-                ComboBox_GeminiModel.ItemsSource = geminiCore.GetModels();
-            }
-            catch
-            {
-                // 如果刷新失败，静默忽略，用户仍然可以手动刷新
-            }
+            // 不再自动刷新模型列表，改为用户手动刷新
+            // 初始化时只显示空列表，用户需要手动点击刷新按钮
+            ComboBox_GeminiModel.ItemsSource = new List<string>();
             UpdateProviderVisibility();
             Logger.Log("Settings loaded.");
         }
@@ -195,7 +185,8 @@ namespace VPetLLM
                     Url = TextBox_OllamaUrl.Text
                 };
                 var ollamaCore = new Core.OllamaChatCore(ollamaSettings, _plugin.Settings);
-                ComboBox_OllamaModel.ItemsSource = ollamaCore.GetModels();
+                var models = ollamaCore.RefreshModels();
+                ComboBox_OllamaModel.ItemsSource = models;
                 Logger.Log("Ollama models refreshed.");
             }
             catch (Exception ex)
@@ -228,7 +219,8 @@ namespace VPetLLM
                     Url = TextBox_OpenAIUrl.Text
                 };
                 var openAICore = new Core.OpenAIChatCore(openAISettings, _plugin.Settings);
-                ComboBox_OpenAIModel.ItemsSource = openAICore.GetModels();
+                var models = openAICore.RefreshModels();
+                ComboBox_OpenAIModel.ItemsSource = models;
                 Logger.Log("OpenAI models refreshed.");
             }
             catch (Exception ex)
@@ -248,7 +240,8 @@ namespace VPetLLM
                     Url = TextBox_GeminiUrl.Text
                 };
                 var geminiCore = new Core.GeminiChatCore(geminiSettings, _plugin.Settings);
-                ComboBox_GeminiModel.ItemsSource = geminiCore.GetModels();
+                var models = geminiCore.RefreshModels();
+                ComboBox_GeminiModel.ItemsSource = models;
                 Logger.Log("Gemini models refreshed.");
             }
             catch (Exception ex)
@@ -293,7 +286,8 @@ namespace VPetLLM
             ComboBox_OllamaModel.Text = _plugin.Settings.Ollama.Model;
             if (_plugin.ChatCore is Core.OllamaChatCore ollamaCore)
             {
-                ComboBox_OllamaModel.ItemsSource = ollamaCore.GetModels();
+                // 不再自动获取模型列表，改为用户手动刷新
+                ComboBox_OllamaModel.ItemsSource = new List<string>();
             }
             
             TextBox_OpenAIApiKey.Text = _plugin.Settings.OpenAI.ApiKey;

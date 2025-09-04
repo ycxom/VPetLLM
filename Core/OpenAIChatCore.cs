@@ -91,10 +91,15 @@ namespace VPetLLM.Core
             {
                 History.Add(new Message { Role = "assistant", Content = message });
             }
+            // 始终保存历史记录，无论上下文设置如何
+            SaveHistory();
             return message;
         }
 
-        public override List<string> GetModels()
+        /// <summary>
+        /// 手动刷新可用模型列表
+        /// </summary>
+        public List<string> RefreshModels()
         {
             // 处理OpenAI URL兼容性：自动补全到/models端点
             string apiUrl = _openAISetting.Url;
@@ -133,6 +138,12 @@ namespace VPetLLM.Core
                 models.Add(model["id"].ToString());
             }
             return models;
+        }
+
+        public override List<string> GetModels()
+        {
+            // 返回空列表，避免启动时自动扫描
+            return new List<string>();
         }
     }
 }

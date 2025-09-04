@@ -116,10 +116,15 @@ namespace VPetLLM.Core
             {
                 History.Add(new Message { Role = "model", Content = message });
             }
+            // 始终保存历史记录，无论上下文设置如何
+            SaveHistory();
             return message;
         }
 
-        public override List<string> GetModels()
+        /// <summary>
+        /// 手动刷新可用模型列表
+        /// </summary>
+        public List<string> RefreshModels()
         {
             // 处理反向代理地址：如果URL已经是完整的端点，直接使用；否则添加标准路径
             string requestUrl;
@@ -189,6 +194,12 @@ namespace VPetLLM.Core
             
             System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Models found: {models.Count}");
             return models;
+        }
+
+        public override List<string> GetModels()
+        {
+            // 返回空列表，避免启动时自动扫描
+            return new List<string>();
         }
     }
 }
