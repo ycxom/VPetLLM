@@ -75,8 +75,43 @@ namespace VPetLLM.Core
 
         private string GetHistoryFilePath()
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            return Path.Combine(appData, "VPetLLM", "chat_history.json");
+            // 使用相对路径，智能识别当前Mod目录
+            // 从当前程序集位置向上查找Mod目录结构
+            var currentAssemblyPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            var currentDirectory = Path.GetDirectoryName(currentAssemblyPath);
+            
+            // 向上查找包含data文件夹的Mod目录
+            var modDataPath = FindModDataDirectory(currentDirectory);
+            
+            return Path.Combine(modDataPath, "chat_history.json");
+        }
+        
+        private string FindModDataDirectory(string startDirectory)
+        {
+            var directory = new DirectoryInfo(startDirectory);
+            
+            // 向上查找直到找到包含data文件夹的目录
+            while (directory != null)
+            {
+                var dataPath = Path.Combine(directory.FullName, "data");
+                if (Directory.Exists(dataPath))
+                {
+                    return dataPath;
+                }
+                
+                // 如果当前目录有plugin子目录（Mod结构特征），则使用当前目录的data文件夹
+                var pluginPath = Path.Combine(directory.FullName, "plugin");
+                if (Directory.Exists(pluginPath))
+                {
+                    dataPath = Path.Combine(directory.FullName, "data");
+                    return dataPath;
+                }
+                
+                directory = directory.Parent;
+            }
+            
+            // 如果找不到，使用当前目录下的data文件夹
+            return Path.Combine(startDirectory, "data");
         }
         public virtual List<string> GetModels()
         {
