@@ -32,16 +32,15 @@
 	    <LastGenOutput>Settings.Designer.cs</LastGenOutput>
 	  </None>
 	</ItemGroup>
-	
-	<ItemGroup>
-	  <ProjectReference Include="..\VPet\VPet-Simulator.Core\VPet-Simulator.Core.csproj" />
-	</ItemGroup>
 
 	<Target Name="CopyResources" AfterTargets="Build">
 		<ItemGroup>
 			<FilesToCopy Include="$(OutDir)**\*" />
 		</ItemGroup>
-		<Copy SourceFiles="@(FilesToCopy)" DestinationFiles="@(FilesToCopy->'$(ProjectDir)3000_VPetLLM\plugin\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+		<Copy
+				SourceFiles="@(FilesToCopy)"
+				DestinationFiles="@(FilesToCopy->'$(ProjectDir)3000_VPetLLM\plugin\%(RecursiveDir)%(Filename)%(Extension)')"
+				SkipUnchangedFiles="true" />
 	</Target>
 
 </Project>
