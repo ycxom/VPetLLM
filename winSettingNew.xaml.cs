@@ -67,6 +67,10 @@ namespace VPetLLM
             CheckBox_EnableChatHistory.IsChecked = _plugin.Settings.EnableChatHistory;
             CheckBox_SeparateChatByProvider.IsChecked = _plugin.Settings.SeparateChatByProvider;
             
+            // 加载日志设置
+            CheckBox_LogAutoScroll.IsChecked = _plugin.Settings.LogAutoScroll;
+            TextBox_MaxLogCount.Text = _plugin.Settings.MaxLogCount.ToString();
+            
             // 初始化Ollama高级配置
             CheckBox_Ollama_EnableAdvanced.IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
             Slider_Ollama_Temperature.Value = _plugin.Settings.Ollama.Temperature;
@@ -130,6 +134,16 @@ namespace VPetLLM
             _plugin.Settings.EnableChatHistory = CheckBox_EnableChatHistory.IsChecked ?? true;
             _plugin.Settings.SeparateChatByProvider = CheckBox_SeparateChatByProvider.IsChecked ?? true;
 
+            // 保存日志设置
+            _plugin.Settings.LogAutoScroll = CheckBox_LogAutoScroll.IsChecked ?? true;
+            if (int.TryParse(TextBox_MaxLogCount.Text, out int maxLogCount) && maxLogCount > 0)
+            {
+                _plugin.Settings.MaxLogCount = maxLogCount;
+            }
+
+            // 应用日志设置
+            Logger.AutoScroll = _plugin.Settings.LogAutoScroll;
+            Logger.SetMaxLogCount(_plugin.Settings.MaxLogCount);
             
             // 保存当前聊天历史记录（如果启用）
             if (_plugin.ChatCore != null && _plugin.Settings.EnableChatHistory)

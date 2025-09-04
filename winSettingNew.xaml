@@ -144,6 +144,11 @@
 
             <GroupBox Header="日志" Grid.Row="1" Margin="0,10,0,0">
                 <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Left" Margin="5">
+                        <CheckBox x:Name="CheckBox_LogAutoScroll" Content="自动滚动" Margin="0,0,10,0"/>
+                        <TextBlock Text="最大日志数量:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox x:Name="TextBox_MaxLogCount" Width="60" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    </StackPanel>
                     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button x:Name="Button_CopyLog" Content="复制" Click="Button_CopyLog_Click" Margin="5"/>
                         <Button x:Name="Button_ClearLog" Content="清空" Click="Button_ClearLog_Click" Margin="5"/>

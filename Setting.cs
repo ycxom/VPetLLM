@@ -12,6 +12,8 @@ namespace VPetLLM
         public string Role { get; set; } = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回答用户的问题。";
         public bool EnableChatHistory { get; set; } = true;
         public bool SeparateChatByProvider { get; set; } = false;
+        public bool LogAutoScroll { get; set; } = true;
+        public int MaxLogCount { get; set; } = 1000;
 
         private readonly string _path;
 
