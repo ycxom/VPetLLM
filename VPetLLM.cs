@@ -6,6 +6,8 @@ using System.Windows.Controls;
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
+using VPetLLM.Services;
+using VPetLLM.Controllers;
 
 namespace VPetLLM
 {
@@ -15,6 +17,8 @@ namespace VPetLLM
         public Setting Settings;
         public IChatCore? ChatCore;
         public TalkBox? TalkBox;
+        public LLMIntegrationService? LLMService;
+        public LLMStateService? StateService;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -39,6 +43,10 @@ namespace VPetLLM
             }
             // 加载聊天历史记录
             ChatCore?.LoadHistory();
+            
+            // 初始化LLM状态服务
+            InitializeLLMServices(mainwin);
+            
             Logger.Log("VPetLLM plugin constructor finished.");
         }
 
@@ -60,6 +68,54 @@ namespace VPetLLM
                 Logger.Log("Dispatcher.Invoke finished.");
             });
             Logger.Log("LoadPlugin finished.");
+        }
+        
+        /// <summary>
+        /// 初始化LLM服务
+        /// </summary>
+        private void InitializeLLMServices(IMainWindow mainwin)
+        {
+            try
+            {
+                // 通过反射或其他方式获取GameCore实例
+                // 这里使用更安全的方式获取游戏核心实例
+                var mainProperty = mainwin.GetType().GetProperty("Main");
+                if (mainProperty != null && mainProperty.GetValue(mainwin) is GameCore gameCore)
+                {
+                    StateService = new LLMStateService(gameCore);
+                    LLMService = new LLMIntegrationService(gameCore);
+                    Logger.Log("LLM状态服务初始化成功");
+                }
+                else
+                {
+                    Logger.Log("无法获取GameCore实例，LLM服务未初始化");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"LLM服务初始化失败: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 获取宠物状态信息
+        /// </summary>
+        public string GetPetStatusInfo()
+        {
+            return StateService?.GetStatusSummary() ?? "LLM状态服务未初始化";
+        }
+        
+        /// <summary>
+        /// 处理LLM增强的用户输入
+        /// </summary>
+        public async Task<SayInfo> ProcessWithLLMAsync(string userInput)
+        {
+            if (LLMService == null)
+            {
+                return new SayInfoWithOutStream("LLM服务未初始化");
+            }
+            
+            return await LLMService.ProcessWithLLMAsync(userInput);
         }
 
         public override void Save()
