@@ -33,19 +33,8 @@
 	  </None>
 	</ItemGroup>
 	
-	<PropertyGroup>
-		<SteamVPetPath Condition="'$(SteamVPetPath)' == ''">$([MSBuild]::GetRegistryValueFromView('HKEY_CURRENT_USER\Software\Valve\Steam', 'SteamPath', null, RegistryView.Registry32))</SteamVPetPath>
-		<SteamVPetPath Condition="'$(SteamVPetPath)' != ''">$(SteamVPetPath)\steamapps\common\VPet</SteamVPetPath>
-		<SteamVPetPath Condition="!Exists('$(SteamVPetPath)')">C:\Program Files (x86)\Steam\steamapps\common\VPet</SteamVPetPath>
-		<SteamVPetPath Condition="!Exists('$(SteamVPetPath)')">C:\Program Files\Steam\steamapps\common\VPet</SteamVPetPath>
-	</PropertyGroup>
-
-	<Target Name="ValidateSteamVPetPath" BeforeTargets="Build">
-		<Error Condition="!Exists('$(SteamVPetPath)')" Text="Steam VPet directory not found. Please install VPet from Steam or set the SteamVPetPath property manually." />
-	</Target>
-
 	<ItemGroup>
-	  <ProjectReference Include="$(SteamVPetPath)\VPet-Simulator.Core\VPet-Simulator.Core.csproj" Condition="Exists('$(SteamVPetPath)\VPet-Simulator.Core\VPet-Simulator.Core.csproj')" />
+	  <ProjectReference Include="..\VPet\VPet-Simulator.Core\VPet-Simulator.Core.csproj" />
 	</ItemGroup>
 
 	<Target Name="CopyResources" AfterTargets="Build">
