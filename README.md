@@ -1,31 +1,54 @@
 # VPetLLM
 
-VPetLLM is a plugin for VPet-Simulator that allows you to chat with your pet using various Large Language Models (LLMs).
+VPetLLM 是一个为 VPet-Simulator 设计的插件，它允许你使用各种大型语言模型（LLM）与你的虚拟宠物进行交谈。
 
-## Features
+## ✨ 功能
 
-- Supports multiple LLM providers:
-    - Ollama
-    - OpenAI
-    - Gemini
-- Easy to configure
-- Allows you to chat with your pet in real-time
+- **多样的 LLM 提供商支持：**
+  - **Ollama:** 与在本地运行的 Ollama 模型进行交互。
+  - **OpenAI:** 集成 OpenAI 的 GPT 模型。
+  - **Gemini:** 连接 Google 的 Gemini 模型。
+- **灵活的上下文管理：**
+  - **保持聊天上下文：** 在整个会话中保持对话的连续性。
+  - **保存聊天记录：** 自动保存你的对话，以便下次启动时可以恢复。
+  - **按提供商分离聊天记录：** 为每个 LLM 提供商维护独立的聊天历史。
+  - **自动迁移聊天记录：** 在切换 LLM 提供商时，无缝地转移你的对话历史。
+- **高级模型设置：**
+  - **温度控制：** 调整模型响应的随机性。
+  - **最大 Token:** 设置模型单次响应的最大长度。
+- **优化的用户界面：**
+  - **选项卡式布局：** 清晰地组织不同 LLM 提供商的设置。
+  - **可调整的角色设定窗口：** 通过拖拽轻松地调整角色设定文本框的大小。
+  - **“未保存”提示：** 当有未保存的更改时，提供清晰的视觉提示。
 
-## Installation
+## 🚀 安装
 
-1. Download the latest release from the [releases page](https://github.com/your-username/VPetLLM/releases).
-2. Extract the `30002_VPetLLM` folder to the `mod` folder in your VPet-Simulator installation directory.
-3. Start VPet-Simulator and enable the plugin in the settings.
+1. 从 [Releases 页面](https://github.com/ycxom/VPetLLM/releases)下载最新版本。
+2. 将解压后的 `3000_VPetLLM` 文件夹移动到你的 VPet-Simulator 安装目录下的 `mod` 文件夹中。
+3. 启动 VPet-Simulator 并在设置中启用该插件。
 
-## Configuration
+## ⚙️ 配置
 
-1. Open the VPet-Simulator settings and go to the "MOD Config" tab.
-2. Click on "VPetLLM" to open the plugin settings.
-3. Select your preferred LLM provider and enter the required information (e.g., API key, model name).
-4. Click "Save" to save your settings.
+1. 打开 VPet-Simulator 的设置，并进入“MOD Config”选项卡。
+2. 点击“VPetLLM”以打开插件设置。
+3. **选择 LLM 提供商：** 从下拉菜单中选择你想要使用的 LLM 提供商（Ollama、OpenAI 或 Gemini）。
+4. **填写提供商设置：**
+   - **Ollama:** 输入你的 Ollama 服务的 URL（默认为 `http://localhost:11434`）并选择一个模型。
+   - **OpenAI:** 输入你的 API 密钥、API 地址和模型名称。
+   - **Gemini:** 输入你的 API 密钥、API 地址和模型名称。
+5. **角色设定：** 在可调整大小的文本框中定义你的虚拟宠物的角色和个性。
+6. **上下文控制：** 根据你的偏好，配置聊天上下文和历史记录的保存选项。
+7. **高级设置：** 如果需要，可以为每个提供商启用并调整高级设置，如温度和最大 Token。
+8. **保存：** 点击“保存”按钮以应用你的设置。如果有未保存的更改，“未保存”的红色提示将会出现。
 
-## Usage
+## 💬 使用
 
-1. Open the chat window in VPet-Simulator.
-2. Type your message and press Enter.
-3. Your pet will respond to you using the configured LLM.
+1. 在 VPet-Simulator 中打开聊天窗口。
+2. 输入你的消息并按 Enter。
+3. 你的虚拟宠物将会使用你配置的 LLM 来回应你。
+
+## 🤝 贡献
+
+欢迎各位大佬PR！
+
+- 该项目由Gemini 等AI编写！

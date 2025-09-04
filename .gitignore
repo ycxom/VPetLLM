@@ -4,6 +4,7 @@
 *.user
 *.userosscache
 *.sln.docstates
+.codebuddy
 
 # Build results
 [Bb]in/
