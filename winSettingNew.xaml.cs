@@ -141,9 +141,7 @@ namespace VPetLLM
                 _plugin.Settings.MaxLogCount = maxLogCount;
             }
 
-            // 应用日志设置
-            Logger.AutoScroll = _plugin.Settings.LogAutoScroll;
-            Logger.SetMaxLogCount(_plugin.Settings.MaxLogCount);
+            // 应用日志设置 - 现在Logger类直接从Setting.Instance读取设置值
             
             // 保存当前聊天历史记录（如果启用）
             if (_plugin.ChatCore != null && _plugin.Settings.EnableChatHistory)

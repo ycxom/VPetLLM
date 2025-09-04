@@ -11,12 +11,14 @@ namespace VPetLLM
 {
     public class VPetLLM : MainPlugin
     {
+        public static VPetLLM? Instance { get; private set; }
         public Setting Settings;
         public IChatCore? ChatCore;
         public TalkBox? TalkBox;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
+            Instance = this;
             Logger.Log("VPetLLM plugin constructor started.");
             Settings = new Setting(ExtensionValue.BaseDirectory);
             Logger.Log("Settings loaded.");
