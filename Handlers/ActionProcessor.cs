@@ -25,8 +25,10 @@ namespace VPetLLM.Handlers
             _handlers.Add(new BuyHandler());
         }
 
-        public string Process(string response)
+        public string Process(string response, Setting settings)
         {
+            if (!settings.EnableAction) return response;
+
             var regex = new Regex(@"\[:(\w+)\((.+?)\)\]");
             var matches = regex.Matches(response);
 
@@ -40,6 +42,8 @@ namespace VPetLLM.Handlers
                     var handler = _handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
                     if (handler != null)
                     {
+                        if (handler.Keyword == "buy" && !settings.EnableBuy) continue;
+                        
                         if (int.TryParse(valueStr, out int intValue))
                         {
                             handler.Execute(intValue, _mainWindow);

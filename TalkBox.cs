@@ -29,7 +29,7 @@ namespace VPetLLM
             {
                 var response = await Task.Run(() => _plugin.ChatCore.Chat(text));
                 Logger.Log($"Chat core responded: {response}");
-                var processedResponse = _plugin.ActionProcessor.Process(response);
+                var processedResponse = _plugin.ActionProcessor.Process(response, _plugin.Settings);
                 Application.Current.Dispatcher.Invoke(() => _plugin.MW.Main.Say(processedResponse));
             }
             catch (Exception e)

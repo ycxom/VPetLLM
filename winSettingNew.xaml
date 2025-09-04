@@ -133,13 +133,17 @@
             </TabItem>
             <TabItem Header="高级选项">
                 <StackPanel>
-                    <CheckBox x:Name="CheckBox_EnableAction" Content="启用 VPet 动作" Margin="0,10,0,5" IsChecked="True">
+                    <CheckBox x:Name="CheckBox_EnableAction" Content="启动智能桌面宠物" Margin="0,10,0,5" IsChecked="True">
                         <CheckBox.ToolTip>
                             <ToolTip>
-                                <TextBlock Text="启用后，LLM 将能够控制 VPet 的动作。"/>
+                                <TextBlock Text="启用此功能会增加 Token 消耗，因为它会向 AI 发送额外的数据。"/>
                             </ToolTip>
                         </CheckBox.ToolTip>
                     </CheckBox>
+                    <StackPanel Margin="20,0,0,0">
+                        <CheckBox x:Name="CheckBox_EnableBuy" Content="允许宠物购买东西" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
+                        <CheckBox x:Name="CheckBox_EnableState" Content="允许获取宠物状态" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
             <TabItem Header="工具列表">

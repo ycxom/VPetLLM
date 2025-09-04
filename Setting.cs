@@ -17,6 +17,8 @@ namespace VPetLLM
         public bool LogAutoScroll { get; set; } = true;
         public int MaxLogCount { get; set; } = 1000;
         public bool EnableAction { get; set; } = true;
+        public bool EnableBuy { get; set; } = true;
+        public bool EnableState { get; set; } = true;
 
         private readonly string _path;
 

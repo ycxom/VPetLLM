@@ -21,10 +21,35 @@ namespace VPetLLM.Core
         {
             if (Settings == null || MainWindow == null) return "";
 
-            var core = MainWindow.Core;
-            var status = $"当前状态: 等级({core.Save.Level}), 金钱({core.Save.Money:F2}), 体力({core.Save.Strength:F0}/{core.Save.StrengthMax:F0}), 健康({core.Save.Health:F0}), 心情({core.Save.Feeling:F0}/{core.Save.FeelingMax:F0}), 好感度({core.Save.Likability:F0}/{core.Save.LikabilityMax:F0}), 饱食度({core.Save.StrengthFood:F0}/{core.Save.StrengthMax:F0}), 口渴度({core.Save.StrengthDrink:F0}/{core.Save.StrengthMax:F0})";
-            var items = string.Join(",", MainWindow.Foods.Select(f => f.Name));
-            return $"{Settings.Role}\n{status}\n你可以在回答中通过特定指令来影响我的状态，格式为[:指令(参数)]。例如[:Happy(10)]会让我更开心, [:Buy(物品名称)]则会让我购买物品。可用指令:Happy,Health,Exp,Buy。可购买物品列表:{items}。";
+            var parts = new List<string> { Settings.Role };
+
+            if (Settings.EnableState)
+            {
+                var core = MainWindow.Core;
+                var status = $"当前状态: 等级({core.Save.Level}), 金钱({core.Save.Money:F2}), 体力({core.Save.Strength:F0}/{core.Save.StrengthMax:F0}), 健康({core.Save.Health:F0}), 心情({core.Save.Feeling:F0}/{core.Save.FeelingMax:F0}), 好感度({core.Save.Likability:F0}/{core.Save.LikabilityMax:F0}), 饱食度({core.Save.StrengthFood:F0}/{core.Save.StrengthMax:F0}), 口渴度({core.Save.StrengthDrink:F0}/{core.Save.StrengthMax:F0})";
+                parts.Add(status);
+            }
+
+            var instructions = new List<string>();
+            if (Settings.EnableAction)
+            {
+                instructions.Add("Happy");
+                instructions.Add("Health");
+                instructions.Add("Exp");
+            }
+            if (Settings.EnableBuy)
+            {
+                instructions.Add("Buy");
+                var items = string.Join(",", MainWindow.Foods.Select(f => f.Name));
+                parts.Add($"可购买物品列表:{items}。");
+            }
+
+            if (instructions.Any())
+            {
+                parts.Add($"可以在回答中通过特定指令来影响自身的状态，格式为[:指令(参数)]。可用指令:{string.Join(",", instructions)}。");
+            }
+
+            return string.Join("\n", parts);
         }
 
         // 统一的上下文模式状态，确保切换提供商时状态保持一致

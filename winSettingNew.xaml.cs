@@ -42,6 +42,8 @@ namespace VPetLLM
             CheckBox_SeparateChatByProvider.IsChecked = _plugin.Settings.SeparateChatByProvider;
             CheckBox_AutoMigrateChatHistory.IsChecked = _plugin.Settings.AutoMigrateChatHistory;
             CheckBox_EnableAction.IsChecked = _plugin.Settings.EnableAction;
+            CheckBox_EnableBuy.IsChecked = _plugin.Settings.EnableBuy;
+            CheckBox_EnableState.IsChecked = _plugin.Settings.EnableState;
             CheckBox_LogAutoScroll.IsChecked = _plugin.Settings.LogAutoScroll;
             TextBox_MaxLogCount.Text = _plugin.Settings.MaxLogCount.ToString();
             
@@ -59,6 +61,7 @@ namespace VPetLLM
             Slider_Gemini_Temperature.Value = _plugin.Settings.Gemini.Temperature;
             TextBlock_Gemini_TemperatureValue.Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
             TextBox_Gemini_MaxTokens.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
+            LogBox.ItemsSource = Logger.Logs;
         }
 
         private void Button_Save_Click(object sender, RoutedEventArgs e)
@@ -84,6 +87,8 @@ namespace VPetLLM
             _plugin.Settings.SeparateChatByProvider = CheckBox_SeparateChatByProvider.IsChecked ?? true;
             _plugin.Settings.AutoMigrateChatHistory = CheckBox_AutoMigrateChatHistory.IsChecked ?? true;
             _plugin.Settings.EnableAction = CheckBox_EnableAction.IsChecked ?? true;
+            _plugin.Settings.EnableBuy = CheckBox_EnableBuy.IsChecked ?? true;
+            _plugin.Settings.EnableState = CheckBox_EnableState.IsChecked ?? true;
             _plugin.Settings.LogAutoScroll = CheckBox_LogAutoScroll.IsChecked ?? true;
             if (int.TryParse(TextBox_MaxLogCount.Text, out int maxLogCount))
                 _plugin.Settings.MaxLogCount = maxLogCount;
