@@ -1,14 +1,2 @@
 VPetLLM#VPetLLM:|
-VPetLLM_Description#虚拟桌宠LLM聚合接口:|
-Settings#设置:|
-API_Provider#API提供商:|
-API_Key#API密钥:|
-API_Endpoint#API端点:|
-Model#模型:|
-Temperature#温度:|
-Max_Tokens#最大令牌数:|
-Top_P#Top P:|
-Frequency_Penalty#频率惩罚:|
-Presence_Penalty#存在惩罚:|
-Save#保存:|
-Restore_Defaults#恢复默认设置:|
+VPetLLM_Description#虚拟桌宠LLM聚合接口，适配OpenAI，Gemini，Ollama 协议:|

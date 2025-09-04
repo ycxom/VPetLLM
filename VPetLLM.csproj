@@ -42,5 +42,4 @@
 				DestinationFiles="@(FilesToCopy->'$(ProjectDir)3000_VPetLLM\plugin\%(RecursiveDir)%(Filename)%(Extension)')"
 				SkipUnchangedFiles="true" />
 	</Target>
-
 </Project>

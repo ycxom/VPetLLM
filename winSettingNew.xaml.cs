@@ -4,12 +4,14 @@ using System.Windows;
 using System.Windows.Controls;
 using LinePutScript.Localization.WPF;
 using VPetLLM.Core;
+using System.Windows.Media;
 
 namespace VPetLLM
 {
     public partial class winSettingNew : Window
     {
         private readonly VPetLLM _plugin;
+        private bool isModified = false;
 
         public winSettingNew(VPetLLM plugin)
         {
@@ -20,10 +22,25 @@ namespace VPetLLM
             // LocalizeCore 方法需要进一步调查正确用法
             
             // 注册温度滑块值变化事件
-            Slider_OpenAI_Temperature.ValueChanged += Slider_OpenAI_Temperature_ValueChanged;
-            Slider_Gemini_Temperature.ValueChanged += Slider_Gemini_Temperature_ValueChanged;
-            Slider_Ollama_Temperature.ValueChanged += Slider_Ollama_Temperature_ValueChanged;
-            
+            Slider_OpenAI_Temperature.ValueChanged += Setting_Changed;
+            Slider_Gemini_Temperature.ValueChanged += Setting_Changed;
+            Slider_Ollama_Temperature.ValueChanged += Setting_Changed;
+
+            // 注册文本框和复选框的更改事件
+            foreach (var textBox in FindVisualChildren<TextBox>(this))
+            {
+                textBox.TextChanged += Setting_Changed;
+            }
+            foreach (var comboBox in FindVisualChildren<ComboBox>(this))
+            {
+                comboBox.SelectionChanged += Setting_Changed;
+            }
+            foreach (var checkBox in FindVisualChildren<CheckBox>(this))
+            {
+                checkBox.Checked += Setting_Changed;
+                checkBox.Unchecked += Setting_Changed;
+            }
+
             Logger.Log("Setting window opened.");
             ComboBox_Provider.ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
             LogBox.ItemsSource = Logger.Logs;
@@ -32,6 +49,8 @@ namespace VPetLLM
 
         private void LoadSettings()
         {
+            isModified = false;
+            TextBlock_Unsaved.Visibility = Visibility.Collapsed;
             Logger.Log("Loading settings.");
             ComboBox_Provider.SelectedItem = _plugin.Settings.Provider;
             TextBox_OllamaUrl.Text = _plugin.Settings.Ollama.Url;
@@ -81,13 +100,14 @@ namespace VPetLLM
             // 不再自动刷新模型列表，改为用户手动刷新
             // 初始化时只显示空列表，用户需要手动点击刷新按钮
             ComboBox_GeminiModel.ItemsSource = new List<string>();
-            UpdateProviderVisibility();
             Logger.Log("Settings loaded.");
         }
 
         private void Button_Save_Click(object sender, RoutedEventArgs e)
         {
             Logger.Log("Saving settings.");
+            isModified = false;
+            TextBlock_Unsaved.Visibility = Visibility.Collapsed;
             
             // 在保存设置之前获取旧的提供商值
             var oldProvider = _plugin.Settings.Provider;
@@ -199,37 +219,8 @@ namespace VPetLLM
 
         private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateProviderVisibility();
         }
 
-        private void UpdateProviderVisibility()
-        {
-            Grid_Ollama.Visibility = Visibility.Collapsed;
-            Grid_OpenAI.Visibility = Visibility.Collapsed;
-            Grid_Gemini.Visibility = Visibility.Collapsed;
-            Button_RefreshOllamaModels.IsEnabled = false;
-            Button_RefreshOpenAIModels.IsEnabled = false;
-            Button_RefreshGeminiModels.IsEnabled = false;
-
-            if (ComboBox_Provider.SelectedItem == null) return;
-
-            switch ((Setting.LLMType)ComboBox_Provider.SelectedItem)
-            {
-                case Setting.LLMType.Ollama:
-                    Grid_Ollama.Visibility = Visibility.Visible;
-                    Button_RefreshOllamaModels.IsEnabled = true;
-                    break;
-                case Setting.LLMType.OpenAI:
-                    Grid_OpenAI.Visibility = Visibility.Visible;
-                    Button_RefreshOpenAIModels.IsEnabled = true;
-                    break;
-                case Setting.LLMType.Gemini:
-                    Grid_Gemini.Visibility = Visibility.Visible;
-                    Button_RefreshGeminiModels.IsEnabled = true;
-                    break;
-            }
-            Logger.Log($"Provider view changed to {ComboBox_Provider.SelectedItem}.");
-        }
 
         private void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
         {
@@ -309,6 +300,8 @@ namespace VPetLLM
         private void Button_RestoreDefaults_Click(object sender, RoutedEventArgs e)
         {
             if (ComboBox_Provider.SelectedItem == null) return;
+            isModified = false;
+            TextBlock_Unsaved.Visibility = Visibility.Collapsed;
 
             // 保存当前选择的提供商
             var currentProvider = (Setting.LLMType)ComboBox_Provider.SelectedItem;
@@ -379,23 +372,62 @@ namespace VPetLLM
             
             // 保持当前选择的提供商不变
             ComboBox_Provider.SelectedItem = currentProvider;
-            UpdateProviderVisibility();
             Logger.Log("Settings loaded without changing provider.");
         }
 
+        private void Setting_Changed(object sender, RoutedEventArgs e)
+        {
+            if (this.IsLoaded)
+            {
+                isModified = true;
+                TextBlock_Unsaved.Visibility = Visibility.Visible;
+            }
+        }
         private void Slider_OpenAI_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            TextBlock_OpenAI_TemperatureValue.Text = Slider_OpenAI_Temperature.Value.ToString("F2");
+            if (this.IsLoaded)
+            {
+                TextBlock_OpenAI_TemperatureValue.Text = e.NewValue.ToString("F2");
+                Setting_Changed(sender, e);
+            }
         }
 
         private void Slider_Gemini_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            TextBlock_Gemini_TemperatureValue.Text = Slider_Gemini_Temperature.Value.ToString("F2");
+            if (this.IsLoaded)
+            {
+                TextBlock_Gemini_TemperatureValue.Text = e.NewValue.ToString("F2");
+                Setting_Changed(sender, e);
+            }
         }
 
         private void Slider_Ollama_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            TextBlock_Ollama_TemperatureValue.Text = Slider_Ollama_Temperature.Value.ToString("F2");
+            if (this.IsLoaded)
+            {
+                TextBlock_Ollama_TemperatureValue.Text = e.NewValue.ToString("F2");
+                Setting_Changed(sender, e);
+            }
+        }
+
+        public static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
+        {
+            if (depObj != null)
+            {
+                for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
+                {
+                    DependencyObject child = VisualTreeHelper.GetChild(depObj, i);
+                    if (child != null && child is T)
+                    {
+                        yield return (T)child;
+                    }
+
+                    foreach (T childOfChild in FindVisualChildren<T>(child))
+                    {
+                        yield return childOfChild;
+                    }
+                }
+            }
         }
 
         private void Button_ClearContext_Click(object sender, RoutedEventArgs e)
