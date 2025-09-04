@@ -25,5 +25,15 @@ namespace VPetLLM
         /// 更新聊天历史（用户编辑后）
         /// </summary>
         void UpdateHistory(List<Core.Message> editedHistory);
+
+        /// <summary>
+        /// 获取当前聊天历史记录（用于切换提供商时保存）
+        /// </summary>
+        List<Core.Message> GetChatHistory();
+
+        /// <summary>
+        /// 设置聊天历史记录（用于切换提供商时恢复）
+        /// </summary>
+        void SetChatHistory(List<Core.Message> history);
     }
 }

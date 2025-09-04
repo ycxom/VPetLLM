@@ -65,6 +65,34 @@ namespace VPetLLM
             Settings.Save();
         }
 
+        public void UpdateChatCore(IChatCore newChatCore)
+        {
+            // 首先更新ChatCore字段
+            ChatCore = newChatCore;
+            Logger.Log($"ChatCore updated to: {ChatCore?.GetType().Name}");
+            
+            // 重新加载聊天历史记录
+            ChatCore?.LoadHistory();
+            Logger.Log("Chat history reloaded");
+            
+            // 重新创建TalkBox以确保使用新的ChatCore实例
+            // 使用InvokeAsync并等待完成，确保热重载生效
+            Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                if (TalkBox != null)
+                {
+                    MW.TalkAPI.Remove(TalkBox);
+                    Logger.Log("Old TalkBox removed from TalkAPI");
+                }
+                TalkBox = new TalkBox(this);
+                MW.TalkAPI.Add(TalkBox);
+                Logger.Log("New TalkBox added to TalkAPI");
+                
+                // 验证新的TalkBox是否使用正确的ChatCore实例
+                Logger.Log($"New TalkBox should use ChatCore: {ChatCore?.GetType().Name}");
+            }).Wait(); // 等待操作完成
+        }
+
         public override void Setting()
         {
             Application.Current.Dispatcher.Invoke(() =>
@@ -75,5 +103,11 @@ namespace VPetLLM
         }
 
         public override string PluginName => "VPetLLM";
+
+        // 测试方法：验证当前ChatCore实例类型
+        public string GetCurrentChatCoreInfo()
+        {
+            return $"ChatCore Type: {ChatCore?.GetType().Name}, Hash: {ChatCore?.GetHashCode()}";
+        }
     }
 }

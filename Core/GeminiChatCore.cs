@@ -12,8 +12,6 @@ namespace VPetLLM.Core
         private readonly HttpClient _httpClient;
         private readonly Setting.GeminiSetting _geminiSetting;
         private readonly Setting _setting;
-        private bool _keepContext = true; // 默认保持上下文
-
         public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting)
             : base(setting)
         {
@@ -22,19 +20,11 @@ namespace VPetLLM.Core
             _httpClient = new HttpClient();
         }
 
-        /// <summary>
-        /// 设置是否保持上下文
-        /// </summary>
-        public void SetContextMode(bool keepContext)
-        {
-            _keepContext = keepContext;
-        }
-
 
 
         public override async Task<string> Chat(string prompt)
         {
-            // 根据上下文设置决定是否保留历史
+            // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (!_keepContext)
             {
                 ClearContext();
@@ -115,7 +105,7 @@ namespace VPetLLM.Core
             var responseObject = JObject.Parse(responseString);
             var message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
             
-            // 根据上下文设置决定是否保留历史
+            // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (_keepContext)
             {
                 // 使用标准化角色名称，而不是Gemini特有的"model"

@@ -22,6 +22,9 @@ namespace VPetLLM
         public override async void Responded(string text)
         {
             Logger.Log($"Responded called with text: {text}");
+            Logger.Log($"Current ChatCore instance: {_plugin.ChatCore?.GetType().Name}");
+            Logger.Log($"Current ChatCore hash: {_plugin.ChatCore?.GetHashCode()}");
+            
             try
             {
                 var response = await Task.Run(() => _plugin.ChatCore.Chat(text));

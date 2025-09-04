@@ -83,7 +83,13 @@ namespace VPetLLM
         private void Button_Save_Click(object sender, RoutedEventArgs e)
         {
             Logger.Log("Saving settings.");
-            _plugin.Settings.Provider = (Setting.LLMType)ComboBox_Provider.SelectedItem;
+            
+            // 在保存设置之前获取旧的提供商值
+            var oldProvider = _plugin.Settings.Provider;
+            var newProvider = (Setting.LLMType)ComboBox_Provider.SelectedItem;
+            
+            // 更新设置
+            _plugin.Settings.Provider = newProvider;
             _plugin.Settings.Ollama.Url = TextBox_OllamaUrl.Text;
             _plugin.Settings.Ollama.Model = ComboBox_OllamaModel.Text;
             _plugin.Settings.OpenAI.ApiKey = TextBox_OpenAIApiKey.Text;
@@ -125,23 +131,53 @@ namespace VPetLLM
             _plugin.Settings.SeparateChatByProvider = CheckBox_SeparateChatByProvider.IsChecked ?? true;
 
             
+            // 保存当前聊天历史记录（如果启用）
+            if (_plugin.ChatCore != null && _plugin.Settings.EnableChatHistory)
+            {
+                _plugin.ChatCore.SaveHistory();
+            }
+
             _plugin.Settings.Save();
             Logger.Log("Settings saved to file.");
-            _plugin.ChatCore = null;
-            switch (_plugin.Settings.Provider)
+            
+            if (oldProvider != newProvider)
             {
-                case Setting.LLMType.Ollama:
-                    _plugin.ChatCore = new Core.OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings);
-                    Logger.Log("Chat core set to Ollama.");
-                    break;
-                case Setting.LLMType.OpenAI:
-                    _plugin.ChatCore = new Core.OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings);
-                    Logger.Log("Chat core set to OpenAI.");
-                    break;
-                case Setting.LLMType.Gemini:
-                    _plugin.ChatCore = new Core.GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings);
-                    Logger.Log("Chat core set to Gemini.");
-                    break;
+                Logger.Log($"Provider changed from {oldProvider} to {newProvider}");
+                
+                // 保存当前历史记录以便后续恢复
+                var oldHistory = _plugin.ChatCore?.GetChatHistory();
+                
+                IChatCore? newChatCore = null;
+                switch (newProvider)
+                {
+                    case Setting.LLMType.Ollama:
+                        newChatCore = new Core.OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings);
+                        Logger.Log("New chat core created for Ollama.");
+                        break;
+                    case Setting.LLMType.OpenAI:
+                        newChatCore = new Core.OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings);
+                        Logger.Log("New chat core created for OpenAI.");
+                        break;
+                    case Setting.LLMType.Gemini:
+                        newChatCore = new Core.GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings);
+                        Logger.Log("New chat core created for Gemini.");
+                        break;
+                }
+                
+                // 如果启用了聊天历史记录，尝试恢复历史记录
+                if (_plugin.Settings.EnableChatHistory && oldHistory != null && oldHistory.Count > 0)
+                {
+                    newChatCore?.SetChatHistory(oldHistory);
+                    Logger.Log($"Restored {oldHistory.Count} messages from previous provider");
+                }
+                
+                // 更新主类的ChatCore实例
+                _plugin.UpdateChatCore(newChatCore);
+                Logger.Log("Chat core instance updated in main plugin.");
+            }
+            else
+            {
+                Logger.Log("Provider unchanged, keeping current chat core instance.");
             }
             // 保存后不关闭界面，方便调试
             Logger.Log("Settings saved successfully. Window remains open for debugging.");

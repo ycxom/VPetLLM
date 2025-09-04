@@ -15,9 +15,28 @@ namespace VPetLLM.Core
         protected Setting? Settings { get; }
         public abstract Task<string> Chat(string prompt);
 
+        // 统一的上下文模式状态，确保切换提供商时状态保持一致
+        protected bool _keepContext = true;
+        
         protected ChatCoreBase(Setting? settings = null)
         {
             Settings = settings;
+        }
+        
+        /// <summary>
+        /// 设置是否保持上下文（统一管理，确保切换提供商时状态一致）
+        /// </summary>
+        public virtual void SetContextMode(bool keepContext)
+        {
+            _keepContext = keepContext;
+        }
+        
+        /// <summary>
+        /// 获取当前上下文模式状态
+        /// </summary>
+        public virtual bool GetContextMode()
+        {
+            return _keepContext;
         }
 
         public virtual void LoadHistory()
@@ -200,6 +219,23 @@ namespace VPetLLM.Core
             History.Clear();
             History.AddRange(editedHistory);
             SaveHistory(); // 更新后立即保存
+        }
+
+        /// <summary>
+        /// 获取当前聊天历史记录（用于切换提供商时保存）
+        /// </summary>
+        public virtual List<Message> GetChatHistory()
+        {
+            return new List<Message>(History);
+        }
+
+        /// <summary>
+        /// 设置聊天历史记录（用于切换提供商时恢复）
+        /// </summary>
+        public virtual void SetChatHistory(List<Message> history)
+        {
+            History.Clear();
+            History.AddRange(history);
         }
     }
 
