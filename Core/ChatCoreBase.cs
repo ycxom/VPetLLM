@@ -43,6 +43,9 @@ namespace VPetLLM.Core
         {
             try
             {
+                // 检查并处理历史文件迁移（从统一模式切换到独立模式时）
+                CheckAndMigrateHistoryFile();
+                
                 var historyFile = GetHistoryFilePath();
                 if (File.Exists(historyFile))
                 {
@@ -159,6 +162,42 @@ namespace VPetLLM.Core
             {
                 // 统一模式：所有提供商使用同一个文件
                 return Path.Combine(modDataPath, "chat_history.json");
+            }
+        }
+        
+        /// <summary>
+        /// 检查并处理历史文件迁移（从统一模式切换到独立模式时）
+        /// </summary>
+        private void CheckAndMigrateHistoryFile()
+        {
+            if (Settings == null || !Settings.SeparateChatByProvider) return;
+            
+            var unifiedFile = Path.Combine(FindModDataDirectory(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)), "chat_history.json");
+            var providerFile = GetHistoryFilePath();
+            
+            // 如果统一模式文件存在，但提供商特定文件不存在
+            if (File.Exists(unifiedFile) && !File.Exists(providerFile))
+            {
+                // 检查是否启用了自动迁移
+                if (Settings.AutoMigrateChatHistory)
+                {
+                    try
+                    {
+                        File.Move(unifiedFile, providerFile);
+                        Console.WriteLine($"已将聊天历史从统一文件迁移到提供商特定文件: {Path.GetFileName(providerFile)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"迁移聊天历史文件失败: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"检测到统一聊天历史文件，但当前使用独立模式。");
+                    Console.WriteLine($"统一文件: {Path.GetFileName(unifiedFile)}");
+                    Console.WriteLine($"提供商文件: {Path.GetFileName(providerFile)}");
+                    Console.WriteLine($"如需自动迁移，请在设置中启用\"自动迁移聊天历史\"选项。");
+                }
             }
         }
         

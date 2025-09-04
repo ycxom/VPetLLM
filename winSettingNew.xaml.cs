@@ -66,6 +66,7 @@ namespace VPetLLM
             // 加载聊天历史保存设置
             CheckBox_EnableChatHistory.IsChecked = _plugin.Settings.EnableChatHistory;
             CheckBox_SeparateChatByProvider.IsChecked = _plugin.Settings.SeparateChatByProvider;
+            CheckBox_AutoMigrateChatHistory.IsChecked = _plugin.Settings.AutoMigrateChatHistory;
             
             // 加载日志设置
             CheckBox_LogAutoScroll.IsChecked = _plugin.Settings.LogAutoScroll;
@@ -133,6 +134,7 @@ namespace VPetLLM
             // 保存聊天历史保存设置
             _plugin.Settings.EnableChatHistory = CheckBox_EnableChatHistory.IsChecked ?? true;
             _plugin.Settings.SeparateChatByProvider = CheckBox_SeparateChatByProvider.IsChecked ?? true;
+            _plugin.Settings.AutoMigrateChatHistory = CheckBox_AutoMigrateChatHistory.IsChecked ?? true;
 
             // 保存日志设置
             _plugin.Settings.LogAutoScroll = CheckBox_LogAutoScroll.IsChecked ?? true;
@@ -373,6 +375,7 @@ namespace VPetLLM
             // 加载聊天历史保存设置
             CheckBox_EnableChatHistory.IsChecked = _plugin.Settings.EnableChatHistory;
             CheckBox_SeparateChatByProvider.IsChecked = _plugin.Settings.SeparateChatByProvider;
+            CheckBox_AutoMigrateChatHistory.IsChecked = _plugin.Settings.AutoMigrateChatHistory;
             
             // 保持当前选择的提供商不变
             ComboBox_Provider.SelectedItem = currentProvider;
