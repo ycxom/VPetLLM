@@ -7,5 +7,6 @@ namespace VPetLLM.Handlers
         string Keyword { get; }
         void Execute(int value, IMainWindow mainWindow);
         void Execute(string value, IMainWindow mainWindow);
+        void Execute(IMainWindow mainWindow);
     }
 }

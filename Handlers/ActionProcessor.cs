@@ -31,7 +31,7 @@ namespace VPetLLM.Handlers
         {
             if (!settings.EnableAction) return response;
 
-            var regex = new Regex(@"\[:(\w+)\((.+?)\)\]");
+            var regex = new Regex(@"\[:(\w+)\((.*?)\)\]");
             var matches = regex.Matches(response);
 
             Application.Current.Dispatcher.Invoke(() =>
@@ -48,7 +48,11 @@ namespace VPetLLM.Handlers
                         if (handler.Keyword == "action" && !settings.EnableActionExecution) continue;
                         if (handler.Keyword == "move" && !settings.EnableMove) continue;
 
-                        if (int.TryParse(valueStr, out int intValue))
+                        if (string.IsNullOrEmpty(valueStr))
+                        {
+                            handler.Execute(_mainWindow);
+                        }
+                        else if (int.TryParse(valueStr, out int intValue))
                         {
                             handler.Execute(intValue, _mainWindow);
                         }

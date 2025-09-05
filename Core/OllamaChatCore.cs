@@ -31,10 +31,19 @@ namespace VPetLLM.Core
 
         public override async Task<string> Chat(string prompt)
         {
-            // 检查并添加系统角色消息
-            if (!string.IsNullOrEmpty(_setting.Role) && !History.Any(m => m.Role == "system"))
+            // 检查并更新系统消息（确保Role设置生效）
+            var systemMessage = History.FirstOrDefault(m => m.Role == "system");
+            var currentSystemMessage = GetSystemMessage();
+            
+            if (systemMessage == null)
             {
-                History.Insert(0, new Message { Role = "system", Content = GetSystemMessage() });
+                // 如果没有系统消息，添加新的
+                History.Insert(0, new Message { Role = "system", Content = currentSystemMessage });
+            }
+            else if (systemMessage.Content != currentSystemMessage)
+            {
+                // 如果系统消息内容已更改，更新它
+                systemMessage.Content = currentSystemMessage;
             }
             
             // 根据上下文设置决定是否保留历史（使用基类的统一状态）
@@ -101,7 +110,7 @@ namespace VPetLLM.Core
             return models;
         }
 
-        public override List<string> GetModels()
+        public new List<string> GetModels()
         {
             // 返回空列表，避免启动时自动扫描
             return new List<string>();

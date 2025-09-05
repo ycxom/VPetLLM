@@ -18,5 +18,9 @@ namespace VPetLLM.Handlers
         {
             // Not used for this handler
         }
+        public void Execute(IMainWindow mainWindow)
+        {
+            mainWindow.Main.DisplayMove();
+        }
     }
 }

@@ -13,5 +13,6 @@ namespace VPetLLM.Handlers
             mainWindow.Main.LabelDisplayShowChangeNumber("健康 ".Translate() + (value > 0 ? "+" : "") + "{0:f0}", value);
         }
         public void Execute(string value, IMainWindow mainWindow) { }
+        public void Execute(IMainWindow mainWindow) { }
     }
 }

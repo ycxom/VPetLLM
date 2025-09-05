@@ -38,40 +38,22 @@ namespace VPetLLM.Core
             // 使用dynamic类型来构建请求数据，避免匿名类型转换问题
             dynamic requestData;
             
-            if (!string.IsNullOrEmpty(_setting.Role))
+            // 有角色设置时，包含systemInstruction字段
+            requestData = new
             {
-                // 有角色设置时，包含systemInstruction字段
-                requestData = new
+                contents = History
+                    .Where(m => m.Role != "system")
+                    .Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
+                generationConfig = new
                 {
-                    contents = History
-                        .Where(m => m.Role != "system")
-                        .Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
-                    generationConfig = new
-                    {
-                        maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
-                        temperature = _geminiSetting.EnableAdvanced ? _geminiSetting.Temperature : 0.8
-                    },
-                    systemInstruction = new
-                    {
-                        parts = new[] { new { text = GetSystemMessage() } }
-                    }
-                };
-            }
-            else
-            {
-                // 没有角色设置时，不包含systemInstruction字段
-                requestData = new
+                    maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
+                    temperature = _geminiSetting.EnableAdvanced ? _geminiSetting.Temperature : 0.8
+                },
+                systemInstruction = new
                 {
-                    contents = History
-                        .Where(m => m.Role != "system")
-                        .Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
-                    generationConfig = new
-                    {
-                        maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
-                        temperature = _geminiSetting.EnableAdvanced ? _geminiSetting.Temperature : 0.8
-                    }
-                };
-            }
+                    parts = new[] { new { text = GetSystemMessage() } }
+                }
+            };
             
             var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
             
@@ -195,7 +177,7 @@ namespace VPetLLM.Core
             return models;
         }
 
-        public override List<string> GetModels()
+        public new List<string> GetModels()
         {
             // 返回空列表，避免启动时自动扫描
             return new List<string>();

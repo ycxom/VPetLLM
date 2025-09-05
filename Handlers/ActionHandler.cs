@@ -8,7 +8,8 @@ namespace VPetLLM.Handlers
 
         public void Execute(string actionName, IMainWindow mainWindow)
         {
-            switch (actionName.ToLower())
+            var action = string.IsNullOrEmpty(actionName) ? "idel" : actionName.ToLower();
+            switch (action)
             {
                 case "touchhead":
                     mainWindow.Main.DisplayTouchHead();
@@ -31,6 +32,10 @@ namespace VPetLLM.Handlers
         public void Execute(int value, IMainWindow mainWindow)
         {
             // Not used for this handler
+        }
+        public void Execute(IMainWindow mainWindow)
+        {
+            Execute("idel", mainWindow);
         }
     }
 }

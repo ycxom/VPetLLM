@@ -15,7 +15,6 @@ namespace VPetLLM
             _plugin = plugin;
             InitializeComponent();
             LoadSettings();
-            // 注册温度滑块值变化事件
             Slider_Ollama_Temperature.ValueChanged += Slider_Temperature_ValueChanged;
             Slider_OpenAI_Temperature.ValueChanged += Slider_Temperature_ValueChanged;
             Slider_Gemini_Temperature.ValueChanged += Slider_Temperature_ValueChanged;
@@ -26,6 +25,8 @@ namespace VPetLLM
             // LLM 设置
             ComboBox_Provider.ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
             ComboBox_Provider.SelectedItem = _plugin.Settings.Provider;
+            TextBox_AiName.Text = _plugin.Settings.AiName;
+            TextBox_UserName.Text = _plugin.Settings.UserName;
             TextBox_Role.Text = _plugin.Settings.Role;
             TextBox_OllamaUrl.Text = _plugin.Settings.Ollama.Url;
             ComboBox_OllamaModel.Text = _plugin.Settings.Ollama.Model;
@@ -46,6 +47,7 @@ namespace VPetLLM
             CheckBox_EnableState.IsChecked = _plugin.Settings.EnableState;
             CheckBox_EnableActionExecution.IsChecked = _plugin.Settings.EnableActionExecution;
             CheckBox_EnableMove.IsChecked = _plugin.Settings.EnableMove;
+            CheckBox_EnableTime.IsChecked = _plugin.Settings.EnableTime;
             CheckBox_LogAutoScroll.IsChecked = _plugin.Settings.LogAutoScroll;
             TextBox_MaxLogCount.Text = _plugin.Settings.MaxLogCount.ToString();
             
@@ -73,6 +75,8 @@ namespace VPetLLM
 
             // LLM 设置
             _plugin.Settings.Provider = newProvider;
+            _plugin.Settings.AiName = TextBox_AiName.Text;
+            _plugin.Settings.UserName = TextBox_UserName.Text;
             _plugin.Settings.Role = TextBox_Role.Text;
             _plugin.Settings.Ollama.Url = TextBox_OllamaUrl.Text;
             _plugin.Settings.Ollama.Model = ComboBox_OllamaModel.Text;
@@ -93,6 +97,7 @@ namespace VPetLLM
             _plugin.Settings.EnableState = CheckBox_EnableState.IsChecked ?? true;
             _plugin.Settings.EnableActionExecution = CheckBox_EnableActionExecution.IsChecked ?? true;
             _plugin.Settings.EnableMove = CheckBox_EnableMove.IsChecked ?? true;
+            _plugin.Settings.EnableTime = CheckBox_EnableTime.IsChecked ?? true;
             _plugin.Settings.LogAutoScroll = CheckBox_LogAutoScroll.IsChecked ?? true;
             if (int.TryParse(TextBox_MaxLogCount.Text, out int maxLogCount))
                 _plugin.Settings.MaxLogCount = maxLogCount;
@@ -116,7 +121,7 @@ namespace VPetLLM
 
             if (oldProvider != newProvider)
             {
-                var oldHistory = _plugin.ChatCore?.GetChatHistory();
+                var oldHistory = _plugin.ChatCore.GetChatHistory();
                 IChatCore newChatCore = newProvider switch
                 {
                     Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW),
@@ -149,7 +154,11 @@ namespace VPetLLM
         private void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e) { }
         private void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e) { }
         private void Button_ClearContext_Click(object sender, RoutedEventArgs e) { _plugin.ChatCore?.ClearContext(); }
-        private void Button_EditContext_Click(object sender, RoutedEventArgs e) { }
+        private void Button_EditContext_Click(object sender, RoutedEventArgs e)
+        {
+            var contextEditor = new winContextEditor(_plugin.ChatCore);
+            contextEditor.Show();
+        }
         private void Button_CopyLog_Click(object sender, RoutedEventArgs e) { }
         private void Button_ClearLog_Click(object sender, RoutedEventArgs e) { }
     }

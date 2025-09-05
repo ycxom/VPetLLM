@@ -9,7 +9,9 @@ namespace VPetLLM
         public OllamaSetting Ollama { get; set; } = new OllamaSetting();
         public OpenAISetting OpenAI { get; set; } = new OpenAISetting();
         public GeminiSetting Gemini { get; set; } = new GeminiSetting();
-        public string Role { get; set; } = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回答用户的问题。";
+        public string AiName { get; set; } = "虚拟宠物";
+        public string UserName { get; set; } = "主人";
+        public string Role { get; set; } = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回应我。";
         public bool KeepContext { get; set; } = true;
         public bool EnableChatHistory { get; set; } = true;
         public bool SeparateChatByProvider { get; set; } = false;
@@ -21,6 +23,7 @@ namespace VPetLLM
         public bool EnableState { get; set; } = true;
         public bool EnableActionExecution { get; set; } = true;
         public bool EnableMove { get; set; } = true;
+        public bool EnableTime { get; set; } = true;
 
         private readonly string _path;
 

@@ -22,16 +22,27 @@ namespace VPetLLM.Core
         {
             if (Settings == null || MainWindow == null) return "";
 
-            var parts = new List<string> { Settings.Role };
+            var basePrompt = $"你的名字是{Settings.AiName}，我的名字是{Settings.UserName}。";
+            var parts = new List<string> { basePrompt, Settings.Role };
 
             if (Settings.EnableState)
             {
                 var core = MainWindow.Core;
                 var status = $"当前状态: 等级({core.Save.Level}), 金钱({core.Save.Money:F2}), 体力({core.Save.Strength:F0}/{core.Save.StrengthMax:F0}), 健康({core.Save.Health:F0}), 心情({core.Save.Feeling:F0}/{core.Save.FeelingMax:F0}), 好感度({core.Save.Likability:F0}/{core.Save.LikabilityMax:F0}), 饱食度({core.Save.StrengthFood:F0}/{core.Save.StrengthMax:F0}), 口渴度({core.Save.StrengthDrink:F0}/{core.Save.StrengthMax:F0})";
+                if (Settings.EnableTime)
+                {
+                    status += $", 当前时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+                }
                 parts.Add(status);
             }
 
             var instructions = new List<string>();
+            if (Settings.EnableAction)
+            {
+                instructions.Add("Happy");
+                instructions.Add("Health");
+                instructions.Add("Exp");
+            }
             if (Settings.EnableActionExecution)
             {
                 instructions.Add("Action");
@@ -49,7 +60,7 @@ namespace VPetLLM.Core
 
             if (instructions.Any())
             {
-                parts.Add($"你可以在回答中通过特定指令来影响我的状态，格式为[:指令(参数)]。可用指令:{string.Join(",", instructions)}。可用动作:TouchHead,TouchBody,Move,Sleep,Idel。");
+                parts.Add($"你可以在回答中通过特定指令来影响我的状态，格式为[:指令(参数)]。可用指令:{string.Join(",", instructions)}。可用动作:TouchHead,TouchBody,Move,Sleep,Idel。Move指令需提供x,y坐标,例如[:Move(100,200)]。当前坐标:({MainWindow.Main.Core.Controller.GetWindowsDistanceLeft():F0},{MainWindow.Main.Core.Controller.GetWindowsDistanceUp():F0})。屏幕尺寸:({SystemParameters.PrimaryScreenWidth},{SystemParameters.PrimaryScreenHeight})。");
             }
 
             return string.Join("\n", parts);
@@ -301,13 +312,6 @@ namespace VPetLLM.Core
             SaveHistory(); // 更新后立即保存
         }
 
-        /// <summary>
-        /// 获取当前聊天历史记录（用于切换提供商时保存）
-        /// </summary>
-        public virtual List<Message> GetChatHistory()
-        {
-            return new List<Message>(History);
-        }
 
         /// <summary>
         /// 设置聊天历史记录（用于切换提供商时恢复）
@@ -316,6 +320,11 @@ namespace VPetLLM.Core
         {
             History.Clear();
             History.AddRange(history);
+        }
+
+        public List<Message> GetChatHistory()
+        {
+            return History;
         }
     }
 
