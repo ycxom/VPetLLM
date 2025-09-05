@@ -65,23 +65,33 @@ namespace VPetLLM.Core
                 parts.Add($"可购买物品列表:{items}。");
             }
 
-            if (stateInstructions.Any())
+            var instructions = new List<string>();
+            foreach (var handler in ActionProcessor.Handlers)
             {
-                parts.Add($"你可以通过特定指令影响我的状态，格式为[:state(指令(参数))]。可用状态指令: {string.Join(", ", stateInstructions)}。例如[:state(Happy(10))]。");
+                bool isEnabled = handler.ActionType switch
+                {
+                    ActionType.State => (handler.Keyword == "buy" && Settings.EnableBuy) || (handler.Keyword != "buy" && Settings.EnableAction),
+                    ActionType.Body => (handler.Keyword == "action" && Settings.EnableActionExecution) || (handler.Keyword == "move" && Settings.EnableMove),
+                    ActionType.Talk => true, // SayHandler is always enabled
+                    _ => false
+                };
+
+                if (isEnabled)
+                {
+                    instructions.Add(handler.Description);
+                }
             }
- 
-            if (bodyInstructions.Any())
+
+            if (instructions.Any())
             {
-                var bodyParts = new List<string>();
-                if (bodyInstructions.Contains("action"))
-                {
-                    bodyParts.Add("Action指令可用于播放动画，可用动作: TouchHead, TouchBody, Sleep, Idel。例如[:body(Action(TouchHead))]");
-                }
-                if (bodyInstructions.Contains("move"))
-                {
-                    bodyParts.Add($"Move指令用于移动，需提供x,y坐标。例如[:body(Move(100,200))]。当前坐标:({MainWindow.Main.Core.Controller.GetWindowsDistanceLeft():F0},{MainWindow.Main.Core.Controller.GetWindowsDistanceUp():F0})，屏幕尺寸:({SystemParameters.PrimaryScreenWidth},{SystemParameters.PrimaryScreenHeight})。");
-                }
-                parts.Add($"你可以通过特定指令控制我的身体，格式为[:body(指令(参数))]。{string.Join(" ", bodyParts)}");
+                var rule = "你必须严格遵循以下规则:\n" +
+                           "1. 你的回复可以包含一个或多个指令，用于按顺序控制我的行为和情绪。\n" +
+                           "2. 严禁在括号或星号中描述动作，例如 '(高兴地摇尾巴)' 是错误的。你必须使用指令来替代。\n" +
+                           "3. 优先级规则: `move`指令拥有最高优先级。如果回复中包含`move`指令，则只会执行`move`，并忽略所有其他指令。\n" +
+                           "4. `say`指令用于说话，格式为 `[:talk(say(\"文本\",情绪))]`。文本必须用英文双引号包裹。所有要说的文本都必须在指令内部。\n" +
+                           "5. 你可以像编写脚本一样，将多个非`move`指令组合在一起，它们会按顺序执行。例如: `[:talk(say(\"你好！\",happy))][:body(action(touchhead))]`";
+                parts.Add(rule);
+                parts.Add("可用指令列表:\n" + string.Join("\n", instructions));
             }
 
             return string.Join("\n", parts);

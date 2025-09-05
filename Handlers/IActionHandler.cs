@@ -5,7 +5,8 @@ namespace VPetLLM.Handlers
     public enum ActionType
     {
         State,
-        Body
+        Body,
+        Talk
     }
 
     public interface IActionHandler

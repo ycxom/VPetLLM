@@ -12,6 +12,7 @@ namespace VPetLLM.Handlers
 
         public void Execute(string itemName, IMainWindow mainWindow)
         {
+            Logger.Log($"BuyHandler executed with value: {itemName}");
             var food = mainWindow.Foods.FirstOrDefault(f => f.Name.ToLower() == itemName.ToLower());
             if (food != null)
             {

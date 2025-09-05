@@ -51,7 +51,7 @@ namespace VPetLLM
             CheckBox_EnableTime.IsChecked = _plugin.Settings.EnableTime;
             CheckBox_LogAutoScroll.IsChecked = _plugin.Settings.LogAutoScroll;
             TextBox_MaxLogCount.Text = _plugin.Settings.MaxLogCount.ToString();
-            
+
             CheckBox_Ollama_EnableAdvanced.IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
             Slider_Ollama_Temperature.Value = _plugin.Settings.Ollama.Temperature;
             TextBlock_Ollama_TemperatureValue.Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
@@ -103,7 +103,7 @@ namespace VPetLLM
             _plugin.Settings.LogAutoScroll = CheckBox_LogAutoScroll.IsChecked ?? true;
             if (int.TryParse(TextBox_MaxLogCount.Text, out int maxLogCount))
                 _plugin.Settings.MaxLogCount = maxLogCount;
-            
+
             _plugin.Settings.Ollama.EnableAdvanced = CheckBox_Ollama_EnableAdvanced.IsChecked ?? false;
             _plugin.Settings.Ollama.Temperature = Slider_Ollama_Temperature.Value;
             if (int.TryParse(TextBox_Ollama_MaxTokens.Text, out int ollamaMaxTokens))
@@ -152,7 +152,7 @@ namespace VPetLLM
 
         private void Button_RestoreDefaults_Click(object sender, RoutedEventArgs e) { }
         private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
-        
+
         private void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -168,7 +168,7 @@ namespace VPetLLM
                 MessageBox.Show($"刷新Ollama模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        
+
         private void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -184,7 +184,7 @@ namespace VPetLLM
                 MessageBox.Show($"刷新OpenAI模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        
+
         private void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -200,7 +200,7 @@ namespace VPetLLM
                 MessageBox.Show($"刷新Gemini模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        
+
         private void Button_ClearContext_Click(object sender, RoutedEventArgs e) { _plugin.ChatCore?.ClearContext(); }
         private void Button_EditContext_Click(object sender, RoutedEventArgs e)
         {
