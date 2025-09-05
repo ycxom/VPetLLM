@@ -124,9 +124,9 @@ namespace VPetLLM
                 var oldHistory = _plugin.ChatCore.GetChatHistory();
                 IChatCore newChatCore = newProvider switch
                 {
-                    Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW),
-                    Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW),
-                    Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW),
+                    Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
                 if (_plugin.Settings.EnableChatHistory && oldHistory != null)
@@ -155,7 +155,7 @@ namespace VPetLLM
         {
             try
             {
-                var ollamaCore = new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW);
+                var ollamaCore = new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = ollamaCore.RefreshModels();
                 ComboBox_OllamaModel.ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(ComboBox_OllamaModel.Text))
@@ -171,7 +171,7 @@ namespace VPetLLM
         {
             try
             {
-                var openAICore = new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW);
+                var openAICore = new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = openAICore.RefreshModels();
                 ComboBox_OpenAIModel.ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(ComboBox_OpenAIModel.Text))
@@ -187,7 +187,7 @@ namespace VPetLLM
         {
             try
             {
-                var geminiCore = new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW);
+                var geminiCore = new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = geminiCore.RefreshModels();
                 ComboBox_GeminiModel.ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(ComboBox_GeminiModel.Text))

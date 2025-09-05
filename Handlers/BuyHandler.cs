@@ -7,6 +7,7 @@ namespace VPetLLM.Handlers
     public class BuyHandler : IActionHandler
     {
         public string Keyword => "buy";
+        public ActionType ActionType => ActionType.State;
 
         public void Execute(string itemName, IMainWindow mainWindow)
         {

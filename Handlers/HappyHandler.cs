@@ -6,6 +6,7 @@ namespace VPetLLM.Handlers
     public class HappyHandler : IActionHandler
     {
         public string Keyword => "happy";
+        public ActionType ActionType => ActionType.State;
 
         public void Execute(int value, IMainWindow mainWindow)
         {

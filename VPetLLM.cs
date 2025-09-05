@@ -24,18 +24,19 @@ namespace VPetLLM
             Logger.Log("VPetLLM plugin constructor started.");
             Settings = new Setting(ExtensionValue.BaseDirectory);
             Logger.Log("Settings loaded.");
+            ActionProcessor = new ActionProcessor(mainwin);
             switch (Settings.Provider)
             {
                 case global::VPetLLM.Setting.LLMType.Ollama:
-                    ChatCore = new OllamaChatCore(Settings.Ollama, Settings, mainwin);
+                    ChatCore = new OllamaChatCore(Settings.Ollama, Settings, mainwin, ActionProcessor);
                     Logger.Log("Chat core set to Ollama.");
                     break;
                 case global::VPetLLM.Setting.LLMType.OpenAI:
-                    ChatCore = new OpenAIChatCore(Settings.OpenAI, Settings, mainwin);
+                    ChatCore = new OpenAIChatCore(Settings.OpenAI, Settings, mainwin, ActionProcessor);
                     Logger.Log("Chat core set to OpenAI.");
                     break;
                 case global::VPetLLM.Setting.LLMType.Gemini:
-                    ChatCore = new GeminiChatCore(Settings.Gemini, Settings, mainwin);
+                    ChatCore = new GeminiChatCore(Settings.Gemini, Settings, mainwin, ActionProcessor);
                     Logger.Log("Chat core set to Gemini.");
                     break;
             }
@@ -47,7 +48,6 @@ namespace VPetLLM
         public override void LoadPlugin()
         {
             Logger.Log("LoadPlugin started.");
-            ActionProcessor = new ActionProcessor(MW);
             Application.Current.Dispatcher.Invoke(() =>
             {
                 Logger.Log("Dispatcher.Invoke started.");

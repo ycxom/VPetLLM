@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Handlers;
 using System.Linq;
 using System.Windows;
 using System.Text;
@@ -16,11 +17,12 @@ namespace VPetLLM.Core
         protected List<Message> History { get; } = new List<Message>();
         protected Setting? Settings { get; }
         protected IMainWindow? MainWindow { get; }
+        protected ActionProcessor? ActionProcessor { get; }
         public abstract Task<string> Chat(string prompt);
 
         protected string GetSystemMessage()
         {
-            if (Settings == null || MainWindow == null) return "";
+            if (Settings == null || MainWindow == null || ActionProcessor == null) return "";
 
             var basePrompt = $"你的名字是{Settings.AiName}，我的名字是{Settings.UserName}。";
             var parts = new List<string> { basePrompt, Settings.Role };
@@ -36,31 +38,50 @@ namespace VPetLLM.Core
                 parts.Add(status);
             }
 
-            var instructions = new List<string>();
-            if (Settings.EnableAction)
+            var stateInstructions = new List<string>();
+            var bodyInstructions = new List<string>();
+
+            foreach (var handler in ActionProcessor.Handlers)
             {
-                instructions.Add("Happy");
-                instructions.Add("Health");
-                instructions.Add("Exp");
+                if (handler.ActionType == ActionType.State)
+                {
+                    if ((handler.Keyword == "buy" && Settings.EnableBuy) || (handler.Keyword != "buy" && Settings.EnableAction))
+                    {
+                        stateInstructions.Add(handler.Keyword);
+                    }
+                }
+                else if (handler.ActionType == ActionType.Body)
+                {
+                    if ((handler.Keyword == "action" && Settings.EnableActionExecution) || (handler.Keyword == "move" && Settings.EnableMove))
+                    {
+                        bodyInstructions.Add(handler.Keyword);
+                    }
+                }
             }
-            if (Settings.EnableActionExecution)
-            {
-                instructions.Add("Action");
-            }
-            if (Settings.EnableMove)
-            {
-                instructions.Add("Move");
-            }
+
             if (Settings.EnableBuy)
             {
-                instructions.Add("Buy");
                 var items = string.Join(",", MainWindow.Foods.Select(f => f.Name));
                 parts.Add($"可购买物品列表:{items}。");
             }
 
-            if (instructions.Any())
+            if (stateInstructions.Any())
             {
-                parts.Add($"你可以在回答中通过特定指令来影响我的状态，格式为[:指令(参数)]。可用指令:{string.Join(",", instructions)}。可用动作:TouchHead,TouchBody,Move,Sleep,Idel。Move指令需提供x,y坐标,例如[:Move(100,200)]。当前坐标:({MainWindow.Main.Core.Controller.GetWindowsDistanceLeft():F0},{MainWindow.Main.Core.Controller.GetWindowsDistanceUp():F0})。屏幕尺寸:({SystemParameters.PrimaryScreenWidth},{SystemParameters.PrimaryScreenHeight})。");
+                parts.Add($"你可以通过特定指令影响我的状态，格式为[:state(指令(参数))]。可用状态指令: {string.Join(", ", stateInstructions)}。例如[:state(Happy(10))]。");
+            }
+
+            if (bodyInstructions.Any())
+            {
+                var bodyParts = new List<string>();
+                if (bodyInstructions.Contains("action"))
+                {
+                    bodyParts.Add("Action指令可用于播放动画，可用动作: TouchHead, TouchBody, Sleep, Idel。例如[:body(Action(TouchHead))]");
+                }
+                if (bodyInstructions.Contains("move"))
+                {
+                    bodyParts.Add($"Move指令用于移动，需提供x,y坐标。例如[:body(Move(100,200))]。当前坐标:({MainWindow.Main.Core.Controller.GetWindowsDistanceLeft():F0},{MainWindow.Main.Core.Controller.GetWindowsDistanceUp():F0})，屏幕尺寸:({SystemParameters.PrimaryScreenWidth},{SystemParameters.PrimaryScreenHeight})。");
+                }
+                parts.Add($"你可以通过特定指令控制我的身体，格式为[:body(指令(参数))]。{string.Join(" ", bodyParts)}");
             }
 
             return string.Join("\n", parts);
@@ -69,10 +90,11 @@ namespace VPetLLM.Core
         // 统一的上下文模式状态，确保切换提供商时状态保持一致
         protected bool _keepContext = true;
         
-        protected ChatCoreBase(Setting? settings = null, IMainWindow? mainWindow = null)
+        protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
         {
             Settings = settings;
             MainWindow = mainWindow;
+            ActionProcessor = actionProcessor;
         }
         
         /// <summary>

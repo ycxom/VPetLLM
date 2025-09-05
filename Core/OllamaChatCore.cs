@@ -8,6 +8,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
+using VPetLLM.Handlers;
+
 namespace VPetLLM.Core
 {
     public class OllamaChatCore : ChatCoreBase
@@ -16,8 +18,8 @@ namespace VPetLLM.Core
         private readonly HttpClient _httpClient;
         private readonly Setting.OllamaSetting _ollamaSetting;
         private readonly Setting _setting;
-        public OllamaChatCore(Setting.OllamaSetting ollamaSetting, Setting setting, IMainWindow mainWindow)
-            : base(setting, mainWindow)
+        public OllamaChatCore(Setting.OllamaSetting ollamaSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
+            : base(setting, mainWindow, actionProcessor)
         {
             _ollamaSetting = ollamaSetting;
             _setting = setting;

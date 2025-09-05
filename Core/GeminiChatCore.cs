@@ -5,6 +5,8 @@ using VPet_Simulator.Windows.Interface;
 using System.Text;
 using System.Threading.Tasks;
 
+using VPetLLM.Handlers;
+
 namespace VPetLLM.Core
 {
     public class GeminiChatCore : ChatCoreBase
@@ -13,8 +15,8 @@ namespace VPetLLM.Core
         private readonly HttpClient _httpClient;
         private readonly Setting.GeminiSetting _geminiSetting;
         private readonly Setting _setting;
-        public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting, IMainWindow mainWindow)
-            : base(setting, mainWindow)
+        public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
+            : base(setting, mainWindow, actionProcessor)
         {
             _geminiSetting = geminiSetting;
             _setting = setting;

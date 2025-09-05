@@ -5,6 +5,7 @@ namespace VPetLLM.Handlers
     public class ActionHandler : IActionHandler
     {
         public string Keyword => "action";
+        public ActionType ActionType => ActionType.Body;
 
         public void Execute(string actionName, IMainWindow mainWindow)
         {

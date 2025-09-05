@@ -8,7 +8,7 @@ namespace VPetLLM.Handlers
 {
     public class ActionProcessor
     {
-        private readonly List<IActionHandler> _handlers = new List<IActionHandler>();
+        public List<IActionHandler> Handlers { get; } = new List<IActionHandler>();
         private readonly IMainWindow _mainWindow;
 
         public ActionProcessor(IMainWindow mainWindow)
@@ -19,29 +19,29 @@ namespace VPetLLM.Handlers
 
         private void RegisterHandlers()
         {
-            _handlers.Add(new HappyHandler());
-            _handlers.Add(new HealthHandler());
-            _handlers.Add(new ExpHandler());
-            _handlers.Add(new BuyHandler());
-            _handlers.Add(new ActionHandler());
-            _handlers.Add(new MoveHandler());
+            Handlers.Add(new HappyHandler());
+            Handlers.Add(new HealthHandler());
+            Handlers.Add(new ExpHandler());
+            Handlers.Add(new BuyHandler());
+            Handlers.Add(new ActionHandler());
+            Handlers.Add(new MoveHandler());
         }
 
         public string Process(string response, Setting settings)
         {
             if (!settings.EnableAction) return response;
 
-            var regex = new Regex(@"\[:(\w+)(?:\((.*?)\))?\]");
+            var regex = new Regex(@"\[:(\w+)\((\w+)(?:\((.*?)\))?\)\]");
             var matches = regex.Matches(response);
 
             Application.Current.Dispatcher.Invoke(() =>
             {
                 foreach (Match match in matches)
                 {
-                    var keyword = match.Groups[1].Value.ToLower();
-                    var valueStr = match.Groups[2].Value;
+                    var keyword = match.Groups[2].Value.ToLower();
+                    var valueStr = match.Groups[3].Value;
 
-                    var handler = _handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
+                    var handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
                     if (handler != null)
                     {
                         if (handler.Keyword == "buy" && !settings.EnableBuy) continue;

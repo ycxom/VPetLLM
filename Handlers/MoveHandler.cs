@@ -8,6 +8,7 @@ namespace VPetLLM.Handlers
     public class MoveHandler : IActionHandler
     {
         public string Keyword => "move";
+        public ActionType ActionType => ActionType.Body;
 
         public void Execute(string coordinates, IMainWindow mainWindow)
         {

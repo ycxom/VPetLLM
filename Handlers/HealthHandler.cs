@@ -6,6 +6,7 @@ namespace VPetLLM.Handlers
     public class HealthHandler : IActionHandler
     {
         public string Keyword => "health";
+        public ActionType ActionType => ActionType.State;
 
         public void Execute(int value, IMainWindow mainWindow)
         {

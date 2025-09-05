@@ -6,6 +6,7 @@ namespace VPetLLM.Handlers
     public class ExpHandler : IActionHandler
     {
         public string Keyword => "exp";
+        public ActionType ActionType => ActionType.State;
 
         public void Execute(int value, IMainWindow mainWindow)
         {
