@@ -12,6 +12,7 @@ namespace VPetLLM.Handlers
     {
         string Keyword { get; }
         ActionType ActionType { get; }
+        string Description { get; }
         void Execute(int value, IMainWindow mainWindow);
         void Execute(string value, IMainWindow mainWindow);
         void Execute(IMainWindow mainWindow);

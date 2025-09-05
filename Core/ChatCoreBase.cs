@@ -69,7 +69,7 @@ namespace VPetLLM.Core
             {
                 parts.Add($"你可以通过特定指令影响我的状态，格式为[:state(指令(参数))]。可用状态指令: {string.Join(", ", stateInstructions)}。例如[:state(Happy(10))]。");
             }
-
+ 
             if (bodyInstructions.Any())
             {
                 var bodyParts = new List<string>();

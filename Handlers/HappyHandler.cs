@@ -7,6 +7,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "happy";
         public ActionType ActionType => ActionType.State;
+        public string Description => "通过 'happy' 指令增加或减少心情值。例如 '[:state(happy(10))]'。";
 
         public void Execute(int value, IMainWindow mainWindow)
         {

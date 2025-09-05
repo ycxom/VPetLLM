@@ -7,6 +7,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "health";
         public ActionType ActionType => ActionType.State;
+        public string Description => "通过 'health' 指令增加或减少健康值。例如 '[:state(health(10))]'。";
 
         public void Execute(int value, IMainWindow mainWindow)
         {
