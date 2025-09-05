@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VPetLLM"
         mc:Ignorable="d"
-        Title="VPetLLM" Height="450" Width="800">
+        Title="VPetLLM" Height="640" Width="800">
     <Grid Margin="10">
         <TabControl>
             <TabItem Header="LLM设置">
@@ -25,7 +25,7 @@
                             <Label Content="用户名称" VerticalAlignment="Top" Margin="0,10,0,0"/>
                             <TextBox x:Name="TextBox_UserName" MaxWidth="300"/>
                             <Label Content="角色设定" VerticalAlignment="Top" Margin="0,10,0,0"/>
-                            <TextBox x:Name="TextBox_Role" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="100" MaxWidth="300"/>
+                            <TextBox x:Name="TextBox_Role" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Height="120" Width="300"/>
                             
                             <Label Content="上下文控制" Margin="0,10,0,0"/>
                             <CheckBox x:Name="CheckBox_KeepContext" Content="保持聊天上下文" Margin="0,0,0,5" IsChecked="True"/>
