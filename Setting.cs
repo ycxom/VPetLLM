@@ -12,6 +12,7 @@ namespace VPetLLM
         public string AiName { get; set; } = "虚拟宠物";
         public string UserName { get; set; } = "主人";
         public string Role { get; set; } = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回应我。";
+        public bool FollowVPetName { get; set; } = true;
         public bool KeepContext { get; set; } = true;
         public bool EnableChatHistory { get; set; } = true;
         public bool SeparateChatByProvider { get; set; } = false;

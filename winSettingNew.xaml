@@ -24,6 +24,7 @@
                             <TextBox x:Name="TextBox_AiName" MaxWidth="300"/>
                             <Label Content="用户名称" VerticalAlignment="Top" Margin="0,10,0,0"/>
                             <TextBox x:Name="TextBox_UserName" MaxWidth="300"/>
+                            <CheckBox x:Name="CheckBox_FollowVPetName" Content="名字与主人名字设置跟着桌面宠物设置" Margin="0,5,0,0"/>
                             <Label Content="角色设定" VerticalAlignment="Top" Margin="0,10,0,0"/>
                             <TextBox x:Name="TextBox_Role" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Height="120" Width="300"/>
                             

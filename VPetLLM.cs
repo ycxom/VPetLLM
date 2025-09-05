@@ -1,6 +1,7 @@
 using LinePutScript.Localization.WPF;
 using Newtonsoft.Json;
 using System.IO;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using VPet_Simulator.Core;
@@ -17,6 +18,7 @@ namespace VPetLLM
         public IChatCore? ChatCore;
         public TalkBox? TalkBox;
         public ActionProcessor? ActionProcessor;
+        private System.Timers.Timer _syncTimer;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -43,6 +45,23 @@ namespace VPetLLM
             // 加载聊天历史记录
             ChatCore?.LoadHistory();
             Logger.Log("VPetLLM plugin constructor finished.");
+
+            _syncTimer = new System.Timers.Timer(5000); // 5 seconds
+            _syncTimer.Elapsed += SyncNames;
+            _syncTimer.AutoReset = true;
+            _syncTimer.Enabled = true;
+        }
+
+        private void SyncNames(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (Settings.FollowVPetName)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Settings.AiName = MW.Core.Save.Name;
+                    Settings.UserName = MW.Core.Save.HostName;
+                });
+            }
         }
 
         public override void LoadPlugin()

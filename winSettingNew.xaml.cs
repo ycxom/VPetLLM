@@ -27,6 +27,7 @@ namespace VPetLLM
             ComboBox_Provider.SelectedItem = _plugin.Settings.Provider;
             TextBox_AiName.Text = _plugin.Settings.AiName;
             TextBox_UserName.Text = _plugin.Settings.UserName;
+            CheckBox_FollowVPetName.IsChecked = _plugin.Settings.FollowVPetName;
             TextBox_Role.Text = _plugin.Settings.Role;
             TextBox_OllamaUrl.Text = _plugin.Settings.Ollama.Url;
             ComboBox_OllamaModel.Text = _plugin.Settings.Ollama.Model;
@@ -77,6 +78,7 @@ namespace VPetLLM
             _plugin.Settings.Provider = newProvider;
             _plugin.Settings.AiName = TextBox_AiName.Text;
             _plugin.Settings.UserName = TextBox_UserName.Text;
+            _plugin.Settings.FollowVPetName = CheckBox_FollowVPetName.IsChecked ?? true;
             _plugin.Settings.Role = TextBox_Role.Text;
             _plugin.Settings.Ollama.Url = TextBox_OllamaUrl.Text;
             _plugin.Settings.Ollama.Model = ComboBox_OllamaModel.Text;
