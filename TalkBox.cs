@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using System.Windows;
+using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
 
@@ -20,49 +24,108 @@ namespace VPetLLM
             Logger.Log("TalkBox created.");
         }
 
-        public override async void Responded(string text)
-        {
-            Logger.Log($"Responded called with text: {text}");
-            try
-            {
-                var response = await Task.Run(() => _plugin.ChatCore.Chat(text));
-                Logger.Log($"Chat core responded: {response}");
-                
-                var actionQueue = _plugin.ActionProcessor.Process(response, _plugin.Settings);
+       public override async void Responded(string text)
+       {
+           Logger.Log($"Responded called with text: {text}");
+           try
+           {
+               var response = await Task.Run(() => _plugin.ChatCore.Chat(text));
+               Logger.Log($"Chat core responded: {response}");
 
-                await Application.Current.Dispatcher.Invoke(async () =>
-                {
-                    if (actionQueue.Any(a => a.IsBlocking))
-                    {
-                        actionQueue.First(a => a.IsBlocking).Action.Invoke(_plugin.MW);
-                        return;
-                    }
+               var actionQueue = _plugin.ActionProcessor.Process(response, _plugin.Settings);
 
-                    foreach (var item in actionQueue)
-                    {
-                        if (item.Type == ActionType.Talk)
-                        {
-                            _plugin.MW.Core.Save.Mode = item.Emotion;
-                            _plugin.MW.Main.Say(item.Text);
-                            // 等待说话动画完成，这里用一个估算的时间
-                            // 实际项目中可能需要更精确的事件来同步
-                            await Task.Delay(item.Text.Length * 150);
-                        }
-                        else
-                        {
-                            item.Action.Invoke(_plugin.MW);
-                            // 为非说话动作添加一个小的延迟
-                            await Task.Delay(500);
-                        }
-                    }
-                });
-            }
-            catch (Exception e)
-            {
-                Logger.Log($"An error occurred in Responded: {e}");
-                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
-            }
-        }
+               await Application.Current.Dispatcher.Invoke(async () =>
+               {
+                   foreach (var item in actionQueue)
+                   {
+                       if (item.Handler is SayHandler)
+                       {
+                           var match = new Regex("\"(.*?)\"").Match(item.Value);
+                           if (match.Success)
+                           {
+                               var emotionMatch = new Regex(",(.*?)\\)").Match(item.Value);
+                               var emotion = emotionMatch.Success ? (IGameSave.ModeType)Enum.Parse(typeof(IGameSave.ModeType), emotionMatch.Groups[1].Value, true) : IGameSave.ModeType.Nomal;
+                               _plugin.MW.Core.Save.Mode = emotion;
+                               _plugin.MW.Main.Say(match.Groups[1].Value);
+                               await Task.Delay(match.Groups[1].Value.Length * 150);
+                           }
+                       }
+                       else
+                       {
+                           if (string.IsNullOrEmpty(item.Value))
+                               item.Handler.Execute(_plugin.MW);
+                           else if (int.TryParse(item.Value, out int intValue))
+                               item.Handler.Execute(intValue, _plugin.MW);
+                           else
+                               item.Handler.Execute(item.Value, _plugin.MW);
+                           await Task.Delay(500);
+                       }
+                   }
+               });
+
+               await ProcessTools(text);
+           }
+           catch (Exception e)
+           {
+               Logger.Log($"An error occurred in Responded: {e}");
+               await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
+           }
+       }
+
+       private async Task ProcessTools(string text)
+       {
+           if (_plugin.Settings.Tools == null) return;
+
+           foreach (var tool in _plugin.Settings.Tools)
+           {
+               if (!tool.IsEnabled) continue;
+
+               var client = new HttpClient();
+               var requestData = new { prompt = text };
+               var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
+
+               try
+               {
+                   var response = await client.PostAsync(tool.Url, content);
+                   response.EnsureSuccessStatusCode();
+                   var responseString = await response.Content.ReadAsStringAsync();
+                   var actionQueue = _plugin.ActionProcessor.Process(responseString, _plugin.Settings);
+
+                   await Application.Current.Dispatcher.Invoke(async () =>
+                   {
+                       foreach (var item in actionQueue)
+                       {
+                           if (item.Handler is SayHandler)
+                           {
+                               var match = new Regex("\"(.*?)\"").Match(item.Value);
+                               if (match.Success)
+                               {
+                                   var emotionMatch = new Regex(",(.*?)\\)").Match(item.Value);
+                                   var emotion = emotionMatch.Success ? (IGameSave.ModeType)Enum.Parse(typeof(IGameSave.ModeType), emotionMatch.Groups[1].Value, true) : IGameSave.ModeType.Nomal;
+                                   _plugin.MW.Core.Save.Mode = emotion;
+                                   _plugin.MW.Main.Say(match.Groups[1].Value);
+                                   await Task.Delay(match.Groups[1].Value.Length * 150);
+                               }
+                           }
+                           else
+                           {
+                               if (string.IsNullOrEmpty(item.Value))
+                                   item.Handler.Execute(_plugin.MW);
+                               else if (int.TryParse(item.Value, out int intValue))
+                                   item.Handler.Execute(intValue, _plugin.MW);
+                               else
+                                   item.Handler.Execute(item.Value, _plugin.MW);
+                               await Task.Delay(500);
+                           }
+                       }
+                   });
+               }
+               catch (Exception e)
+               {
+                   Logger.Log($"An error occurred in ProcessTools: {e}");
+               }
+           }
+       }
 
         public override void Setting()
         {

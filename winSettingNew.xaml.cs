@@ -6,208 +6,264 @@ using VPetLLM.Core;
 
 namespace VPetLLM
 {
-    public partial class winSettingNew : Window
-    {
-        private readonly VPetLLM _plugin;
+   public partial class winSettingNew : Window
+   {
+       private readonly VPetLLM _plugin;
 
-        public winSettingNew(VPetLLM plugin)
-        {
-            _plugin = plugin;
-            InitializeComponent();
-            LoadSettings();
-            Slider_Ollama_Temperature.ValueChanged += Slider_Temperature_ValueChanged;
-            Slider_OpenAI_Temperature.ValueChanged += Slider_Temperature_ValueChanged;
-            Slider_Gemini_Temperature.ValueChanged += Slider_Temperature_ValueChanged;
-        }
+       public winSettingNew(VPetLLM plugin)
+       {
+           _plugin = plugin;
+           InitializeComponent();
+           LoadSettings();
+           ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Slider_Temperature_ValueChanged;
+           ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Slider_Temperature_ValueChanged;
+           ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Slider_Temperature_ValueChanged;
+       }
 
-        private void LoadSettings()
-        {
-            // LLM 设置
-            ComboBox_Provider.ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
-            ComboBox_Provider.SelectedItem = _plugin.Settings.Provider;
-            TextBox_AiName.Text = _plugin.Settings.AiName;
-            TextBox_UserName.Text = _plugin.Settings.UserName;
-            CheckBox_FollowVPetName.IsChecked = _plugin.Settings.FollowVPetName;
-            TextBox_Role.Text = _plugin.Settings.Role;
-            TextBox_OllamaUrl.Text = _plugin.Settings.Ollama.Url;
-            ComboBox_OllamaModel.Text = _plugin.Settings.Ollama.Model;
-            TextBox_OpenAIApiKey.Text = _plugin.Settings.OpenAI.ApiKey;
-            ComboBox_OpenAIModel.Text = _plugin.Settings.OpenAI.Model;
-            TextBox_OpenAIUrl.Text = _plugin.Settings.OpenAI.Url;
-            TextBox_GeminiApiKey.Text = _plugin.Settings.Gemini.ApiKey;
-            ComboBox_GeminiModel.Text = _plugin.Settings.Gemini.Model;
-            TextBox_GeminiUrl.Text = _plugin.Settings.Gemini.Url;
+       private void LoadSettings()
+       {
+           // LLM 设置
+           ((ComboBox)this.FindName("ComboBox_Provider")).ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
+           ((ComboBox)this.FindName("ComboBox_Provider")).SelectedItem = _plugin.Settings.Provider;
+           ((TextBox)this.FindName("TextBox_AiName")).Text = _plugin.Settings.AiName;
+           ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
+           ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
+           ((TextBox)this.FindName("TextBox_Role")).Text = _plugin.Settings.Role;
+           ((TextBox)this.FindName("TextBox_OllamaUrl")).Text = _plugin.Settings.Ollama.Url;
+           ((ComboBox)this.FindName("ComboBox_OllamaModel")).Text = _plugin.Settings.Ollama.Model;
+           ((TextBox)this.FindName("TextBox_OpenAIApiKey")).Text = _plugin.Settings.OpenAI.ApiKey;
+           ((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text = _plugin.Settings.OpenAI.Model;
+           ((TextBox)this.FindName("TextBox_OpenAIUrl")).Text = _plugin.Settings.OpenAI.Url;
+           ((TextBox)this.FindName("TextBox_GeminiApiKey")).Text = _plugin.Settings.Gemini.ApiKey;
+           ((ComboBox)this.FindName("ComboBox_GeminiModel")).Text = _plugin.Settings.Gemini.Model;
+           ((TextBox)this.FindName("TextBox_GeminiUrl")).Text = _plugin.Settings.Gemini.Url;
 
-            // 高级选项
-            CheckBox_KeepContext.IsChecked = _plugin.Settings.KeepContext;
-            CheckBox_EnableChatHistory.IsChecked = _plugin.Settings.EnableChatHistory;
-            CheckBox_SeparateChatByProvider.IsChecked = _plugin.Settings.SeparateChatByProvider;
-            CheckBox_AutoMigrateChatHistory.IsChecked = _plugin.Settings.AutoMigrateChatHistory;
-            CheckBox_EnableAction.IsChecked = _plugin.Settings.EnableAction;
-            CheckBox_EnableBuy.IsChecked = _plugin.Settings.EnableBuy;
-            CheckBox_EnableState.IsChecked = _plugin.Settings.EnableState;
-            CheckBox_EnableActionExecution.IsChecked = _plugin.Settings.EnableActionExecution;
-            CheckBox_EnableMove.IsChecked = _plugin.Settings.EnableMove;
-            CheckBox_EnableTime.IsChecked = _plugin.Settings.EnableTime;
-            CheckBox_LogAutoScroll.IsChecked = _plugin.Settings.LogAutoScroll;
-            TextBox_MaxLogCount.Text = _plugin.Settings.MaxLogCount.ToString();
+           // 高级选项
+           ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked = _plugin.Settings.KeepContext;
+           ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
+           ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked = _plugin.Settings.SeparateChatByProvider;
+           ((CheckBox)this.FindName("CheckBox_AutoMigrateChatHistory")).IsChecked = _plugin.Settings.AutoMigrateChatHistory;
+           ((CheckBox)this.FindName("CheckBox_EnableAction")).IsChecked = _plugin.Settings.EnableAction;
+           ((CheckBox)this.FindName("CheckBox_EnableBuy")).IsChecked = _plugin.Settings.EnableBuy;
+           ((CheckBox)this.FindName("CheckBox_EnableState")).IsChecked = _plugin.Settings.EnableState;
+           ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).IsChecked = _plugin.Settings.EnableActionExecution;
+           ((CheckBox)this.FindName("CheckBox_EnableMove")).IsChecked = _plugin.Settings.EnableMove;
+           ((CheckBox)this.FindName("CheckBox_EnableTime")).IsChecked = _plugin.Settings.EnableTime;
+           ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
+           ((TextBox)this.FindName("TextBox_MaxLogCount")).Text = _plugin.Settings.MaxLogCount.ToString();
+           ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+           ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
+           ((Slider)this.FindName("Slider_Ollama_Temperature")).Value = _plugin.Settings.Ollama.Temperature;
+           ((TextBlock)this.FindName("TextBlock_Ollama_TemperatureValue")).Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
+           ((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).Text = _plugin.Settings.Ollama.MaxTokens.ToString();
 
-            CheckBox_Ollama_EnableAdvanced.IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
-            Slider_Ollama_Temperature.Value = _plugin.Settings.Ollama.Temperature;
-            TextBlock_Ollama_TemperatureValue.Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
-            TextBox_Ollama_MaxTokens.Text = _plugin.Settings.Ollama.MaxTokens.ToString();
+           ((CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced")).IsChecked = _plugin.Settings.OpenAI.EnableAdvanced;
+           ((Slider)this.FindName("Slider_OpenAI_Temperature")).Value = _plugin.Settings.OpenAI.Temperature;
+           ((TextBlock)this.FindName("TextBlock_OpenAI_TemperatureValue")).Text = _plugin.Settings.OpenAI.Temperature.ToString("F2");
+           ((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).Text = _plugin.Settings.OpenAI.MaxTokens.ToString();
 
-            CheckBox_OpenAI_EnableAdvanced.IsChecked = _plugin.Settings.OpenAI.EnableAdvanced;
-            Slider_OpenAI_Temperature.Value = _plugin.Settings.OpenAI.Temperature;
-            TextBlock_OpenAI_TemperatureValue.Text = _plugin.Settings.OpenAI.Temperature.ToString("F2");
-            TextBox_OpenAI_MaxTokens.Text = _plugin.Settings.OpenAI.MaxTokens.ToString();
+           ((CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced")).IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
+           ((Slider)this.FindName("Slider_Gemini_Temperature")).Value = _plugin.Settings.Gemini.Temperature;
+           ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
+           ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).Text = _plugin.Settings.Gemini.MaxTokens.ToString();
+           ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
+       }
 
-            CheckBox_Gemini_EnableAdvanced.IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
-            Slider_Gemini_Temperature.Value = _plugin.Settings.Gemini.Temperature;
-            TextBlock_Gemini_TemperatureValue.Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
-            TextBox_Gemini_MaxTokens.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
-            LogBox.ItemsSource = Logger.Logs;
-        }
+       private void Button_Save_Click(object sender, RoutedEventArgs e)
+       {
+           var providerComboBox = (ComboBox)this.FindName("ComboBox_Provider");
+           var aiNameTextBox = (TextBox)this.FindName("TextBox_AiName");
+           var userNameTextBox = (TextBox)this.FindName("TextBox_UserName");
+           var followVPetNameCheckBox = (CheckBox)this.FindName("CheckBox_FollowVPetName");
+           var roleTextBox = (TextBox)this.FindName("TextBox_Role");
+           var ollamaUrlTextBox = (TextBox)this.FindName("TextBox_OllamaUrl");
+           var ollamaModelComboBox = (ComboBox)this.FindName("ComboBox_OllamaModel");
+           var openAIApiKeyTextBox = (TextBox)this.FindName("TextBox_OpenAIApiKey");
+           var openAIModelComboBox = (ComboBox)this.FindName("ComboBox_OpenAIModel");
+           var openAIUrlTextBox = (TextBox)this.FindName("TextBox_OpenAIUrl");
+           var geminiApiKeyTextBox = (TextBox)this.FindName("TextBox_GeminiApiKey");
+           var geminiModelComboBox = (ComboBox)this.FindName("ComboBox_GeminiModel");
+           var geminiUrlTextBox = (TextBox)this.FindName("TextBox_GeminiUrl");
+           var keepContextCheckBox = (CheckBox)this.FindName("CheckBox_KeepContext");
+           var enableChatHistoryCheckBox = (CheckBox)this.FindName("CheckBox_EnableChatHistory");
+           var separateChatByProviderCheckBox = (CheckBox)this.FindName("CheckBox_SeparateChatByProvider");
+           var autoMigrateChatHistoryCheckBox = (CheckBox)this.FindName("CheckBox_AutoMigrateChatHistory");
+           var enableActionCheckBox = (CheckBox)this.FindName("CheckBox_EnableAction");
+           var enableBuyCheckBox = (CheckBox)this.FindName("CheckBox_EnableBuy");
+           var enableStateCheckBox = (CheckBox)this.FindName("CheckBox_EnableState");
+           var enableActionExecutionCheckBox = (CheckBox)this.FindName("CheckBox_EnableActionExecution");
+           var enableMoveCheckBox = (CheckBox)this.FindName("CheckBox_EnableMove");
+           var enableTimeCheckBox = (CheckBox)this.FindName("CheckBox_EnableTime");
+           var logAutoScrollCheckBox = (CheckBox)this.FindName("CheckBox_LogAutoScroll");
+           var maxLogCountTextBox = (TextBox)this.FindName("TextBox_MaxLogCount");
+           var ollamaEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced");
+           var ollamaTemperatureSlider = (Slider)this.FindName("Slider_Ollama_Temperature");
+           var ollamaMaxTokensTextBox = (TextBox)this.FindName("TextBox_Ollama_MaxTokens");
+           var openAIEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced");
+           var openAITemperatureSlider = (Slider)this.FindName("Slider_OpenAI_Temperature");
+           var openAIMaxTokensTextBox = (TextBox)this.FindName("TextBox_OpenAI_MaxTokens");
+           var geminiEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced");
+           var geminiTemperatureSlider = (Slider)this.FindName("Slider_Gemini_Temperature");
+           var geminiMaxTokensTextBox = (TextBox)this.FindName("TextBox_Gemini_MaxTokens");
+           var toolsDataGrid = (DataGrid)this.FindName("DataGrid_Tools");
+           var unsavedTextBlock = (TextBlock)this.FindName("TextBlock_Unsaved");
 
-        private void Button_Save_Click(object sender, RoutedEventArgs e)
-        {
-            var oldProvider = _plugin.Settings.Provider;
-            var newProvider = (Setting.LLMType)ComboBox_Provider.SelectedItem;
+           var oldProvider = _plugin.Settings.Provider;
+           var newProvider = (Setting.LLMType)providerComboBox.SelectedItem;
 
-            // LLM 设置
-            _plugin.Settings.Provider = newProvider;
-            _plugin.Settings.AiName = TextBox_AiName.Text;
-            _plugin.Settings.UserName = TextBox_UserName.Text;
-            _plugin.Settings.FollowVPetName = CheckBox_FollowVPetName.IsChecked ?? true;
-            _plugin.Settings.Role = TextBox_Role.Text;
-            _plugin.Settings.Ollama.Url = TextBox_OllamaUrl.Text;
-            _plugin.Settings.Ollama.Model = ComboBox_OllamaModel.Text;
-            _plugin.Settings.OpenAI.ApiKey = TextBox_OpenAIApiKey.Text;
-            _plugin.Settings.OpenAI.Model = ComboBox_OpenAIModel.Text;
-            _plugin.Settings.OpenAI.Url = TextBox_OpenAIUrl.Text;
-            _plugin.Settings.Gemini.ApiKey = TextBox_GeminiApiKey.Text;
-            _plugin.Settings.Gemini.Model = ComboBox_GeminiModel.Text;
-            _plugin.Settings.Gemini.Url = TextBox_GeminiUrl.Text;
+           // LLM 设置
+           _plugin.Settings.Provider = newProvider;
+           _plugin.Settings.AiName = aiNameTextBox.Text;
+           _plugin.Settings.UserName = userNameTextBox.Text;
+           _plugin.Settings.FollowVPetName = followVPetNameCheckBox.IsChecked ?? true;
+           _plugin.Settings.Role = roleTextBox.Text;
+           _plugin.Settings.Ollama.Url = ollamaUrlTextBox.Text;
+           _plugin.Settings.Ollama.Model = ollamaModelComboBox.Text;
+           _plugin.Settings.OpenAI.ApiKey = openAIApiKeyTextBox.Text;
+           _plugin.Settings.OpenAI.Model = openAIModelComboBox.Text;
+           _plugin.Settings.OpenAI.Url = openAIUrlTextBox.Text;
+           _plugin.Settings.Gemini.ApiKey = geminiApiKeyTextBox.Text;
+           _plugin.Settings.Gemini.Model = geminiModelComboBox.Text;
+           _plugin.Settings.Gemini.Url = geminiUrlTextBox.Text;
 
-            // 高级选项
-            _plugin.Settings.KeepContext = CheckBox_KeepContext.IsChecked ?? true;
-            _plugin.Settings.EnableChatHistory = CheckBox_EnableChatHistory.IsChecked ?? true;
-            _plugin.Settings.SeparateChatByProvider = CheckBox_SeparateChatByProvider.IsChecked ?? true;
-            _plugin.Settings.AutoMigrateChatHistory = CheckBox_AutoMigrateChatHistory.IsChecked ?? true;
-            _plugin.Settings.EnableAction = CheckBox_EnableAction.IsChecked ?? true;
-            _plugin.Settings.EnableBuy = CheckBox_EnableBuy.IsChecked ?? true;
-            _plugin.Settings.EnableState = CheckBox_EnableState.IsChecked ?? true;
-            _plugin.Settings.EnableActionExecution = CheckBox_EnableActionExecution.IsChecked ?? true;
-            _plugin.Settings.EnableMove = CheckBox_EnableMove.IsChecked ?? true;
-            _plugin.Settings.EnableTime = CheckBox_EnableTime.IsChecked ?? true;
-            _plugin.Settings.LogAutoScroll = CheckBox_LogAutoScroll.IsChecked ?? true;
-            if (int.TryParse(TextBox_MaxLogCount.Text, out int maxLogCount))
-                _plugin.Settings.MaxLogCount = maxLogCount;
+           // 高级选项
+           _plugin.Settings.KeepContext = ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked ?? true;
+           _plugin.Settings.EnableChatHistory = ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked ?? true;
+           _plugin.Settings.SeparateChatByProvider = ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked ?? true;
+           _plugin.Settings.AutoMigrateChatHistory = ((CheckBox)this.FindName("CheckBox_AutoMigrateChatHistory")).IsChecked ?? true;
+           _plugin.Settings.EnableAction = ((CheckBox)this.FindName("CheckBox_EnableAction")).IsChecked ?? true;
+           _plugin.Settings.EnableBuy = ((CheckBox)this.FindName("CheckBox_EnableBuy")).IsChecked ?? true;
+           _plugin.Settings.EnableState = ((CheckBox)this.FindName("CheckBox_EnableState")).IsChecked ?? true;
+           _plugin.Settings.EnableActionExecution = ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).IsChecked ?? true;
+           _plugin.Settings.EnableMove = ((CheckBox)this.FindName("CheckBox_EnableMove")).IsChecked ?? true;
+           _plugin.Settings.EnableTime = ((CheckBox)this.FindName("CheckBox_EnableTime")).IsChecked ?? true;
+           _plugin.Settings.LogAutoScroll = ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked ?? true;
+           if (int.TryParse(((TextBox)this.FindName("TextBox_MaxLogCount")).Text, out int maxLogCount))
+               _plugin.Settings.MaxLogCount = maxLogCount;
 
-            _plugin.Settings.Ollama.EnableAdvanced = CheckBox_Ollama_EnableAdvanced.IsChecked ?? false;
-            _plugin.Settings.Ollama.Temperature = Slider_Ollama_Temperature.Value;
-            if (int.TryParse(TextBox_Ollama_MaxTokens.Text, out int ollamaMaxTokens))
-                _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
+           _plugin.Settings.Ollama.EnableAdvanced = ollamaEnableAdvancedCheckBox.IsChecked ?? false;
+           _plugin.Settings.Ollama.Temperature = ollamaTemperatureSlider.Value;
+           if (int.TryParse(ollamaMaxTokensTextBox.Text, out int ollamaMaxTokens))
+               _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
 
-            _plugin.Settings.OpenAI.EnableAdvanced = CheckBox_OpenAI_EnableAdvanced.IsChecked ?? false;
-            _plugin.Settings.OpenAI.Temperature = Slider_OpenAI_Temperature.Value;
-            if (int.TryParse(TextBox_OpenAI_MaxTokens.Text, out int openAIMaxTokens))
-                _plugin.Settings.OpenAI.MaxTokens = openAIMaxTokens;
+           _plugin.Settings.OpenAI.EnableAdvanced = openAIEnableAdvancedCheckBox.IsChecked ?? false;
+           _plugin.Settings.OpenAI.Temperature = openAITemperatureSlider.Value;
+           if (int.TryParse(openAIMaxTokensTextBox.Text, out int openAIMaxTokens))
+               _plugin.Settings.OpenAI.MaxTokens = openAIMaxTokens;
 
-            _plugin.Settings.Gemini.EnableAdvanced = CheckBox_Gemini_EnableAdvanced.IsChecked ?? false;
-            _plugin.Settings.Gemini.Temperature = Slider_Gemini_Temperature.Value;
-            if (int.TryParse(TextBox_Gemini_MaxTokens.Text, out int geminiMaxTokens))
-                _plugin.Settings.Gemini.MaxTokens = geminiMaxTokens;
+           _plugin.Settings.Gemini.EnableAdvanced = geminiEnableAdvancedCheckBox.IsChecked ?? false;
+           _plugin.Settings.Gemini.Temperature = geminiTemperatureSlider.Value;
+           if (int.TryParse(geminiMaxTokensTextBox.Text, out int geminiMaxTokens))
+               _plugin.Settings.Gemini.MaxTokens = geminiMaxTokens;
 
-            _plugin.Settings.Save();
+           _plugin.Settings.Tools = new List<Setting.ToolSetting>((IEnumerable<Setting.ToolSetting>)toolsDataGrid.ItemsSource);
 
-            if (oldProvider != newProvider)
-            {
-                var oldHistory = _plugin.ChatCore.GetChatHistory();
-                IChatCore newChatCore = newProvider switch
-                {
-                    Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
-                    Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
-                    Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
-                    _ => throw new NotImplementedException()
-                };
-                if (_plugin.Settings.EnableChatHistory && oldHistory != null)
-                {
-                    newChatCore.SetChatHistory(oldHistory);
-                }
-                _plugin.UpdateChatCore(newChatCore);
-            }
-            TextBlock_Unsaved.Visibility = Visibility.Collapsed;
-        }
+          _plugin.Settings.Save();
 
-        private void Slider_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (sender == Slider_Ollama_Temperature)
-                TextBlock_Ollama_TemperatureValue.Text = e.NewValue.ToString("F2");
-            else if (sender == Slider_OpenAI_Temperature)
-                TextBlock_OpenAI_TemperatureValue.Text = e.NewValue.ToString("F2");
-            else if (sender == Slider_Gemini_Temperature)
-                TextBlock_Gemini_TemperatureValue.Text = e.NewValue.ToString("F2");
-        }
+           if (oldProvider != newProvider)
+           {
+               var oldHistory = _plugin.ChatCore.GetChatHistory();
+               IChatCore newChatCore = newProvider switch
+               {
+                   Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                   Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                   Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                   _ => throw new NotImplementedException()
+               };
+               if (_plugin.Settings.EnableChatHistory && oldHistory != null)
+               {
+                   newChatCore.SetChatHistory(oldHistory);
+               }
+               _plugin.UpdateChatCore(newChatCore);
+           }
+           unsavedTextBlock.Visibility = Visibility.Collapsed;
+       }
 
-        private void Button_RestoreDefaults_Click(object sender, RoutedEventArgs e) { }
-        private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
+       private void Slider_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+       {
+           if (sender == ((Slider)this.FindName("Slider_Ollama_Temperature")))
+               ((TextBlock)this.FindName("TextBlock_Ollama_TemperatureValue")).Text = e.NewValue.ToString("F2");
+           else if (sender == ((Slider)this.FindName("Slider_OpenAI_Temperature")))
+               ((TextBlock)this.FindName("TextBlock_OpenAI_TemperatureValue")).Text = e.NewValue.ToString("F2");
+           else if (sender == ((Slider)this.FindName("Slider_Gemini_Temperature")))
+               ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = e.NewValue.ToString("F2");
+       }
 
-        private void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var ollamaCore = new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
-                var models = ollamaCore.RefreshModels();
-                ComboBox_OllamaModel.ItemsSource = models;
-                if (models.Count > 0 && string.IsNullOrEmpty(ComboBox_OllamaModel.Text))
-                    ComboBox_OllamaModel.SelectedIndex = 0;
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show($"刷新Ollama模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+       private void Button_RestoreDefaults_Click(object sender, RoutedEventArgs e) { }
+       private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
 
-        private void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var openAICore = new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
-                var models = openAICore.RefreshModels();
-                ComboBox_OpenAIModel.ItemsSource = models;
-                if (models.Count > 0 && string.IsNullOrEmpty(ComboBox_OpenAIModel.Text))
-                    ComboBox_OpenAIModel.SelectedIndex = 0;
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show($"刷新OpenAI模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+       private void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
+       {
+           try
+           {
+               var ollamaCore = new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+               var models = ollamaCore.RefreshModels();
+               ((ComboBox)this.FindName("ComboBox_OllamaModel")).ItemsSource = models;
+               if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_OllamaModel")).Text))
+                   ((ComboBox)this.FindName("ComboBox_OllamaModel")).SelectedIndex = 0;
+           }
+           catch (System.Exception ex)
+           {
+               MessageBox.Show($"刷新Ollama模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+           }
+       }
 
-        private void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var geminiCore = new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
-                var models = geminiCore.RefreshModels();
-                ComboBox_GeminiModel.ItemsSource = models;
-                if (models.Count > 0 && string.IsNullOrEmpty(ComboBox_GeminiModel.Text))
-                    ComboBox_GeminiModel.SelectedIndex = 0;
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show($"刷新Gemini模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+       private void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e)
+       {
+           try
+           {
+               var openAICore = new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+               var models = openAICore.RefreshModels();
+               ((ComboBox)this.FindName("ComboBox_OpenAIModel")).ItemsSource = models;
+               if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text))
+                   ((ComboBox)this.FindName("ComboBox_OpenAIModel")).SelectedIndex = 0;
+           }
+           catch (System.Exception ex)
+           {
+               MessageBox.Show($"刷新OpenAI模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+           }
+       }
 
-        private void Button_ClearContext_Click(object sender, RoutedEventArgs e) { _plugin.ChatCore?.ClearContext(); }
-        private void Button_EditContext_Click(object sender, RoutedEventArgs e)
-        {
-            var contextEditor = new winContextEditor(_plugin.ChatCore);
-            contextEditor.Show();
-        }
-        private void Button_CopyLog_Click(object sender, RoutedEventArgs e) { }
-        private void Button_ClearLog_Click(object sender, RoutedEventArgs e) { }
-    }
+       private void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
+       {
+           try
+           {
+               var geminiCore = new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+               var models = geminiCore.RefreshModels();
+               ((ComboBox)this.FindName("ComboBox_GeminiModel")).ItemsSource = models;
+               if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_GeminiModel")).Text))
+                   ((ComboBox)this.FindName("ComboBox_GeminiModel")).SelectedIndex = 0;
+           }
+           catch (System.Exception ex)
+           {
+               MessageBox.Show($"刷新Gemini模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+           }
+       }
+
+       private void Button_ClearContext_Click(object sender, RoutedEventArgs e) { _plugin.ChatCore?.ClearContext(); }
+       private void Button_EditContext_Click(object sender, RoutedEventArgs e)
+       {
+           var contextEditor = new winContextEditor(_plugin.ChatCore);
+           contextEditor.Show();
+       }
+       private void Button_CopyLog_Click(object sender, RoutedEventArgs e) { }
+       private void Button_ClearLog_Click(object sender, RoutedEventArgs e) { }
+      private void Button_AddTool_Click(object sender, RoutedEventArgs e)
+      {
+          var newTool = new Setting.ToolSetting();
+          _plugin.Settings.Tools.Add(newTool);
+          ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
+          ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+      }
+
+      private void Button_DeleteTool_Click(object sender, RoutedEventArgs e)
+      {
+          if (((DataGrid)this.FindName("DataGrid_Tools")).SelectedItem is Setting.ToolSetting selectedTool)
+          {
+              _plugin.Settings.Tools.Remove(selectedTool);
+              ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
+              ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+          }
+      }
+   }
 }

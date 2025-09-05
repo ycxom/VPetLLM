@@ -25,7 +25,7 @@ namespace VPetLLM
         public bool EnableActionExecution { get; set; } = true;
         public bool EnableMove { get; set; } = true;
         public bool EnableTime { get; set; } = true;
-
+        public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         private readonly string _path;
 
         public Setting(string path)
@@ -73,6 +73,13 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
         }
 
+        public class ToolSetting
+        {
+            public string Name { get; set; } = "";
+            public string Url { get; set; } = "";
+            public string ApiKey { get; set; } = "";
+            public bool IsEnabled { get; set; } = true;
+        }
         public enum LLMType
         {
             Ollama,
