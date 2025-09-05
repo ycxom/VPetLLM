@@ -150,9 +150,55 @@ namespace VPetLLM
 
         private void Button_RestoreDefaults_Click(object sender, RoutedEventArgs e) { }
         private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
-        private void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e) { }
-        private void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e) { }
-        private void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e) { }
+        
+        private void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var ollamaCore = new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW);
+                var models = ollamaCore.RefreshModels();
+                ComboBox_OllamaModel.ItemsSource = models;
+                if (models.Count > 0 && string.IsNullOrEmpty(ComboBox_OllamaModel.Text))
+                    ComboBox_OllamaModel.SelectedIndex = 0;
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"刷新Ollama模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        private void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var openAICore = new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW);
+                var models = openAICore.RefreshModels();
+                ComboBox_OpenAIModel.ItemsSource = models;
+                if (models.Count > 0 && string.IsNullOrEmpty(ComboBox_OpenAIModel.Text))
+                    ComboBox_OpenAIModel.SelectedIndex = 0;
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"刷新OpenAI模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        private void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var geminiCore = new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW);
+                var models = geminiCore.RefreshModels();
+                ComboBox_GeminiModel.ItemsSource = models;
+                if (models.Count > 0 && string.IsNullOrEmpty(ComboBox_GeminiModel.Text))
+                    ComboBox_GeminiModel.SelectedIndex = 0;
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"刷新Gemini模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
         private void Button_ClearContext_Click(object sender, RoutedEventArgs e) { _plugin.ChatCore?.ClearContext(); }
         private void Button_EditContext_Click(object sender, RoutedEventArgs e)
         {

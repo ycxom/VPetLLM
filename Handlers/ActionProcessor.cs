@@ -31,7 +31,7 @@ namespace VPetLLM.Handlers
         {
             if (!settings.EnableAction) return response;
 
-            var regex = new Regex(@"\[:(\w+)\((.*?)\)\]");
+            var regex = new Regex(@"\[:(\w+)(?:\((.*?)\))?\]");
             var matches = regex.Matches(response);
 
             Application.Current.Dispatcher.Invoke(() =>
