@@ -10,7 +10,7 @@ using System.Collections.Generic;
 
 using VPetLLM.Handlers;
 
-namespace VPetLLM.Core
+namespace VPetLLM.Core.ChatCore
 {
     public class OllamaChatCore : ChatCoreBase
     {
@@ -34,13 +34,13 @@ namespace VPetLLM.Core
         public override async Task<string> Chat(string prompt)
         {
             // 检查并更新系统消息（确保Role设置生效）
-            var systemMessage = History.FirstOrDefault(m => m.Role == "system");
+            var systemMessage = HistoryManager.GetHistory().FirstOrDefault(m => m.Role == "system");
             var currentSystemMessage = GetSystemMessage();
             
             if (systemMessage == null)
             {
                 // 如果没有系统消息，添加新的
-                History.Insert(0, new Message { Role = "system", Content = currentSystemMessage });
+                HistoryManager.GetHistory().Insert(0, new Message { Role = "system", Content = currentSystemMessage });
             }
             else if (systemMessage.Content != currentSystemMessage)
             {
@@ -55,12 +55,12 @@ namespace VPetLLM.Core
             }
             else
             {
-                History.Add(new Message { Role = "user", Content = prompt });
+               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt }, Chat);
             }
             var data = new
             {
                 model = _ollamaSetting.Model,
-                messages = History,
+                messages = HistoryManager.GetHistory(),
                 stream = false,
                 options = _ollamaSetting.EnableAdvanced ? new
                 {
@@ -77,7 +77,7 @@ namespace VPetLLM.Core
             // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (_keepContext)
             {
-                History.Add(new Message { Role = "assistant", Content = message });
+               await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message }, Chat);
             }
             // 只有在保持上下文模式时才保存历史记录
             if (_keepContext)

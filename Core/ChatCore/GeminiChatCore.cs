@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 using VPetLLM.Handlers;
 
-namespace VPetLLM.Core
+namespace VPetLLM.Core.ChatCore
 {
     public class GeminiChatCore : ChatCoreBase
     {
@@ -34,7 +34,7 @@ namespace VPetLLM.Core
             }
             else
             {
-                History.Add(new Message { Role = "user", Content = prompt });
+               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt }, Chat);
             }
             
             // 使用dynamic类型来构建请求数据，避免匿名类型转换问题
@@ -43,7 +43,7 @@ namespace VPetLLM.Core
             // 有角色设置时，包含systemInstruction字段
             requestData = new
             {
-                contents = History
+                contents = HistoryManager.GetHistory()
                     .Where(m => m.Role != "system")
                     .Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
                 generationConfig = new
@@ -94,7 +94,7 @@ namespace VPetLLM.Core
             if (_keepContext)
             {
                 // 使用标准化角色名称，而不是Gemini特有的"model"
-                History.Add(new Message { Role = "assistant", Content = message });
+               await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message }, Chat);
             }
             // 只有在保持上下文模式时才保存历史记录
             if (_keepContext)

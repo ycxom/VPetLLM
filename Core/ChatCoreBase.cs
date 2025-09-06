@@ -14,99 +14,29 @@ namespace VPetLLM.Core
     public abstract class ChatCoreBase : IChatCore
     {
         public abstract string Name { get; }
-        protected List<Message> History { get; } = new List<Message>();
+        protected HistoryManager HistoryManager { get; }
         protected Setting? Settings { get; }
         protected IMainWindow? MainWindow { get; }
         protected ActionProcessor? ActionProcessor { get; }
-        public abstract Task<string> Chat(string prompt);
+        protected SystemMessageProvider SystemMessageProvider { get; }
+    public abstract Task<string> Chat(string prompt);
 
         protected string GetSystemMessage()
         {
-            if (Settings == null || MainWindow == null || ActionProcessor == null) return "";
-
-            var basePrompt = $"你的名字是{Settings.AiName}，我的名字是{Settings.UserName}。";
-            var parts = new List<string> { basePrompt, Settings.Role };
-
-            if (Settings.EnableState)
-            {
-                var core = MainWindow.Core;
-                var status = $"当前状态: 等级({core.Save.Level}), 金钱({core.Save.Money:F2}), 体力({core.Save.Strength:F0}/{core.Save.StrengthMax:F0}), 健康({core.Save.Health:F0}), 心情({core.Save.Feeling:F0}/{core.Save.FeelingMax:F0}), 好感度({core.Save.Likability:F0}/{core.Save.LikabilityMax:F0}), 饱食度({core.Save.StrengthFood:F0}/{core.Save.StrengthMax:F0}), 口渴度({core.Save.StrengthDrink:F0}/{core.Save.StrengthMax:F0})";
-                if (Settings.EnableTime)
-                {
-                    status += $", 当前时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
-                }
-                parts.Add(status);
-            }
-
-            var stateInstructions = new List<string>();
-            var bodyInstructions = new List<string>();
-
-            foreach (var handler in ActionProcessor.Handlers)
-            {
-                if (handler.ActionType == ActionType.State)
-                {
-                    if ((handler.Keyword == "buy" && Settings.EnableBuy) || (handler.Keyword != "buy" && Settings.EnableAction))
-                    {
-                        stateInstructions.Add(handler.Keyword);
-                    }
-                }
-                else if (handler.ActionType == ActionType.Body)
-                {
-                    if ((handler.Keyword == "action" && Settings.EnableActionExecution) || (handler.Keyword == "move" && Settings.EnableMove))
-                    {
-                        bodyInstructions.Add(handler.Keyword);
-                    }
-                }
-            }
-
-            if (Settings.EnableBuy)
-            {
-                var items = string.Join(",", MainWindow.Foods.Select(f => f.Name));
-                parts.Add($"可购买物品列表:{items}。");
-            }
-
-            var instructions = new List<string>();
-            foreach (var handler in ActionProcessor.Handlers)
-            {
-                bool isEnabled = handler.ActionType switch
-                {
-                    ActionType.State => (handler.Keyword == "buy" && Settings.EnableBuy) || (handler.Keyword != "buy" && Settings.EnableAction),
-                    ActionType.Body => (handler.Keyword == "action" && Settings.EnableActionExecution) || (handler.Keyword == "move" && Settings.EnableMove),
-                    ActionType.Talk => true, // SayHandler is always enabled
-                    _ => false
-                };
-
-                if (isEnabled)
-                {
-                    instructions.Add(handler.Description);
-                }
-            }
-
-            if (instructions.Any())
-            {
-                var rule = "你必须严格遵循以下规则:\n" +
-                           "1. 你的回复可以包含一个或多个指令，用于按顺序控制我的行为和情绪。\n" +
-                           "2. 严禁在括号或星号中描述动作，例如 '(高兴地摇尾巴)' 是错误的。你必须使用指令来替代。\n" +
-                           "3. 优先级规则: `move`指令拥有最高优先级。如果回复中包含`move`指令，则只会执行`move`，并忽略所有其他指令。\n" +
-                           "4. `say`指令用于说话，格式为 `[:talk(say(\"文本\",情绪))]`。文本必须用英文双引号包裹。所有要说的文本都必须在指令内部。\n" +
-                           "5. 你可以像编写脚本一样，将多个非`move`指令组合在一起，它们会按顺序执行。例如: `[:talk(say(\"你好！\",happy))][:body(action(touchhead))][:state(happy(10))]`" +
-                           "6. 聊天需要拼接[:state(happy(10))]控制心情，以便调整VPet参数";
-                parts.Add(rule);
-                parts.Add("可用指令列表(包括可用情绪: happy, nomal, poorcondition, ill):\n" + string.Join("\n", instructions));
-            }
-
-            return string.Join("\n", parts);
+            return SystemMessageProvider.GetSystemMessage();
         }
 
         // 统一的上下文模式状态，确保切换提供商时状态保持一致
         protected bool _keepContext = true;
         
-        protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
-        {
-            Settings = settings;
-            MainWindow = mainWindow;
-            ActionProcessor = actionProcessor;
-        }
+      protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
+      {
+          Settings = settings;
+          MainWindow = mainWindow;
+          ActionProcessor = actionProcessor;
+          HistoryManager = new HistoryManager(settings, Name);
+          SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
+      }
         
         /// <summary>
         /// 设置是否保持上下文（统一管理，确保切换提供商时状态一致）
@@ -124,195 +54,6 @@ namespace VPetLLM.Core
             return _keepContext;
         }
 
-        public virtual void LoadHistory()
-        {
-            try
-            {
-                // 检查并处理历史文件迁移（从统一模式切换到独立模式时）
-                CheckAndMigrateHistoryFile();
-                
-                var historyFile = GetHistoryFilePath();
-                if (File.Exists(historyFile))
-                {
-                    var json = File.ReadAllText(historyFile);
-                    var messages = JsonConvert.DeserializeObject<List<Message>>(json);
-                    if (messages != null && messages.Count > 0)
-                    {
-                        // 先备份当前历史，防止加载失败时数据丢失
-                        var backupHistory = new List<Message>(History);
-                        try
-                        {
-                            // 先创建新列表，验证数据有效性后再替换
-                            var newHistory = new List<Message>();
-                            var normalizedMessages = ChatHistoryCompatibility.NormalizeRoles(messages);
-                            newHistory.AddRange(normalizedMessages);
-                            
-                            // 验证通过后替换原历史记录
-                            History.Clear();
-                            History.AddRange(newHistory);
-                            
-                            Console.WriteLine($"成功加载 {messages.Count} 条历史消息（已标准化角色名称）");
-                            
-                            // 如果检测到角色不一致，自动修复历史文件
-                            if (ChatHistoryCompatibility.HasRoleInconsistencies(messages))
-                            {
-                                ChatHistoryCompatibility.FixRoleInconsistencies(historyFile);
-                            }
-                        }
-                        catch
-                        {
-                            // 如果加载失败，恢复备份数据
-                            History.Clear();
-                            History.AddRange(backupHistory);
-                            throw;
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("历史记录为空或格式不正确");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"历史文件不存在: {historyFile}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"加载聊天历史失败: {ex.Message}");
-            }
-        }
-
-        public virtual void SaveHistory()
-        {
-            // 检查是否启用了聊天历史保存功能
-            if (Settings != null && !Settings.EnableChatHistory)
-            {
-                Console.WriteLine("聊天历史保存功能已禁用，跳过保存");
-                return;
-            }
-            
-            try
-            {
-                var historyFile = GetHistoryFilePath();
-                var directory = Path.GetDirectoryName(historyFile);
-                if (!Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-                
-                // 直接保存当前历史列表
-                var json = JsonConvert.SerializeObject(History, Formatting.Indented);
-                
-                // 使用临时文件确保写入完整性
-                var tempFile = historyFile + ".tmp";
-                File.WriteAllText(tempFile, json);
-                
-                // 原子替换
-                if (File.Exists(historyFile))
-                {
-                    File.Replace(tempFile, historyFile, null);
-                }
-                else
-                {
-                    File.Move(tempFile, historyFile);
-                }
-                
-                Console.WriteLine($"成功保存聊天历史到: {historyFile}");
-                Console.WriteLine($"保存了{History.Count} 条消息");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"保存聊天历史失败: {ex.Message}");
-            }
-        }
-
-        private string GetHistoryFilePath()
-        {
-            // 使用相对路径，智能识别当前Mod目录
-            // 从当前程序集位置向上查找Mod目录结构
-            var currentAssemblyPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-            var currentDirectory = Path.GetDirectoryName(currentAssemblyPath);
-            
-            // 向上查找包含data文件夹的Mod目录
-            var modDataPath = FindModDataDirectory(currentDirectory);
-            
-            // 根据配置决定是否按提供商分离聊天记录
-            if (Settings != null && Settings.SeparateChatByProvider)
-            {
-                // 分离模式：每个提供商使用独立的文件
-                return Path.Combine(modDataPath, $"chat_history_{Name.ToLower()}.json");
-            }
-            else
-            {
-                // 统一模式：所有提供商使用同一个文件
-                return Path.Combine(modDataPath, "chat_history.json");
-            }
-        }
-        
-        /// <summary>
-        /// 检查并处理历史文件迁移（从统一模式切换到独立模式时）
-        /// </summary>
-        private void CheckAndMigrateHistoryFile()
-        {
-            if (Settings == null || !Settings.SeparateChatByProvider) return;
-            
-            var unifiedFile = Path.Combine(FindModDataDirectory(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)), "chat_history.json");
-            var providerFile = GetHistoryFilePath();
-            
-            // 如果统一模式文件存在，但提供商特定文件不存在
-            if (File.Exists(unifiedFile) && !File.Exists(providerFile))
-            {
-                // 检查是否启用了自动迁移
-                if (Settings.AutoMigrateChatHistory)
-                {
-                    try
-                    {
-                        File.Move(unifiedFile, providerFile);
-                        Console.WriteLine($"已将聊天历史从统一文件迁移到提供商特定文件: {Path.GetFileName(providerFile)}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"迁移聊天历史文件失败: {ex.Message}");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"检测到统一聊天历史文件，但当前使用独立模式。");
-                    Console.WriteLine($"统一文件: {Path.GetFileName(unifiedFile)}");
-                    Console.WriteLine($"提供商文件: {Path.GetFileName(providerFile)}");
-                    Console.WriteLine($"如需自动迁移，请在设置中启用\"自动迁移聊天历史\"选项。");
-                }
-            }
-        }
-        
-        private string FindModDataDirectory(string startDirectory)
-        {
-            var directory = new DirectoryInfo(startDirectory);
-            
-            // 向上查找直到找到包含data文件夹的目录
-            while (directory != null)
-            {
-                var dataPath = Path.Combine(directory.FullName, "data");
-                if (Directory.Exists(dataPath))
-                {
-                    return dataPath;
-                }
-                
-                // 如果当前目录有plugin子目录（Mod结构特征），则使用当前目录的data文件夹
-                var pluginPath = Path.Combine(directory.FullName, "plugin");
-                if (Directory.Exists(pluginPath))
-                {
-                    dataPath = Path.Combine(directory.FullName, "data");
-                    return dataPath;
-                }
-                
-                directory = directory.Parent;
-            }
-            
-            // 如果找不到，使用当前目录下的data文件夹
-            return Path.Combine(startDirectory, "data");
-        }
         public virtual List<string> GetModels()
         {
             return new List<string>();
@@ -321,45 +62,54 @@ namespace VPetLLM.Core
         /// <summary>
         /// 清除聊天历史上下文
         /// </summary>
-        public virtual void ClearContext()
-        {
-            History.RemoveAll(m => m.Role != "system"); // 保留系统角色消息
-            // 不再自动保存，由调用者决定何时保存
-        }
+       public virtual void ClearContext()
+       {
+           HistoryManager.ClearHistory();
+       }
 
         /// <summary>
         /// 获取聊天历史用于编辑
         /// </summary>
-        public virtual List<Message> GetHistoryForEditing()
-        {
-            return new List<Message>(History);
-        }
+       public virtual List<Message> GetHistoryForEditing()
+       {
+           return HistoryManager.GetHistory();
+       }
 
         /// <summary>
         /// 更新聊天历史（用户编辑后）
         /// </summary>
-        public virtual void UpdateHistory(List<Message> editedHistory)
-        {
-            History.Clear();
-            History.AddRange(editedHistory);
-            SaveHistory(); // 更新后立即保存
-        }
+       public virtual void UpdateHistory(List<Message> editedHistory)
+       {
+           HistoryManager.GetHistory().Clear();
+           HistoryManager.GetHistory().AddRange(editedHistory);
+           HistoryManager.SaveHistory();
+       }
 
 
         /// <summary>
         /// 设置聊天历史记录（用于切换提供商时恢复）
         /// </summary>
-        public virtual void SetChatHistory(List<Message> history)
-        {
-            History.Clear();
-            History.AddRange(history);
-        }
+       public virtual void SetChatHistory(List<Message> history)
+       {
+           HistoryManager.GetHistory().Clear();
+           HistoryManager.GetHistory().AddRange(history);
+       }
 
-        public List<Message> GetChatHistory()
-        {
-            return History;
-        }
-    }
+      public List<Message> GetChatHistory()
+      {
+          return HistoryManager.GetHistory();
+      }
+
+      public void SaveHistory()
+      {
+          HistoryManager.SaveHistory();
+      }
+
+      public void LoadHistory()
+      {
+          HistoryManager.LoadHistory();
+      }
+  }
 
     public class Message
     {

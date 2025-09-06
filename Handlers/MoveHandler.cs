@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Windows;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Utils;
 
 namespace VPetLLM.Handlers
 {
@@ -13,7 +14,7 @@ namespace VPetLLM.Handlers
 
         public void Execute(string value, IMainWindow mainWindow)
         {
-            Logger.Log($"MoveHandler executed with value: {value}");
+            Utils.Logger.Log($"MoveHandler executed with value: {value}");
             if (string.IsNullOrWhiteSpace(value))
             {
                 mainWindow.Main.DisplayMove();

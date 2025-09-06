@@ -37,7 +37,7 @@ namespace VPetLLM
 
         private void Button_Delete_Click(object sender, RoutedEventArgs e)
         {
-            if (DataGrid_Context.SelectedItem is Message selectedMessage)
+            if (((System.Windows.Controls.DataGrid)this.FindName("DataGrid_Context")).SelectedItem is Message selectedMessage)
             {
                 ChatHistory.Remove(selectedMessage);
             }

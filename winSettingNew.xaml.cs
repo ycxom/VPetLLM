@@ -3,15 +3,17 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using VPetLLM.Core;
+using VPetLLM.Core.ChatCore;
+using VPetLLM.Utils;
 
 namespace VPetLLM
 {
-   public partial class winSettingNew : Window
-   {
-       private readonly VPetLLM _plugin;
-
-       public winSettingNew(VPetLLM plugin)
-       {
+    public partial class winSettingNew : Window
+    {
+        private readonly VPetLLM _plugin;
+ 
+        public winSettingNew(VPetLLM plugin)
+        {
            _plugin = plugin;
            InitializeComponent();
            LoadSettings();
@@ -49,6 +51,8 @@ namespace VPetLLM
            ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).IsChecked = _plugin.Settings.EnableActionExecution;
            ((CheckBox)this.FindName("CheckBox_EnableMove")).IsChecked = _plugin.Settings.EnableMove;
            ((CheckBox)this.FindName("CheckBox_EnableTime")).IsChecked = _plugin.Settings.EnableTime;
+           ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked = _plugin.Settings.EnableHistoryCompression;
+           ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text = _plugin.Settings.HistoryCompressionThreshold.ToString();
            ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
            ((TextBox)this.FindName("TextBox_MaxLogCount")).Text = _plugin.Settings.MaxLogCount.ToString();
            ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
@@ -66,6 +70,7 @@ namespace VPetLLM
            ((Slider)this.FindName("Slider_Gemini_Temperature")).Value = _plugin.Settings.Gemini.Temperature;
            ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
            ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).Text = _plugin.Settings.Gemini.MaxTokens.ToString();
+          ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
            ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
        }
 
@@ -137,6 +142,9 @@ namespace VPetLLM
            _plugin.Settings.EnableActionExecution = ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).IsChecked ?? true;
            _plugin.Settings.EnableMove = ((CheckBox)this.FindName("CheckBox_EnableMove")).IsChecked ?? true;
            _plugin.Settings.EnableTime = ((CheckBox)this.FindName("CheckBox_EnableTime")).IsChecked ?? true;
+          _plugin.Settings.EnableHistoryCompression = ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked ?? false;
+          if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text, out int historyCompressionThreshold))
+              _plugin.Settings.HistoryCompressionThreshold = historyCompressionThreshold;
            _plugin.Settings.LogAutoScroll = ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked ?? true;
            if (int.TryParse(((TextBox)this.FindName("TextBox_MaxLogCount")).Text, out int maxLogCount))
                _plugin.Settings.MaxLogCount = maxLogCount;
@@ -246,8 +254,18 @@ namespace VPetLLM
            var contextEditor = new winContextEditor(_plugin.ChatCore);
            contextEditor.Show();
        }
-       private void Button_CopyLog_Click(object sender, RoutedEventArgs e) { }
-       private void Button_ClearLog_Click(object sender, RoutedEventArgs e) { }
+      private void Button_CopyLog_Click(object sender, RoutedEventArgs e) {
+          var logBox = (ListBox)this.FindName("LogBox");
+          var sb = new System.Text.StringBuilder();
+          foreach (var item in logBox.Items)
+          {
+              sb.AppendLine(item.ToString());
+          }
+          Clipboard.SetText(sb.ToString());
+      }
+      private void Button_ClearLog_Click(object sender, RoutedEventArgs e) {
+          Logger.Clear();
+      }
       private void Button_AddTool_Click(object sender, RoutedEventArgs e)
       {
           var newTool = new Setting.ToolSetting();
@@ -264,6 +282,6 @@ namespace VPetLLM
               ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
               ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
           }
+          }
       }
-   }
-}
+  }

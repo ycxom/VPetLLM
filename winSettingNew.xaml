@@ -151,6 +151,13 @@
                         <CheckBox x:Name="CheckBox_EnableActionExecution" Content="允许宠物执行动作" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
                         <CheckBox x:Name="CheckBox_EnableMove" Content="允许宠物移动" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
                         <CheckBox x:Name="CheckBox_EnableTime" Content="允许获取当前时间" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
+                       <CheckBox x:Name="CheckBox_EnableHistoryCompression" Content="启用聊天记录压缩" Margin="0,10,0,5"/>
+                       <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
+                           <TextBlock Text="压缩阈值:" VerticalAlignment="Center"/>
+                           <TextBox x:Name="TextBox_HistoryCompressionThreshold" Width="50" Margin="5,0"/>
+                          <TextBlock Text="当前上下文长度:" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                          <TextBlock x:Name="TextBlock_CurrentContextLength" VerticalAlignment="Center"/>
+                       </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </TabItem>

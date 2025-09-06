@@ -10,8 +10,9 @@ using System.Windows;
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
+using VPetLLM.Utils;
 
-namespace VPetLLM
+namespace VPetLLM.Windows
 {
     public class TalkBox : VPet_Simulator.Windows.Interface.TalkBox
     {

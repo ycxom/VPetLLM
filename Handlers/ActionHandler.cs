@@ -1,4 +1,5 @@
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Utils;
 
 namespace VPetLLM.Handlers
 {
@@ -10,7 +11,7 @@ namespace VPetLLM.Handlers
 
         public void Execute(string actionName, IMainWindow mainWindow)
         {
-            Logger.Log($"ActionHandler executed with value: {actionName}");
+            Utils.Logger.Log($"ActionHandler executed with value: {actionName}");
             var action = string.IsNullOrEmpty(actionName) ? "idel" : actionName.ToLower();
             switch (action)
             {

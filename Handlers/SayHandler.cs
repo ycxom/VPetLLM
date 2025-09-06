@@ -1,5 +1,6 @@
 using System;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Utils;
 using static VPet_Simulator.Core.IGameSave;
 
 namespace VPetLLM.Handlers
@@ -12,7 +13,7 @@ namespace VPetLLM.Handlers
 
         public void Execute(string value, IMainWindow mainWindow)
         {
-            Logger.Log($"SayHandler executed with value: {value}");
+            Utils.Logger.Log($"SayHandler executed with value: {value}");
             try
             {
                 string text;
@@ -37,15 +38,15 @@ namespace VPetLLM.Handlers
                 if (Enum.TryParse<ModeType>(moodStr, true, out var parsedMode))
                 {
                     mainWindow.Core.Save.Mode = parsedMode;
-                    Logger.Log($"SayHandler set mode to: {parsedMode}");
+                    Utils.Logger.Log($"SayHandler set mode to: {parsedMode}");
                 }
                 
                 mainWindow.Main.Say(text);
-                Logger.Log($"SayHandler called Say with text: \"{text}\" and mode {mainWindow.Core.Save.Mode}");
+                Utils.Logger.Log($"SayHandler called Say with text: \"{text}\" and mode {mainWindow.Core.Save.Mode}");
             }
             catch(Exception e)
             {
-                Logger.Log($"Error in SayHandler: {e.Message}");
+                Utils.Logger.Log($"Error in SayHandler: {e.Message}");
             }
         }
 

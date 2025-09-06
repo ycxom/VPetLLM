@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Windows.Controls;
 using VPetLLM.Core;
+using VPetLLM.Windows;
 
-namespace VPetLLM
+namespace VPetLLM.Utils
 {
     public static class Logger
     {
@@ -32,11 +34,16 @@ namespace VPetLLM
                         var windows = System.Windows.Application.Current.Windows;
                         foreach (System.Windows.Window window in windows)
                         {
-                            if (window is winSettingNew settingWindow && settingWindow.LogBox != null)
-                            {
-                                settingWindow.LogBox.ScrollIntoView(Logs[Logs.Count - 1]);
-                                break;
-                            }
+                           var settingWindow = window as winSettingNew;
+                           if (settingWindow != null)
+                           {
+                               var logBox = (ListBox)settingWindow.FindName("LogBox");
+                               if (logBox != null)
+                               {
+                                   logBox.ScrollIntoView(Logs[Logs.Count - 1]);
+                                   break;
+                               }
+                           }
                         }
                     }));
                 }

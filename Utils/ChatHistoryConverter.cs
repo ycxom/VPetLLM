@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
+using VPetLLM.Core;
 
-namespace VPetLLM.Core
+namespace VPetLLM.Utils
 {
     /// <summary>
     /// 聊天历史转换工具，用于将旧的按提供商分离的格式转换为新的合并格式
@@ -18,7 +19,7 @@ namespace VPetLLM.Core
         {
             if (!Directory.Exists(dataDirectory))
             {
-                Logger.Log($"数据目录不存在: {dataDirectory}");
+               Utils.Logger.Log($"数据目录不存在: {dataDirectory}");
                 return;
             }
 
@@ -32,11 +33,11 @@ namespace VPetLLM.Core
 
                 if (oldFiles.Length == 0)
                 {
-                    Logger.Log("未找到旧的聊天历史文件");
+                   Utils.Logger.Log("未找到旧的聊天历史文件");
                     return;
                 }
 
-                Logger.Log($"找到 {oldFiles.Length} 个聊天历史文件，开始转换...");
+               Utils.Logger.Log($"找到 {oldFiles.Length} 个聊天历史文件，开始转换...");
 
                 // 收集所有消息
                 var allMessages = new List<Message>();
@@ -55,7 +56,7 @@ namespace VPetLLM.Core
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"转换文件 {Path.GetFileName(filePath)} 失败: {ex.Message}");
+                       Utils.Logger.Log($"转换文件 {Path.GetFileName(filePath)} 失败: {ex.Message}");
                     }
                 }
 
@@ -65,20 +66,20 @@ namespace VPetLLM.Core
                     var newFilePath = Path.Combine(dataDirectory, "chat_history.json");
                     SaveMergedHistory(newFilePath, allMessages);
                     
-                    Logger.Log($"成功转换 {allMessages.Count} 条消息到新格式");
-                    Logger.Log($"转换的文件: {string.Join(", ", convertedFiles)}");
+                   Utils.Logger.Log($"成功转换 {allMessages.Count} 条消息到新格式");
+                   Utils.Logger.Log($"转换的文件: {string.Join(", ", convertedFiles)}");
                     
                     // 可选：备份或删除旧文件
                     BackupOldFiles(oldFiles, dataDirectory);
                 }
                 else
                 {
-                    Logger.Log("没有找到可转换的消息");
+                   Utils.Logger.Log("没有找到可转换的消息");
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"转换聊天历史失败: {ex.Message}");
+               Utils.Logger.Log($"转换聊天历史失败: {ex.Message}");
             }
         }
 
@@ -109,7 +110,7 @@ namespace VPetLLM.Core
                             messages.AddRange(providerMessages);
                         }
                     }
-                    Logger.Log($"从 {fileName} 转换了 {messages.Count} 条消息（旧字典格式）");
+                   Utils.Logger.Log($"从 {fileName} 转换了 {messages.Count} 条消息（旧字典格式）");
                     return messages;
                 }
             }
@@ -125,13 +126,13 @@ namespace VPetLLM.Core
                 if (newFormat != null)
                 {
                     messages.AddRange(newFormat);
-                    Logger.Log($"从 {fileName} 读取了 {messages.Count} 条消息（新列表格式）");
+                   Utils.Logger.Log($"从 {fileName} 读取了 {messages.Count} 条消息（新列表格式）");
                     return messages;
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"文件 {fileName} 格式无法识别: {ex.Message}");
+               Utils.Logger.Log($"文件 {fileName} 格式无法识别: {ex.Message}");
             }
 
             return messages;
@@ -160,11 +161,11 @@ namespace VPetLLM.Core
                     File.Move(tempFile, filePath);
                 }
                 
-                Logger.Log($"已保存合并的聊天历史到: {Path.GetFileName(filePath)}");
+               Utils.Logger.Log($"已保存合并的聊天历史到: {Path.GetFileName(filePath)}");
             }
             catch (Exception ex)
             {
-                Logger.Log($"保存合并聊天历史失败: {ex.Message}");
+               Utils.Logger.Log($"保存合并聊天历史失败: {ex.Message}");
             }
         }
 
@@ -189,11 +190,11 @@ namespace VPetLLM.Core
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log($"备份文件 {Path.GetFileName(filePath)} 失败: {ex.Message}");
+                   Utils.Logger.Log($"备份文件 {Path.GetFileName(filePath)} 失败: {ex.Message}");
                 }
             }
 
-            Logger.Log($"旧文件已备份到: {backupDir}");
+           Utils.Logger.Log($"旧文件已备份到: {backupDir}");
         }
 
         /// <summary>

@@ -25,6 +25,8 @@ namespace VPetLLM
         public bool EnableActionExecution { get; set; } = true;
         public bool EnableMove { get; set; } = true;
         public bool EnableTime { get; set; } = true;
+        public bool EnableHistoryCompression { get; set; } = false;
+        public int HistoryCompressionThreshold { get; set; } = 20;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         private readonly string _path;
 
