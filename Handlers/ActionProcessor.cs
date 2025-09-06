@@ -28,6 +28,7 @@ namespace VPetLLM.Handlers
             Handlers.Add(new ActionHandler());
             Handlers.Add(new MoveHandler());
             Handlers.Add(new SayHandler());
+            Handlers.Add(new PluginHandler());
         }
 
         public List<HandlerAction> Process(string response, Setting settings)
@@ -51,6 +52,7 @@ namespace VPetLLM.Handlers
                     ActionType.State => settings.EnableState,
                     ActionType.Body => (handler.Keyword == "move" && settings.EnableMove) || (handler.Keyword == "action" && settings.EnableActionExecution),
                     ActionType.Talk => true,
+                    ActionType.Plugin => true,
                     _ => false
                 };
                 if (handler.Keyword == "buy") isEnabled = settings.EnableBuy;

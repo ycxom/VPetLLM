@@ -76,6 +76,11 @@ namespace VPetLLM.Core
            return HistoryManager.GetHistory();
        }
 
+       public List<Message> GetChatHistory()
+       {
+           return HistoryManager.GetHistory();
+       }
+
         /// <summary>
         /// 更新聊天历史（用户编辑后）
         /// </summary>
@@ -96,10 +101,6 @@ namespace VPetLLM.Core
            HistoryManager.GetHistory().AddRange(history);
        }
 
-      public List<Message> GetChatHistory()
-      {
-          return HistoryManager.GetHistory();
-      }
 
       public void SaveHistory()
       {

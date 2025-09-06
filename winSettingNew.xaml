@@ -205,6 +205,19 @@
                     </DockPanel>
                 </GroupBox>
             </TabItem>
+            <TabItem Header="插件">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ListBox x:Name="ListBox_Plugins" Margin="5"/>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
+                        <Button Content="加载插件" Click="Button_LoadPlugins_Click" Margin="5"/>
+                        <Button Content="卸载插件" Click="Button_UnloadPlugin_Click" Margin="5"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>

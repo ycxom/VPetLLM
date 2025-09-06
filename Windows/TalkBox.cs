@@ -18,6 +18,8 @@ namespace VPetLLM.Windows
     {
         public override string APIName { get; } = "VPetLLM";
         private readonly VPetLLM _plugin;
+        public event Action<string> OnSendMessage;
+
 
         public TalkBox(VPetLLM plugin) : base(plugin)
         {
@@ -25,46 +27,65 @@ namespace VPetLLM.Windows
             Logger.Log("TalkBox created.");
         }
 
+        public void HandleNormalResponse(string message)
+        {
+            _plugin.MW.Main.Say(message);
+        }
+
        public override async void Responded(string text)
        {
+           OnSendMessage?.Invoke(text);
            Logger.Log($"Responded called with text: {text}");
            try
            {
+               Logger.Log("Calling ChatCore.Chat...");
                var response = await Task.Run(() => _plugin.ChatCore.Chat(text));
                Logger.Log($"Chat core responded: {response}");
 
+               Logger.Log("Processing actions...");
                var actionQueue = _plugin.ActionProcessor.Process(response, _plugin.Settings);
+               Logger.Log($"Found {actionQueue.Count} actions.");
 
                await Application.Current.Dispatcher.Invoke(async () =>
                {
-                   foreach (var item in actionQueue)
+                   try
                    {
-                       if (item.Handler is SayHandler)
+                       foreach (var item in actionQueue)
                        {
-                           var match = new Regex("\"(.*?)\"").Match(item.Value);
-                           if (match.Success)
+                           Logger.Log($"Executing action: {item.Keyword}, value: {item.Value}");
+                           if (item.Handler is SayHandler)
                            {
-                               var emotionMatch = new Regex(",(.*?)\\)").Match(item.Value);
-                               var emotion = emotionMatch.Success ? (IGameSave.ModeType)Enum.Parse(typeof(IGameSave.ModeType), emotionMatch.Groups[1].Value, true) : IGameSave.ModeType.Nomal;
-                               _plugin.MW.Core.Save.Mode = emotion;
-                               _plugin.MW.Main.Say(match.Groups[1].Value);
-                               await Task.Delay(match.Groups[1].Value.Length * 150);
+                               var match = new Regex("\"(.*?)\"").Match(item.Value);
+                               if (match.Success)
+                               {
+                                   var emotionMatch = new Regex(",(.*?)\\)").Match(item.Value);
+                                   var emotion = emotionMatch.Success ? (IGameSave.ModeType)Enum.Parse(typeof(IGameSave.ModeType), emotionMatch.Groups[1].Value, true) : IGameSave.ModeType.Nomal;
+                                   _plugin.MW.Core.Save.Mode = emotion;
+                                   _plugin.MW.Main.Say(match.Groups[1].Value);
+                                   await Task.Delay(match.Groups[1].Value.Length * 150);
+                               }
+                           }
+                           else
+                           {
+                               if (string.IsNullOrEmpty(item.Value))
+                                   item.Handler.Execute(_plugin.MW);
+                               else if (int.TryParse(item.Value, out int intValue))
+                                   item.Handler.Execute(intValue, _plugin.MW);
+                               else
+                                   item.Handler.Execute(item.Value, _plugin.MW);
+                               await Task.Delay(500);
                            }
                        }
-                       else
-                       {
-                           if (string.IsNullOrEmpty(item.Value))
-                               item.Handler.Execute(_plugin.MW);
-                           else if (int.TryParse(item.Value, out int intValue))
-                               item.Handler.Execute(intValue, _plugin.MW);
-                           else
-                               item.Handler.Execute(item.Value, _plugin.MW);
-                           await Task.Delay(500);
-                       }
+                   }
+                   catch (Exception ex)
+                   {
+                       Logger.Log($"An error occurred while executing actions: {ex}");
                    }
                });
 
+               Logger.Log("Processing tools...");
                await ProcessTools(text);
+               Logger.Log("Responded finished.");
            }
            catch (Exception e)
            {

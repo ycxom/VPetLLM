@@ -6,7 +6,9 @@ namespace VPetLLM.Handlers
     {
         State,
         Body,
-        Talk
+        Talk,
+        Plugin,
+        Tool
     }
 
     public interface IActionHandler

@@ -22,6 +22,7 @@ namespace VPetLLM
         public Windows.TalkBox? TalkBox;
         public ActionProcessor? ActionProcessor;
         private System.Timers.Timer _syncTimer;
+        public List<IVPetLLMPlugin> Plugins = new List<IVPetLLMPlugin>();
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -52,6 +53,8 @@ namespace VPetLLM
             _syncTimer.Elapsed += SyncNames;
             _syncTimer.AutoReset = true;
             _syncTimer.Enabled = true;
+
+            LoadPlugins();
         }
 
         private void SyncNames(object sender, System.Timers.ElapsedEventArgs e)
@@ -137,12 +140,81 @@ namespace VPetLLM
         }
         public override string PluginName => "VPetLLM";
         
+
+        public async Task<string> SendChat(string prompt)
+        {
+            if (ChatCore == null)
+            {
+                return "错误：聊天核心未初始化。";
+            }
+            return await ChatCore.Chat(prompt);
+        }
+
+        public List<Message> GetChatHistory()
+        {
+            return ChatCore?.GetChatHistory() ?? new List<Message>();
+        }
+
+        public void SetChatHistory(List<Message> history)
+        {
+            ChatCore?.SetChatHistory(history);
+        }
+
+        public void ClearChatHistory()
+        {
+            ChatCore?.ClearContext();
+        }
         // 测试方法：验证当前ChatCore实例类型
         public string GetCurrentChatCoreInfo()
         {
             return $"ChatCore Type: {ChatCore?.GetType().Name}, Hash: {ChatCore?.GetHashCode()}";
         }
+
+        public void LoadPlugins()
+        {
+            var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
+            if (!Directory.Exists(pluginDir))
+            {
+                Directory.CreateDirectory(pluginDir);
+                return;
+            }
+
+            Plugins.Clear();
+            foreach (var file in Directory.GetFiles(pluginDir, "*.dll"))
+            {
+                try
+                {
+                    var assembly = System.Reflection.Assembly.LoadFrom(file);
+                    foreach (var type in assembly.GetTypes())
+                    {
+                        if (typeof(IVPetLLMPlugin).IsAssignableFrom(type) && !type.IsInterface)
+                        {
+                            var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
+                            plugin.Initialize(this);
+                            Plugins.Add(plugin);
+                            Logger.Log($"Loaded plugin: {plugin.Name}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to load plugin {file}: {ex.Message}");
+                }
+            }
+        }
+
+        public void UnloadPlugin(IVPetLLMPlugin plugin)
+        {
+            plugin.Unload();
+            Plugins.Remove(plugin);
+            Logger.Log($"Unloaded plugin: {plugin.Name}");
+        }
+            public void Log(string message)
+            {
+                Logger.Log(message);
+            }
     }
+
 }
     public class Setting
     {

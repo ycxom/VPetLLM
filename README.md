@@ -60,3 +60,84 @@ VPetLLM 是一个为 VPet-Simulator 设计的插件，它允许你使用各种�
 欢迎各位大佬PR！
 
 - 该项目由Gemini 等AI编写！
+## 🔌 API 文档
+
+VPetLLM 插件现在提供了一组公共API，允许其他插件或外部程序与之交互。
+
+### 获取插件实例
+
+首先，你需要获取 `VPetLLM` 插件的实例：
+
+```csharp
+var vpetLLM = VPetLLM.VPetLLM.Instance;
+if (vpetLLM == null)
+{
+    // 插件未加载或未启用
+    return;
+}
+```
+
+### 发送聊天消息
+
+异步地向当前配置的LLM发送一条消息，并获取回复。
+
+**方法签名:**
+```csharp
+public async Task<string> SendChat(string prompt)
+```
+
+**示例:**
+```csharp
+string reply = await vpetLLM.SendChat("你好！");
+Console.WriteLine(reply);
+```
+
+### 获取聊天记录
+
+获取当前的聊天历史记录。
+
+**方法签名:**
+```csharp
+public List<Message> GetChatHistory()
+```
+
+**示例:**
+```csharp
+List<Message> history = vpetLLM.GetChatHistory();
+foreach (var message in history)
+{
+    Console.WriteLine($"{message.Role}: {message.Content}");
+}
+```
+
+### 设置聊天记录
+
+用一个新的列表覆盖当前的聊天历史记录。这在需要从外部恢复或修改对话上下文时非常有用。
+
+**方法签名:**
+```csharp
+public void SetChatHistory(List<Message> history)
+```
+
+**示例:**
+```csharp
+var newHistory = new List<Message>
+{
+    new Message { Role = "user", Content = "我们来玩个新游戏吧！" }
+};
+vpetLLM.SetChatHistory(newHistory);
+```
+
+### 清除聊天记录
+
+清空当前的聊天上下文和历史记录。
+
+**方法签名:**
+```csharp
+public void ClearChatHistory()
+```
+
+**示例:**
+```csharp
+vpetLLM.ClearChatHistory();
+```

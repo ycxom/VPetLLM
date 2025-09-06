@@ -73,6 +73,12 @@ namespace VPetLLM.Core
                 parts.Add($"可购买物品列表:{items}。");
             }
 
+           if (VPetLLM.Instance.Plugins.Any())
+           {
+               var pluginDescriptions = VPetLLM.Instance.Plugins.Select(p => $"{p.Name}: {p.Description}");
+               parts.Add("可用插件列表:\n" + string.Join("\n", pluginDescriptions));
+           }
+
             return string.Join("\n", parts);
         }
     }
