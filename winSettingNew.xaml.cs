@@ -107,12 +107,7 @@ namespace VPetLLM
             ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).Text = _plugin.Settings.Gemini.MaxTokens.ToString();
            ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
             ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
-            var pluginDisplayList = new List<string>();
-            foreach (var plugin in _plugin.Plugins)
-            {
-                pluginDisplayList.Add($"{plugin.Name}【{plugin.Description}】");
-            }
-            ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
+            ((DataGrid)this.FindName("DataGrid_Plugins")).ItemsSource = _plugin.Plugins;
         }
 
         private void SaveSettings()
@@ -318,22 +313,16 @@ namespace VPetLLM
 
        private void Button_UnloadPlugin_Click(object sender, RoutedEventArgs e)
        {
-           var listBox = (ListBox)this.FindName("ListBox_Plugins");
-           if (listBox.SelectedItem is string selectedPluginString)
+           var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
+           if (dataGrid.SelectedItem is IVPetLLMPlugin selectedPlugin)
            {
-               var selectedIndex = listBox.SelectedIndex;
-               if (selectedIndex >= 0 && selectedIndex < _plugin.Plugins.Count)
+               _plugin.UnloadPlugin(selectedPlugin);
+               if (System.IO.File.Exists(selectedPlugin.FilePath))
                {
-                   var selectedPlugin = _plugin.Plugins[selectedIndex];
-                   _plugin.UnloadPlugin(selectedPlugin);
-                   ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = null;
-                   var pluginDisplayList = new List<string>();
-                   foreach (var plugin in _plugin.Plugins)
-                   {
-                       pluginDisplayList.Add($"{plugin.Name}【{plugin.Description}】");
-                   }
-                   ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
+                   System.IO.File.Delete(selectedPlugin.FilePath);
                }
+               dataGrid.ItemsSource = null;
+               dataGrid.ItemsSource = _plugin.Plugins;
            }
        }
 
@@ -346,13 +335,9 @@ namespace VPetLLM
             if (dialog.ShowDialog() == true)
             {
                 _plugin.ImportPlugin(dialog.FileName);
-                ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = null;
-                var pluginDisplayList = new List<string>();
-                foreach (var plugin in _plugin.Plugins)
-                {
-                    pluginDisplayList.Add($"{plugin.Name}【{plugin.Description}】");
-                }
-                ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
+                var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
+                dataGrid.ItemsSource = null;
+                dataGrid.ItemsSource = _plugin.Plugins;
             }
         }
 
@@ -365,6 +350,31 @@ namespace VPetLLM
             };
             System.Diagnostics.Process.Start(psi);
             e.Handled = true;
+        }
+
+        private void DataGrid_Plugins_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            if (e.EditAction == DataGridEditAction.Commit)
+            {
+                if (e.Column is DataGridCheckBoxColumn)
+                {
+                    var plugin = e.Row.Item as IVPetLLMPlugin;
+                    if (plugin != null)
+                    {
+                        // The binding automatically updates the `Enabled` property.
+                        // Now, we need to add/remove the plugin from the ChatCore and save the state.
+                        if (plugin.Enabled)
+                        {
+                            _plugin.ChatCore.AddPlugin(plugin);
+                        }
+                        else
+                        {
+                            _plugin.ChatCore.RemovePlugin(plugin);
+                        }
+                        _plugin.SavePluginStates();
+                    }
+                }
+            }
         }
     }
 }

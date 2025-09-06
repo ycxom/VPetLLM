@@ -117,6 +117,16 @@ namespace VPetLLM.Core
         {
             ResponseHandler = handler;
         }
+
+        public virtual void AddPlugin(IVPetLLMPlugin plugin)
+        {
+            SystemMessageProvider.AddPlugin(plugin);
+        }
+
+        public virtual void RemovePlugin(IVPetLLMPlugin plugin)
+        {
+            SystemMessageProvider.RemovePlugin(plugin);
+        }
   }
 
     public class Message

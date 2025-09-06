@@ -202,7 +202,13 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <ListBox x:Name="ListBox_Plugins" Margin="5"/>
+                    <DataGrid x:Name="DataGrid_Plugins" AutoGenerateColumns="False" CanUserAddRows="False" Margin="5">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled}" Width="Auto"/>
+                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="描述" Binding="{Binding Description}" Width="2*" IsReadOnly="True"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
                         <TextBlock VerticalAlignment="Center" Margin="0,0,10,0">
                             <Run Text="如何使用？查看"/>

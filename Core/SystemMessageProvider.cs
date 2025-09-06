@@ -73,13 +73,23 @@ namespace VPetLLM.Core
                 parts.Add($"可购买物品列表:{items}。");
             }
 
-           if (VPetLLM.Instance.Plugins.Any())
+           if (VPetLLM.Instance.Plugins.Any(p => p.Enabled))
            {
-               var pluginDescriptions = VPetLLM.Instance.Plugins.Select(p => $"{p.Name}: {p.Description}");
+               var pluginDescriptions = VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => $"{p.Name}: {p.Description}");
                parts.Add("可用插件列表:\n" + string.Join("\n", pluginDescriptions));
            }
 
             return string.Join("\n", parts);
+        }
+
+        public void AddPlugin(IVPetLLMPlugin plugin)
+        {
+            // No action needed here for now, as GetSystemMessage dynamically fetches the list
+        }
+
+        public void RemovePlugin(IVPetLLMPlugin plugin)
+        {
+            // No action needed here for now, as GetSystemMessage dynamically fetches the list
         }
     }
 }

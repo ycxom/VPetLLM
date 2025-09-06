@@ -94,6 +94,7 @@ namespace VPetLLM
        {
            Settings.Save();
            ChatCore?.SaveHistory();
+           SavePluginStates();
        }
 
         public void UpdateChatCore(IChatCore newChatCore)
@@ -179,6 +180,13 @@ namespace VPetLLM
                 return;
             }
 
+            var configFile = Path.Combine(pluginDir, "plugins.json");
+            var pluginStates = new Dictionary<string, bool>();
+            if (File.Exists(configFile))
+            {
+                pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
+            }
+
             Plugins.Clear();
             foreach (var file in Directory.GetFiles(pluginDir, "*.dll"))
             {
@@ -190,9 +198,15 @@ namespace VPetLLM
                         if (typeof(IVPetLLMPlugin).IsAssignableFrom(type) && !type.IsInterface)
                         {
                             var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
+                            plugin.FilePath = file;
+                            plugin.Enabled = pluginStates.TryGetValue(plugin.Name, out var enabled) ? enabled : true;
                             plugin.Initialize(this);
                             Plugins.Add(plugin);
-                            Logger.Log($"Loaded plugin: {plugin.Name}");
+                            if (plugin.Enabled)
+                            {
+                                ChatCore?.AddPlugin(plugin);
+                            }
+                            Logger.Log($"Loaded plugin: {plugin.Name}, Enabled: {plugin.Enabled}");
                         }
                     }
                 }
@@ -201,6 +215,14 @@ namespace VPetLLM
                     Logger.Log($"Failed to load plugin {file}: {ex.Message}");
                 }
             }
+        }
+
+        public void SavePluginStates()
+        {
+            var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
+            var configFile = Path.Combine(pluginDir, "plugins.json");
+            var pluginStates = Plugins.ToDictionary(p => p.Name, p => p.Enabled);
+            File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
         }
 
         public void UnloadPlugin(IVPetLLMPlugin plugin)

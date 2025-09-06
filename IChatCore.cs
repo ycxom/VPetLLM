@@ -37,5 +37,7 @@ namespace VPetLLM
         /// 设置聊天历史记录（用于切换提供商时恢复）
         /// </summary>
         void SetChatHistory(List<Core.Message> history);
+        void AddPlugin(Core.IVPetLLMPlugin plugin);
+        void RemovePlugin(Core.IVPetLLMPlugin plugin);
     }
 }
