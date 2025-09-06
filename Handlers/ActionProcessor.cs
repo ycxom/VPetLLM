@@ -41,25 +41,41 @@ namespace VPetLLM.Handlers
 
             foreach (Match match in matches)
             {
-                var keyword = match.Groups[2].Value.ToLower();
-                var valueStr = match.Groups[3].Value;
-                var handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
+                var type = match.Groups[1].Value.ToLower();
+                string keyword;
+                string valueStr;
+                IActionHandler handler;
+
+                if (type == "plugin")
+                {
+                    keyword = type;
+                    handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
+                    string pluginName = match.Groups[2].Value;
+                    string pluginArgs = match.Groups[3].Value;
+                    valueStr = $"{pluginName}({pluginArgs})";
+                }
+                else
+                {
+                    keyword = match.Groups[2].Value.ToLower();
+                    valueStr = match.Groups[3].Value;
+                    handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
+                }
 
                 if (handler == null) continue;
 
                 bool isEnabled = handler.ActionType switch
                 {
                     ActionType.State => settings.EnableState,
-                    ActionType.Body => (handler.Keyword == "move" && settings.EnableMove) || (handler.Keyword == "action" && settings.EnableActionExecution),
+                    ActionType.Body => (handler.Keyword.ToLower() == "move" && settings.EnableMove) || (handler.Keyword.ToLower() == "action" && settings.EnableActionExecution),
                     ActionType.Talk => true,
                     ActionType.Plugin => true,
                     _ => false
                 };
-                if (handler.Keyword == "buy") isEnabled = settings.EnableBuy;
+                if (handler.Keyword.ToLower() == "buy") isEnabled = settings.EnableBuy;
 
                 if (!isEnabled) continue;
 
-                actions.Add(new HandlerAction(handler.ActionType, handler.Keyword, valueStr, handler));
+                actions.Add(new HandlerAction(handler.ActionType, keyword, valueStr, handler));
             }
             return actions;
         }

@@ -29,7 +29,11 @@ namespace VPetLLM.Core.ChatCore
 
 
 
-        public override async Task<string> Chat(string prompt)
+        public override Task<string> Chat(string prompt)
+        {
+            return Chat(prompt, false);
+        }
+        public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
             // 检查并更新系统消息（确保Role设置生效）
             var systemMessage = HistoryManager.GetHistory().FirstOrDefault(m => m.Role == "system");
@@ -53,7 +57,10 @@ namespace VPetLLM.Core.ChatCore
             }
             else
             {
-               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
+                if (!isFunctionCall)
+                {
+                    await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
+                }
             }
             // 构建请求数据，根据启用开关决定是否包含高级参数
             object data;
@@ -62,7 +69,7 @@ namespace VPetLLM.Core.ChatCore
                 data = new
                 {
                     model = _openAISetting.Model,
-                    messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)),
+                    messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)).Select(m => new { role = m.Role == "plugin" ? "user" : m.Role, content = m.Content }),
                     temperature = _openAISetting.Temperature,
                     max_tokens = _openAISetting.MaxTokens
                 };
@@ -72,7 +79,7 @@ namespace VPetLLM.Core.ChatCore
                 data = new
                 {
                     model = _openAISetting.Model,
-                    messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold))
+                    messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)).Select(m => new { role = m.Role == "plugin" ? "user" : m.Role, content = m.Content })
                 };
             }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -105,7 +112,8 @@ namespace VPetLLM.Core.ChatCore
             {
                 SaveHistory();
             }
-            return message;
+            ResponseHandler?.Invoke(message);
+            return "";
         }
 
         public override async Task<string> Summarize(string text)

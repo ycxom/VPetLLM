@@ -8,6 +8,8 @@ namespace VPetLLM
     {
         string Name { get; }
         Task<string> Chat(string prompt);
+        Task<string> Chat(string prompt, bool isFunctionCall);
+        void SetResponseHandler(Action<string> handler);
         void SaveHistory();
         void LoadHistory();
         List<string> GetModels();

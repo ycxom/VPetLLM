@@ -19,7 +19,9 @@ namespace VPetLLM.Core
         protected IMainWindow? MainWindow { get; }
         protected ActionProcessor? ActionProcessor { get; }
         protected SystemMessageProvider SystemMessageProvider { get; }
+        protected Action<string> ResponseHandler;
     public abstract Task<string> Chat(string prompt);
+    public abstract Task<string> Chat(string prompt, bool isFunctionCall);
     public abstract Task<string> Summarize(string text);
 
         protected string GetSystemMessage()
@@ -111,6 +113,10 @@ namespace VPetLLM.Core
       {
           HistoryManager.LoadHistory();
       }
+        public void SetResponseHandler(Action<string> handler)
+        {
+            ResponseHandler = handler;
+        }
   }
 
     public class Message

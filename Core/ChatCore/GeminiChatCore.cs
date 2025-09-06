@@ -25,7 +25,11 @@ namespace VPetLLM.Core.ChatCore
 
 
 
-        public override async Task<string> Chat(string prompt)
+        public override Task<string> Chat(string prompt)
+        {
+            return Chat(prompt, false);
+        }
+        public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
             // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (!_keepContext)
@@ -34,7 +38,10 @@ namespace VPetLLM.Core.ChatCore
             }
             else
             {
-               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
+                if (!isFunctionCall)
+                {
+                    await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
+                }
             }
             
             // 使用dynamic类型来构建请求数据，避免匿名类型转换问题
@@ -46,7 +53,7 @@ namespace VPetLLM.Core.ChatCore
                 contents = HistoryManager.GetHistory()
                     .Where(m => m.Role != "system")
                     .Skip(Math.Max(0, HistoryManager.GetHistory().Count(m => m.Role != "system") - _setting.HistoryCompressionThreshold))
-                    .Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
+                    .Select(m => new { role = m.Role == "plugin" ? "user" : m.Role, parts = new[] { new { text = m.Content } } }),
                 generationConfig = new
                 {
                     maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
@@ -102,7 +109,8 @@ namespace VPetLLM.Core.ChatCore
             {
                 SaveHistory();
             }
-            return message;
+            ResponseHandler?.Invoke(message);
+            return "";
         }
 
 

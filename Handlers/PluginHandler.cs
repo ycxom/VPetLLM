@@ -18,7 +18,7 @@ namespace VPetLLM.Handlers
         public async void Execute(string value, IMainWindow main)
         {
             VPetLLM.Instance.Log($"PluginHandler: Received value: {value}");
-            var match = new Regex(@"(.*?)(?:\((.*)\))?").Match(value);
+            var match = new Regex(@"(\w+)(?:\((.*)\))?").Match(value);
             if (match.Success)
             {
                 var pluginName = match.Groups[1].Value.Trim();
@@ -34,6 +34,7 @@ namespace VPetLLM.Handlers
                         VPetLLM.Instance.Log($"PluginHandler: Plugin function returned: {result}");
                         var message = new Message { Role = "plugin", Content = result };
                         VPetLLM.Instance.ChatCore.GetChatHistory().Add(message);
+                        await VPetLLM.Instance.ChatCore.Chat(result, true);
                     }
                 }
                 else
