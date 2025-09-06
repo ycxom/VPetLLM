@@ -12,11 +12,13 @@ namespace VPetLLM.Core
         private List<Message> _history = new List<Message>();
        private readonly Setting _settings;
        private readonly string _historyFilePath;
+       private readonly ChatCoreBase _chatCore;
 
-       public HistoryManager(Setting settings, string name)
+       public HistoryManager(Setting settings, string name, ChatCoreBase chatCore)
        {
            _settings = settings;
            _historyFilePath = GetHistoryFilePath(name);
+           _chatCore = chatCore;
            LoadHistory();
        }
 
@@ -38,13 +40,13 @@ namespace VPetLLM.Core
            File.WriteAllText(_historyFilePath, json);
        }
 
-      public async Task AddMessage(Message message, Func<string, Task<string>> chatFunction)
+      public async Task AddMessage(Message message)
       {
-          _history.Add(message);
-          if (_settings.EnableHistoryCompression && _history.Count > _settings.HistoryCompressionThreshold)
+          if (_settings.EnableHistoryCompression && _history.Count >= _settings.HistoryCompressionThreshold)
           {
-              await CompressHistory(chatFunction);
+              await CompressHistory();
           }
+          _history.Add(message);
       }
 
         public void ClearHistory()
@@ -52,34 +54,45 @@ namespace VPetLLM.Core
             _history.Clear();
         }
 
-    private async Task CompressHistory(Func<string, Task<string>> chatFunction)
+    private async Task CompressHistory()
     {
         var backupFilePath = _historyFilePath.Replace(".json", "_backup.json");
         File.WriteAllText(backupFilePath, JsonConvert.SerializeObject(_history, Formatting.Indented));
 
-        var historyToCompress = _history.Where(m => m.Role == "user" || m.Role == "assistant").ToList();
-        var lastUserMessage = _history.LastOrDefault(m => m.Role == "user");
+        var validHistory = _history.Where(m => !string.IsNullOrWhiteSpace(m.Content)).ToList();
+        var lastUserMessageIndex = validHistory.FindLastIndex(m => m.Role == "user");
 
-       var historyText = string.Join("\n", historyToCompress.Where(m => m.Role != "system").Select(m => $"{m.Role}: {m.Content}"));
-     var prompt = $"你是一个聊天记录总结助手，请将以下对话总结为一段摘要:\n{historyText}";
-
-     // Temporarily disable history compression to prevent infinite recursion
-        var originalCompressionState = _settings.EnableHistoryCompression;
-        _settings.EnableHistoryCompression = false;
-
-        var summary = await chatFunction(prompt);
-
-        // Restore the original state
-        _settings.EnableHistoryCompression = originalCompressionState;
-
-        _history.Clear();
-        _history.Add(new Message { Role = "system", Content = _settings.Role });
-        _history.Add(new Message { Role = "assistant", Content = summary });
-        if (lastUserMessage != null)
+        if (lastUserMessageIndex == -1)
         {
-            _history.Add(lastUserMessage);
+            return;
         }
 
+        var messagesToKeep = validHistory.Skip(lastUserMessageIndex).ToList();
+        var historyToCompress = validHistory.Take(lastUserMessageIndex)
+                                             .Where(m => m.Role == "user" || m.Role == "assistant")
+                                             .ToList();
+
+        if (!historyToCompress.Any())
+        {
+            return;
+        }
+
+        var historyText = string.Join("\n", historyToCompress.Select(m => m.Content));
+        var prompt = $"请将以下多轮对话总结为一段摘要，以便后续机器人能理解上下文。总结时不要模仿任何角色，内容要尽可能简洁，只保留核心信息，避免任何与总结任务无关的词语。要总结的内容如下:\n{historyText}";
+
+        var summary = await _chatCore.Summarize(prompt);
+
+        if (string.IsNullOrWhiteSpace(summary))
+        {
+            return;
+        }
+
+        var newHistory = new List<Message>
+        {
+            new Message { Role = "assistant", Content = summary }
+        };
+        newHistory.AddRange(messagesToKeep);
+        _history = newHistory;
         SaveHistory();
     }
 

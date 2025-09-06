@@ -55,12 +55,12 @@ namespace VPetLLM.Core.ChatCore
             }
             else
             {
-               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt }, Chat);
+               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
             }
             var data = new
             {
                 model = _ollamaSetting.Model,
-                messages = HistoryManager.GetHistory(),
+                messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)),
                 stream = false,
                 options = _ollamaSetting.EnableAdvanced ? new
                 {
@@ -77,7 +77,7 @@ namespace VPetLLM.Core.ChatCore
             // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (_keepContext)
             {
-               await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message }, Chat);
+               await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
             }
             // 只有在保持上下文模式时才保存历史记录
             if (_keepContext)
@@ -87,6 +87,21 @@ namespace VPetLLM.Core.ChatCore
             return message;
         }
 
+        public override async Task<string> Summarize(string text)
+        {
+            var data = new
+            {
+                model = _ollamaSetting.Model,
+                prompt = text,
+                stream = false
+            };
+            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("/api/generate", content);
+            response.EnsureSuccessStatusCode();
+            var responseString = await response.Content.ReadAsStringAsync();
+            var responseObject = JObject.Parse(responseString);
+            return responseObject["response"].ToString();
+        }
         /// <summary>
         /// 手动刷新可用模型列表
         /// </summary>

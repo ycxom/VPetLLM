@@ -20,6 +20,7 @@ namespace VPetLLM.Core
         protected ActionProcessor? ActionProcessor { get; }
         protected SystemMessageProvider SystemMessageProvider { get; }
     public abstract Task<string> Chat(string prompt);
+    public abstract Task<string> Summarize(string text);
 
         protected string GetSystemMessage()
         {
@@ -34,7 +35,7 @@ namespace VPetLLM.Core
           Settings = settings;
           MainWindow = mainWindow;
           ActionProcessor = actionProcessor;
-          HistoryManager = new HistoryManager(settings, Name);
+          HistoryManager = new HistoryManager(settings, Name, this);
           SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
       }
         

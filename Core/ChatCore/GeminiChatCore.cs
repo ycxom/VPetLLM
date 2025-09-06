@@ -34,7 +34,7 @@ namespace VPetLLM.Core.ChatCore
             }
             else
             {
-               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt }, Chat);
+               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
             }
             
             // 使用dynamic类型来构建请求数据，避免匿名类型转换问题
@@ -45,6 +45,7 @@ namespace VPetLLM.Core.ChatCore
             {
                 contents = HistoryManager.GetHistory()
                     .Where(m => m.Role != "system")
+                    .Skip(Math.Max(0, HistoryManager.GetHistory().Count(m => m.Role != "system") - _setting.HistoryCompressionThreshold))
                     .Select(m => new { role = m.Role, parts = new[] { new { text = m.Content } } }),
                 generationConfig = new
                 {
@@ -94,7 +95,7 @@ namespace VPetLLM.Core.ChatCore
             if (_keepContext)
             {
                 // 使用标准化角色名称，而不是Gemini特有的"model"
-               await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message }, Chat);
+               await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
             }
             // 只有在保持上下文模式时才保存历史记录
             if (_keepContext)
@@ -104,6 +105,41 @@ namespace VPetLLM.Core.ChatCore
             return message;
         }
 
+
+        public override async Task<string> Summarize(string text)
+        {
+            var requestData = new
+            {
+                contents = new[]
+                {
+                    new { parts = new[] { new { text = text } } }
+                }
+            };
+
+            var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
+
+            var baseUrl = _geminiSetting.Url.TrimEnd('/');
+            if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
+            {
+                baseUrl += "/v1beta";
+            }
+            var modelName = _geminiSetting.Model;
+            var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
+
+            var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
+            request.Content = content;
+            request.Headers.Add("User-Agent", "Lolisi_VPet_LLMAPI");
+            if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
+            {
+                request.Headers.Add("x-goog-api-key", _geminiSetting.ApiKey);
+            }
+
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+            var responseString = await response.Content.ReadAsStringAsync();
+            var responseObject = JObject.Parse(responseString);
+            return responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
+        }
         /// <summary>
         /// 手动刷新可用模型列表
         /// </summary>

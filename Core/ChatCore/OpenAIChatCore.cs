@@ -53,7 +53,7 @@ namespace VPetLLM.Core.ChatCore
             }
             else
             {
-               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt }, Chat);
+               await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
             }
             // 构建请求数据，根据启用开关决定是否包含高级参数
             object data;
@@ -62,7 +62,7 @@ namespace VPetLLM.Core.ChatCore
                 data = new
                 {
                     model = _openAISetting.Model,
-                    messages = HistoryManager.GetHistory().Take(10),
+                    messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)),
                     temperature = _openAISetting.Temperature,
                     max_tokens = _openAISetting.MaxTokens
                 };
@@ -72,7 +72,7 @@ namespace VPetLLM.Core.ChatCore
                 data = new
                 {
                     model = _openAISetting.Model,
-                    messages = HistoryManager.GetHistory().Take(10)
+                    messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold))
                 };
             }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -98,7 +98,7 @@ namespace VPetLLM.Core.ChatCore
             // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (_keepContext)
             {
-               await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message }, Chat);
+               await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
             }
             // 只有在保持上下文模式时才保存历史记录
             if (_keepContext)
@@ -106,6 +106,53 @@ namespace VPetLLM.Core.ChatCore
                 SaveHistory();
             }
             return message;
+        }
+
+        public override async Task<string> Summarize(string text)
+        {
+            var messages = new[]
+            {
+                new { role = "user", content = text }
+            };
+
+            object data;
+            if (_openAISetting.EnableAdvanced)
+            {
+                data = new
+                {
+                    model = _openAISetting.Model,
+                    messages = messages,
+                    temperature = _openAISetting.Temperature,
+                    max_tokens = _openAISetting.MaxTokens
+                };
+            }
+            else
+            {
+                data = new
+                {
+                    model = _openAISetting.Model,
+                    messages = messages
+                };
+            }
+
+            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+
+            string apiUrl = _openAISetting.Url;
+            if (!apiUrl.Contains("/chat/completions"))
+            {
+                var baseUrl = apiUrl.TrimEnd('/');
+                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
+                {
+                    baseUrl += "/v1";
+                }
+                apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
+            }
+
+            var response = await _httpClient.PostAsync(apiUrl, content);
+            response.EnsureSuccessStatusCode();
+            var responseString = await response.Content.ReadAsStringAsync();
+            var responseObject = JObject.Parse(responseString);
+            return responseObject["choices"][0]["message"]["content"].ToString();
         }
 
         /// <summary>
