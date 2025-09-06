@@ -8,19 +8,10 @@
         Title="VPetLLM" Height="640" Width="800">
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <DockPanel Grid.Row="0" Margin="0,0,0,5">
-            <WrapPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="保存" Click="Button_Save_Click" Margin="5"/>
-                <Button Content="恢复默认设置" Click="Button_RestoreDefaults_Click" Margin="5"/>
-                <TextBlock x:Name="TextBlock_Unsaved" Text="未保存" Foreground="Red" Visibility="Collapsed" VerticalAlignment="Center" Margin="5,0"/>
-            </WrapPanel>
-        </DockPanel>
-
-        <TabControl Grid.Row="1">
+        <TabControl Grid.Row="0">
             <TabItem Header="LLM设置">
                 <Grid>
                     <Grid.ColumnDefinitions>

@@ -17,10 +17,50 @@ namespace VPetLLM
             _plugin = plugin;
             InitializeComponent();
             LoadSettings();
-            ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Slider_Temperature_ValueChanged;
-            ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Slider_Temperature_ValueChanged;
-            ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Slider_Temperature_ValueChanged;
+            ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
+            ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Control_ValueChanged;
+            ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Control_ValueChanged;
+
+            // Add event handlers for all other controls
+            ((ComboBox)this.FindName("ComboBox_Provider")).SelectionChanged += Control_SelectionChanged;
+            ((TextBox)this.FindName("TextBox_AiName")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_UserName")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_FollowVPetName")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_Role")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_OllamaUrl")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_OllamaModel")).SelectionChanged += Control_SelectionChanged;
+            ((TextBox)this.FindName("TextBox_OpenAIApiKey")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_OpenAIModel")).SelectionChanged += Control_SelectionChanged;
+            ((TextBox)this.FindName("TextBox_OpenAIUrl")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_GeminiApiKey")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_GeminiModel")).SelectionChanged += Control_SelectionChanged;
+            ((TextBox)this.FindName("TextBox_GeminiUrl")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_KeepContext")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_AutoMigrateChatHistory")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableAction")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableBuy")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableState")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableMove")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableTime")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).TextChanged += Control_TextChanged;
         }
+
+        private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => SaveSettings();
+        private void Control_SelectionChanged(object sender, SelectionChangedEventArgs e) => SaveSettings();
+        private void Control_TextChanged(object sender, TextChangedEventArgs e) => SaveSettings();
+        private void Control_Click(object sender, RoutedEventArgs e) => SaveSettings();
 
         private void LoadSettings()
         {
@@ -75,7 +115,7 @@ namespace VPetLLM
             ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
         }
 
-        private void Button_Save_Click(object sender, RoutedEventArgs e)
+        private void SaveSettings()
         {
             var providerComboBox = (ComboBox)this.FindName("ComboBox_Provider");
             var aiNameTextBox = (TextBox)this.FindName("TextBox_AiName");
@@ -112,7 +152,6 @@ namespace VPetLLM
             var geminiTemperatureSlider = (Slider)this.FindName("Slider_Gemini_Temperature");
             var geminiMaxTokensTextBox = (TextBox)this.FindName("TextBox_Gemini_MaxTokens");
             var toolsDataGrid = (DataGrid)this.FindName("DataGrid_Tools");
-            var unsavedTextBlock = (TextBlock)this.FindName("TextBlock_Unsaved");
 
             var oldProvider = _plugin.Settings.Provider;
             var newProvider = (Setting.LLMType)providerComboBox.SelectedItem;
@@ -178,24 +217,6 @@ namespace VPetLLM
                 }
                 _plugin.UpdateChatCore(newChatCore);
             }
-            unsavedTextBlock.Visibility = Visibility.Collapsed;
-        }
-
-        private void Slider_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (sender == ((Slider)this.FindName("Slider_Ollama_Temperature")))
-                ((TextBlock)this.FindName("TextBlock_Ollama_TemperatureValue")).Text = e.NewValue.ToString("F2");
-            else if (sender == ((Slider)this.FindName("Slider_OpenAI_Temperature")))
-                ((TextBlock)this.FindName("TextBlock_OpenAI_TemperatureValue")).Text = e.NewValue.ToString("F2");
-            else if (sender == ((Slider)this.FindName("Slider_Gemini_Temperature")))
-                ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = e.NewValue.ToString("F2");
-        }
-
-        private void Button_RestoreDefaults_Click(object sender, RoutedEventArgs e)
-        {
-            _plugin.ResetSettings();
-            LoadSettings();
-            ((TextBlock)this.FindName("TextBlock_Unsaved")).Visibility = Visibility.Visible;
         }
         private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
 
