@@ -67,7 +67,12 @@ namespace VPetLLM
             ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).Text = _plugin.Settings.Gemini.MaxTokens.ToString();
            ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
             ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
-            ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = _plugin.Plugins;
+            var pluginDisplayList = new List<string>();
+            foreach (var plugin in _plugin.Plugins)
+            {
+                pluginDisplayList.Add($"{plugin.Name}【{plugin.Description}】");
+            }
+            ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
         }
 
         private void Button_Save_Click(object sender, RoutedEventArgs e)
@@ -282,17 +287,52 @@ namespace VPetLLM
        {
            _plugin.LoadPlugins();
            ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = null;
-           ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = _plugin.Plugins;
+            var pluginDisplayList = new List<string>();
+            foreach (var plugin in _plugin.Plugins)
+            {
+                pluginDisplayList.Add($"{plugin.Name}【{plugin.Description}】");
+            }
+            ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
        }
 
        private void Button_UnloadPlugin_Click(object sender, RoutedEventArgs e)
        {
-           if (((ListBox)this.FindName("ListBox_Plugins")).SelectedItem is IVPetLLMPlugin selectedPlugin)
+           var listBox = (ListBox)this.FindName("ListBox_Plugins");
+           if (listBox.SelectedItem is string selectedPluginString)
            {
-               _plugin.UnloadPlugin(selectedPlugin);
-               ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = null;
-               ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = _plugin.Plugins;
+               var selectedIndex = listBox.SelectedIndex;
+               if (selectedIndex >= 0 && selectedIndex < _plugin.Plugins.Count)
+               {
+                   var selectedPlugin = _plugin.Plugins[selectedIndex];
+                   _plugin.UnloadPlugin(selectedPlugin);
+                   ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = null;
+                   var pluginDisplayList = new List<string>();
+                   foreach (var plugin in _plugin.Plugins)
+                   {
+                       pluginDisplayList.Add($"{plugin.Name}【{plugin.Description}】");
+                   }
+                   ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
+               }
            }
        }
+
+        private void Button_ImportPlugin_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "插件文件 (*.dll)|*.dll"
+            };
+            if (dialog.ShowDialog() == true)
+            {
+                _plugin.ImportPlugin(dialog.FileName);
+                ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = null;
+                var pluginDisplayList = new List<string>();
+                foreach (var plugin in _plugin.Plugins)
+                {
+                    pluginDisplayList.Add($"{plugin.Name}【{plugin.Description}】");
+                }
+                ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
+            }
+        }
     }
 }

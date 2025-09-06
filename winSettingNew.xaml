@@ -214,6 +214,7 @@
                     <ListBox x:Name="ListBox_Plugins" Margin="5"/>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
                         <Button Content="加载插件" Click="Button_LoadPlugins_Click" Margin="5"/>
+                        <Button Content="导入插件" Click="Button_ImportPlugin_Click" Margin="5"/>
                         <Button Content="卸载插件" Click="Button_UnloadPlugin_Click" Margin="5"/>
                     </StackPanel>
                 </Grid>

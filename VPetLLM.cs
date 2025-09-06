@@ -213,6 +213,29 @@ namespace VPetLLM
             {
                 Logger.Log(message);
             }
+
+        public void ImportPlugin(string filePath)
+        {
+            var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
+            if (!Directory.Exists(pluginDir))
+            {
+                Directory.CreateDirectory(pluginDir);
+            }
+
+            var fileName = Path.GetFileName(filePath);
+            var destPath = Path.Combine(pluginDir, fileName);
+
+            try
+            {
+                File.Copy(filePath, destPath, true);
+                Logger.Log($"Imported plugin: {fileName}");
+                LoadPlugins();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to import plugin {fileName}: {ex.Message}");
+            }
+        }
     }
 
 }
