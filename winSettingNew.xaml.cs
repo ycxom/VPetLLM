@@ -355,5 +355,16 @@ namespace VPetLLM
                 ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
             }
         }
+
+        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = e.Uri.AbsoluteUri,
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
+            e.Handled = true;
+        }
     }
 }
