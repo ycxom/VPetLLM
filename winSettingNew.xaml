@@ -7,7 +7,20 @@
         mc:Ignorable="d"
         Title="VPetLLM" Height="640" Width="800">
     <Grid Margin="10">
-        <TabControl>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,5">
+            <WrapPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="保存" Click="Button_Save_Click" Margin="5"/>
+                <Button Content="恢复默认设置" Click="Button_RestoreDefaults_Click" Margin="5"/>
+                <TextBlock x:Name="TextBlock_Unsaved" Text="未保存" Foreground="Red" Visibility="Collapsed" VerticalAlignment="Center" Margin="5,0"/>
+            </WrapPanel>
+        </DockPanel>
+
+        <TabControl Grid.Row="1">
             <TabItem Header="LLM设置">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -19,7 +32,7 @@
                         <StackPanel Margin="0,0,10,0">
                             <Label Content="LLM 提供商"/>
                             <ComboBox x:Name="ComboBox_Provider" Margin="0,0,0,10" SelectionChanged="ComboBox_Provider_SelectionChanged"/>
-                            
+
                             <Label Content="AI名称" VerticalAlignment="Top" Margin="0,10,0,0"/>
                             <TextBox x:Name="TextBox_AiName" MaxWidth="300"/>
                             <Label Content="用户名称" VerticalAlignment="Top" Margin="0,10,0,0"/>
@@ -27,7 +40,7 @@
                             <CheckBox x:Name="CheckBox_FollowVPetName" Content="名字与主人名字设置跟着桌面宠物设置" Margin="0,5,0,0"/>
                             <Label Content="角色设定" VerticalAlignment="Top" Margin="0,10,0,0"/>
                             <TextBox x:Name="TextBox_Role" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Height="120" Width="300"/>
-                            
+
                             <Label Content="上下文控制" Margin="0,10,0,0"/>
                             <CheckBox x:Name="CheckBox_KeepContext" Content="保持聊天上下文" Margin="0,0,0,5" IsChecked="True"/>
                             <CheckBox x:Name="CheckBox_EnableChatHistory" Content="保存聊天历史" Margin="0,0,0,5" IsChecked="True"/>
@@ -37,12 +50,6 @@
                                 <Button x:Name="Button_ClearContext" Content="清除上下文" Click="Button_ClearContext_Click" Margin="5"/>
                                 <Button x:Name="Button_EditContext" Content="编辑上下文" Click="Button_EditContext_Click" Margin="5"/>
                             </WrapPanel>
-
-                            <WrapPanel HorizontalAlignment="Right" Margin="0,10,0,0">
-                               <Button Content="保存" Click="Button_Save_Click" Margin="5"/>
-                               <Button Content="恢复默认设置" Click="Button_RestoreDefaults_Click" Margin="5"/>
-                            </WrapPanel>
-                            <TextBlock x:Name="TextBlock_Unsaved" Text="未保存" Foreground="Red" Visibility="Collapsed" HorizontalAlignment="Right" Margin="0,5,5,0"/>
                         </StackPanel>
                     </ScrollViewer>
 
@@ -151,13 +158,13 @@
                         <CheckBox x:Name="CheckBox_EnableActionExecution" Content="允许宠物执行动作" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
                         <CheckBox x:Name="CheckBox_EnableMove" Content="允许宠物移动" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
                         <CheckBox x:Name="CheckBox_EnableTime" Content="允许获取当前时间" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
-                       <CheckBox x:Name="CheckBox_EnableHistoryCompression" Content="启用聊天记录压缩" Margin="0,10,0,5"/>
-                       <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
-                           <TextBlock Text="压缩阈值:" VerticalAlignment="Center"/>
-                           <TextBox x:Name="TextBox_HistoryCompressionThreshold" Width="50" Margin="5,0"/>
-                          <TextBlock Text="当前上下文长度:" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                          <TextBlock x:Name="TextBlock_CurrentContextLength" VerticalAlignment="Center"/>
-                       </StackPanel>
+                        <CheckBox x:Name="CheckBox_EnableHistoryCompression" Content="启用聊天记录压缩" Margin="0,10,0,5"/>
+                        <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
+                            <TextBlock Text="压缩阈值:" VerticalAlignment="Center"/>
+                            <TextBox x:Name="TextBox_HistoryCompressionThreshold" Width="50" Margin="5,0"/>
+                            <TextBlock Text="当前上下文长度:" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            <TextBlock x:Name="TextBlock_CurrentContextLength" VerticalAlignment="Center"/>
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </TabItem>
@@ -175,7 +182,7 @@
                             <DataGridCheckBoxColumn Header="启用" Binding="{Binding IsEnabled}" Width="Auto"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                   <TextBlock Text="此列表用于配置 MCP (Model-Controlled Plugin) 工具" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5"/>
+                    <TextBlock Text="此列表用于配置 MCP (Model-Controlled Plugin) 工具" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5"/>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
                         <Button Content="添加" Click="Button_AddTool_Click" Margin="5"/>
                         <Button Content="删除" Click="Button_DeleteTool_Click" Margin="5"/>

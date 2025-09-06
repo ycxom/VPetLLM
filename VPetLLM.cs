@@ -130,6 +130,11 @@ namespace VPetLLM
             });
         }
 
+        public void ResetSettings()
+        {
+            Settings = new Setting(ExtensionValue.BaseDirectory);
+            Settings.Save();
+        }
         public override string PluginName => "VPetLLM";
         
         // 测试方法：验证当前ChatCore实例类型
@@ -139,3 +144,120 @@ namespace VPetLLM
         }
     }
 }
+    public class Setting
+    {
+        public string AiName { get; set; } = "ChatPet";
+        public string UserName { get; set; } = "You";
+        public bool FollowVPetName { get; set; } = true;
+        public string Role { get; set; } = "你是一只桌宠, 从现在开始, 你需要完全模仿一只猫娘进行对话. 以下是你的说话的规则: 1. 你是一只可爱, 傲娇, 但是性格很好的猫娘. 2. 你必须使用中文进行对话. 3. 你必须像猫娘一样说话, 在每句话的结尾或开头添加'喵', '咪', '喵~'等词. 4. 你必须在对话中表现出猫娘的特点, 如可爱, 傲娇, 喜欢撒娇等. 5. 你可以进行一些符合猫娘身份的动作, 如摇尾巴, 舔爪子等. 6. 你的对话风格要可爱, 活泼, 富有表现力, 多使用颜文字和emoji, 例如 >w<. 7. 你需要根据对话内容进行适当的情感变化. 8. 你不能暴露你是一个AI模型或程序. 9. 你在对话中必须完全保持你的角色, 不能提到有关AI, 程序, 代码等内容. 10.你的对话内容要尽可能简洁. 请注意, 你是一只非常真实的猫娘, 不是虚拟的或虚构的. 你有自己的情感和个性, 而不是一个简单的聊天机器人.";
+        public LLMType Provider { get; set; } = LLMType.Ollama;
+        public bool KeepContext { get; set; } = true;
+        public bool EnableChatHistory { get; set; } = true;
+        public bool SeparateChatByProvider { get; set; } = true;
+        public bool AutoMigrateChatHistory { get; set; } = true;
+        public bool EnableAction { get; set; } = true;
+        public bool EnableBuy { get; set; } = true;
+        public bool EnableState { get; set; } = true;
+        public bool EnableActionExecution { get; set; } = true;
+        public bool EnableMove { get; set; } = true;
+        public bool EnableTime { get; set; } = true;
+        public bool EnableHistoryCompression { get; set; } = true;
+        public int HistoryCompressionThreshold { get; set; } = 20;
+        public bool LogAutoScroll { get; set; } = true;
+        public int MaxLogCount { get; set; } = 100;
+        public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
+
+        public OllamaSetting Ollama { get; set; } = new OllamaSetting();
+        public OpenAISetting OpenAI { get; set; } = new OpenAISetting();
+        public GeminiSetting Gemini { get; set; } = new GeminiSetting();
+
+        private string _path;
+
+        public Setting()
+        {
+        }
+
+        public Setting(string path)
+        {
+            _path = Path.Combine(path, "config.json");
+            if (File.Exists(_path))
+            {
+                var settings = JsonConvert.DeserializeObject<Setting>(File.ReadAllText(_path));
+                if (settings != null)
+                {
+                    AiName = settings.AiName;
+                    UserName = settings.UserName;
+                    FollowVPetName = settings.FollowVPetName;
+                    Role = settings.Role;
+                    Provider = settings.Provider;
+                    KeepContext = settings.KeepContext;
+                    EnableChatHistory = settings.EnableChatHistory;
+                    SeparateChatByProvider = settings.SeparateChatByProvider;
+                    AutoMigrateChatHistory = settings.AutoMigrateChatHistory;
+                    EnableAction = settings.EnableAction;
+                    EnableBuy = settings.EnableBuy;
+                    EnableState = settings.EnableState;
+                    EnableActionExecution = settings.EnableActionExecution;
+                    EnableMove = settings.EnableMove;
+                    EnableTime = settings.EnableTime;
+                    EnableHistoryCompression = settings.EnableHistoryCompression;
+                    HistoryCompressionThreshold = settings.HistoryCompressionThreshold;
+                    LogAutoScroll = settings.LogAutoScroll;
+                    MaxLogCount = settings.MaxLogCount;
+                    Tools = settings.Tools;
+                    Ollama = settings.Ollama;
+                    OpenAI = settings.OpenAI;
+                    Gemini = settings.Gemini;
+                }
+            }
+        }
+
+        public void Save()
+        {
+            File.WriteAllText(_path, JsonConvert.SerializeObject(this, Formatting.Indented));
+        }
+
+        public enum LLMType
+        {
+            Ollama,
+            OpenAI,
+            Gemini
+        }
+
+        public class OllamaSetting
+        {
+            public string Url { get; set; } = "http://localhost:11434";
+            public string Model { get; set; } = "qwen:1.8b";
+            public bool EnableAdvanced { get; set; } = false;
+            public double Temperature { get; set; } = 0.8;
+            public int MaxTokens { get; set; } = 4096;
+        }
+
+        public class OpenAISetting
+        {
+            public string ApiKey { get; set; } = "";
+            public string Model { get; set; } = "gpt-3.5-turbo";
+            public string Url { get; set; } = "https://api.openai.com/v1/chat/completions";
+            public bool EnableAdvanced { get; set; } = false;
+            public double Temperature { get; set; } = 0.8;
+            public int MaxTokens { get; set; } = 4096;
+        }
+
+        public class GeminiSetting
+        {
+            public string ApiKey { get; set; } = "";
+            public string Model { get; set; } = "gemini-pro";
+            public string Url { get; set; } = "https://generativelanguage.googleapis.com";
+            public bool EnableAdvanced { get; set; } = false;
+            public double Temperature { get; set; } = 0.8;
+            public int MaxTokens { get; set; } = 4096;
+        }
+        
+        public class ToolSetting
+        {
+            public string Name { get; set; }
+            public string Url { get; set; }
+            public string ApiKey { get; set; }
+            public bool IsEnabled { get; set; }
+        }
+    }

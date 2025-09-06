@@ -197,7 +197,12 @@ namespace VPetLLM
                ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = e.NewValue.ToString("F2");
        }
 
-       private void Button_RestoreDefaults_Click(object sender, RoutedEventArgs e) { }
+       private void Button_RestoreDefaults_Click(object sender, RoutedEventArgs e)
+       {
+           _plugin.ResetSettings();
+           LoadSettings();
+           ((TextBlock)this.FindName("TextBlock_Unsaved")).Visibility = Visibility.Visible;
+       }
        private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
 
        private void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
