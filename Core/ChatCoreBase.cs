@@ -148,6 +148,21 @@ namespace VPetLLM.Core
                 };
             }
         }
+        public string DisplayContent
+        {
+            get
+            {
+                if (Role == "assistant")
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(Content ?? "", @"(?<=say\("")(?:[^""\\]|\\.)*(?=""\))");
+                    if (match.Success)
+                    {
+                        return match.Value;
+                    }
+                }
+                return Content ?? "";
+            }
+        }
     }
 }
 
