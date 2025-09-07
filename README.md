@@ -55,101 +55,20 @@ VPetLLM 是一个为 VPet-Simulator 设计的插件，它允许你使用各种�
 2. 输入你的消息并按 Enter。
 3. 你的虚拟宠物将会使用你配置的 LLM 来回应你，并且如果启用了任何工具，它也可能会使用这些工具来提供更丰富、更有用的响应。
 
+## 🔌 插件系统
+
+VPetLLM 现在拥有一个强大的插件系统，允许开发者扩展其功能。通过创建自己的插件，你可以：
+
+- **连接外部 API**: 获取天气、新闻、股票等实时数据。
+- **执行自定义动作**: 控制智能家居、发送邮件、或者任何你能想到的事情。
+- **增强 AI 的能力**: 为你的桌宠赋予全新的、独一-无二的技能。
+
+我们为插件开发者提供了一套完整的接口和的文档。
+
+**➡️ [点击这里查看详细的插件开发文档](https://github.com/ycxom/VPetLLM_Plugin)**
+
 ## 🤝 贡献
 
 欢迎各位大佬PR！
 
 - 该项目由Gemini 等AI编写！
-
-## 🔌 插件系统
-
-VPetLLM 现在拥有一个强大的插件系统，允许开发者扩展其功能。通过创建自己的插件，你可以：
--   **连接外部 API**: 获取天气、新闻、股票等实时数据。
--   **执行自定义动作**: 控制智能家居、发送邮件、或者任何你能想到的事情。
--   **增强 AI 的能力**: 为你的桌宠赋予全新的、独一-无二的技能。
-
-我们为插件开发者提供了一套完整的接口和详细的文档，让你能够轻松上手。
-
-**➡️ [点击这里查看详细的插件开发文档](PLUGIN_README.md)**
-
-## 📦 API 文档
-
-VPetLLM 插件提供了一组公共 API，允许其他插件或外部程序与之交互。
-
-### 获取插件实例
-
-首先，你需要获取 `VPetLLM` 插件的实例：
-
-```csharp
-var vpetLLM = VPetLLM.VPetLLM.Instance;
-if (vpetLLM == null)
-{
-    // 插件未加载或未启用
-    return;
-}
-```
-
-### 核心接口: IChatCore
-
-所有与聊天相关的功能都通过 `IChatCore` 接口提供。你可以通过 `vpetLLM.ChatCore` 来访问它。
-
-```csharp
-var chatCore = vpetLLM.ChatCore;
-```
-
-### 发送聊天消息
-
-异步地向当前配置的 LLM 发送一条消息。
-
-**方法签名:**
-```csharp
-Task<string> Chat(string prompt, bool isFunctionCall = false)
-```
--   `prompt`: 要发送给 AI 的文本。
--   `isFunctionCall`: 一个布尔值，指示此调用是否源自插件（函数调用）。当为 `true` 时，`prompt` 不会被作为新的 `user` 消息添加到历史记录中，因为它被假定为插件返回的结果。
-
-**示例:**
-```csharp
-// 普通用户聊天
-await chatCore.Chat("你好！");
-
-// 模拟插件返回结果
-await chatCore.Chat("这是插件返回的信息。", true);
-```
-*注意：该方法现在主要通过回调机制处理响应，返回值主要用于兼容旧的处理流程，在新的实现中可能为空。*
-
-### 响应处理
-
-通过注册一个响应处理器，你可以异步地接收并处理来自 AI 的回复。
-
-**方法签名:**
-```csharp
-void SetResponseHandler(Action<string> handler)
-```
-
-**示例:**
-```csharp
-chatCore.SetResponseHandler(response =>
-{
-    Console.WriteLine($"收到 AI 回复: {response}");
-    // 在这里处理回复，例如更新 UI 或执行动作
-});
-```
-
-### 聊天记录管理
-
-**获取聊天记录:**
-```csharp
-List<Message> history = chatCore.GetChatHistory();
-```
-
-**设置聊天记录:**
-```csharp
-var newHistory = new List<Message> { ... };
-chatCore.SetChatHistory(newHistory);
-```
-
-**清除聊天记录:**
-```csharp
-chatCore.ClearContext();
-```
