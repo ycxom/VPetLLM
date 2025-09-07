@@ -18,29 +18,21 @@ namespace VPetLLM
         public ContextEditorItem(Message originalMessage)
         {
             OriginalMessage = originalMessage;
-            if (originalMessage.Role == "assistant")
-            {
-                var match = Regex.Match(originalMessage.Content, @"say\s*\(\s*""([^""]*)""");
-                Content = match.Success ? match.Groups[1].Value : originalMessage.Content;
-            }
-            else
-            {
-                Content = originalMessage.Content;
-            }
+            Content = originalMessage.Content;
         }
     }
     public partial class winContextEditor : Window
     {
-        private readonly IChatCore _chatCore;
+        private readonly VPetLLM _plugin;
         public ObservableCollection<ContextEditorItem> DisplayHistory { get; set; }
         private List<Message> _originalHistory;
 
-        public winContextEditor(IChatCore chatCore)
+        public winContextEditor(VPetLLM plugin)
         {
             InitializeComponent();
-            _chatCore = chatCore;
+            _plugin = plugin;
 
-            _originalHistory = _chatCore.GetChatHistory();
+            _originalHistory = _plugin.ChatCore.GetChatHistory();
             var displayItems = _originalHistory
                 .Where(m => m.Role != "system")
                 .Select(m => new ContextEditorItem(m));
@@ -49,38 +41,14 @@ namespace VPetLLM
             DataContext = this;
         }
 
-        private void DataGrid_Context_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
-        {
-            if (e.Row.DataContext is ContextEditorItem item)
-            {
-                // Prevent editing of non-assistant roles' content
-                if (item.Role != "assistant" && e.Column.Header.ToString() == "内容")
-                {
-                    e.Cancel = true;
-                }
-            }
-        }
-        
         private void Button_Save_Click(object sender, RoutedEventArgs e)
         {
             foreach (var item in DisplayHistory)
             {
-                if (item.Role == "assistant")
-                {
-                    var originalSayMatch = Regex.Match(item.OriginalMessage.Content, @"(say\s*\(\s*"")([^""]*)(""[^)]*\))");
-                    if (originalSayMatch.Success && originalSayMatch.Groups[2].Value != item.Content)
-                    {
-                        string newText = item.Content.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                        item.OriginalMessage.Content = originalSayMatch.Groups[1].Value + newText + originalSayMatch.Groups[3].Value;
-                    }
-                }
-                else
-                {
-                    item.OriginalMessage.Content = item.Content;
-                }
+                item.OriginalMessage.Content = item.Content;
             }
 
-            _chatCore.SetChatHistory(_originalHistory);
+            _plugin.ChatCore.SetChatHistory(_originalHistory);
             Close();
         }
 

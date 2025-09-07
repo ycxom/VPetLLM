@@ -75,8 +75,6 @@ namespace VPetLLM.Handlers
                         {
                             var result = await actionPlugin.Function(arguments);
                             VPetLLM.Instance.Log($"PluginHandler: Plugin function returned: {result}");
-                            var message = new Message { Role = "plugin", Content = result };
-                            VPetLLM.Instance.ChatCore.GetChatHistory().Add(message);
                             await VPetLLM.Instance.ChatCore.Chat(result, true);
                         }
                     }

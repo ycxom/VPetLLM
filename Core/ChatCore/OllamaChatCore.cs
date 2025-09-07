@@ -37,37 +37,23 @@ namespace VPetLLM.Core.ChatCore
         }
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
-            // 检查并更新系统消息（确保Role设置生效）
-            var systemMessage = HistoryManager.GetHistory().FirstOrDefault(m => m.Role == "system");
-            var currentSystemMessage = GetSystemMessage();
-            
-            if (systemMessage == null)
-            {
-                // 如果没有系统消息，添加新的
-                HistoryManager.GetHistory().Insert(0, new Message { Role = "system", Content = currentSystemMessage });
-            }
-            else if (systemMessage.Content != currentSystemMessage)
-            {
-                // 如果系统消息内容已更改，更新它
-                systemMessage.Content = currentSystemMessage;
-            }
-            
-            // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (!_keepContext)
             {
                 ClearContext();
             }
             else
             {
-                if (!isFunctionCall)
+                if (!string.IsNullOrEmpty(prompt))
                 {
+                    //无论是用户输入还是插件返回，都作为user角色
                     await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
                 }
             }
+            List<Message> history = GetCoreHistory();
             var data = new
             {
                 model = _ollamaSetting.Model,
-                messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)).Select(m => new { role = m.Role == "plugin" ? "user" : m.Role, content = m.Content }),
+                messages = history.Select(m => new { role = m.Role, content = m.Content }),
                 stream = false,
                 options = _ollamaSetting.EnableAdvanced ? new
                 {
@@ -109,6 +95,16 @@ namespace VPetLLM.Core.ChatCore
             var responseString = await response.Content.ReadAsStringAsync();
             var responseObject = JObject.Parse(responseString);
             return responseObject["response"].ToString();
+        }
+
+        private List<Message> GetCoreHistory()
+        {
+            var history = new List<Message>
+            {
+                new Message { Role = "system", Content = GetSystemMessage() }
+            };
+            history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
+            return history;
         }
         /// <summary>
         /// 手动刷新可用模型列表

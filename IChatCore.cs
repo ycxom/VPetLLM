@@ -7,6 +7,7 @@ namespace VPetLLM
     public interface IChatCore
     {
         string Name { get; }
+        Core.HistoryManager HistoryManager { get; }
         Task<string> Chat(string prompt);
         Task<string> Chat(string prompt, bool isFunctionCall);
         void SetResponseHandler(Action<string> handler);

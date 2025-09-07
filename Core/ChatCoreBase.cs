@@ -14,7 +14,7 @@ namespace VPetLLM.Core
     public abstract class ChatCoreBase : IChatCore
     {
         public abstract string Name { get; }
-        protected HistoryManager HistoryManager { get; }
+        public HistoryManager HistoryManager { get; }
         protected Setting? Settings { get; }
         protected IMainWindow? MainWindow { get; }
         protected ActionProcessor? ActionProcessor { get; }

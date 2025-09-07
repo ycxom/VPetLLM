@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using VPet_Simulator.Core;
-using System.Windows;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Utils;
 
 namespace VPetLLM.Handlers
 {
@@ -36,32 +36,69 @@ namespace VPetLLM.Handlers
             var actions = new List<HandlerAction>();
             if (!settings.EnableAction) return actions;
 
-            var regex = new Regex(@"\[:(\w+)\((\w+)(?:\((.*?)\))?\)\]");
+            var regex = new Regex(@"\[:(plugin)\(((\w+)(?:\((.*)\))?)\)\]|\[:(\w+)\((.*?)\)\]");
             var matches = regex.Matches(response);
+            Logger.Log($"ActionProcessor: Found {matches.Count} matches for response: {response}");
 
             foreach (Match match in matches)
             {
-                var type = match.Groups[1].Value.ToLower();
-                string keyword;
-                string valueStr;
-                IActionHandler handler;
+                string type, fullValue, keyword, value;
 
-                if (type == "plugin")
+                if (match.Groups[1].Success && match.Groups[1].Value == "plugin")
                 {
-                    keyword = type;
-                    handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
-                    string pluginName = match.Groups[2].Value;
-                    string pluginArgs = match.Groups[3].Value;
-                    valueStr = $"{pluginName}({pluginArgs})";
+                    type = "plugin";
+                    fullValue = match.Groups[2].Value;
+                    keyword = match.Groups[3].Value.ToLower();
+                    value = match.Groups[4].Value;
                 }
                 else
                 {
-                    keyword = match.Groups[2].Value.ToLower();
-                    valueStr = match.Groups[3].Value;
-                    handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
+                    type = match.Groups[5].Value.ToLower();
+                    fullValue = match.Groups[6].Value;
+                    keyword = type;
+                    value = fullValue;
+
+                    if (type != "plugin")
+                    {
+                        var valueMatch = new Regex(@"(\w+)(?:\((.*)\))?").Match(fullValue);
+                        if (valueMatch.Success)
+                        {
+                            keyword = valueMatch.Groups[1].Value.ToLower();
+                            value = valueMatch.Groups[2].Value;
+                        }
+                    }
                 }
 
-                if (handler == null) continue;
+                IActionHandler handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
+
+                if (handler == null)
+                {
+                    // Fallback for type-based handlers like 'plugin'
+                    handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == type);
+                    if (handler == null)
+                    {
+                        // If no handler is found, check if it's a plugin name
+                        var plugin = VPetLLM.Instance.Plugins.Find(p => p.Name.Replace(" ", "_").ToLower() == keyword);
+                        if (plugin != null)
+                        {
+                            handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == "plugin");
+                            if (handler != null)
+                            {
+                                value = $"{keyword}({value})";
+                            }
+                        }
+
+                        if (handler == null)
+                        {
+                            Logger.Log($"ActionProcessor: No handler or plugin found for type or keyword: {type}/{keyword}");
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        value = fullValue;
+                    }
+                }
 
                 bool isEnabled = handler.ActionType switch
                 {
@@ -73,13 +110,18 @@ namespace VPetLLM.Handlers
                 };
                 if (handler.Keyword.ToLower() == "buy") isEnabled = settings.EnableBuy;
 
-                if (!isEnabled) continue;
-
-                actions.Add(new HandlerAction(handler.ActionType, keyword, valueStr, handler));
+                if (!isEnabled)
+                {
+                    Logger.Log($"ActionProcessor: Handler '{handler.Keyword}' is disabled.");
+                    continue;
+                }
+                
+                actions.Add(new HandlerAction(handler.ActionType, keyword, value, handler));
             }
             return actions;
         }
     }
+
     public class HandlerAction
     {
         public ActionType Type { get; }

@@ -4,7 +4,8 @@ using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
 using System.Text;
 using System.Threading.Tasks;
-
+using System.Collections.Generic;
+using System.Linq;
 using VPetLLM.Handlers;
 
 namespace VPetLLM.Core.ChatCore
@@ -27,49 +28,33 @@ namespace VPetLLM.Core.ChatCore
             }
         }
 
-
-
         public override Task<string> Chat(string prompt)
         {
             return Chat(prompt, false);
         }
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
-            // 检查并更新系统消息（确保Role设置生效）
-            var systemMessage = HistoryManager.GetHistory().FirstOrDefault(m => m.Role == "system");
-            var currentSystemMessage = GetSystemMessage();
-            
-            if (systemMessage == null)
-            {
-                // 如果没有系统消息，添加新的
-                HistoryManager.GetHistory().Insert(0, new Message { Role = "system", Content = currentSystemMessage });
-            }
-            else if (systemMessage.Content != currentSystemMessage)
-            {
-                // 如果系统消息内容已更改，更新它
-                systemMessage.Content = currentSystemMessage;
-            }
-            
-            // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (!_keepContext)
             {
                 ClearContext();
             }
             else
             {
-                if (!isFunctionCall)
+                if (!string.IsNullOrEmpty(prompt))
                 {
+                    //无论是用户输入还是插件返回，都作为user角色
                     await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
                 }
             }
             // 构建请求数据，根据启用开关决定是否包含高级参数
+            List<Message> history = GetCoreHistory();
             object data;
             if (_openAISetting.EnableAdvanced)
             {
                 data = new
                 {
                     model = _openAISetting.Model,
-                    messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)).Select(m => new { role = m.Role == "plugin" ? "user" : m.Role, content = m.Content }),
+                    messages = history.Select(m => new { role = m.Role, content = m.Content }),
                     temperature = _openAISetting.Temperature,
                     max_tokens = _openAISetting.MaxTokens
                 };
@@ -79,7 +64,7 @@ namespace VPetLLM.Core.ChatCore
                 data = new
                 {
                     model = _openAISetting.Model,
-                    messages = HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)).Select(m => new { role = m.Role == "plugin" ? "user" : m.Role, content = m.Content })
+                    messages = history.Select(m => new { role = m.Role, content = m.Content })
                 };
             }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -163,21 +148,24 @@ namespace VPetLLM.Core.ChatCore
             return responseObject["choices"][0]["message"]["content"].ToString();
         }
 
-        /// <summary>
-        /// 手动刷新可用模型列表
-        /// </summary>
+        private List<Message> GetCoreHistory()
+        {
+            var history = new List<Message>
+            {
+                new Message { Role = "system", Content = GetSystemMessage() }
+            };
+            history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
+            return history;
+        }
         public List<string> RefreshModels()
         {
-            // 处理OpenAI URL兼容性：自动补全到/models端点
             string apiUrl = _openAISetting.Url;
             if (apiUrl.Contains("/chat/completions"))
             {
-                // 如果URL包含完整端点，替换为/models
                 apiUrl = apiUrl.Replace("/chat/completions", "/models");
             }
             else
             {
-                // 如果URL不包含完整端点，自动补全
                 var baseUrl = apiUrl.TrimEnd('/');
                 if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
                 {
@@ -209,7 +197,6 @@ namespace VPetLLM.Core.ChatCore
 
         public new List<string> GetModels()
         {
-            // 返回空列表，避免启动时自动扫描
             return new List<string>();
         }
     }

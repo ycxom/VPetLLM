@@ -4,7 +4,8 @@ using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
 using System.Text;
 using System.Threading.Tasks;
-
+using System.Collections.Generic;
+using System.Linq;
 using VPetLLM.Handlers;
 
 namespace VPetLLM.Core.ChatCore
@@ -23,37 +24,33 @@ namespace VPetLLM.Core.ChatCore
             _httpClient = new HttpClient();
         }
 
-
-
         public override Task<string> Chat(string prompt)
         {
             return Chat(prompt, false);
         }
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
-            // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (!_keepContext)
             {
                 ClearContext();
             }
             else
             {
-                if (!isFunctionCall)
+                if (!string.IsNullOrEmpty(prompt))
                 {
-                    await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
+                    if (!string.IsNullOrEmpty(prompt))
+                    {
+                        //无论是用户输入还是插件返回，都作为user角色
+                        await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
+                    }
                 }
             }
             
-            // 使用dynamic类型来构建请求数据，避免匿名类型转换问题
-            dynamic requestData;
-            
-            // 有角色设置时，包含systemInstruction字段
-            requestData = new
+            List<Message> history = GetCoreHistory();
+            var requestData = new
             {
-                contents = HistoryManager.GetHistory()
-                    .Where(m => m.Role != "system")
-                    .Skip(Math.Max(0, HistoryManager.GetHistory().Count(m => m.Role != "system") - _setting.HistoryCompressionThreshold))
-                    .Select(m => new { role = m.Role == "plugin" ? "user" : m.Role, parts = new[] { new { text = m.Content } } }),
+                contents = history.Where(m => m.Role != "system")
+                                  .Select(m => new { role = m.Role == "assistant" ? "model" : m.Role, parts = new[] { new { text = m.Content } } }),
                 generationConfig = new
                 {
                     maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
@@ -67,20 +64,14 @@ namespace VPetLLM.Core.ChatCore
             
             var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
             
-            // 构建正确的Gemini API端点：使用模型名称和generateContent方法
             var baseUrl = _geminiSetting.Url.TrimEnd('/');
-            
-            // 如果URL不包含v1或v1beta后缀，自动添加/v1beta
             if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
             {
                 baseUrl += "/v1beta";
             }
-            
-            // 构建完整的API端点：/v1beta/models/{modelName}:generateContent
-            var modelName = _geminiSetting.Model; // 使用用户配置的模型名称
+            var modelName = _geminiSetting.Model;
             var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
             
-            // 创建HTTP请求并添加必要的头信息
             var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
             request.Content = content;
             request.Headers.Add("User-Agent", "Lolisi_VPet_LLMAPI");
@@ -98,13 +89,10 @@ namespace VPetLLM.Core.ChatCore
             var responseObject = JObject.Parse(responseString);
             var message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
             
-            // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (_keepContext)
             {
-                // 使用标准化角色名称，而不是Gemini特有的"model"
                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
             }
-            // 只有在保持上下文模式时才保存历史记录
             if (_keepContext)
             {
                 SaveHistory();
@@ -148,38 +136,37 @@ namespace VPetLLM.Core.ChatCore
             var responseObject = JObject.Parse(responseString);
             return responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
         }
-        /// <summary>
-        /// 手动刷新可用模型列表
-        /// </summary>
+        private List<Message> GetCoreHistory()
+        {
+            var history = new List<Message>
+            {
+                new Message { Role = "system", Content = GetSystemMessage() }
+            };
+            history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
+            return history;
+        }
         public List<string> RefreshModels()
         {
-            // 处理反向代理地址：如果URL已经是完整的端点，直接使用；否则添加标准路径
             string requestUrl;
             if (_geminiSetting.Url.Contains("/models"))
             {
-                // URL已经是完整的请求地址
                 requestUrl = _geminiSetting.Url;
             }
             else
             {
-                // 标准Google Gemini API路径
                 var baseUrl = _geminiSetting.Url.TrimEnd('/');
                 
-                // 如果URL不包含v1或v1beta后缀，自动添加/v1beta
                 if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
                 {
                     baseUrl += "/v1beta";
                 }
                 
-                // 确保路径拼接正确，URL以斜杠结尾
                 requestUrl = baseUrl.EndsWith("/") ? $"{baseUrl}models/" : $"{baseUrl}/models/";
             }
             
-            // 添加详细日志输出用于调试
             System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Request URL: {requestUrl}");
             System.Diagnostics.Debug.WriteLine($"[GeminiDebug] API Key present: {!string.IsNullOrEmpty(_geminiSetting.ApiKey)}");
             
-            // 创建HTTP请求并添加必要的头信息
             var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
             request.Headers.Add("User-Agent", "Lolisi_VPet_LLMAPI");
             request.Headers.Add("Connection", "keep-alive");
@@ -192,7 +179,6 @@ namespace VPetLLM.Core.ChatCore
             
             var response = _httpClient.SendAsync(request).Result;
             
-            // 添加响应状态码日志
             System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Response Status: {(int)response.StatusCode} {response.StatusCode}");
             
             if (!response.IsSuccessStatusCode)
@@ -225,7 +211,6 @@ namespace VPetLLM.Core.ChatCore
 
         public new List<string> GetModels()
         {
-            // 返回空列表，避免启动时自动扫描
             return new List<string>();
         }
     }

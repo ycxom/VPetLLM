@@ -105,7 +105,7 @@ namespace VPetLLM
             ((Slider)this.FindName("Slider_Gemini_Temperature")).Value = _plugin.Settings.Gemini.Temperature;
             ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
             ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).Text = _plugin.Settings.Gemini.MaxTokens.ToString();
-           ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+            ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
             ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
             ((DataGrid)this.FindName("DataGrid_Plugins")).ItemsSource = _plugin.Plugins;
         }
@@ -212,6 +212,23 @@ namespace VPetLLM
                 }
                 _plugin.UpdateChatCore(newChatCore);
             }
+            else
+            {
+                // 如果提供商没变，也需要重新创建ChatCore以应用新的设置
+                var currentHistory = _plugin.ChatCore.GetChatHistory();
+                IChatCore updatedChatCore = newProvider switch
+                {
+                    Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    _ => throw new NotImplementedException()
+                };
+                if (_plugin.Settings.EnableChatHistory && currentHistory != null)
+                {
+                    updatedChatCore.SetChatHistory(currentHistory);
+                }
+                _plugin.UpdateChatCore(updatedChatCore);
+            }
         }
         private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
 
@@ -266,65 +283,67 @@ namespace VPetLLM
         private void Button_ClearContext_Click(object sender, RoutedEventArgs e) { _plugin.ChatCore?.ClearContext(); }
         private void Button_EditContext_Click(object sender, RoutedEventArgs e)
         {
-            var contextEditor = new winContextEditor(_plugin.ChatCore);
+            var contextEditor = new winContextEditor(_plugin);
             contextEditor.Show();
         }
-       private void Button_CopyLog_Click(object sender, RoutedEventArgs e) {
-           var logBox = (ListBox)this.FindName("LogBox");
-           var sb = new System.Text.StringBuilder();
-           foreach (var item in logBox.Items)
-           {
-               sb.AppendLine(item.ToString());
-           }
-           Clipboard.SetText(sb.ToString());
-       }
-       private void Button_ClearLog_Click(object sender, RoutedEventArgs e) {
-           Logger.Clear();
-       }
-       private void Button_AddTool_Click(object sender, RoutedEventArgs e)
-       {
-           var newTool = new Setting.ToolSetting();
-           _plugin.Settings.Tools.Add(newTool);
-           ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
-           ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
-       }
+        private void Button_CopyLog_Click(object sender, RoutedEventArgs e)
+        {
+            var logBox = (ListBox)this.FindName("LogBox");
+            var sb = new System.Text.StringBuilder();
+            foreach (var item in logBox.Items)
+            {
+                sb.AppendLine(item.ToString());
+            }
+            Clipboard.SetText(sb.ToString());
+        }
+        private void Button_ClearLog_Click(object sender, RoutedEventArgs e)
+        {
+            Logger.Clear();
+        }
+        private void Button_AddTool_Click(object sender, RoutedEventArgs e)
+        {
+            var newTool = new Setting.ToolSetting();
+            _plugin.Settings.Tools.Add(newTool);
+            ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
+            ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+        }
 
-       private void Button_DeleteTool_Click(object sender, RoutedEventArgs e)
-       {
-           if (((DataGrid)this.FindName("DataGrid_Tools")).SelectedItem is Setting.ToolSetting selectedTool)
-           {
-               _plugin.Settings.Tools.Remove(selectedTool);
-               ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
-               ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
-           }
-       }
+        private void Button_DeleteTool_Click(object sender, RoutedEventArgs e)
+        {
+            if (((DataGrid)this.FindName("DataGrid_Tools")).SelectedItem is Setting.ToolSetting selectedTool)
+            {
+                _plugin.Settings.Tools.Remove(selectedTool);
+                ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
+                ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+            }
+        }
 
-       private void Button_LoadPlugins_Click(object sender, RoutedEventArgs e)
-       {
-           _plugin.LoadPlugins();
-           ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = null;
+        private void Button_LoadPlugins_Click(object sender, RoutedEventArgs e)
+        {
+            _plugin.LoadPlugins();
+            ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = null;
             var pluginDisplayList = new List<string>();
             foreach (var plugin in _plugin.Plugins)
             {
                 pluginDisplayList.Add($"{plugin.Name}【{plugin.Description}】");
             }
             ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
-       }
+        }
 
-       private void Button_UnloadPlugin_Click(object sender, RoutedEventArgs e)
-       {
-           var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
-           if (dataGrid.SelectedItem is IVPetLLMPlugin selectedPlugin)
-           {
-               _plugin.UnloadPlugin(selectedPlugin);
-               if (System.IO.File.Exists(selectedPlugin.FilePath))
-               {
-                   System.IO.File.Delete(selectedPlugin.FilePath);
-               }
-               dataGrid.ItemsSource = null;
-               dataGrid.ItemsSource = _plugin.Plugins;
-           }
-       }
+        private void Button_UnloadPlugin_Click(object sender, RoutedEventArgs e)
+        {
+            var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
+            if (dataGrid.SelectedItem is IVPetLLMPlugin selectedPlugin)
+            {
+                _plugin.UnloadPlugin(selectedPlugin);
+                if (System.IO.File.Exists(selectedPlugin.FilePath))
+                {
+                    System.IO.File.Delete(selectedPlugin.FilePath);
+                }
+                dataGrid.ItemsSource = null;
+                dataGrid.ItemsSource = _plugin.Plugins;
+            }
+        }
 
         private void Button_ImportPlugin_Click(object sender, RoutedEventArgs e)
         {
