@@ -78,9 +78,8 @@ namespace VPetLLM.Core
                 }
             }
 
-           if (VPetLLM.Instance.Plugins.Any(p => p.Enabled))
+           if (_settings.EnablePlugin && VPetLLM.Instance.Plugins.Any(p => p.Enabled))
            {
-               parts.Add("你可以使用 '[:plugin(插件名称(参数))]' 来调用插件。例如 '[:plugin(system_info())]'");
                var pluginDescriptions = VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => $"{p.Name}: {p.Description}");
                parts.Add("可用插件列表:\n" + string.Join("\n", pluginDescriptions));
            }

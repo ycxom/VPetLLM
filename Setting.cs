@@ -27,6 +27,7 @@ namespace VPetLLM
         public bool EnableTime { get; set; } = true;
         public bool EnableHistoryCompression { get; set; } = false;
         public int HistoryCompressionThreshold { get; set; } = 20;
+        public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         private readonly string _path;
 
