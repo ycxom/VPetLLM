@@ -27,6 +27,7 @@ namespace VPetLLM
         public ActionProcessor? ActionProcessor;
         private System.Timers.Timer _syncTimer;
         public List<IVPetLLMPlugin> Plugins = new List<IVPetLLMPlugin>();
+        public string PluginPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -181,7 +182,7 @@ namespace VPetLLM
 
         public void LoadPlugins()
         {
-            var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
+            var pluginDir = PluginPath;
             if (!Directory.Exists(pluginDir))
             {
                 Directory.CreateDirectory(pluginDir);
@@ -227,7 +228,7 @@ namespace VPetLLM
 
         public void SavePluginStates()
         {
-            var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
+            var pluginDir = PluginPath;
             var configFile = Path.Combine(pluginDir, "plugins.json");
             var pluginStates = Plugins.ToDictionary(p => p.Name, p => p.Enabled);
             File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
@@ -246,7 +247,7 @@ namespace VPetLLM
 
         public void ImportPlugin(string filePath)
         {
-            var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
+            var pluginDir = PluginPath;
             if (!Directory.Exists(pluginDir))
             {
                 Directory.CreateDirectory(pluginDir);
