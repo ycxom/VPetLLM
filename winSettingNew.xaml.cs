@@ -294,7 +294,16 @@ namespace VPetLLM
             {
                 sb.AppendLine(item.ToString());
             }
-            Clipboard.SetText(sb.ToString());
+            var textToCopy = sb.ToString();
+
+            try
+            {
+                Clipboard.SetText(textToCopy);
+            }
+            catch (System.Runtime.InteropServices.COMException)
+            {
+                // 即使SetText成功，也可能抛出异常，我们直接忽略它
+            }
         }
         private void Button_ClearLog_Click(object sender, RoutedEventArgs e)
         {
