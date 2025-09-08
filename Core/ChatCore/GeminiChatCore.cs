@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Net;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
 using System.Text;
@@ -21,7 +22,11 @@ namespace VPetLLM.Core.ChatCore
         {
             _geminiSetting = geminiSetting;
             _setting = setting;
-            _httpClient = new HttpClient();
+            var handler = new HttpClientHandler
+            {
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
+            };
+            _httpClient = new HttpClient(handler);
         }
 
         public override Task<string> Chat(string prompt)
@@ -189,20 +194,37 @@ namespace VPetLLM.Core.ChatCore
             }
             
             var responseString = response.Content.ReadAsStringAsync().Result;
-            JObject responseObject;
+            var models = new List<string>();
             try
             {
-                responseObject = JObject.Parse(responseString);
+                var jsonToken = JToken.Parse(responseString);
+
+                // Handle official Gemini format: { "models": [...] }
+                if (jsonToken is JObject responseObject && responseObject["models"] is JArray modelsArray)
+                {
+                    foreach (var model in modelsArray)
+                    {
+                        models.Add(model["name"].ToString().Replace("models/", ""));
+                    }
+                }
+                // Handle old format: [...]
+                else if (jsonToken is JArray responseArray)
+                {
+                    foreach (var model in responseArray)
+                    {
+                        // The user's old format returns an array of objects with an 'id' or 'name'
+                        var modelName = model["id"]?.ToString() ?? model["name"]?.ToString();
+                        if (!string.IsNullOrEmpty(modelName))
+                        {
+                            models.Add(modelName.Replace("models/", ""));
+                        }
+                    }
+                }
             }
             catch (JsonReaderException)
             {
                 System.Diagnostics.Debug.WriteLine($"[GeminiDebug] JSON Parse Error: {responseString}");
                 throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
-            }
-            var models = new List<string>();
-            foreach (var model in responseObject["models"])
-            {
-                models.Add(model["name"].ToString().Replace("models/", ""));
             }
             
             System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Models found: {models.Count}");
