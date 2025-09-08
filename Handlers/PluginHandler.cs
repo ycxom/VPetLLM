@@ -18,7 +18,7 @@ namespace VPetLLM.Handlers
         public async void Execute(string value, IMainWindow main)
         {
             VPetLLM.Instance.Log($"PluginHandler: Received value: {value}");
-            var match = new Regex(@"(delete|disable|enable):(\w+)|(\w+)(?:\((.*)\))?").Match(value);
+            var match = new Regex(@"(delete|disable|enable):(\w+)|(\w+)\((.*)\)").Match(value);
             if (match.Success)
             {
                 if (match.Groups[1].Success) // Management commands
@@ -48,12 +48,16 @@ namespace VPetLLM.Handlers
                             VPetLLM.Instance.ChatCore.RemovePlugin(plugin);
                             VPetLLM.Instance.Log($"PluginHandler: Disabled plugin: {plugin.Name}");
                             VPetLLM.Instance.SavePluginStates();
+                            VPetLLM.Instance.UpdateSystemMessage();
+                            VPetLLM.Instance.RefreshPluginList();
                             break;
                         case "enable":
                             plugin.Enabled = true;
                             VPetLLM.Instance.ChatCore.AddPlugin(plugin);
                             VPetLLM.Instance.Log($"PluginHandler: Enabled plugin: {plugin.Name}");
                             VPetLLM.Instance.SavePluginStates();
+                            VPetLLM.Instance.UpdateSystemMessage();
+                            VPetLLM.Instance.RefreshPluginList();
                             break;
                     }
                 }
@@ -62,7 +66,7 @@ namespace VPetLLM.Handlers
                     var pluginName = match.Groups[3].Value.Trim();
                     var arguments = match.Groups[4].Value;
                     VPetLLM.Instance.Log($"PluginHandler: Parsed plugin name: {pluginName}, arguments: {arguments}");
-                    var plugin = VPetLLM.Instance.Plugins.Find(p => p.Name.Replace(" ", "_").ToLower() == pluginName);
+                    var plugin = VPetLLM.Instance.Plugins.Find(p => p.Name.Replace(" ", "_").ToLower() == pluginName.ToLower());
                     if (plugin != null)
                     {
                         if (!plugin.Enabled)

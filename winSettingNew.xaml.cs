@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using VPetLLM.Core;
@@ -15,8 +17,10 @@ namespace VPetLLM
         public winSettingNew(VPetLLM plugin)
         {
             _plugin = plugin;
+            _plugin.SettingWindow = this;
             InitializeComponent();
             LoadSettings();
+            Closed += Window_Closed;
             ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Control_ValueChanged;
@@ -55,6 +59,7 @@ namespace VPetLLM
             ((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).TextChanged += Control_TextChanged;
+            ((DataGrid)this.FindName("DataGrid_Plugins")).CellEditEnding += DataGrid_Plugins_CellEditEnding;
         }
 
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => SaveSettings();
@@ -330,27 +335,53 @@ namespace VPetLLM
         private void Button_LoadPlugins_Click(object sender, RoutedEventArgs e)
         {
             _plugin.LoadPlugins();
-            ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = null;
-            var pluginDisplayList = new List<string>();
-            foreach (var plugin in _plugin.Plugins)
-            {
-                pluginDisplayList.Add($"{plugin.Name}【{plugin.Description}】");
-            }
-            ((ListBox)this.FindName("ListBox_Plugins")).ItemsSource = pluginDisplayList;
+            RefreshPluginList();
         }
 
-        private void Button_UnloadPlugin_Click(object sender, RoutedEventArgs e)
+        private async void Button_UnloadPlugin_Click(object sender, RoutedEventArgs e)
         {
             var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
             if (dataGrid.SelectedItem is IVPetLLMPlugin selectedPlugin)
             {
-                _plugin.UnloadPlugin(selectedPlugin);
-                if (System.IO.File.Exists(selectedPlugin.FilePath))
+                if (_plugin.Settings.ShowUninstallWarning)
                 {
-                    System.IO.File.Delete(selectedPlugin.FilePath);
+                    var confirmDialog = new winUninstallConfirm();
+                    if (confirmDialog.ShowDialog() == true)
+                    {
+                        if (confirmDialog.DoNotShowAgain)
+                        {
+                            _plugin.Settings.ShowUninstallWarning = false;
+                            _plugin.Settings.Save();
+                        }
+                    }
+                    else
+                    {
+                        return;
+                    }
                 }
-                dataGrid.ItemsSource = null;
-                dataGrid.ItemsSource = _plugin.Plugins;
+
+                var filePath = selectedPlugin.FilePath;
+                _plugin.UnloadPlugin(selectedPlugin);
+
+                await Task.Delay(100);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+
+                try
+                {
+                    if (File.Exists(filePath))
+                    {
+                        File.Delete(filePath);
+                        Logger.Log($"Deleted plugin file: {filePath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to delete plugin file {filePath}: {ex.Message}");
+                    MessageBox.Show($"无法删除插件文件: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+
+                RefreshPluginList();
             }
         }
 
@@ -403,6 +434,20 @@ namespace VPetLLM
                     }
                 }
             }
+        }
+        public void RefreshPluginList()
+        {
+            var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
+            if (dataGrid != null)
+            {
+                dataGrid.ItemsSource = null;
+                dataGrid.ItemsSource = _plugin.Plugins;
+            }
+        }
+
+        private void Window_Closed(object? sender, EventArgs e)
+        {
+            _plugin.SettingWindow = null;
         }
     }
 }

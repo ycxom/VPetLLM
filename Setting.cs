@@ -29,6 +29,7 @@ namespace VPetLLM
         public int HistoryCompressionThreshold { get; set; } = 20;
         public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
+        public bool ShowUninstallWarning { get; set; } = true;
         private readonly string _path;
 
         public Setting(string path)

@@ -66,7 +66,7 @@ namespace VPetLLM.Core
                                "3. 优先级规则: `move`指令拥有最高优先级。如果回复中包含`move`指令，则只会执行`move`，并忽略所有其他指令。\n" +
                                "4. `say`指令用于说话，格式为 `[:talk(say(\"文本\",情绪))]`。文本必须用英文双引号包裹。所有要说的文本都必须在指令内部。\n" +
                                "5. 你可以像编写脚本一样，将多个非`move`指令组合在一起，它们会按顺序执行。例如: `[:talk(say(\"你好！\",happy))][:body(action(touchhead))][:state(happy(10))]`\n" +
-                               "6. 聊天需要拼接[:state(happy(10))]控制心情，以便调整VPet参数";
+                               "6. 聊天需要拼接[:state(happy(10))]控制心情，以便调整VPet_Simulator参数";
                     parts.Add(rule);
                     parts.Add("可用指令列表(包括可用情绪: happy, nomal, poorcondition, ill):\n" + string.Join("\n", instructions));
                 }
