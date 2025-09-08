@@ -3,11 +3,13 @@
         "Tab": {
             "en": "Language",
             "zh-hans": "语言",
+            "zh-hant": "語言",
             "jp": "言語"
         },
         "Select": {
             "en": "English",
             "zh-hans": "简体中文",
+            "zh-hant": "繁體中文",
             "jp": "日本語"
         }
     },
@@ -15,66 +17,79 @@
         "Tab": {
             "en": "LLM Settings",
             "zh-hans": "LLM设置",
+            "zh-hant": "LLM設定",
             "jp": "LLM設定"
         },
         "Provider": {
             "en": "LLM Provider",
             "zh-hans": "LLM 提供商",
+            "zh-hant": "LLM 供應商",
             "jp": "LLMプロバイダー"
         },
         "AiName": {
             "en": "AI Name",
             "zh-hans": "AI名称",
+            "zh-hant": "AI名稱",
             "jp": "AI名"
         },
         "UserName": {
             "en": "User Name",
             "zh-hans": "用户名称",
+            "zh-hant": "用戶名稱",
             "jp": "ユーザー名"
         },
         "FollowVPetName": {
             "en": "Follow VPet Name Settings",
             "zh-hans": "名字与主人名字设置跟着桌面宠物设置",
+            "zh-hant": "名字與主人名字設置跟著桌面寵物設置",
             "jp": "デスクトップペットの設定に従う"
         },
         "Role": {
             "en": "Role Setting",
             "zh-hans": "角色设定",
+            "zh-hant": "角色設定",
             "jp": "役割設定"
         },
         "ContextControl": {
             "en": "Context Control",
             "zh-hans": "上下文控制",
+            "zh-hant": "上下文控制",
             "jp": "コンテキスト制御"
         },
         "KeepContext": {
             "en": "Keep Chat Context",
             "zh-hans": "保持聊天上下文",
+            "zh-hant": "保持聊天上下文",
             "jp": "チャットコンテキストを維持する"
         },
         "EnableChatHistory": {
             "en": "Save Chat History",
             "zh-hans": "保存聊天历史",
+            "zh-hant": "保存聊天歷史",
             "jp": "チャット履歴を保存する"
         },
         "SeparateChatByProvider": {
             "en": "Separate Chat by Provider",
             "zh-hans": "按提供商分离聊天记录",
+            "zh-hant": "按供應商分離聊天記錄",
             "jp": "プロバイダー別にチャットを分離する"
         },
         "AutoMigrateChatHistory": {
             "en": "Auto Migrate Chat History",
             "zh-hans": "自动迁移聊天历史",
+            "zh-hant": "自動遷移聊天歷史",
             "jp": "チャット履歴を自動移行する"
         },
         "ClearContext": {
             "en": "Clear Context",
             "zh-hans": "清除上下文",
+            "zh-hant": "清除上下文",
             "jp": "コンテキストをクリアする"
         },
         "EditContext": {
             "en": "Edit Context",
             "zh-hans": "编辑上下文",
+            "zh-hant": "編輯上下文",
             "jp": "コンテキストを編集する"
         }
     },
@@ -82,36 +97,43 @@
         "Header": {
             "en": "Ollama",
             "zh-hans": "Ollama",
+            "zh-hant": "Ollama",
             "jp": "Ollama"
         },
         "URL": {
             "en": "URL",
             "zh-hans": "URL",
+            "zh-hant": "URL",
             "jp": "URL"
         },
         "Model": {
             "en": "Model",
             "zh-hans": "模型",
+            "zh-hant": "模型",
             "jp": "モデル"
         },
         "Refresh": {
             "en": "Refresh",
             "zh-hans": "刷新",
+            "zh-hant": "刷新",
             "jp": "更新"
         },
         "EnableAdvanced": {
             "en": "Enable Advanced Configuration",
             "zh-hans": "启用高级配置",
+            "zh-hant": "啟用高級配置",
             "jp": "詳細設定を有効にする"
         },
         "Temperature": {
             "en": "Temperature:",
             "zh-hans": "温度:",
+            "zh-hant": "溫度:",
             "jp": "温度:"
         },
         "MaxTokens": {
             "en": "Max Tokens:",
             "zh-hans": "最大Token:",
+            "zh-hant": "最大Token:",
             "jp": "最大トークン:"
         }
     },
@@ -119,41 +141,49 @@
         "Header": {
             "en": "OpenAI",
             "zh-hans": "OpenAI",
+            "zh-hant": "OpenAI",
             "jp": "OpenAI"
         },
         "ApiKey": {
             "en": "API Key",
             "zh-hans": "API 密钥",
+            "zh-hant": "API 金鑰",
             "jp": "APIキー"
         },
         "Model": {
             "en": "Model",
             "zh-hans": "模型",
+            "zh-hant": "模型",
             "jp": "モデル"
         },
         "Refresh": {
             "en": "Refresh",
             "zh-hans": "刷新",
+            "zh-hant": "刷新",
             "jp": "更新"
         },
         "ApiAddress": {
             "en": "API Address",
             "zh-hans": "API 地址",
+            "zh-hant": "API 地址",
             "jp": "APIアドレス"
         },
         "EnableAdvanced": {
             "en": "Enable Advanced Configuration",
             "zh-hans": "启用高级配置",
+            "zh-hant": "啟用高級配置",
             "jp": "詳細設定を有効にする"
         },
         "Temperature": {
             "en": "Temperature:",
             "zh-hans": "温度:",
+            "zh-hant": "溫度:",
             "jp": "温度:"
         },
         "MaxTokens": {
             "en": "Max Tokens:",
             "zh-hans": "最大Token:",
+            "zh-hant": "最大Token:",
             "jp": "最大トークン:"
         }
     },
@@ -161,46 +191,55 @@
         "Header": {
             "en": "Gemini",
             "zh-hans": "Gemini",
+            "zh-hant": "Gemini",
             "jp": "Gemini"
         },
         "ApiKey": {
             "en": "API Key",
             "zh-hans": "API 密钥",
+            "zh-hant": "API 金鑰",
             "jp": "APIキー"
         },
         "Model": {
             "en": "Model",
             "zh-hans": "模型",
+            "zh-hant": "模型",
             "jp": "モデル"
         },
         "Refresh": {
             "en": "Refresh",
             "zh-hans": "刷新",
+            "zh-hant": "刷新",
             "jp": "更新"
         },
         "ApiAddress": {
             "en": "API Address",
             "zh-hans": "API 地址",
+            "zh-hant": "API 地址",
             "jp": "APIアドレス"
         },
         "ApiEndpointNote": {
             "en": "Note: Please provide the correct API endpoint URL.",
             "zh-hans": "注意：请提供正确的 API 端点 URL。",
+            "zh-hant": "注意：請提供正確的 API 端點 URL。",
             "jp": "注意：正しいAPIエンドポイントURLを提供してください。"
         },
         "EnableAdvanced": {
             "en": "Enable Advanced Configuration",
             "zh-hans": "启用高级配置",
+            "zh-hant": "啟用高級配置",
             "jp": "詳細設定を有効にする"
         },
         "Temperature": {
             "en": "Temperature:",
             "zh-hans": "温度:",
+            "zh-hant": "溫度:",
             "jp": "温度:"
         },
         "MaxTokens": {
             "en": "Max Tokens:",
             "zh-hans": "最大Token:",
+            "zh-hant": "最大Token:",
             "jp": "最大トークン:"
         }
     },
@@ -208,56 +247,67 @@
         "Tab": {
             "en": "Advanced Options",
             "zh-hans": "高级选项",
+            "zh-hant": "高級選項",
             "jp": "詳細オプション"
         },
         "EnableAction": {
             "en": "Enable Smart Desktop Pet",
             "zh-hans": "启动智能桌面宠物",
+            "zh-hant": "啟動智能桌面寵物",
             "jp": "スマートデスクトップペットを有効にする"
         },
         "EnableActionToolTip": {
             "en": "Enabling this feature will increase Token consumption as it sends additional data to the AI.",
             "zh-hans": "启用此功能会增加 Token 消耗，因为它会向 AI 发送额外的数据。",
+            "zh-hant": "啟用此功能會增加 Token 消耗，因為它會向 AI 發送額外的數據。",
             "jp": "この機能を有効にすると、AIに追加データが送信されるため、トークンの消費量が増加します。"
         },
         "EnableBuy": {
             "en": "Allow pet to buy things",
             "zh-hans": "允许宠物购买东西",
+            "zh-hant": "允許寵物購買東西",
             "jp": "ペットに買い物を許可する"
         },
         "EnableState": {
             "en": "Allow getting pet status",
             "zh-hans": "允许获取宠物状态",
+            "zh-hant": "允许获取宠物状态",
             "jp": "ペットの状態を取得できるようにする"
         },
         "EnableActionExecution": {
             "en": "Allow pet to perform actions",
             "zh-hans": "允许宠物执行动作",
+            "zh-hant": "允許寵物執行動作",
             "jp": "ペットにアクションを実行させる"
         },
         "EnableMove": {
             "en": "Allow pet to move",
             "zh-hans": "允许宠物移动",
+            "zh-hant": "允許寵物移動",
             "jp": "ペットの移動を許可する"
         },
         "EnableTime": {
             "en": "Allow getting current time",
             "zh-hans": "允许获取当前时间",
+            "zh-hant": "允許獲取當前時間",
             "jp": "現在時刻の取得を許可する"
         },
         "EnableHistoryCompression": {
             "en": "Enable Chat History Compression",
             "zh-hans": "启用聊天记录压缩",
+            "zh-hant": "啟用聊天記錄壓縮",
             "jp": "チャット履歴の圧縮を有効にする"
         },
         "HistoryCompressionThreshold": {
             "en": "Compression Threshold:",
             "zh-hans": "压缩阈值:",
+            "zh-hant": "壓縮閾值:",
             "jp": "圧縮しきい値:"
         },
         "CurrentContextLength": {
             "en": "Current Context Length:",
             "zh-hans": "当前上下文长度:",
+            "zh-hant": "當前上下文長度:",
             "jp": "現在のコンテキスト長:"
         }
     },
@@ -265,41 +315,49 @@
         "Tab": {
             "en": "Tools",
             "zh-hans": "工具列表",
+            "zh-hant": "工具列表",
             "jp": "ツール"
         },
         "Description": {
             "en": "This list is for configuring MCP (Model-Controlled Plugin) tools",
             "zh-hans": "此列表用于配置 MCP (Model-Controlled Plugin) 工具",
+            "zh-hant": "此列表用於配置 MCP (Model-Controlled Plugin) 工具",
             "jp": "このリストはMCP（Model-Controlled Plugin）ツールを設定するためのものです"
         },
         "Add": {
             "en": "Add",
             "zh-hans": "添加",
+            "zh-hant": "添加",
             "jp": "追加"
         },
         "Delete": {
             "en": "Delete",
             "zh-hans": "删除",
+            "zh-hant": "刪除",
             "jp": "削除"
         },
         "Name": {
             "en": "Name",
             "zh-hans": "名称",
+            "zh-hant": "名稱",
             "jp": "名前"
         },
         "URL": {
             "en": "URL",
             "zh-hans": "URL",
+            "zh-hant": "URL",
             "jp": "URL"
         },
         "ApiKey": {
             "en": "API Key",
             "zh-hans": "API Key",
+            "zh-hant": "API Key",
             "jp": "APIキー"
         },
         "Enabled": {
             "en": "Enabled",
             "zh-hans": "启用",
+            "zh-hant": "啟用",
             "jp": "有効"
         }
     },
@@ -307,26 +365,31 @@
         "Tab": {
             "en": "Log",
             "zh-hans": "日志",
+            "zh-hant": "日誌",
             "jp": "ログ"
         },
         "AutoScroll": {
             "en": "Auto Scroll",
             "zh-hans": "自动滚动",
+            "zh-hant": "自動滾動",
             "jp": "自動スクロール"
         },
         "MaxLogCount": {
             "en": "Max Log Count:",
             "zh-hans": "最大日志数量:",
+            "zh-hant": "最大日誌數量:",
             "jp": "最大ログ数:"
         },
         "Copy": {
             "en": "Copy",
             "zh-hans": "复制",
+            "zh-hant": "複製",
             "jp": "コピー"
         },
         "Clear": {
             "en": "Clear",
             "zh-hans": "清空",
+            "zh-hant": "清空",
             "jp": "クリア"
         }
     },
@@ -334,41 +397,49 @@
         "Tab": {
             "en": "Plugin",
             "zh-hans": "插件",
+            "zh-hant": "插件",
             "jp": "プラグイン"
         },
         "HowToUse": {
             "en": "How to use? View",
             "zh-hans": "如何使用？查看",
+            "zh-hant": "如何使用？查看",
             "jp": "使い方？表示"
         },
         "LoadPlugins": {
             "en": "Load Plugins",
             "zh-hans": "加载插件",
+            "zh-hant": "加載插件",
             "jp": "プラグインを読み込む"
         },
         "ImportPlugin": {
             "en": "Import Plugin",
             "zh-hans": "导入插件",
+            "zh-hant": "導入插件",
             "jp": "プラグインをインポートする"
         },
         "UnloadPlugin": {
             "en": "Unload Plugin",
             "zh-hans": "卸载插件",
+            "zh-hant": "卸載插件",
             "jp": "プラグインをアンロードする"
         },
         "Enabled": {
             "en": "Enabled",
             "zh-hans": "启用",
+            "zh-hant": "啟用",
             "jp": "有効"
         },
         "Name": {
             "en": "Name",
             "zh-hans": "名称",
+            "zh-hant": "名稱",
             "jp": "名前"
         },
         "Description": {
             "en": "Description",
             "zh-hans": "描述",
+            "zh-hant": "描述",
             "jp": "説明"
         }
     },
@@ -376,36 +447,43 @@
         "Title": {
             "en": "Context Editor",
             "zh-hans": "上下文编辑器",
+            "zh-hant": "上下文編輯器",
             "jp": "コンテキストエディタ"
         },
         "Role": {
             "en": "Role",
             "zh-hans": "角色",
+            "zh-hant": "角色",
             "jp": "役割"
         },
         "Content": {
             "en": "Content",
             "zh-hans": "内容",
+            "zh-hant": "內容",
             "jp": "内容"
         },
         "Save": {
             "en": "Save",
             "zh-hans": "保存",
+            "zh-hant": "保存",
             "jp": "保存"
         },
         "Cancel": {
             "en": "Cancel",
             "zh-hans": "取消",
+            "zh-hant": "取消",
             "jp": "キャンセル"
         },
         "Add": {
             "en": "Add",
             "zh-hans": "添加",
+            "zh-hant": "添加",
             "jp": "追加"
         },
         "Delete": {
             "en": "Delete",
             "zh-hans": "删除",
+            "zh-hant": "刪除",
             "jp": "削除"
         }
     },
@@ -413,26 +491,31 @@
         "Title": {
             "en": "Confirm Uninstall",
             "zh-hans": "确认卸载",
+            "zh-hant": "確認卸載",
             "jp": "アンインストールを確認する"
         },
         "Message": {
             "en": "Are you sure you want to uninstall this plugin? This will delete the plugin file and cannot be undone.",
             "zh-hans": "您确定要卸载此插件吗？这将删除插件文件且无法撤销。",
+            "zh-hant": "您確定要卸載此插件嗎？這將刪除插件文件且無法撤銷。",
             "jp": "このプラグインをアンインストールしてもよろしいですか？これにより、プラグインファイルが削除され、元に戻すことはできません。"
         },
         "DoNotShowAgain": {
             "en": "Do not show this again",
             "zh-hans": "不再显示",
+            "zh-hant": "不再顯示",
             "jp": "今後表示しない"
         },
         "Yes": {
             "en": "Yes",
             "zh-hans": "是",
+            "zh-hant": "是",
             "jp": "はい"
         },
         "No": {
             "en": "No",
             "zh-hans": "否",
+            "zh-hant": "否",
             "jp": "いいえ"
         }
     }

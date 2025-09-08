@@ -41,6 +41,18 @@ namespace VPetLLM
             var dllPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             var langPath = Path.Combine(dllPath, "VPetLLM_lang", "Language.json");
             LanguageHelper.LoadLanguages(langPath);
+            if (string.IsNullOrEmpty(Settings.Language))
+            {
+                var culture = System.Globalization.CultureInfo.CurrentUICulture.Name.ToLower();
+                if (LanguageHelper.LanguageDisplayMap.ContainsKey(culture))
+                {
+                    Settings.Language = culture;
+                }
+                else
+                {
+                    Settings.Language = "en";
+                }
+            }
             ActionProcessor = new ActionProcessor(mainwin);
             switch (Settings.Provider)
             {

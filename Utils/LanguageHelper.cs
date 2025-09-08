@@ -7,21 +7,21 @@ namespace VPetLLM.Utils
 {
     public static class LanguageHelper
     {
-        private static JObject _languageData;
+        private static JObject _languageData = new JObject();
         public static Dictionary<string, string> LanguageDisplayMap { get; private set; } = new Dictionary<string, string>();
 
         public static void LoadLanguages(string path)
         {
-            if (!File.Exists(path))
+            var langDir = Path.GetDirectoryName(path);
+            if (!Directory.Exists(langDir)) return;
+
+            foreach (var file in Directory.GetFiles(langDir, "*.json"))
             {
-                // Fallback in case the file doesn't exist
-                LanguageDisplayMap = new Dictionary<string, string> { { "en", "English" } };
-                _languageData = new JObject();
-                return;
+                var json = File.ReadAllText(file);
+                var jObject = JObject.Parse(json);
+                _languageData.Merge(jObject);
             }
-            var json = File.ReadAllText(path);
-            _languageData = JObject.Parse(json);
-            LanguageDisplayMap = _languageData["Language"]["Tab"].ToObject<Dictionary<string, string>>();
+            LanguageDisplayMap = _languageData["Language"]["Select"].ToObject<Dictionary<string, string>>();
         }
 
         public static string Get(string path, string langCode)
@@ -31,11 +31,7 @@ namespace VPetLLM.Utils
                 return $"[{path}]";
             }
 
-            JToken token = _languageData;
-            foreach (var part in path.Split('.'))
-            {
-                token = token?[part];
-            }
+            var token = _languageData.SelectToken(path);
 
             return token?[langCode]?.ToString() ?? $"[{path}]";
         }
