@@ -5,14 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VPetLLM"
         mc:Ignorable="d"
-        Title="VPetLLM" Height="640" Width="800">
+        Title="VPetLLM" Height="640" Width="900">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <TabControl Grid.Row="0">
-            <TabItem Header="LLM设置">
+            <TabItem Header="LLM设置" x:Name="Tab_LLM">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -21,35 +21,35 @@
 
                     <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="0,0,10,0">
-                            <Label Content="LLM 提供商"/>
+                            <Label Content="LLM 提供商" x:Name="Label_Provider"/>
                             <ComboBox x:Name="ComboBox_Provider" Margin="0,0,0,10" SelectionChanged="ComboBox_Provider_SelectionChanged"/>
 
-                            <Label Content="AI名称" VerticalAlignment="Top" Margin="0,10,0,0"/>
+                            <Label Content="AI名称" VerticalAlignment="Top" Margin="0,10,0,0" x:Name="Label_AiName"/>
                             <TextBox x:Name="TextBox_AiName" MaxWidth="300"/>
-                            <Label Content="用户名称" VerticalAlignment="Top" Margin="0,10,0,0"/>
+                            <Label Content="用户名称" VerticalAlignment="Top" Margin="0,10,0,0" x:Name="Label_UserName"/>
                             <TextBox x:Name="TextBox_UserName" MaxWidth="300"/>
                             <CheckBox x:Name="CheckBox_FollowVPetName" Content="名字与主人名字设置跟着桌面宠物设置" Margin="0,5,0,0"/>
-                            <Label Content="角色设定" VerticalAlignment="Top" Margin="0,10,0,0"/>
+                            <Label Content="角色设定" VerticalAlignment="Top" Margin="0,10,0,0" x:Name="Label_Role"/>
                             <TextBox x:Name="TextBox_Role" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Height="120" Width="300"/>
 
-                            <Label Content="上下文控制" Margin="0,10,0,0"/>
+                            <Label Content="上下文控制" Margin="0,10,0,0" x:Name="Label_ContextControl"/>
                             <CheckBox x:Name="CheckBox_KeepContext" Content="保持聊天上下文" Margin="0,0,0,5" IsChecked="True"/>
                             <CheckBox x:Name="CheckBox_EnableChatHistory" Content="保存聊天历史" Margin="0,0,0,5" IsChecked="True"/>
                             <CheckBox x:Name="CheckBox_SeparateChatByProvider" Content="按提供商分离聊天记录" Margin="0,0,0,5" IsChecked="True"/>
                             <CheckBox x:Name="CheckBox_AutoMigrateChatHistory" Content="自动迁移聊天历史" Margin="0,0,0,5" IsChecked="True"/>
                             <WrapPanel HorizontalAlignment="Right" Margin="0,10,0,0">
-                                <Button x:Name="Button_ClearContext" Content="清除上下文" Click="Button_ClearContext_Click" Margin="5"/>
-                                <Button x:Name="Button_EditContext" Content="编辑上下文" Click="Button_EditContext_Click" Margin="5"/>
+                                <Button x:Name="Button_ClearContext" Content="清除上下文" Click="Button_ClearContext_Click" Margin="5" />
+                                <Button x:Name="Button_EditContext" Content="编辑上下文" Click="Button_EditContext_Click" Margin="5" />
                             </WrapPanel>
                         </StackPanel>
                     </ScrollViewer>
 
                     <TabControl Grid.Column="1">
-                        <TabItem Header="Ollama">
+                        <TabItem Header="Ollama" x:Name="Tab_Ollama">
                             <StackPanel>
-                                <Label Content="URL"/>
+                                <Label Content="URL" x:Name="Label_OllamaUrl"/>
                                 <TextBox x:Name="TextBox_OllamaUrl"/>
-                                <Label Content="模型"/>
+                                <Label Content="模型" x:Name="Label_OllamaModel"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -61,22 +61,22 @@
                                 <CheckBox x:Name="CheckBox_Ollama_EnableAdvanced" Content="启用高级配置" Margin="0,10,0,5"/>
                                 <StackPanel x:Name="StackPanel_Ollama_Advanced" IsEnabled="{Binding ElementName=CheckBox_Ollama_EnableAdvanced, Path=IsChecked}">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                        <TextBlock Text="温度:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBlock Text="温度:" Width="60" VerticalAlignment="Center" x:Name="TextBlock_Ollama_Temperature"/>
                                         <Slider x:Name="Slider_Ollama_Temperature" Minimum="0" Maximum="2" Width="100" Margin="5,0" VerticalAlignment="Center"/>
                                         <TextBlock x:Name="TextBlock_Ollama_TemperatureValue" Width="30" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                        <TextBlock Text="最大Token:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBlock Text="最大Token:" Width="60" VerticalAlignment="Center" x:Name="TextBlock_Ollama_MaxTokens"/>
                                         <TextBox x:Name="TextBox_Ollama_MaxTokens" Width="80" Margin="5,0" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>
                         </TabItem>
-                        <TabItem Header="OpenAI">
+                        <TabItem Header="OpenAI" x:Name="Tab_OpenAI">
                             <StackPanel>
-                                <Label Content="API 密钥"/>
+                                <Label Content="API 密钥" x:Name="Label_OpenAIApiKey"/>
                                 <TextBox x:Name="TextBox_OpenAIApiKey"/>
-                                <Label Content="模型"/>
+                                <Label Content="模型" x:Name="Label_OpenAIModel"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -85,27 +85,27 @@
                                     <ComboBox x:Name="ComboBox_OpenAIModel" Grid.Column="0" IsEditable="True"/>
                                     <Button x:Name="Button_RefreshOpenAIModels" Grid.Column="1" Content="刷新" Click="Button_RefreshOpenAIModels_Click" Margin="5,0,0,0"/>
                                 </Grid>
-                                <Label Content="API 地址"/>
+                                <Label Content="API 地址" x:Name="Label_OpenAIUrl"/>
                                 <TextBox x:Name="TextBox_OpenAIUrl"/>
                                 <CheckBox x:Name="CheckBox_OpenAI_EnableAdvanced" Content="启用高级配置" Margin="0,10,0,5"/>
                                 <StackPanel x:Name="StackPanel_OpenAI_Advanced" IsEnabled="{Binding ElementName=CheckBox_OpenAI_EnableAdvanced, Path=IsChecked}">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                        <TextBlock Text="温度:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBlock Text="温度:" Width="60" VerticalAlignment="Center" x:Name="TextBlock_OpenAI_Temperature"/>
                                         <Slider x:Name="Slider_OpenAI_Temperature" Minimum="0" Maximum="2" Width="100" Margin="5,0" VerticalAlignment="Center"/>
                                         <TextBlock x:Name="TextBlock_OpenAI_TemperatureValue" Width="30" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                        <TextBlock Text="最大Token:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBlock Text="最大Token:" Width="60" VerticalAlignment="Center" x:Name="TextBlock_OpenAI_MaxTokens"/>
                                         <TextBox x:Name="TextBox_OpenAI_MaxTokens" Width="80" Margin="5,0" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>
                         </TabItem>
-                        <TabItem Header="Gemini">
+                        <TabItem Header="Gemini" x:Name="Tab_Gemini">
                             <StackPanel>
-                                <Label Content="API 密钥"/>
+                                <Label Content="API 密钥" x:Name="Label_GeminiApiKey"/>
                                 <TextBox x:Name="TextBox_GeminiApiKey"/>
-                                <Label Content="模型"/>
+                                <Label Content="模型" x:Name="Label_GeminiModel"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -114,18 +114,18 @@
                                     <ComboBox x:Name="ComboBox_GeminiModel" Grid.Column="0" IsEditable="True"/>
                                     <Button x:Name="Button_RefreshGeminiModels" Grid.Column="1" Content="刷新" Click="Button_RefreshGeminiModels_Click" Margin="5,0,0,0"/>
                                 </Grid>
-                                <Label Content="API 地址"/>
+                                <Label Content="API 地址" x:Name="Label_GeminiUrl"/>
                                 <TextBox x:Name="TextBox_GeminiUrl"/>
-                                <TextBlock Text="注意：请提供正确的 API 端点 URL。" TextWrapping="Wrap" Foreground="Gray"/>
+                                <TextBlock Text="注意：请提供正确的 API 端点 URL。" TextWrapping="Wrap" Foreground="Gray" x:Name="TextBlock_GeminiApiEndpointNote"/>
                                 <CheckBox x:Name="CheckBox_Gemini_EnableAdvanced" Content="启用高级配置" Margin="0,10,0,5"/>
                                 <StackPanel x:Name="StackPanel_Gemini_Advanced" IsEnabled="{Binding ElementName=CheckBox_Gemini_EnableAdvanced, Path=IsChecked}">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                        <TextBlock Text="温度:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBlock Text="温度:" Width="60" VerticalAlignment="Center" x:Name="TextBlock_Gemini_Temperature"/>
                                         <Slider x:Name="Slider_Gemini_Temperature" Minimum="0" Maximum="2" Width="100" Margin="5,0" VerticalAlignment="Center"/>
                                         <TextBlock x:Name="TextBlock_Gemini_TemperatureValue" Width="30" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                        <TextBlock Text="最大Token:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBlock Text="最大Token:" Width="60" VerticalAlignment="Center" x:Name="TextBlock_Gemini_MaxTokens"/>
                                         <TextBox x:Name="TextBox_Gemini_MaxTokens" Width="80" Margin="5,0" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </StackPanel>
@@ -134,7 +134,13 @@
                     </TabControl>
                 </Grid>
             </TabItem>
-            <TabItem Header="高级选项">
+            <TabItem Header="语言" x:Name="Tab_Language">
+                <StackPanel>
+                    <Label Content="界面语言" x:Name="Label_Language"/>
+                    <ComboBox x:Name="ComboBox_Language" Margin="0,0,0,10"/>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="高级选项" x:Name="Tab_Advanced">
                 <StackPanel>
                     <CheckBox x:Name="CheckBox_EnableAction" Content="启动智能桌面宠物" Margin="0,10,0,5" IsChecked="True">
                         <CheckBox.ToolTip>
@@ -151,15 +157,15 @@
                         <CheckBox x:Name="CheckBox_EnableTime" Content="允许获取当前时间" IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}" IsChecked="True"/>
                         <CheckBox x:Name="CheckBox_EnableHistoryCompression" Content="启用聊天记录压缩" Margin="0,10,0,5"/>
                         <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
-                            <TextBlock Text="压缩阈值:" VerticalAlignment="Center"/>
+                            <TextBlock Text="压缩阈值:" VerticalAlignment="Center" x:Name="TextBlock_HistoryCompressionThreshold"/>
                             <TextBox x:Name="TextBox_HistoryCompressionThreshold" Width="50" Margin="5,0"/>
-                            <TextBlock Text="当前上下文长度:" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            <TextBlock Text="当前上下文长度:" VerticalAlignment="Center" Margin="10,0,0,0" x:Name="TextBlock_CurrentContextLengthLabel"/>
                             <TextBlock x:Name="TextBlock_CurrentContextLength" VerticalAlignment="Center"/>
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </TabItem>
-            <TabItem Header="工具列表">
+            <TabItem Header="工具列表" x:Name="Tab_Tools">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
@@ -173,30 +179,30 @@
                             <DataGridCheckBoxColumn Header="启用" Binding="{Binding IsEnabled}" Width="Auto"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                    <TextBlock Text="此列表用于配置 MCP (Model-Controlled Plugin) 工具" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5"/>
+                    <TextBlock Text="此列表用于配置 MCP (Model-Controlled Plugin) 工具" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5" x:Name="TextBlock_ToolsDescription"/>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
-                        <Button Content="添加" Click="Button_AddTool_Click" Margin="5"/>
-                        <Button Content="删除" Click="Button_DeleteTool_Click" Margin="5"/>
+                        <Button Content="添加" Click="Button_AddTool_Click" Margin="5" x:Name="Button_AddTool"/>
+                        <Button Content="删除" Click="Button_DeleteTool_Click" Margin="5" x:Name="Button_DeleteTool"/>
                     </StackPanel>
                 </Grid>
             </TabItem>
-            <TabItem Header="日志">
+            <TabItem Header="日志" x:Name="Tab_Log">
                 <GroupBox Header="日志" Margin="0,10,0,0">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Left" Margin="5">
-                            <CheckBox x:Name="CheckBox_LogAutoScroll" Content="自动滚动" Margin="0,0,10,0"/>
-                            <TextBlock Text="最大日志数量:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                            <TextBox x:Name="TextBox_MaxLogCount" Width="60" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <CheckBox x:Name="CheckBox_LogAutoScroll" Content="自动滚动" Margin="0,0,10,0" />
+                            <TextBlock Text="最大日志数量:" VerticalAlignment="Center" Margin="0,0,5,0" x:Name="TextBlock_MaxLogCount"/>
+                            <TextBox x:Name="TextBox_MaxLogCount" Width="60" VerticalAlignment="Center" Margin="0,0,10,0" />
                         </StackPanel>
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="Button_CopyLog" Content="复制" Click="Button_CopyLog_Click" Margin="5"/>
-                            <Button x:Name="Button_ClearLog" Content="清空" Click="Button_ClearLog_Click" Margin="5"/>
+                            <Button x:Name="Button_CopyLog" Content="复制" Click="Button_CopyLog_Click" Margin="5" />
+                            <Button x:Name="Button_ClearLog" Content="清空" Click="Button_ClearLog_Click" Margin="5" />
                         </StackPanel>
                         <ListBox x:Name="LogBox" MinHeight="100"/>
                     </DockPanel>
                 </GroupBox>
             </TabItem>
-            <TabItem Header="插件">
+            <TabItem Header="插件" x:Name="Tab_Plugin">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
@@ -210,15 +216,15 @@
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
-                        <TextBlock VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock x:Name="TextBlock_HowToUse" VerticalAlignment="Center" Margin="0,0,10,0">
                             <Run Text="如何使用？查看"/>
                             <Hyperlink NavigateUri="https://github.com/ycxom/VPetLLM_Plugin" RequestNavigate="Hyperlink_RequestNavigate">
                                 <Run Text="https://github.com/ycxom/VPetLLM_Plugin"/>
                             </Hyperlink>
                         </TextBlock>
-                        <Button Content="加载插件" Click="Button_LoadPlugins_Click" Margin="5"/>
-                        <Button Content="导入插件" Click="Button_ImportPlugin_Click" Margin="5"/>
-                        <Button Content="卸载插件" Click="Button_UnloadPlugin_Click" Margin="5"/>
+                        <Button Content="加载插件" Click="Button_LoadPlugins_Click" Margin="5" x:Name="Button_LoadPlugins"/>
+                        <Button Content="导入插件" Click="Button_ImportPlugin_Click" Margin="5" x:Name="Button_ImportPlugin"/>
+                        <Button Content="卸载插件" Click="Button_UnloadPlugin_Click" Margin="5" x:Name="Button_UnloadPlugin"/>
                     </StackPanel>
                 </Grid>
             </TabItem>

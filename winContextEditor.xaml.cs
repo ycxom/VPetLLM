@@ -1,11 +1,10 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using VPetLLM.Core;
+using VPetLLM.Utils;
 
 namespace VPetLLM
 {
@@ -39,6 +38,7 @@ namespace VPetLLM
             DisplayHistory = new ObservableCollection<ContextEditorItem>(displayItems);
 
             DataContext = this;
+            UpdateUIForLanguage();
         }
 
         private void Button_Save_Click(object sender, RoutedEventArgs e)
@@ -70,6 +70,36 @@ namespace VPetLLM
             {
                 DisplayHistory.Remove(selectedItem);
                 _originalHistory.Remove(selectedItem.OriginalMessage);
+            }
+        }
+
+        private void UpdateUIForLanguage()
+        {
+            var langCode = _plugin.Settings.Language;
+            Title = LanguageHelper.Get("ContextEditor.Title", langCode);
+            if (FindName("Column_Role") is DataGridTextColumn columnRole)
+            {
+                columnRole.Header = LanguageHelper.Get("ContextEditor.Role", langCode);
+            }
+            if (FindName("Column_Content") is DataGridTextColumn columnContent)
+            {
+                columnContent.Header = LanguageHelper.Get("ContextEditor.Content", langCode);
+            }
+            if (FindName("Button_Save") is Button buttonSave)
+            {
+                buttonSave.Content = LanguageHelper.Get("ContextEditor.Save", langCode);
+            }
+            if (FindName("Button_Cancel") is Button buttonCancel)
+            {
+                buttonCancel.Content = LanguageHelper.Get("ContextEditor.Cancel", langCode);
+            }
+            if (FindName("Button_Add") is Button buttonAdd)
+            {
+                buttonAdd.Content = LanguageHelper.Get("ContextEditor.Add", langCode);
+            }
+            if (FindName("Button_Delete") is Button buttonDelete)
+            {
+                buttonDelete.Content = LanguageHelper.Get("ContextEditor.Delete", langCode);
             }
         }
     }

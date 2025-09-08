@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="确认卸载" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterScreen">
     <StackPanel Margin="15">
-        <TextBlock Text="确定要卸载此插件吗？此操作将删除插件文件，且不可恢复。" TextWrapping="Wrap" MaxWidth="300" Margin="0,0,0,15"/>
+        <TextBlock Text="确定要卸载此插件吗？此操作将删除插件文件，且不可恢复。" TextWrapping="Wrap" MaxWidth="300" Margin="0,0,0,15" x:Name="TextBlock_Message"/>
         <CheckBox x:Name="CheckBox_DoNotShowAgain" Content="不再提醒" Margin="0,0,0,15"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="Button_Yes" Content="是" Width="75" Margin="5" Click="Button_Yes_Click"/>

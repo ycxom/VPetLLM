@@ -1,11 +1,14 @@
 using Newtonsoft.Json;
+using System.Globalization;
 using System.IO;
+using VPetLLM.Utils;
 
 namespace VPetLLM
 {
-    public class Setting
+    public partial class Setting
     {
         public LLMType Provider { get; set; } = LLMType.Ollama;
+        public string Language { get; set; }
         public OllamaSetting Ollama { get; set; } = new OllamaSetting();
         public OpenAISetting OpenAI { get; set; } = new OpenAISetting();
         public GeminiSetting Gemini { get; set; } = new GeminiSetting();
@@ -39,6 +42,19 @@ namespace VPetLLM
             {
                 var json = File.ReadAllText(_path);
                 JsonConvert.PopulateObject(json, this);
+            }
+
+            if (string.IsNullOrEmpty(Language))
+            {
+                var culture = CultureInfo.CurrentUICulture.Name.ToLower();
+                if (LanguageHelper.LanguageDisplayMap.ContainsKey(culture))
+                {
+                    Language = culture;
+                }
+                else
+                {
+                    Language = "en";
+                }
             }
         }
 

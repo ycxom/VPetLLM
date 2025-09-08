@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
 using VPetLLM.Utils;
@@ -16,17 +18,19 @@ namespace VPetLLM
 
         public winSettingNew(VPetLLM plugin)
         {
+            InitializeComponent();
             _plugin = plugin;
             _plugin.SettingWindow = this;
-            InitializeComponent();
             LoadSettings();
             Closed += Window_Closed;
+            Loaded += (s, e) => UpdateUIForLanguage();
             ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Control_ValueChanged;
 
             // Add event handlers for all other controls
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectionChanged += Control_SelectionChanged;
+            ((ComboBox)this.FindName("ComboBox_Language")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_AiName")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_UserName")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).Click += Control_Click;
@@ -63,7 +67,14 @@ namespace VPetLLM
         }
 
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => SaveSettings();
-        private void Control_SelectionChanged(object sender, SelectionChangedEventArgs e) => SaveSettings();
+        private void Control_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            SaveSettings();
+            if (sender == FindName("ComboBox_Language"))
+            {
+                UpdateUIForLanguage();
+            }
+        }
         private void Control_TextChanged(object sender, TextChangedEventArgs e) => SaveSettings();
         private void Control_Click(object sender, RoutedEventArgs e) => SaveSettings();
 
@@ -71,6 +82,9 @@ namespace VPetLLM
         {
             ((ComboBox)this.FindName("ComboBox_Provider")).ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectedItem = _plugin.Settings.Provider;
+            var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
+            languageComboBox.ItemsSource = LanguageHelper.LanguageDisplayMap.Values;
+            languageComboBox.SelectedItem = LanguageHelper.LanguageDisplayMap.FirstOrDefault(x => x.Key == _plugin.Settings.Language).Value;
             ((TextBox)this.FindName("TextBox_AiName")).Text = _plugin.Settings.AiName;
             ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
@@ -118,6 +132,7 @@ namespace VPetLLM
         private void SaveSettings()
         {
             var providerComboBox = (ComboBox)this.FindName("ComboBox_Provider");
+            var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
             var aiNameTextBox = (TextBox)this.FindName("TextBox_AiName");
             var userNameTextBox = (TextBox)this.FindName("TextBox_UserName");
             var followVPetNameCheckBox = (CheckBox)this.FindName("CheckBox_FollowVPetName");
@@ -157,6 +172,12 @@ namespace VPetLLM
             var newProvider = (Setting.LLMType)providerComboBox.SelectedItem;
 
             _plugin.Settings.Provider = newProvider;
+            var selectedLanguageDisplay = (string)languageComboBox.SelectedItem;
+            var selectedLangCode = LanguageHelper.LanguageDisplayMap.FirstOrDefault(x => x.Value == selectedLanguageDisplay).Key;
+            if (selectedLangCode != null)
+            {
+                _plugin.Settings.Language = selectedLangCode;
+            }
             _plugin.Settings.AiName = aiNameTextBox.Text;
             _plugin.Settings.UserName = userNameTextBox.Text;
             _plugin.Settings.FollowVPetName = followVPetNameCheckBox.IsChecked ?? true;
@@ -448,6 +469,112 @@ namespace VPetLLM
         private void Window_Closed(object? sender, EventArgs e)
         {
             _plugin.SettingWindow = null;
+        }
+
+        private void UpdateUIForLanguage()
+        {
+            var langCode = _plugin.Settings.Language;
+
+            if (FindName("Tab_LLM") is TabItem tabLLM) tabLLM.Header = LanguageHelper.Get("LLM_Settings.Tab", langCode);
+            if (FindName("Tab_Language") is TabItem tabLanguage) tabLanguage.Header = LanguageHelper.Get("Language.Tab", langCode);
+            if (FindName("Tab_Advanced") is TabItem tabAdvanced) tabAdvanced.Header = LanguageHelper.Get("Advanced_Options.Tab", langCode);
+            if (FindName("Tab_Tools") is TabItem tabTools) tabTools.Header = LanguageHelper.Get("Tools.Tab", langCode);
+            if (FindName("Tab_Log") is TabItem tabLog) tabLog.Header = LanguageHelper.Get("Log.Tab", langCode);
+            if (FindName("Tab_Plugin") is TabItem tabPlugin) tabPlugin.Header = LanguageHelper.Get("Plugin.Tab", langCode);
+
+            if (FindName("Label_Language") is Label labelLanguage) labelLanguage.Content = LanguageHelper.Get("Language.Select", langCode);
+            if (FindName("Label_Provider") is Label labelProvider) labelProvider.Content = LanguageHelper.Get("LLM_Settings.Provider", langCode);
+            if (FindName("Label_AiName") is Label labelAiName) labelAiName.Content = LanguageHelper.Get("LLM_Settings.AiName", langCode);
+            if (FindName("Label_UserName") is Label labelUserName) labelUserName.Content = LanguageHelper.Get("LLM_Settings.UserName", langCode);
+            if (FindName("CheckBox_FollowVPetName") is CheckBox checkBoxFollowVPetName) checkBoxFollowVPetName.Content = LanguageHelper.Get("LLM_Settings.FollowVPetName", langCode);
+            if (FindName("Label_Role") is Label labelRole) labelRole.Content = LanguageHelper.Get("LLM_Settings.Role", langCode);
+            if (FindName("Label_ContextControl") is Label labelContextControl) labelContextControl.Content = LanguageHelper.Get("LLM_Settings.ContextControl", langCode);
+            if (FindName("CheckBox_KeepContext") is CheckBox checkBoxKeepContext) checkBoxKeepContext.Content = LanguageHelper.Get("LLM_Settings.KeepContext", langCode);
+            if (FindName("CheckBox_EnableChatHistory") is CheckBox checkBoxEnableChatHistory) checkBoxEnableChatHistory.Content = LanguageHelper.Get("LLM_Settings.EnableChatHistory", langCode);
+            if (FindName("CheckBox_SeparateChatByProvider") is CheckBox checkBoxSeparateChatByProvider) checkBoxSeparateChatByProvider.Content = LanguageHelper.Get("LLM_Settings.SeparateChatByProvider", langCode);
+            if (FindName("CheckBox_AutoMigrateChatHistory") is CheckBox checkBoxAutoMigrateChatHistory) checkBoxAutoMigrateChatHistory.Content = LanguageHelper.Get("LLM_Settings.AutoMigrateChatHistory", langCode);
+            if (FindName("Button_ClearContext") is Button buttonClearContext) buttonClearContext.Content = LanguageHelper.Get("LLM_Settings.ClearContext", langCode);
+            if (FindName("Button_EditContext") is Button buttonEditContext) buttonEditContext.Content = LanguageHelper.Get("LLM_Settings.EditContext", langCode);
+
+            if (FindName("CheckBox_EnableAction") is CheckBox checkBoxEnableAction)
+            {
+                checkBoxEnableAction.Content = LanguageHelper.Get("Advanced_Options.EnableAction", langCode);
+                if (checkBoxEnableAction.ToolTip is ToolTip toolTip)
+                {
+                    toolTip.Content = LanguageHelper.Get("Advanced_Options.EnableActionToolTip", langCode);
+                }
+            }
+            if (FindName("CheckBox_EnableBuy") is CheckBox checkBoxEnableBuy) checkBoxEnableBuy.Content = LanguageHelper.Get("Advanced_Options.EnableBuy", langCode);
+            if (FindName("CheckBox_EnableState") is CheckBox checkBoxEnableState) checkBoxEnableState.Content = LanguageHelper.Get("Advanced_Options.EnableState", langCode);
+            if (FindName("CheckBox_EnableActionExecution") is CheckBox checkBoxEnableActionExecution) checkBoxEnableActionExecution.Content = LanguageHelper.Get("Advanced_Options.EnableActionExecution", langCode);
+            if (FindName("CheckBox_EnableMove") is CheckBox checkBoxEnableMove) checkBoxEnableMove.Content = LanguageHelper.Get("Advanced_Options.EnableMove", langCode);
+            if (FindName("CheckBox_EnableTime") is CheckBox checkBoxEnableTime) checkBoxEnableTime.Content = LanguageHelper.Get("Advanced_Options.EnableTime", langCode);
+            if (FindName("CheckBox_EnableHistoryCompression") is CheckBox checkBoxEnableHistoryCompression) checkBoxEnableHistoryCompression.Content = LanguageHelper.Get("Advanced_Options.EnableHistoryCompression", langCode);
+            if (FindName("TextBlock_HistoryCompressionThreshold") is TextBlock textBlockHistoryCompressionThreshold) textBlockHistoryCompressionThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionThreshold", langCode);
+            if (FindName("TextBlock_CurrentContextLengthLabel") is TextBlock textBlockCurrentContextLengthLabel) textBlockCurrentContextLengthLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentContextLength", langCode);
+            if (FindName("TextBlock_CurrentContextLength") is TextBlock textBlockCurrentContextLength) textBlockCurrentContextLength.Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+
+            if (FindName("TextBlock_ToolsDescription") is TextBlock textBlockToolsDescription) textBlockToolsDescription.Text = LanguageHelper.Get("Tools.Description", langCode);
+            if (FindName("Button_AddTool") is Button buttonAddTool) buttonAddTool.Content = LanguageHelper.Get("Tools.Add", langCode);
+            if (FindName("Button_DeleteTool") is Button buttonDeleteTool) buttonDeleteTool.Content = LanguageHelper.Get("Tools.Delete", langCode);
+            if (FindName("DataGrid_Tools") is DataGrid dataGridTools)
+            {
+                dataGridTools.Columns[0].Header = LanguageHelper.Get("Tools.Name", langCode);
+                dataGridTools.Columns[1].Header = LanguageHelper.Get("Tools.URL", langCode);
+                dataGridTools.Columns[2].Header = LanguageHelper.Get("Tools.ApiKey", langCode);
+                dataGridTools.Columns[3].Header = LanguageHelper.Get("Tools.Enabled", langCode);
+            }
+
+            if (FindName("CheckBox_LogAutoScroll") is CheckBox checkBoxLogAutoScroll) checkBoxLogAutoScroll.Content = LanguageHelper.Get("Log.AutoScroll", langCode);
+            if (FindName("TextBlock_MaxLogCount") is TextBlock textBlockMaxLogCount) textBlockMaxLogCount.Text = LanguageHelper.Get("Log.MaxLogCount", langCode);
+            if (FindName("Button_CopyLog") is Button buttonCopyLog) buttonCopyLog.Content = LanguageHelper.Get("Log.Copy", langCode);
+            if (FindName("Button_ClearLog") is Button buttonClearLog) buttonClearLog.Content = LanguageHelper.Get("Log.Clear", langCode);
+
+            if (FindName("TextBlock_HowToUse") is TextBlock howToUseTextBlock)
+            {
+                howToUseTextBlock.Inlines.Clear();
+                howToUseTextBlock.Inlines.Add(new Run(LanguageHelper.Get("Plugin.HowToUse", langCode)));
+                var hyperlink = new Hyperlink(new Run("https://github.com/ycxom/VPetLLM_Plugin"));
+                hyperlink.NavigateUri = new Uri("https://github.com/ycxom/VPetLLM_Plugin");
+                hyperlink.RequestNavigate += Hyperlink_RequestNavigate;
+                howToUseTextBlock.Inlines.Add(hyperlink);
+            }
+            if (FindName("Button_LoadPlugins") is Button buttonLoadPlugins) buttonLoadPlugins.Content = LanguageHelper.Get("Plugin.LoadPlugins", langCode);
+            if (FindName("Button_ImportPlugin") is Button buttonImportPlugin) buttonImportPlugin.Content = LanguageHelper.Get("Plugin.ImportPlugin", langCode);
+            if (FindName("Button_UnloadPlugin") is Button buttonUnloadPlugin) buttonUnloadPlugin.Content = LanguageHelper.Get("Plugin.UnloadPlugin", langCode);
+            if (FindName("DataGrid_Plugins") is DataGrid dataGridPlugins)
+            {
+                dataGridPlugins.Columns[0].Header = LanguageHelper.Get("Plugin.Enabled", langCode);
+                dataGridPlugins.Columns[1].Header = LanguageHelper.Get("Plugin.Name", langCode);
+                dataGridPlugins.Columns[2].Header = LanguageHelper.Get("Plugin.Description", langCode);
+            }
+
+            if (FindName("Tab_Ollama") is TabItem tabOllama) tabOllama.Header = LanguageHelper.Get("Ollama.Header", langCode);
+            if (FindName("Label_OllamaUrl") is Label labelOllamaUrl) labelOllamaUrl.Content = LanguageHelper.Get("Ollama.URL", langCode);
+            if (FindName("Label_OllamaModel") is Label labelOllamaModel) labelOllamaModel.Content = LanguageHelper.Get("Ollama.Model", langCode);
+            if (FindName("Button_RefreshOllamaModels") is Button buttonRefreshOllamaModels) buttonRefreshOllamaModels.Content = LanguageHelper.Get("Ollama.Refresh", langCode);
+            if (FindName("CheckBox_Ollama_EnableAdvanced") is CheckBox checkBoxOllamaEnableAdvanced) checkBoxOllamaEnableAdvanced.Content = LanguageHelper.Get("Ollama.EnableAdvanced", langCode);
+            if (FindName("TextBlock_Ollama_Temperature") is TextBlock textBlockOllamaTemperature) textBlockOllamaTemperature.Text = LanguageHelper.Get("Ollama.Temperature", langCode);
+            if (FindName("TextBlock_Ollama_MaxTokens") is TextBlock textBlockOllamaMaxTokens) textBlockOllamaMaxTokens.Text = LanguageHelper.Get("Ollama.MaxTokens", langCode);
+
+            if (FindName("Tab_OpenAI") is TabItem tabOpenAI) tabOpenAI.Header = LanguageHelper.Get("OpenAI.Header", langCode);
+            if (FindName("Label_OpenAIApiKey") is Label labelOpenAIApiKey) labelOpenAIApiKey.Content = LanguageHelper.Get("OpenAI.ApiKey", langCode);
+            if (FindName("Label_OpenAIModel") is Label labelOpenAIModel) labelOpenAIModel.Content = LanguageHelper.Get("OpenAI.Model", langCode);
+            if (FindName("Button_RefreshOpenAIModels") is Button buttonRefreshOpenAIModels) buttonRefreshOpenAIModels.Content = LanguageHelper.Get("OpenAI.Refresh", langCode);
+            if (FindName("Label_OpenAIUrl") is Label labelOpenAIUrl) labelOpenAIUrl.Content = LanguageHelper.Get("OpenAI.ApiAddress", langCode);
+            if (FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox checkBoxOpenAIEnableAdvanced) checkBoxOpenAIEnableAdvanced.Content = LanguageHelper.Get("OpenAI.EnableAdvanced", langCode);
+            if (FindName("TextBlock_OpenAI_Temperature") is TextBlock textBlockOpenAITemperature) textBlockOpenAITemperature.Text = LanguageHelper.Get("OpenAI.Temperature", langCode);
+            if (FindName("TextBlock_OpenAI_MaxTokens") is TextBlock textBlockOpenAIMaxTokens) textBlockOpenAIMaxTokens.Text = LanguageHelper.Get("OpenAI.MaxTokens", langCode);
+
+            if (FindName("Tab_Gemini") is TabItem tabGemini) tabGemini.Header = LanguageHelper.Get("Gemini.Header", langCode);
+            if (FindName("Label_GeminiApiKey") is Label labelGeminiApiKey) labelGeminiApiKey.Content = LanguageHelper.Get("Gemini.ApiKey", langCode);
+            if (FindName("Label_GeminiModel") is Label labelGeminiModel) labelGeminiModel.Content = LanguageHelper.Get("Gemini.Model", langCode);
+            if (FindName("Button_RefreshGeminiModels") is Button buttonRefreshGeminiModels) buttonRefreshGeminiModels.Content = LanguageHelper.Get("Gemini.Refresh", langCode);
+            if (FindName("Label_GeminiUrl") is Label labelGeminiUrl) labelGeminiUrl.Content = LanguageHelper.Get("Gemini.ApiAddress", langCode);
+            if (FindName("TextBlock_GeminiApiEndpointNote") is TextBlock textBlockGeminiApiEndpointNote) textBlockGeminiApiEndpointNote.Text = LanguageHelper.Get("Gemini.ApiEndpointNote", langCode);
+            if (FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox checkBoxGeminiEnableAdvanced) checkBoxGeminiEnableAdvanced.Content = LanguageHelper.Get("Gemini.EnableAdvanced", langCode);
+            if (FindName("TextBlock_Gemini_Temperature") is TextBlock textBlockGeminiTemperature) textBlockGeminiTemperature.Text = LanguageHelper.Get("Gemini.Temperature", langCode);
+            if (FindName("TextBlock_Gemini_MaxTokens") is TextBlock textBlockGeminiMaxTokens) textBlockGeminiMaxTokens.Text = LanguageHelper.Get("Gemini.MaxTokens", langCode);
         }
     }
 }

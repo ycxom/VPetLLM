@@ -38,6 +38,9 @@ namespace VPetLLM
             Utils.Logger.Log("VPetLLM plugin constructor started.");
             Settings = new Setting(ExtensionValue.BaseDirectory);
             Utils.Logger.Log("Settings loaded.");
+            var dllPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            var langPath = Path.Combine(dllPath, "VPetLLM_lang", "Language.json");
+            LanguageHelper.LoadLanguages(langPath);
             ActionProcessor = new ActionProcessor(mainwin);
             switch (Settings.Provider)
             {
