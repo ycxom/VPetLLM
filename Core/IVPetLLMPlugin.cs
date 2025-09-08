@@ -7,11 +7,11 @@ namespace VPetLLM.Core
         string Name { get; }
         string Description { get; }
         string Parameters { get; }
+        string Examples { get; }
         bool Enabled { get; set; }
         string FilePath { get; set; }
-        Task<string> Function(string arguments);
+
         void Initialize(VPetLLM plugin);
         void Unload();
-        void Log(string message);
     }
 }

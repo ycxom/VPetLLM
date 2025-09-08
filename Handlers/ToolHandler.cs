@@ -22,9 +22,9 @@ namespace VPetLLM.Handlers
                 var toolName = match.Groups[1].Value;
                 var arguments = match.Groups[2].Value;
                 var tool = VPetLLM.Instance.Plugins.Find(p => p.Name.Replace(" ", "_").ToLower() == toolName);
-                if (tool != null)
+                if (tool is IActionPlugin actionPlugin)
                 {
-                    var result = await tool.Function(arguments);
+                    var result = await actionPlugin.Function(arguments);
                     var message = new Message { Role = "tool", Content = result };
                     VPetLLM.Instance.ChatCore.GetChatHistory().Add(message);
                 }

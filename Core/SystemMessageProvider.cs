@@ -80,8 +80,8 @@ namespace VPetLLM.Core
 
            if (_settings.EnablePlugin && VPetLLM.Instance.Plugins.Any(p => p.Enabled))
            {
-               var pluginDescriptions = VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => $"{p.Name}: {p.Description}");
-               parts.Add("可用插件列表 (所有插件都必须通过 `[:plugin(plugin_name(parameters))]` 的格式来调用):\n" + string.Join("\n", pluginDescriptions));
+               var pluginDescriptions = VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => $"{p.Name}: {p.Description} {p.Examples}");
+               parts.Add("Available Plugins (all plugins must be called in the format `[:plugin(plugin_name(parameters))]`):\n" + string.Join("\n", pluginDescriptions));
            }
 
             return string.Join("\n", parts);

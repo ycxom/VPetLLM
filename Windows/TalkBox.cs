@@ -61,29 +61,29 @@ namespace VPetLLM.Windows
                         Logger.Log($"Executing action: {item.Keyword}, value: {item.Value}");
                         // The SayHandler is now just for changing emotions, actual speech is handled above.
                         if (item.Handler is SayHandler)
-                       {
-                           var sayMatch = new Regex("\"(.*?)\"").Match(item.Value);
-                           if (sayMatch.Success)
-                           {
-                               _plugin.MW.Main.Say(sayMatch.Groups[1].Value);
-                           }
-                           var emotionMatch = new Regex(@",\s*(.*?)\)").Match(item.Value);
-                           if (emotionMatch.Success)
-                           {
-                               var emotion = (IGameSave.ModeType)Enum.Parse(typeof(IGameSave.ModeType), emotionMatch.Groups[1].Value, true);
-                               _plugin.MW.Core.Save.Mode = emotion;
-                           }
-                       }
-                       else
-                       {
-                           if (string.IsNullOrEmpty(item.Value))
-                               item.Handler.Execute(_plugin.MW);
-                           else if (int.TryParse(item.Value, out int intValue))
-                               item.Handler.Execute(intValue, _plugin.MW);
-                           else
-                               item.Handler.Execute(item.Value, _plugin.MW);
-                           await Task.Delay(500);
-                       }
+                        {
+                            var sayMatch = new Regex("\"(.*?)\"").Match(item.Value);
+                            if (sayMatch.Success)
+                            {
+                                _plugin.MW.Main.Say(sayMatch.Groups[1].Value);
+                            }
+                            var emotionMatch = new Regex(@",\s*(.*?)\)").Match(item.Value);
+                            if (emotionMatch.Success)
+                            {
+                                var emotion = (IGameSave.ModeType)Enum.Parse(typeof(IGameSave.ModeType), emotionMatch.Groups[1].Value, true);
+                                _plugin.MW.Core.Save.Mode = emotion;
+                            }
+                        }
+                        else
+                        {
+                            if (string.IsNullOrEmpty(item.Value))
+                                item.Handler.Execute(_plugin.MW);
+                            else if (int.TryParse(item.Value, out int intValue))
+                                item.Handler.Execute(intValue, _plugin.MW);
+                            else
+                                item.Handler.Execute(item.Value, _plugin.MW);
+                            await Task.Delay(500);
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -137,7 +137,7 @@ namespace VPetLLM.Windows
                         {
                             // This part might need to be refactored similar to HandleResponse
                             item.Handler.Execute(item.Value, _plugin.MW);
-                             await Task.Delay(500);
+                            await Task.Delay(500);
                         }
                     });
                 }

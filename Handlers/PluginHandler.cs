@@ -78,13 +78,17 @@ namespace VPetLLM.Handlers
                         if (plugin is IActionPlugin actionPlugin)
                         {
                             var result = await actionPlugin.Function(arguments);
-                            VPetLLM.Instance.Log($"PluginHandler: Plugin function returned: {result}");
-                            await VPetLLM.Instance.ChatCore.Chat(result, true);
+                            var formattedResult = $"[Plugin.{pluginName}: \"{result}\"]";
+                            VPetLLM.Instance.Log($"PluginHandler: Plugin function returned: {result}, formatted: {formattedResult}");
+                            await VPetLLM.Instance.ChatCore.Chat(formattedResult, true);
                         }
                     }
                     else
                     {
                         VPetLLM.Instance.Log($"PluginHandler: Plugin not found: {pluginName}");
+                        var availablePlugins = string.Join(", ", VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => p.Name));
+                        var errorMessage = $"[SYSTEM] Error: Plugin '{pluginName}' not found. Available plugins are: {availablePlugins}";
+                        await VPetLLM.Instance.ChatCore.Chat(errorMessage, true);
                     }
                 }
             }
