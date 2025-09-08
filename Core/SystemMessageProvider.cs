@@ -69,6 +69,10 @@ namespace VPetLLM.Core
                                "6. 聊天需要拼接[:state(happy(10))]控制心情，以便调整VPet_Simulator参数";
                     parts.Add(rule);
                     parts.Add("可用指令列表(包括可用情绪: happy, nomal, poorcondition, ill):\n" + string.Join("\n", instructions));
+                    if (_settings.EnableActionExecution)
+                    {
+                         parts.Add("可用动画列表 (用于 action 指令): " + string.Join(", ", VPetLLM.Instance.GetAvailableAnimations()));
+                    }
                 }
 
                 if (_settings.EnableBuy)

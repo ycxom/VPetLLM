@@ -1,5 +1,7 @@
+using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Utils;
+using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers
 {
@@ -7,7 +9,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "action";
         public ActionType ActionType => ActionType.Body;
-        public string Description => "通过 'action' 指令播放动画。可用动作: 'touchhead', 'touchbody', 'sleep', 'idel'。例如 '[:body(action(touchhead))]'。";
+        public string Description => "通过 'action' 指令播放动画. 例如 '[:body(action(touchhead))]'.";
 
         public void Execute(string actionName, IMainWindow mainWindow)
         {
@@ -29,6 +31,9 @@ namespace VPetLLM.Handlers
                     break;
                 case "idel":
                     mainWindow.Main.DisplayIdel();
+                    break;
+                default:
+                    mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
                     break;
             }
         }

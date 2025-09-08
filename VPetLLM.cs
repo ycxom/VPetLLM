@@ -317,6 +317,10 @@ namespace VPetLLM
                 // but it's good practice to have a method for explicit updates.
             }
         }
-    }
 
+        public IEnumerable<string> GetAvailableAnimations()
+        {
+            return MW.Main.Core.Graph.GraphsList.Keys;
+        }
+    }
 }
