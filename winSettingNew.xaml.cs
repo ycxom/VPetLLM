@@ -30,7 +30,8 @@ namespace VPetLLM
 
             // Add event handlers for all other controls
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectionChanged += Control_SelectionChanged;
-            ((ComboBox)this.FindName("ComboBox_Language")).SelectionChanged += Control_SelectionChanged;
+             ((ComboBox)this.FindName("ComboBox_Language")).SelectionChanged += Control_SelectionChanged;
+            ((ComboBox)this.FindName("ComboBox_PromptLanguage")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_AiName")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_UserName")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).Click += Control_Click;
@@ -85,6 +86,9 @@ namespace VPetLLM
             var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
             languageComboBox.ItemsSource = LanguageHelper.LanguageDisplayMap.Values;
             languageComboBox.SelectedItem = LanguageHelper.LanguageDisplayMap.FirstOrDefault(x => x.Key == _plugin.Settings.Language).Value;
+           var promptlanguageComboBox = (ComboBox)this.FindName("ComboBox_PromptLanguage");
+           promptlanguageComboBox.ItemsSource = new List<string> { "English", "简体中文" };
+           promptlanguageComboBox.SelectedItem = _plugin.Settings.PromptLanguage == "en" ? "English" : "简体中文";
             ((TextBox)this.FindName("TextBox_AiName")).Text = _plugin.Settings.AiName;
             ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
@@ -133,6 +137,7 @@ namespace VPetLLM
         {
             var providerComboBox = (ComboBox)this.FindName("ComboBox_Provider");
             var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
+           var promptlanguageComboBox = (ComboBox)this.FindName("ComboBox_PromptLanguage");
             var aiNameTextBox = (TextBox)this.FindName("TextBox_AiName");
             var userNameTextBox = (TextBox)this.FindName("TextBox_UserName");
             var followVPetNameCheckBox = (CheckBox)this.FindName("CheckBox_FollowVPetName");
@@ -178,6 +183,7 @@ namespace VPetLLM
             {
                 _plugin.Settings.Language = selectedLangCode;
             }
+           _plugin.Settings.PromptLanguage = (string)promptlanguageComboBox.SelectedItem == "English" ? "en" : "zh";
             _plugin.Settings.AiName = aiNameTextBox.Text;
             _plugin.Settings.UserName = userNameTextBox.Text;
             _plugin.Settings.FollowVPetName = followVPetNameCheckBox.IsChecked ?? true;
@@ -483,6 +489,8 @@ namespace VPetLLM
             if (FindName("Tab_Plugin") is TabItem tabPlugin) tabPlugin.Header = LanguageHelper.Get("Plugin.Tab", langCode);
 
             if (FindName("Label_Language") is Label labelLanguage) labelLanguage.Content = LanguageHelper.Get("Language.Select", langCode);
+           if (FindName("Label_PromptLanguage") is Label labelPromptLanguage) labelPromptLanguage.Content = LanguageHelper.Get("Language.PromptLanguage", langCode);
+          if (FindName("TextBlock_PromptLanguageTooltip") is TextBlock textBlockPromptLanguageTooltip) textBlockPromptLanguageTooltip.Text = LanguageHelper.Get("Language.PromptLanguageTooltip", langCode);
             if (FindName("Label_Provider") is Label labelProvider) labelProvider.Content = LanguageHelper.Get("LLM_Settings.Provider", langCode);
             if (FindName("Label_AiName") is Label labelAiName) labelAiName.Content = LanguageHelper.Get("LLM_Settings.AiName", langCode);
             if (FindName("Label_UserName") is Label labelUserName) labelUserName.Content = LanguageHelper.Get("LLM_Settings.UserName", langCode);

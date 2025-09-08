@@ -9,7 +9,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "say";
         public ActionType ActionType => ActionType.Talk;
-        public string Description => "通过 'say' 指令让宠物说话，并可以指定情绪。格式: '[:talk(say(\"文本\",情绪))]'。文本必须用英文双引号包裹。";
+       public string Description => PromptHelper.Get("Handler_Say_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public void Execute(string value, IMainWindow mainWindow)
         {

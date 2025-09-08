@@ -8,7 +8,8 @@ namespace VPetLLM
     public partial class Setting
     {
         public LLMType Provider { get; set; } = LLMType.Ollama;
-        public string Language { get; set; } = "en";
+        public string Language { get; set; } = "zh-hans";
+        public string PromptLanguage { get; set; } = "zh";
         public OllamaSetting Ollama { get; set; } = new OllamaSetting();
         public OpenAISetting OpenAI { get; set; } = new OpenAISetting();
         public GeminiSetting Gemini { get; set; } = new GeminiSetting();

@@ -9,7 +9,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "action";
         public ActionType ActionType => ActionType.Body;
-        public string Description => "通过 'action' 指令播放动画. 例如 '[:body(action(touchhead))]'.";
+       public string Description => PromptHelper.Get("Handler_Action_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public void Execute(string actionName, IMainWindow mainWindow)
         {

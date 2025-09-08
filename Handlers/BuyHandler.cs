@@ -9,7 +9,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "buy";
         public ActionType ActionType => ActionType.State;
-        public string Description => "通过 'buy' 指令购买物品。需提供物品名称作为参数。例如 '[:state(buy(奶茶))]'。";
+       public string Description => PromptHelper.Get("Handler_Buy_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public void Execute(string itemName, IMainWindow mainWindow)
         {

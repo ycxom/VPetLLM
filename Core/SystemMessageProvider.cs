@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
+using VPetLLM.Utils;
 
 namespace VPetLLM.Core
 {
@@ -23,64 +24,78 @@ namespace VPetLLM.Core
         {
             if (_settings == null || _mainWindow == null || _actionProcessor == null) return "";
 
-            var basePrompt = $"你的名字是{_settings.AiName}，我的名字是{_settings.UserName}。";
-            var parts = new List<string> { basePrompt };
+           var lang = _settings.PromptLanguage;
+           var parts = new List<string>
+           {
+               PromptHelper.Get("Role", lang)
+                           .Replace("{AiName}", _settings.AiName)
+                           .Replace("{UserName}", _settings.UserName),
+              _settings.Role
+           };
 
-            if (_settings.EnableAction)
-            {
-                parts.Add(_settings.Role);
+           if (_settings.EnableAction)
+           {
+               parts.Add(PromptHelper.Get("Character_Setting", lang));
 
-                if (_settings.EnableState)
-                {
-                    var core = _mainWindow.Core;
-                    var status = $"当前状态: 等级({core.Save.Level}), 金钱({core.Save.Money:F2}), 体力({core.Save.Strength:F0}/{core.Save.StrengthMax:F0}), 健康({core.Save.Health:F0}), 心情({core.Save.Feeling:F0}/{core.Save.FeelingMax:F0}), 好感度({core.Save.Likability:F0}/{core.Save.LikabilityMax:F0}), 饱食度({core.Save.StrengthFood:F0}/{core.Save.StrengthMax:F0}), 口渴度({core.Save.StrengthDrink:F0}/{core.Save.StrengthMax:F0})";
-                    if (_settings.EnableTime)
-                    {
-                        status += $", 当前时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
-                    }
-                    parts.Add(status);
-                }
+               if (_settings.EnableState)
+               {
+                   var core = _mainWindow.Core;
+                   var status = PromptHelper.Get("Status_Prefix", lang)
+                       .Replace("{Level}", core.Save.Level.ToString())
+                       .Replace("{Money:F2}", core.Save.Money.ToString("F2"))
+                       .Replace("{Strength:F0}", core.Save.Strength.ToString("F0"))
+                       .Replace("{StrengthMax:F0}", core.Save.StrengthMax.ToString("F0"))
+                       .Replace("{Health:F0}", core.Save.Health.ToString("F0"))
+                       .Replace("{Feeling:F0}", core.Save.Feeling.ToString("F0"))
+                       .Replace("{FeelingMax:F0}", core.Save.FeelingMax.ToString("F0"))
+                       .Replace("{Likability:F0}", core.Save.Likability.ToString("F0"))
+                       .Replace("{LikabilityMax:F0}", core.Save.LikabilityMax.ToString("F0"))
+                       .Replace("{StrengthFood:F0}", core.Save.StrengthFood.ToString("F0"))
+                       .Replace("{StrengthDrink:F0}", core.Save.StrengthDrink.ToString("F0"));
 
-                var instructions = new List<string>();
-                foreach (var handler in _actionProcessor.Handlers)
-                {
-                    bool isEnabled = handler.ActionType switch
-                    {
-                        ActionType.State => (_settings.EnableBuy && handler.Keyword == "buy") || (_settings.EnableAction && handler.Keyword != "buy"),
-                        ActionType.Body => (_settings.EnableActionExecution && handler.Keyword == "action") || (_settings.EnableMove && handler.Keyword == "move"),
-                        ActionType.Talk => true,
-                        _ => false
-                    };
+                   if (_settings.EnableTime)
+                   {
+                       status += PromptHelper.Get("Time_Prefix", lang)
+                                   .Replace("{CurrentTime:yyyy-MM-dd HH:mm:ss}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                   }
+                   parts.Add(status);
+               }
 
-                    if (isEnabled)
-                    {
-                        instructions.Add(handler.Description);
-                    }
-                }
+               var instructions = new List<string>();
+               foreach (var handler in _actionProcessor.Handlers)
+               {
+                   bool isEnabled = handler.ActionType switch
+                   {
+                       ActionType.State => (_settings.EnableBuy && handler.Keyword == "buy") || (_settings.EnableAction && handler.Keyword != "buy"),
+                       ActionType.Body => (_settings.EnableActionExecution && handler.Keyword == "action") || (_settings.EnableMove && handler.Keyword == "move"),
+                       ActionType.Talk => true,
+                       _ => false
+                   };
 
-                if (instructions.Any())
-                {
-                    var rule = "你必须严格遵循以下规则:\n" +
-                               "1. 你的回复可以包含一个或多个指令，用于按顺序控制我的行为和情绪。\n" +
-                               "2. 严禁在括号或星号中描述动作，例如 '(高兴地摇尾巴)' 是错误的。你必须使用指令来替代。\n" +
-                               "3. 优先级规则: `move`指令拥有最高优先级。如果回复中包含`move`指令，则只会执行`move`，并忽略所有其他指令。\n" +
-                               "4. `say`指令用于说话，格式为 `[:talk(say(\"文本\",情绪))]`。文本必须用英文双引号包裹。所有要说的文本都必须在指令内部。\n" +
-                               "5. 你可以像编写脚本一样，将多个非`move`指令组合在一起，它们会按顺序执行。例如: `[:talk(say(\"你好！\",happy))][:body(action(touchhead))][:state(happy(10))]`\n" +
-                               "6. 聊天需要拼接[:state(happy(10))]控制心情，以便调整VPet_Simulator参数";
-                    parts.Add(rule);
-                    parts.Add("可用指令列表(包括可用情绪: happy, nomal, poorcondition, ill):\n" + string.Join("\n", instructions));
-                    if (_settings.EnableActionExecution)
-                    {
-                         parts.Add("可用动画列表 (用于 action 指令): " + string.Join(", ", VPetLLM.Instance.GetAvailableAnimations()));
-                    }
-                }
+                   if (isEnabled)
+                   {
+                       instructions.Add(handler.Description);
+                   }
+               }
 
-                if (_settings.EnableBuy)
-                {
-                    var items = string.Join(",", _mainWindow.Foods.Select(f => f.Name));
-                    parts.Add($"可购买物品列表:{items}。");
-                }
-            }
+               if (instructions.Any())
+               {
+                   parts.Add(PromptHelper.Get("Available_Commands_Prefix", lang)
+                               .Replace("{CommandList}", string.Join("\n", instructions)));
+                   if (_settings.EnableActionExecution)
+                   {
+                       parts.Add(PromptHelper.Get("Available_Animations_Prefix", lang)
+                                   .Replace("{AnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableAnimations())));
+                   }
+               }
+
+               if (_settings.EnableBuy)
+               {
+                   var items = string.Join(",", _mainWindow.Foods.Select(f => f.Name));
+                   parts.Add(PromptHelper.Get("Available_Items_Prefix", lang)
+                               .Replace("{ItemList}", items));
+               }
+           }
 
            if (_settings.EnablePlugin && VPetLLM.Instance.Plugins.Any(p => p.Enabled))
            {
@@ -88,8 +103,10 @@ namespace VPetLLM.Core
                parts.Add("Available Plugins (all plugins must be called in the format `[:plugin(plugin_name(parameters))]`):\n" + string.Join("\n", pluginDescriptions));
            }
 
-            return string.Join("\n", parts);
-        }
+           var systemMessage = string.Join("\n", parts);
+        //    Logger.Log("System Message Generated:\n" + systemMessage); // Uncomment for debugging
+           return systemMessage;
+       }
 
         public void AddPlugin(IVPetLLMPlugin plugin)
         {

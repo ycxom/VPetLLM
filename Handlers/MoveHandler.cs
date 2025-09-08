@@ -10,7 +10,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "move";
         public ActionType ActionType => ActionType.Body;
-        public string Description => "通过 'move' 指令移动。可用参数: 'x,y' (移动到指定坐标), 'random' (随机移动)。添加 'flash' 参数可实现无动画的闪现移动。例如 '[:body(move(100,200))]' 或 '[:body(move(random,flash))]'。";
+       public string Description => PromptHelper.Get("Handler_Move_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public void Execute(string value, IMainWindow mainWindow)
         {

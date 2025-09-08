@@ -9,7 +9,7 @@ namespace VPetLLM.Handlers
     {
         public ActionType ActionType => ActionType.Plugin;
         public string Keyword => "plugin";
-        public string Description => "管理或调用已安装的插件。格式: [:plugin(操作:插件名称)]，支持的操作有 'delete', 'disable', 'enable'。";
+       public string Description => Utils.PromptHelper.Get("Handler_Plugin_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public void Execute(IMainWindow main)
         {

@@ -7,7 +7,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "exp";
         public ActionType ActionType => ActionType.State;
-        public string Description => "通过 'exp' 指令增加或减少经验值。例如 '[:state(exp(10))]'。";
+       public string Description => Utils.PromptHelper.Get("Handler_Exp_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public void Execute(int value, IMainWindow mainWindow)
         {
