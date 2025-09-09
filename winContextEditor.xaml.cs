@@ -43,12 +43,16 @@ namespace VPetLLM
 
         private void Button_Save_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var item in DisplayHistory)
-            {
-                item.OriginalMessage.Content = item.Content;
-            }
+           var systemMessages = _originalHistory.Where(m => m.Role == "system").ToList();
+           var newHistory = new List<Message>(systemMessages);
 
-            _plugin.ChatCore.SetChatHistory(_originalHistory);
+           foreach (var item in DisplayHistory)
+           {
+               item.OriginalMessage.Content = item.Content;
+               newHistory.Add(item.OriginalMessage);
+           }
+
+           _plugin.ChatCore.SetChatHistory(newHistory);
             Close();
         }
 

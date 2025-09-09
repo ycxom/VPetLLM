@@ -60,33 +60,13 @@ namespace VPetLLM.Windows
                     {
                         Logger.Log($"Executing action: {item.Keyword}, value: {item.Value}");
                         // The SayHandler is now just for changing emotions, actual speech is handled above.
-                        if (item.Handler is SayHandler)
-                        {
-                            var sayMatch = new Regex("\"(.*?)\"").Match(item.Value);
-                            string sayText = "";
-                            if (sayMatch.Success)
-                            {
-                                sayText = sayMatch.Groups[1].Value;
-                                _plugin.MW.Main.Say(sayText);
-                            }
-                            var emotionMatch = new Regex(@",\s*(.*?)\)").Match(item.Value);
-                            if (emotionMatch.Success)
-                            {
-                                var emotion = (IGameSave.ModeType)Enum.Parse(typeof(IGameSave.ModeType), emotionMatch.Groups[1].Value, true);
-                                _plugin.MW.Core.Save.Mode = emotion;
-                            }
-                            await Task.Delay(Math.Max(2000, sayText.Length * 200));
-                        }
-                        else
-                        {
-                            if (string.IsNullOrEmpty(item.Value))
-                                item.Handler.Execute(_plugin.MW);
-                            else if (int.TryParse(item.Value, out int intValue))
-                                item.Handler.Execute(intValue, _plugin.MW);
-                            else
-                                item.Handler.Execute(item.Value, _plugin.MW);
-                            await Task.Delay(500);
-                        }
+                       if (string.IsNullOrEmpty(item.Value))
+                           item.Handler.Execute(_plugin.MW);
+                       else if (int.TryParse(item.Value, out int intValue))
+                           item.Handler.Execute(intValue, _plugin.MW);
+                       else
+                           item.Handler.Execute(item.Value, _plugin.MW);
+                       await Task.Delay(500);
                     }
                 }
                 catch (Exception ex)
