@@ -45,39 +45,44 @@ namespace VPetLLM.Handlers
                 var content = match.Groups[1].Value;
                 var parts = content.Split(new[] { '(' }, 2);
                 var command = parts[0].ToLower();
-                var value = parts.Length > 1 ? parts[1].TrimEnd(')') : "";
+                var value = parts.Length > 1 && parts[1].Length > 0 ? parts[1].Substring(0, parts[1].Length - 1) : "";
 
-                IActionHandler handler = null;
-                string keyword = command;
-                string finalValue = value;
+                IActionHandler handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == command);
 
-                // Check for nested commands like talk(say(...))
-                if (command == "talk" || command == "body" || command == "state")
-                {
-                    var innerParts = value.Split(new[] { '(' }, 2);
-                    keyword = innerParts[0].ToLower();
-                    finalValue = innerParts.Length > 1 ? innerParts[1].TrimEnd(')') : "";
-                }
-
-                handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == keyword);
-                
-                // If no direct handler found, check if it's a plugin call not wrapped in [:plugin(...)]
                 if (handler == null)
                 {
-                    var plugin = VPetLLM.Instance.Plugins.Find(p => p.Name.Replace(" ", "_").ToLower() == keyword);
-                    if (plugin != null)
+                    var nestedMatch = new Regex(@"(\w+)\((.*)\)").Match(content);
+                    if (nestedMatch.Success)
                     {
-                        handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == "plugin");
-                        if(handler != null)
-                        {
-                            finalValue = $"{keyword}({finalValue})";
+                        var outerCommand = nestedMatch.Groups[1].Value.ToLower();
+                        var innerValue = nestedMatch.Groups[2].Value.Trim(')');
+                        
+                        handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == outerCommand);
+                        if(handler != null){
+                            value = innerValue;
+                        } else {
+                             var innerParts = innerValue.Split(new[] { '(' }, 2);
+                            var innerCommand = innerParts[0].ToLower();
+                            handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == innerCommand);
+                            if(handler != null){
+                                value = innerParts.Length > 1 ? innerParts[1].TrimEnd(')') : "";
+                            }
                         }
                     }
                 }
 
                 if (handler == null)
                 {
-                    Logger.Log($"ActionProcessor: No handler found for command: {content}");
+                     handler = Handlers.FirstOrDefault(h => h.Keyword == "plugin");
+                     if (handler != null)
+                     {
+                        value = content;
+                     }
+                }
+
+                if (handler == null)
+                {
+                    Logger.Log($"ActionProcessor: No handler found for command: {command}");
                     continue;
                 }
                 
@@ -97,7 +102,7 @@ namespace VPetLLM.Handlers
                     continue;
                 }
 
-                actions.Add(new HandlerAction(handler.ActionType, handler.Keyword, finalValue, handler));
+                actions.Add(new HandlerAction(handler.ActionType, handler.Keyword, value, handler));
             }
             return actions;
         }

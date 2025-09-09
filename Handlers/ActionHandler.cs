@@ -1,8 +1,8 @@
+using System.Threading.Tasks;
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Utils;
 using static VPet_Simulator.Core.GraphInfo;
-using System.Linq;
 
 namespace VPetLLM.Handlers
 {
@@ -12,21 +12,12 @@ namespace VPetLLM.Handlers
         public ActionType ActionType => ActionType.Body;
         public string Description => PromptHelper.Get("Handler_Action_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
-        public void Execute(string actionName, IMainWindow mainWindow)
+        public async Task Execute(string actionName, IMainWindow mainWindow)
         {
             Utils.Logger.Log($"ActionHandler executed with value: {actionName}");
             var action = string.IsNullOrEmpty(actionName) ? "idel" : actionName.ToLower();
-            var availableAnimations = VPetLLM.Instance.GetAvailableAnimations().Select(a => a.ToLower());
 
-            if (!availableAnimations.Contains(action) && action != "touchhead" && action != "touchbody" && action != "move" && action != "sleep" && action != "idel")
-            {
-                var errorMessage = $"[SYSTEM] Animation '{action}' not found. Available animations are: {string.Join(", ", availableAnimations)}";
-                Logger.Log(errorMessage);
-                VPetLLM.Instance.ChatCore.Chat(errorMessage, true);
-                return;
-            }
-
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
             {
                 switch (action)
                 {
@@ -49,16 +40,18 @@ namespace VPetLLM.Handlers
                         mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
                         break;
                 }
+                await Task.Delay(1000);
             });
         }
 
-        public void Execute(int value, IMainWindow mainWindow)
+        public Task Execute(int value, IMainWindow mainWindow)
         {
-            // Not used for this handler
+            return Task.CompletedTask;
         }
-        public void Execute(IMainWindow mainWindow)
+        public Task Execute(IMainWindow mainWindow)
         {
-            Execute("idel", mainWindow);
+            return Execute("idel", mainWindow);
         }
+        public int GetAnimationDuration(string animationName) => 1000;
     }
 }

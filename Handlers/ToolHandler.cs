@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
 
@@ -10,11 +11,12 @@ namespace VPetLLM.Handlers
         public string Keyword => "tool";
         public string Description => Utils.PromptHelper.Get("Handler_Tool_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
-        public void Execute(IMainWindow main)
+        public Task Execute(IMainWindow main)
         {
+            return Task.CompletedTask;
         }
 
-        public async void Execute(string value, IMainWindow main)
+        public async Task Execute(string value, IMainWindow main)
         {
             var match = new Regex(@"(.*?)\((.*)\)").Match(value);
             if (match.Success)
@@ -31,8 +33,10 @@ namespace VPetLLM.Handlers
             }
         }
 
-        public void Execute(int value, IMainWindow main)
-        {
-        }
-    }
+       public Task Execute(int value, IMainWindow main)
+       {
+           return Task.CompletedTask;
+       }
+       public int GetAnimationDuration(string animationName) => 0;
+   }
 }

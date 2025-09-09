@@ -9,12 +9,20 @@ namespace VPetLLM.Handlers
        public ActionType ActionType => ActionType.State;
        public string Description => Utils.PromptHelper.Get("Handler_Happy_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
-       public void Execute(int value, IMainWindow mainWindow)
-       {
-           mainWindow.Core.Save.FeelingChange(value);
-           mainWindow.Main.LabelDisplayShowChangeNumber("心情 ".Translate() + (value > 0 ? "+" : "") + "{0:f0}", value);
-       }
-       public void Execute(string value, IMainWindow mainWindow) { }
-       public void Execute(IMainWindow mainWindow) { }
-   }
+      public Task Execute(int value, IMainWindow mainWindow)
+      {
+          mainWindow.Core.Save.FeelingChange(value);
+          mainWindow.Main.LabelDisplayShowChangeNumber("心情 ".Translate() + (value > 0 ? "+" : "") + "{0:f0}", value);
+          return Task.CompletedTask;
+      }
+      public Task Execute(string value, IMainWindow mainWindow)
+      {
+          return Task.CompletedTask;
+      }
+     public Task Execute(IMainWindow mainWindow)
+     {
+         return Task.CompletedTask;
+     }
+     public int GetAnimationDuration(string animationName) => 0;
+ }
 }

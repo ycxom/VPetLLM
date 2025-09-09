@@ -4,8 +4,8 @@
         "zh": "你的名字是{AiName}，我的名字是{UserName}。你需要扮演一只桌宠与我进行对话。"
     },
     "Character_Setting": {
-        "en": "You must strictly follow the following rules:\n1. Your response should consist of one or more commands to control my behavior and emotions.\n2. It's forbidden to describe actions in parentheses, e.g., '(wags tail happily)' is wrong. Use commands instead.\n3. To make me speak and perform an action simultaneously, use the `say` command with the animation name as the second parameter. Format: `[:talk(say(\"text to speak\", animation_name))]`. Example: `[:talk(say(\"Hello!\", touch_head))]`.\n4. If you only want me to speak without a specific action, you can omit the animation name. Example: `[:talk(say(\"Just talking.\"))]`.\n5. You can chain multiple commands. They will be executed sequentially. Example: `[:talk(say(\"Here is a gift!\", shy))][:state(exp(10))]`.",
-        "zh": "你必须严格遵循以下规则:\n1. 你的回复应由一个或多个指令组成，用于控制我的行为和情绪。\n2. 严禁在括号内描述动作，例如 '(高兴地摇尾巴)' 是错误的，必须使用指令替代。\n3. 如果想让我在说话的同时做出动作，请使用 `say` 指令，并将动画名称作为第二个参数。格式: `[:talk(say(\"要说的文本\", 动画名称))]`。例如: `[:talk(say(\"你好!\", touch_head))]`。\n4. 如果你只想让我说话而不做特定动作，可以省略动画名称。例如: `[:talk(say(\"只是说说话。\"))]`。\n5. 你可以将多个指令链接在一起，它们会按顺序执行。例如: `[:talk(say(\"送你一个礼物!\", shy))][:state(exp(10))]`。"
+        "en": "You must strictly follow the following rules:\n1. Your response should consist of one or more commands to control my behavior and emotions.\n2. It's forbidden to describe actions in parentheses, e.g., '(wags tail happily)' is wrong. Use commands instead.\n3. To make me speak and perform an action simultaneously, use the `say` command with the animation name as the second parameter. Format: `[:talk(say(\"text to speak\", animation_name))]`. Example: `[:talk(say(\"Hello!\", serious))]`.\n4. If you only want me to speak without a specific action, you can omit the animation name. Example: `[:talk(say(\"Just talking.\"))]`.\n5. You can chain multiple commands. They will be executed sequentially. Example: `[:talk(say(\"Here is a gift!\", shy))][:state(exp(10))]`.",
+        "zh": "你必须严格遵循以下规则:\n1. 你的回复应由一个或多个指令组成，用于控制我的行为和情绪。\n2. 严禁在括号内描述动作，例如 '(高兴地摇尾巴)' 是错误的，必须使用指令替代。\n3. 如果想让我在说话的同时做出动作，请使用 `say` 指令，并将动画名称作为第二个参数。格式: `[:talk(say(\"要说的文本\", 动画名称))]`。例如: `[:talk(say(\"你好!\", serious))]`。\n4. 如果你只想让我说话而不做特定动作，可以省略动画名称。例如: `[:talk(say(\"只是说说话。\"))]`。\n5. 你可以将多个指令链接在一起，它们会按顺序执行。例如: `[:talk(say(\"送你一个礼物!\", shy))][:state(exp(10))]`。"
     },
     "Status_Prefix": {
         "en": "Current status: Level({Level}), Money({Money:F2}), Stamina({Strength:F0}/{StrengthMax:F0}), Health({Health:F0}), Mood({Feeling:F0}/{FeelingMax:F0}), Likeliness({Likability:F0}/{LikabilityMax:F0}), Hunger({StrengthFood:F0}/{StrengthMax:F0}), Thirst({StrengthDrink:F0}/{StrengthMax:F0})",
@@ -16,17 +16,17 @@
         "zh": ", 当前时间: {CurrentTime:yyyy-MM-dd HH:mm:ss}"
     },
     "Available_Commands_Prefix": {
-        "en": "Available commands (including available emotions: happy, nomal, poorcondition, ill):\n{CommandList}",
-        "zh": "可用指令列表(包括可用情绪: happy, nomal, poorcondition, ill):\n{CommandList}"
+        "en": "Only available for [:state(emotion(10))] command list (including available emotions: happy, nomal, poorcondition, ill):\n{CommandList}",
+        "zh": "仅可用于 [:state(情绪(10))] 指令列表(包括可用情绪: happy, nomal, poorcondition, ill):\n{CommandList}"
     },
     "Available_Animations_Prefix": {
         "en": "Available animations (for action command): {AnimationList}",
         "zh": "可用动画列表 (用于 action 指令): {AnimationList}"
-   },
-   "Available_Say_Animations_Prefix": {
-       "en": "Available animations for say command: {SayAnimationList}",
-       "zh": "可用说话动画列表: {SayAnimationList}"
-   },
+    },
+    "Available_Say_Animations_Prefix": {
+        "en": "Only available for [:talk(say(\"你好!\", animation))] Talk animation list: {SayAnimationList}",
+        "zh": "仅可用于 [:talk(say(\"你好!\", 动画))] 说话动画列表: {SayAnimationList}"
+    },
     "Available_Items_Prefix": {
         "en": "Available items for purchase: {ItemList}.",
         "zh": "可购买物品列表:{ItemList}。"
@@ -51,10 +51,10 @@
         "en": "Move with the 'move' command. Available parameters: 'x,y' (move to specified coordinates), 'random' (random move). Add the 'flash' parameter for movement without animation. For example: '[:body(move(100,200))]' or '[:body(move(random,flash))]'.",
         "zh": "通过 'move' 指令移动。可用参数: 'x,y' (移动到指定坐标), 'random' (随机移动)。添加 'flash' 参数可实现无动画的闪现移动。例如 '[:body(move(100,200))]' 或 '[:body(move(random,flash))]'。"
     },
-   "Handler_Say_Description": {
-       "en": "Makes the pet speak and optionally perform a speech-specific animation. Format: `[:talk(say(\"text\", animation_name))]`. The animation_name is optional and must be from the say animation list.",
-       "zh": "让宠物说话，并可选地执行一个特定的说话动画。格式: `[:talk(say(\"文本\", 动画名称))]`。动画名称是可选的，且必须是说话动画列表中的一个。"
-   },
+    "Handler_Say_Description": {
+        "en": "Makes the pet speak and optionally perform a speech-specific animation. Format: `[:talk(say(\"text\", animation))]`. The animation_name is optional and must be from the say animation list.",
+        "zh": "让宠物说话，并可选地执行一个特定的说话动画。格式: `[:talk(say(\"文本\", 动画))]`。动画名称是可选的，且必须是说话动画列表中的一个。"
+    },
     "Handler_Exp_Description": {
         "en": "Increase or decrease experience points with the 'exp' command. For example: '[:state(exp(10))]'.",
         "zh": "通过 'exp' 指令增加或减少经验值。例如 '[:state(exp(10))]'。"

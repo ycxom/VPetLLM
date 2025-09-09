@@ -60,12 +60,11 @@ namespace VPetLLM.Windows
                     {
                         Logger.Log($"Executing action: {item.Keyword}, value: {item.Value}");
                         if (string.IsNullOrEmpty(item.Value))
-                            item.Handler.Execute(_plugin.MW);
+                           await item.Handler.Execute(_plugin.MW);
                         else if (int.TryParse(item.Value, out int intValue))
-                            item.Handler.Execute(intValue, _plugin.MW);
+                           await item.Handler.Execute(intValue, _plugin.MW);
                         else
-                            item.Handler.Execute(item.Value, _plugin.MW);
-                        await Task.Delay(1000);
+                           await item.Handler.Execute(item.Value, _plugin.MW);
                     }
                 }
                 catch (Exception ex)
@@ -117,9 +116,7 @@ namespace VPetLLM.Windows
                     {
                         foreach (var item in actionQueue)
                         {
-                            // This part might need to be refactored similar to HandleResponse
-                            item.Handler.Execute(item.Value, _plugin.MW);
-                            await Task.Delay(500);
+                           await item.Handler.Execute(item.Value, _plugin.MW);
                         }
                     });
                 }

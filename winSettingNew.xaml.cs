@@ -264,12 +264,12 @@ namespace VPetLLM
         }
         private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
 
-        private void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
+        private async void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 var ollamaCore = new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
-                var models = ollamaCore.RefreshModels();
+                var models = await Task.Run(() => ollamaCore.RefreshModels());
                 ((ComboBox)this.FindName("ComboBox_OllamaModel")).ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_OllamaModel")).Text))
                     ((ComboBox)this.FindName("ComboBox_OllamaModel")).SelectedIndex = 0;
@@ -280,12 +280,12 @@ namespace VPetLLM
             }
         }
 
-        private void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e)
+        private async void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 var openAICore = new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
-                var models = openAICore.RefreshModels();
+                var models = await Task.Run(() => openAICore.RefreshModels());
                 ((ComboBox)this.FindName("ComboBox_OpenAIModel")).ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text))
                     ((ComboBox)this.FindName("ComboBox_OpenAIModel")).SelectedIndex = 0;
@@ -296,12 +296,12 @@ namespace VPetLLM
             }
         }
 
-        private void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
+        private async void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 var geminiCore = new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
-                var models = geminiCore.RefreshModels();
+                var models = await Task.Run(() => geminiCore.RefreshModels());
                 ((ComboBox)this.FindName("ComboBox_GeminiModel")).ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_GeminiModel")).Text))
                     ((ComboBox)this.FindName("ComboBox_GeminiModel")).SelectedIndex = 0;

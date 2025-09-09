@@ -16,8 +16,9 @@ namespace VPetLLM.Handlers
         string Keyword { get; }
         ActionType ActionType { get; }
         string Description { get; }
-        void Execute(int value, IMainWindow mainWindow);
-        void Execute(string value, IMainWindow mainWindow);
-        void Execute(IMainWindow mainWindow);
-    }
+       Task Execute(int value, IMainWindow mainWindow);
+      Task Execute(string value, IMainWindow mainWindow);
+      Task Execute(IMainWindow mainWindow);
+      int GetAnimationDuration(string animationName);
+  }
 }
