@@ -17,7 +17,7 @@ namespace VPetLLM.Handlers
             try
             {
                 string text;
-                string moodStr;
+                string animation = null;
 
                 int firstQuote = value.IndexOf('"');
                 int lastQuote = value.LastIndexOf('"');
@@ -26,25 +26,33 @@ namespace VPetLLM.Handlers
                 {
                     text = value.Substring(firstQuote + 1, lastQuote - firstQuote - 1);
                     int commaIndex = value.IndexOf(',', lastQuote);
-                    moodStr = (commaIndex != -1) ? value.Substring(commaIndex + 1).Trim() : "Nomal";
+                    if (commaIndex != -1)
+                    {
+                        animation = value.Substring(commaIndex + 1).Trim();
+                    }
                 }
                 else
                 {
                     // Fallback if quotes are missing
                     text = value;
-                    moodStr = "Nomal";
                 }
 
-                if (Enum.TryParse<ModeType>(moodStr, true, out var parsedMode))
-                {
-                    mainWindow.Core.Save.Mode = parsedMode;
-                    Utils.Logger.Log($"SayHandler set mode to: {parsedMode}");
-                }
-                
-                mainWindow.Main.Say(text);
-                Utils.Logger.Log($"SayHandler called Say with text: \"{text}\" and mode {mainWindow.Core.Save.Mode}");
+               var availableSayAnimations = VPetLLM.Instance.GetAvailableSayAnimations().Select(a => a.ToLower());
+               if (string.IsNullOrEmpty(animation) || !availableSayAnimations.Contains(animation.ToLower()))
+               {
+                   if (!string.IsNullOrEmpty(animation))
+                   {
+                       Logger.Log($"Say animation '{animation}' not found. Using random say animation.");
+                   }
+                   mainWindow.Main.SayRnd(text, true);
+               }
+               else
+               {
+                   mainWindow.Main.Say(text, animation, true);
+               }
+                Utils.Logger.Log($"SayHandler called Say with text: \"{text}\" and animation: {animation ?? "none"}");
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Utils.Logger.Log($"Error in SayHandler: {e.Message}");
             }

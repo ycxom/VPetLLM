@@ -323,5 +323,13 @@ namespace VPetLLM
         {
             return MW.Main.Core.Graph.GraphsList.Keys;
         }
+       public IEnumerable<string> GetAvailableSayAnimations()
+       {
+           if (MW.Main.Core.Graph.GraphsName.TryGetValue(VPet_Simulator.Core.GraphInfo.GraphType.Say, out var gl))
+           {
+               return gl;
+           }
+           return new List<string>();
+       }
     }
 }

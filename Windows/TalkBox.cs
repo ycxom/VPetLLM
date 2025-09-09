@@ -59,14 +59,13 @@ namespace VPetLLM.Windows
                     foreach (var item in actionQueue)
                     {
                         Logger.Log($"Executing action: {item.Keyword}, value: {item.Value}");
-                        // The SayHandler is now just for changing emotions, actual speech is handled above.
-                       if (string.IsNullOrEmpty(item.Value))
-                           item.Handler.Execute(_plugin.MW);
-                       else if (int.TryParse(item.Value, out int intValue))
-                           item.Handler.Execute(intValue, _plugin.MW);
-                       else
-                           item.Handler.Execute(item.Value, _plugin.MW);
-                       await Task.Delay(500);
+                        if (string.IsNullOrEmpty(item.Value))
+                            item.Handler.Execute(_plugin.MW);
+                        else if (int.TryParse(item.Value, out int intValue))
+                            item.Handler.Execute(intValue, _plugin.MW);
+                        else
+                            item.Handler.Execute(item.Value, _plugin.MW);
+                        await Task.Delay(1000);
                     }
                 }
                 catch (Exception ex)

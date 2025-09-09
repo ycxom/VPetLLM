@@ -82,11 +82,13 @@ namespace VPetLLM.Core
                {
                    parts.Add(PromptHelper.Get("Available_Commands_Prefix", lang)
                                .Replace("{CommandList}", string.Join("\n", instructions)));
-                   if (_settings.EnableActionExecution)
-                   {
-                       parts.Add(PromptHelper.Get("Available_Animations_Prefix", lang)
-                                   .Replace("{AnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableAnimations())));
-                   }
+                  if (_settings.EnableActionExecution)
+                  {
+                      parts.Add(PromptHelper.Get("Available_Animations_Prefix", lang)
+                                  .Replace("{AnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableAnimations())));
+                      parts.Add(PromptHelper.Get("Available_Say_Animations_Prefix", lang)
+                                  .Replace("{SayAnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableSayAnimations())));
+                  }
                }
 
                if (_settings.EnableBuy)
@@ -104,7 +106,7 @@ namespace VPetLLM.Core
            }
 
            var systemMessage = string.Join("\n", parts);
-        //    Logger.Log("System Message Generated:\n" + systemMessage); // Uncomment for debugging
+        //    Logger.Log("System Message Generated:\n" + systemMessage); // System Role 查看用的
            return systemMessage;
        }
 

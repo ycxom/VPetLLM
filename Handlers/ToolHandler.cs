@@ -8,7 +8,7 @@ namespace VPetLLM.Handlers
     {
         public ActionType ActionType => ActionType.Tool;
         public string Keyword => "tool";
-       public string Description => Utils.PromptHelper.Get("Handler_Tool_Description", VPetLLM.Instance.Settings.PromptLanguage);
+        public string Description => Utils.PromptHelper.Get("Handler_Tool_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public void Execute(IMainWindow main)
         {
