@@ -318,15 +318,20 @@ namespace VPetLLM
             var contextEditor = new winContextEditor(_plugin);
             contextEditor.Show();
         }
-        private void Button_CopyLog_Click(object sender, RoutedEventArgs e)
+        private async void Button_CopyLog_Click(object sender, RoutedEventArgs e)
         {
             var logBox = (ListBox)this.FindName("LogBox");
-            var sb = new System.Text.StringBuilder();
-            foreach (var item in logBox.Items)
+            var items = logBox.Items.Cast<object>().ToList();
+
+            var textToCopy = await Task.Run(() =>
             {
-                sb.AppendLine(item.ToString());
-            }
-            var textToCopy = sb.ToString();
+                var sb = new System.Text.StringBuilder();
+                foreach (var item in items)
+                {
+                    sb.AppendLine(item.ToString());
+                }
+                return sb.ToString();
+            });
 
             try
             {
