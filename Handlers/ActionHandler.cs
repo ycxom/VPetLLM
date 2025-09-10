@@ -21,10 +21,10 @@ namespace VPetLLM.Handlers
             {
                 switch (action)
                 {
-                    case "touchhead":
+                    case "touch_head":
                         mainWindow.Main.DisplayTouchHead();
                         break;
-                    case "touchbody":
+                    case "touch_body":
                         mainWindow.Main.DisplayTouchBody();
                         break;
                     case "move":

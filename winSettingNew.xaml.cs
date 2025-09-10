@@ -401,7 +401,11 @@ namespace VPetLLM
             }
         }
 
-        private void Button_ClearContext_Click(object sender, RoutedEventArgs e) { _plugin.ChatCore?.ClearContext(); }
+        private void Button_ClearContext_Click(object sender, RoutedEventArgs e)
+        {
+            _plugin.ChatCore?.ClearContext();
+            ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+        }
         private void Button_EditContext_Click(object sender, RoutedEventArgs e)
         {
             var contextEditor = new winContextEditor(_plugin);
