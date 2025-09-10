@@ -9,9 +9,22 @@ using System.Windows.Documents;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
 using VPetLLM.Utils;
+using System.Net.Http;
+using System.Security.Cryptography;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace VPetLLM
 {
+    public class PluginStoreItem
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string File { get; set; }
+        public string SHA256 { get; set; }
+    }
+
     public partial class winSettingNew : Window
     {
         private readonly VPetLLM _plugin;
@@ -30,7 +43,7 @@ namespace VPetLLM
 
             // Add event handlers for all other controls
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectionChanged += Control_SelectionChanged;
-             ((ComboBox)this.FindName("ComboBox_Language")).SelectionChanged += Control_SelectionChanged;
+            ((ComboBox)this.FindName("ComboBox_Language")).SelectionChanged += Control_SelectionChanged;
             ((ComboBox)this.FindName("ComboBox_PromptLanguage")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_AiName")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_UserName")).TextChanged += Control_TextChanged;
@@ -65,6 +78,22 @@ namespace VPetLLM
             ((CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).TextChanged += Control_TextChanged;
             ((DataGrid)this.FindName("DataGrid_Plugins")).CellEditEnding += DataGrid_Plugins_CellEditEnding;
+
+            // Proxy settings
+            ((CheckBox)this.FindName("CheckBox_Proxy_IsEnabled")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Proxy_FollowSystemProxy")).Click += Control_Click;
+            ((RadioButton)this.FindName("RadioButton_Proxy_Http")).Click += Control_Click;
+            ((RadioButton)this.FindName("RadioButton_Proxy_Socks")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_Proxy_Address")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForAllAPI")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForOllama")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForOpenAI")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).Click += Control_Click;
+
+            // Plugin Store
+            ((Button)this.FindName("Button_RefreshPluginStore")).Click += Button_RefreshPluginStore_Click;
         }
 
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => SaveSettings();
@@ -86,9 +115,9 @@ namespace VPetLLM
             var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
             languageComboBox.ItemsSource = LanguageHelper.LanguageDisplayMap.Values;
             languageComboBox.SelectedItem = LanguageHelper.LanguageDisplayMap.FirstOrDefault(x => x.Key == _plugin.Settings.Language).Value;
-           var promptlanguageComboBox = (ComboBox)this.FindName("ComboBox_PromptLanguage");
-           promptlanguageComboBox.ItemsSource = new List<string> { "English", "简体中文" };
-           promptlanguageComboBox.SelectedItem = _plugin.Settings.PromptLanguage == "en" ? "English" : "简体中文";
+            var promptlanguageComboBox = (ComboBox)this.FindName("ComboBox_PromptLanguage");
+            promptlanguageComboBox.ItemsSource = new List<string> { "English", "简体中文" };
+            promptlanguageComboBox.SelectedItem = _plugin.Settings.PromptLanguage == "en" ? "English" : "简体中文";
             ((TextBox)this.FindName("TextBox_AiName")).Text = _plugin.Settings.AiName;
             ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
@@ -131,13 +160,36 @@ namespace VPetLLM
             ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
             ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
             ((DataGrid)this.FindName("DataGrid_Plugins")).ItemsSource = _plugin.Plugins;
+
+            // Proxy settings
+            if (_plugin.Settings.Proxy == null)
+            {
+                _plugin.Settings.Proxy = new Setting.ProxySetting();
+            }
+            ((CheckBox)this.FindName("CheckBox_Proxy_IsEnabled")).IsChecked = _plugin.Settings.Proxy.IsEnabled;
+            ((CheckBox)this.FindName("CheckBox_Proxy_FollowSystemProxy")).IsChecked = _plugin.Settings.Proxy.FollowSystemProxy;
+            if (_plugin.Settings.Proxy.Protocol == "http")
+            {
+                ((RadioButton)this.FindName("RadioButton_Proxy_Http")).IsChecked = true;
+            }
+            else
+            {
+                ((RadioButton)this.FindName("RadioButton_Proxy_Socks")).IsChecked = true;
+            }
+            ((TextBox)this.FindName("TextBox_Proxy_Address")).Text = _plugin.Settings.Proxy.Address;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForAllAPI")).IsChecked = _plugin.Settings.Proxy.ForAllAPI;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForOllama")).IsChecked = _plugin.Settings.Proxy.ForOllama;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForOpenAI")).IsChecked = _plugin.Settings.Proxy.ForOpenAI;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked = _plugin.Settings.Proxy.ForGemini;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked = _plugin.Settings.Proxy.ForMcp;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked = _plugin.Settings.Proxy.ForPlugin;
         }
 
         private void SaveSettings()
         {
             var providerComboBox = (ComboBox)this.FindName("ComboBox_Provider");
             var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
-           var promptlanguageComboBox = (ComboBox)this.FindName("ComboBox_PromptLanguage");
+            var promptlanguageComboBox = (ComboBox)this.FindName("ComboBox_PromptLanguage");
             var aiNameTextBox = (TextBox)this.FindName("TextBox_AiName");
             var userNameTextBox = (TextBox)this.FindName("TextBox_UserName");
             var followVPetNameCheckBox = (CheckBox)this.FindName("CheckBox_FollowVPetName");
@@ -183,7 +235,7 @@ namespace VPetLLM
             {
                 _plugin.Settings.Language = selectedLangCode;
             }
-           _plugin.Settings.PromptLanguage = (string)promptlanguageComboBox.SelectedItem == "English" ? "en" : "zh";
+            _plugin.Settings.PromptLanguage = (string)promptlanguageComboBox.SelectedItem == "English" ? "en" : "zh";
             _plugin.Settings.AiName = aiNameTextBox.Text;
             _plugin.Settings.UserName = userNameTextBox.Text;
             _plugin.Settings.FollowVPetName = followVPetNameCheckBox.IsChecked ?? true;
@@ -225,6 +277,25 @@ namespace VPetLLM
             if (int.TryParse(geminiMaxTokensTextBox.Text, out int geminiMaxTokens))
                 _plugin.Settings.Gemini.MaxTokens = geminiMaxTokens;
             _plugin.Settings.Tools = new List<Setting.ToolSetting>((IEnumerable<Setting.ToolSetting>)toolsDataGrid.ItemsSource);
+
+            // Proxy settings
+            _plugin.Settings.Proxy.IsEnabled = ((CheckBox)this.FindName("CheckBox_Proxy_IsEnabled")).IsChecked ?? false;
+            _plugin.Settings.Proxy.FollowSystemProxy = ((CheckBox)this.FindName("CheckBox_Proxy_FollowSystemProxy")).IsChecked ?? true;
+            if (((RadioButton)this.FindName("RadioButton_Proxy_Http")).IsChecked == true)
+            {
+                _plugin.Settings.Proxy.Protocol = "http";
+            }
+            else
+            {
+                _plugin.Settings.Proxy.Protocol = "socks";
+            }
+            _plugin.Settings.Proxy.Address = ((TextBox)this.FindName("TextBox_Proxy_Address")).Text;
+            _plugin.Settings.Proxy.ForAllAPI = ((CheckBox)this.FindName("CheckBox_Proxy_ForAllAPI")).IsChecked ?? true;
+            _plugin.Settings.Proxy.ForOllama = ((CheckBox)this.FindName("CheckBox_Proxy_ForOllama")).IsChecked ?? true;
+            _plugin.Settings.Proxy.ForOpenAI = ((CheckBox)this.FindName("CheckBox_Proxy_ForOpenAI")).IsChecked ?? true;
+            _plugin.Settings.Proxy.ForGemini = ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked ?? true;
+            _plugin.Settings.Proxy.ForMcp = ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked ?? true;
+            _plugin.Settings.Proxy.ForPlugin = ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked ?? true;
 
             _plugin.Settings.Save();
 
@@ -392,28 +463,18 @@ namespace VPetLLM
                     }
                 }
 
-                var filePath = selectedPlugin.FilePath;
-                _plugin.UnloadPlugin(selectedPlugin);
-
-                await Task.Delay(100);
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-
-                try
-                {
-                    if (File.Exists(filePath))
-                    {
-                        File.Delete(filePath);
-                        Logger.Log($"Deleted plugin file: {filePath}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Failed to delete plugin file {filePath}: {ex.Message}");
-                    MessageBox.Show($"无法删除插件文件: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-
+                string pluginFilePath = selectedPlugin.FilePath;
+                bool deleted = await _plugin.UnloadAndTryDeletePlugin(selectedPlugin);
+                
                 RefreshPluginList();
+
+                if (!deleted)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show($"无法删除插件文件: {pluginFilePath}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
+                }
             }
         }
 
@@ -426,9 +487,7 @@ namespace VPetLLM
             if (dialog.ShowDialog() == true)
             {
                 _plugin.ImportPlugin(dialog.FileName);
-                var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
-                dataGrid.ItemsSource = null;
-                dataGrid.ItemsSource = _plugin.Plugins;
+                RefreshPluginList();
             }
         }
 
@@ -492,10 +551,20 @@ namespace VPetLLM
             if (FindName("Tab_Tools") is TabItem tabTools) tabTools.Header = LanguageHelper.Get("Tools.Tab", langCode);
             if (FindName("Tab_Log") is TabItem tabLog) tabLog.Header = LanguageHelper.Get("Log.Tab", langCode);
             if (FindName("Tab_Plugin") is TabItem tabPlugin) tabPlugin.Header = LanguageHelper.Get("Plugin.Tab", langCode);
+            if (FindName("Tab_Proxy") is TabItem tabProxy) tabProxy.Header = LanguageHelper.Get("Proxy.Tab", langCode);
+            if (FindName("Tab_PluginStore") is TabItem tabPluginStore) tabPluginStore.Header = LanguageHelper.Get("PluginStore.Tab", langCode);
+
+            if (FindName("Button_RefreshPluginStore") is Button buttonRefreshPluginStore) buttonRefreshPluginStore.Content = LanguageHelper.Get("PluginStore.Refresh", langCode);
+            if (FindName("DataGrid_PluginStore") is DataGrid dataGridPluginStore)
+            {
+                dataGridPluginStore.Columns[0].Header = LanguageHelper.Get("PluginStore.Name", langCode);
+                dataGridPluginStore.Columns[1].Header = LanguageHelper.Get("PluginStore.Description", langCode);
+                dataGridPluginStore.Columns[2].Header = LanguageHelper.Get("PluginStore.Action", langCode);
+            }
 
             if (FindName("Label_Language") is Label labelLanguage) labelLanguage.Content = LanguageHelper.Get("Language.Select", langCode);
-           if (FindName("Label_PromptLanguage") is Label labelPromptLanguage) labelPromptLanguage.Content = LanguageHelper.Get("Language.PromptLanguage", langCode);
-          if (FindName("TextBlock_PromptLanguageTooltip") is TextBlock textBlockPromptLanguageTooltip) textBlockPromptLanguageTooltip.Text = LanguageHelper.Get("Language.PromptLanguageTooltip", langCode);
+            if (FindName("Label_PromptLanguage") is Label labelPromptLanguage) labelPromptLanguage.Content = LanguageHelper.Get("Language.PromptLanguage", langCode);
+            if (FindName("TextBlock_PromptLanguageTooltip") is TextBlock textBlockPromptLanguageTooltip) textBlockPromptLanguageTooltip.Text = LanguageHelper.Get("Language.PromptLanguageTooltip", langCode);
             if (FindName("Label_Provider") is Label labelProvider) labelProvider.Content = LanguageHelper.Get("LLM_Settings.Provider", langCode);
             if (FindName("Label_AiName") is Label labelAiName) labelAiName.Content = LanguageHelper.Get("LLM_Settings.AiName", langCode);
             if (FindName("Label_UserName") is Label labelUserName) labelUserName.Content = LanguageHelper.Get("LLM_Settings.UserName", langCode);
@@ -588,6 +657,100 @@ namespace VPetLLM
             if (FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox checkBoxGeminiEnableAdvanced) checkBoxGeminiEnableAdvanced.Content = LanguageHelper.Get("Gemini.EnableAdvanced", langCode);
             if (FindName("TextBlock_Gemini_Temperature") is TextBlock textBlockGeminiTemperature) textBlockGeminiTemperature.Text = LanguageHelper.Get("Gemini.Temperature", langCode);
             if (FindName("TextBlock_Gemini_MaxTokens") is TextBlock textBlockGeminiMaxTokens) textBlockGeminiMaxTokens.Text = LanguageHelper.Get("Gemini.MaxTokens", langCode);
+
+            // Proxy UI
+            if (FindName("CheckBox_Proxy_IsEnabled") is CheckBox checkBoxProxyIsEnabled) checkBoxProxyIsEnabled.Content = LanguageHelper.Get("Proxy.EnableProxy", langCode);
+            if (FindName("CheckBox_Proxy_FollowSystemProxy") is CheckBox checkBoxProxyFollowSystemProxy) checkBoxProxyFollowSystemProxy.Content = LanguageHelper.Get("Proxy.FollowSystemProxy", langCode);
+            if (FindName("Label_Proxy_Protocol") is Label labelProxyProtocol) labelProxyProtocol.Content = LanguageHelper.Get("Proxy.Protocol", langCode);
+            if (FindName("RadioButton_Proxy_Http") is RadioButton radioButtonProxyHttp) radioButtonProxyHttp.Content = LanguageHelper.Get("Proxy.Http", langCode);
+            if (FindName("RadioButton_Proxy_Socks") is RadioButton radioButtonProxySocks) radioButtonProxySocks.Content = LanguageHelper.Get("Proxy.Socks5", langCode);
+            if (FindName("Label_Proxy_Address") is Label labelProxyAddress) labelProxyAddress.Content = LanguageHelper.Get("Proxy.ProxyAddress", langCode);
+            if (FindName("Label_Proxy_Scope") is Label labelProxyScope) labelProxyScope.Content = LanguageHelper.Get("Proxy.ProxyScope", langCode);
+            if (FindName("CheckBox_Proxy_ForAllAPI") is CheckBox checkBoxProxyForAllAPI) checkBoxProxyForAllAPI.Content = LanguageHelper.Get("Proxy.ForAllAPI", langCode);
+            if (FindName("CheckBox_Proxy_ForOllama") is CheckBox checkBoxProxyForOllama) checkBoxProxyForOllama.Content = LanguageHelper.Get("Proxy.ForOllama", langCode);
+            if (FindName("CheckBox_Proxy_ForOpenAI") is CheckBox checkBoxProxyForOpenAI) checkBoxProxyForOpenAI.Content = LanguageHelper.Get("Proxy.ForOpenAI", langCode);
+            if (FindName("CheckBox_Proxy_ForGemini") is CheckBox checkBoxProxyForGemini) checkBoxProxyForGemini.Content = LanguageHelper.Get("Proxy.ForGemini", langCode);
+            if (FindName("CheckBox_Proxy_ForMcp") is CheckBox checkBoxProxyForMcp) checkBoxProxyForMcp.Content = LanguageHelper.Get("Proxy.ForMcp", langCode);
+            if (FindName("CheckBox_Proxy_ForPlugin") is CheckBox checkBoxProxyForPlugin) checkBoxProxyForPlugin.Content = LanguageHelper.Get("Proxy.ForPlugin", langCode);
         }
+
+        private async void Button_RefreshPluginStore_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                using (var client = new HttpClient(new HttpClientHandler() { Proxy = _plugin.ChatCore.GetProxy() }))
+                {
+                    var json = await client.GetStringAsync("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
+                    var pluginList = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
+                    var displayList = new List<PluginStoreItem>();
+                    var langCode = _plugin.Settings.Language;
+
+                    foreach (var item in pluginList)
+                    {
+                        var p = new PluginStoreItem
+                        {
+                            Id = item.Key,
+                            Name = item.Value["Name"]?.ToString() ?? string.Empty,
+                            File = item.Value["File"]?.ToString() ?? string.Empty,
+                            SHA256 = item.Value["SHA256"]?.ToString() ?? string.Empty
+                        };
+
+                        var des = item.Value["Description"]?.ToObject<Dictionary<string, string>>();
+                        if (des != null)
+                        {
+                            p.Description = des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty);
+                        }
+                        else
+                        {
+                            p.Description = string.Empty;
+                        }
+
+                        displayList.Add(p);
+                    }
+                    ((DataGrid)this.FindName("DataGrid_PluginStore")).ItemsSource = displayList;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"刷新插件商店失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void Button_InstallPlugin_Click(object sender, RoutedEventArgs e)
+        {
+            if (((Button)sender).DataContext is PluginStoreItem plugin)
+            {
+                try
+                {
+                    using (var client = new HttpClient(new HttpClientHandler() { Proxy = _plugin.ChatCore.GetProxy() }))
+                    {
+                        var data = await client.GetByteArrayAsync(plugin.File);
+                        using (var sha256 = SHA256.Create())
+                        {
+                            var hash = sha256.ComputeHash(data);
+                            var hashString = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                            if (hashString != plugin.SHA256.ToLowerInvariant())
+                            {
+                                MessageBox.Show("文件校验失败，请稍后重试", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                                return;
+                            }
+                        }
+                        var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");;
+                        if (!Directory.Exists(pluginDir))
+                        {
+                            Directory.CreateDirectory(pluginDir);
+                        }
+                        var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
+                        File.WriteAllBytes(filePath, data);
+                        MessageBox.Show("插件安装成功，请重启桌宠以加载新插件", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"安装插件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
     }
 }

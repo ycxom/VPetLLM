@@ -455,6 +455,92 @@
             "jp": "説明"
         }
     },
+    "Proxy": {
+        "Tab": {
+            "en": "Proxy",
+            "zh-hans": "代理",
+            "zh-hant": "代理",
+            "jp": "プロキシ"
+        },
+        "EnableProxy": {
+            "en": "Enable Proxy",
+            "zh-hans": "启用代理",
+            "zh-hant": "啟用代理",
+            "jp": "プロキシを有効にする"
+        },
+        "FollowSystemProxy": {
+            "en": "Follow System Proxy",
+            "zh-hans": "跟随系统代理",
+            "zh-hant": "跟隨系統代理",
+            "jp": "システムプロキシに従う"
+        },
+        "Protocol": {
+            "en": "Protocol",
+            "zh-hans": "协议",
+            "zh-hant": "協議",
+            "jp": "プロトコル"
+        },
+        "Http": {
+            "en": "HTTP",
+            "zh-hans": "HTTP",
+            "zh-hant": "HTTP",
+            "jp": "HTTP"
+        },
+        "Socks5": {
+            "en": "SOCKS5",
+            "zh-hans": "SOCKS5",
+            "zh-hant": "SOCKS5",
+            "jp": "SOCKS5"
+        },
+        "ProxyAddress": {
+            "en": "Proxy Address",
+            "zh-hans": "代理地址",
+            "zh-hant": "代理地址",
+            "jp": "プロキシサーバー"
+        },
+        "ProxyScope": {
+            "en": "Proxy Scope",
+            "zh-hans": "代理范围",
+            "zh-hant": "代理範圍",
+            "jp": "プロキシ範囲"
+        },
+        "ForAllAPI": {
+            "en": "All API Proxy",
+            "zh-hans": "全部API代理",
+            "zh-hant": "全部API代理",
+            "jp": "すべてのAPIプロキシ"
+        },
+        "ForOllama": {
+            "en": "Ollama",
+            "zh-hans": "Ollama",
+            "zh-hant": "Ollama",
+            "jp": "Ollama"
+        },
+        "ForOpenAI": {
+            "en": "OpenAI",
+            "zh-hans": "OpenAI",
+            "zh-hant": "OpenAI",
+            "jp": "OpenAI"
+        },
+        "ForGemini": {
+            "en": "Gemini",
+            "zh-hans": "Gemini",
+            "zh-hant": "Gemini",
+            "jp": "Gemini"
+        },
+        "ForMcp": {
+            "en": "MCP",
+            "zh-hans": "MCP",
+            "zh-hant": "MCP",
+            "jp": "MCP"
+        },
+        "ForPlugin": {
+            "en": "Plugin",
+            "zh-hans": "插件",
+            "zh-hant": "插件",
+            "jp": "プラグイン"
+        }
+    },
     "ContextEditor": {
         "Title": {
             "en": "Context Editor",
@@ -529,6 +615,44 @@
             "zh-hans": "否",
             "zh-hant": "否",
             "jp": "いいえ"
+        }
+    },
+    "PluginStore": {
+        "Tab": {
+            "en": "Plugin Store",
+            "zh-hans": "插件商店",
+            "zh-hant": "插件商店",
+            "jp": "プラグインストア"
+        },
+        "Refresh": {
+            "en": "Refresh Store",
+            "zh-hans": "刷新商店",
+            "zh-hant": "刷新商店",
+            "jp": "ストアを更新"
+        },
+        "Name": {
+            "en": "Name",
+            "zh-hans": "名称",
+            "zh-hant": "名稱",
+            "jp": "名前"
+        },
+        "Description": {
+            "en": "Description",
+            "zh-hans": "描述",
+            "zh-hant": "描述",
+            "jp": "説明"
+        },
+        "Action": {
+            "en": "Action",
+            "zh-hans": "操作",
+            "zh-hant": "操作",
+            "jp": "アクション"
+        },
+        "Install": {
+            "en": "Install",
+            "zh-hans": "安装",
+            "zh-hant": "安裝",
+            "jp": "インストール"
         }
     }
 }

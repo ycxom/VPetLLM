@@ -27,10 +27,9 @@ namespace VPetLLM
         public Windows.TalkBox? TalkBox;
         public ActionProcessor? ActionProcessor;
         private System.Timers.Timer _syncTimer;
-        public List<IVPetLLMPlugin> Plugins = new List<IVPetLLMPlugin>();
-        public string PluginPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
+        public List<IVPetLLMPlugin> Plugins => PluginManager.Plugins;
+        public string PluginPath => PluginManager.PluginPath;
         public winSettingNew? SettingWindow;
-        private readonly Dictionary<string, AssemblyLoadContext> _pluginContexts = new();
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -206,109 +205,30 @@ namespace VPetLLM
 
         public void LoadPlugins()
         {
-            var pluginDir = PluginPath;
-            if (!Directory.Exists(pluginDir))
-            {
-                Directory.CreateDirectory(pluginDir);
-                return;
-            }
-
-            var configFile = Path.Combine(pluginDir, "plugins.json");
-            var pluginStates = new Dictionary<string, bool>();
-            if (File.Exists(configFile))
-            {
-                pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
-            }
-            foreach (var p in Plugins.ToList())
-            {
-                UnloadPlugin(p);
-            }
-            Plugins.Clear();
-            _pluginContexts.Clear();
-            foreach (var file in Directory.GetFiles(pluginDir, "*.dll"))
-            {
-                try
-                {
-                    var context = new AssemblyLoadContext(Path.GetFileNameWithoutExtension(file), isCollectible: true);
-                    using var fs = new FileStream(file, FileMode.Open, FileAccess.Read);
-                    var assembly = context.LoadFromStream(fs);
-                    _pluginContexts[file] = context;
-                    foreach (var type in assembly.GetTypes())
-                    {
-                        if (typeof(IVPetLLMPlugin).IsAssignableFrom(type) && !type.IsInterface)
-                        {
-                            var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
-                            plugin.FilePath = file;
-                            plugin.Enabled = pluginStates.TryGetValue(plugin.Name, out var enabled) ? enabled : true;
-                            plugin.Initialize(this);
-                            Plugins.Add(plugin);
-                            if (plugin.Enabled)
-                            {
-                                ChatCore?.AddPlugin(plugin);
-                            }
-                            Logger.Log($"Loaded plugin: {plugin.Name}, Enabled: {plugin.Enabled}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Failed to load plugin {file}: {ex.Message}");
-                }
-            }
+            PluginManager.LoadPlugins(this.ChatCore);
         }
 
         public void SavePluginStates()
         {
-            var pluginDir = PluginPath;
-            var configFile = Path.Combine(pluginDir, "plugins.json");
-            var pluginStates = Plugins.ToDictionary(p => p.Name, p => p.Enabled);
-            File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
+            PluginManager.SavePluginStates();
         }
 
-        public void UnloadPlugin(IVPetLLMPlugin plugin)
+        public async Task<bool> UnloadAndTryDeletePlugin(IVPetLLMPlugin plugin)
         {
-            if (ChatCore != null)
-            {
-                ChatCore.RemovePlugin(plugin);
-            }
-            plugin.Unload();
-            if (_pluginContexts.TryGetValue(plugin.FilePath, out var context))
-            {
-                context.Unload();
-                _pluginContexts.Remove(plugin.FilePath);
-                Logger.Log($"Unloading AssemblyLoadContext for {plugin.Name}");
-            }
-            Plugins.Remove(plugin);
-            Logger.Log($"Unloaded plugin: {plugin.Name}");
-        }
-        public void Log(string message)
-        {
-            Logger.Log(message);
+            return await PluginManager.UnloadAndTryDeletePlugin(plugin, this.ChatCore);
         }
 
         public void ImportPlugin(string filePath)
         {
-            var pluginDir = PluginPath;
-            if (!Directory.Exists(pluginDir))
-            {
-                Directory.CreateDirectory(pluginDir);
-            }
-
-            var fileName = Path.GetFileName(filePath);
-            var destPath = Path.Combine(pluginDir, fileName);
-
-            try
-            {
-                File.Copy(filePath, destPath, true);
-                Logger.Log($"Imported plugin: {fileName}");
-                LoadPlugins();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Failed to import plugin {fileName}: {ex.Message}");
-            }
+            PluginManager.ImportPlugin(filePath);
+            LoadPlugins();
         }
     
+        public void Log(string message)
+        {
+            Logger.Log(message);
+        }
+        
         public void UpdateSystemMessage()
         {
             if (ChatCore != null)

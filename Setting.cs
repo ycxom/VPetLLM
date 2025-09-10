@@ -34,6 +34,7 @@ namespace VPetLLM
         public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         public bool ShowUninstallWarning { get; set; } = true;
+        public ProxySetting Proxy { get; set; } = new ProxySetting();
         private readonly string _path;
 
         public Setting(string path)
@@ -44,7 +45,10 @@ namespace VPetLLM
                 var json = File.ReadAllText(_path);
                 JsonConvert.PopulateObject(json, this);
             }
-
+            if (Proxy == null)
+            {
+                Proxy = new ProxySetting();
+            }
         }
 
         public void Save()
@@ -94,6 +98,19 @@ namespace VPetLLM
             Ollama,
             OpenAI,
             Gemini
+        }
+        public class ProxySetting
+        {
+            public bool IsEnabled { get; set; } = false;
+            public bool FollowSystemProxy { get; set; } = true;
+            public string Protocol { get; set; } = "http";
+            public string Address { get; set; } = "127.0.0.1:8080";
+            public bool ForAllAPI { get; set; } = true;
+            public bool ForOllama { get; set; } = true;
+            public bool ForOpenAI { get; set; } = true;
+            public bool ForGemini { get; set; } = true;
+            public bool ForMcp { get; set; } = true;
+            public bool ForPlugin { get; set; } = true;
         }
     }
 }

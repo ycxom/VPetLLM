@@ -22,10 +22,8 @@ namespace VPetLLM.Core.ChatCore
         {
             _geminiSetting = geminiSetting;
             _setting = setting;
-            var handler = new HttpClientHandler
-            {
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
-            };
+            var handler = CreateHttpClientHandler();
+            handler.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli;
             _httpClient = new HttpClient(handler);
         }
 

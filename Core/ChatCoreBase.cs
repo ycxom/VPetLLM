@@ -8,6 +8,8 @@ using System.Windows;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using System.Net.Http;
+using System.Net;
 
 namespace VPetLLM.Core
 {
@@ -126,6 +128,52 @@ namespace VPetLLM.Core
         public virtual void RemovePlugin(IVPetLLMPlugin plugin)
         {
             SystemMessageProvider.RemovePlugin(plugin);
+        }
+        
+        public IWebProxy GetProxy()
+        {
+            if (Settings.Proxy.IsEnabled)
+            {
+                bool useProxy = Settings.Proxy.ForAllAPI;
+                if (!useProxy)
+                {
+                    switch (Name)
+                    {
+                        case "Ollama":
+                            useProxy = Settings.Proxy.ForOllama;
+                            break;
+                        case "OpenAI":
+                            useProxy = Settings.Proxy.ForOpenAI;
+                            break;
+                        case "Gemini":
+                            useProxy = Settings.Proxy.ForGemini;
+                            break;
+                        default:
+                            useProxy = Settings.Proxy.ForPlugin;
+                            break;
+                    }
+                }
+
+                if (useProxy)
+                {
+                    if (Settings.Proxy.FollowSystemProxy)
+                    {
+                        return WebRequest.GetSystemWebProxy();
+                    }
+                    else
+                    {
+                        return new WebProxy(Settings.Proxy.Address);
+                    }
+                }
+            }
+            return null;
+        }
+
+        public HttpClientHandler CreateHttpClientHandler()
+        {
+            var handler = new HttpClientHandler();
+            handler.Proxy = GetProxy();
+            return handler;
         }
   }
 

@@ -40,5 +40,6 @@ namespace VPetLLM
         void SetChatHistory(List<Core.Message> history);
         void AddPlugin(Core.IVPetLLMPlugin plugin);
         void RemovePlugin(Core.IVPetLLMPlugin plugin);
+        System.Net.IWebProxy GetProxy();
     }
 }

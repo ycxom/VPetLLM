@@ -7,7 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-
+using System.Linq;
 using VPetLLM.Handlers;
 
 namespace VPetLLM.Core.ChatCore
@@ -23,7 +23,7 @@ namespace VPetLLM.Core.ChatCore
         {
             _ollamaSetting = ollamaSetting;
             _setting = setting;
-            _httpClient = new HttpClient()
+            _httpClient = new HttpClient(CreateHttpClientHandler())
             {
                 BaseAddress = new System.Uri(ollamaSetting.Url)
             };

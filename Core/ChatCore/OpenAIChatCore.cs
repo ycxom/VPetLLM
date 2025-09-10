@@ -21,7 +21,7 @@ namespace VPetLLM.Core.ChatCore
         {
             _openAISetting = openAISetting;
             _setting = setting;
-            _httpClient = new HttpClient();
+            _httpClient = new HttpClient(CreateHttpClientHandler());
             if (!string.IsNullOrEmpty(openAISetting.ApiKey))
             {
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {openAISetting.ApiKey}");
