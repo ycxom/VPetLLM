@@ -13,7 +13,6 @@ namespace VPetLLM.Core.ChatCore
     public class OpenAIChatCore : ChatCoreBase
     {
         public override string Name => "OpenAI";
-        private readonly HttpClient _httpClient;
         private readonly Setting.OpenAISetting _openAISetting;
         private readonly Setting _setting;
         public OpenAIChatCore(Setting.OpenAISetting openAISetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
@@ -21,11 +20,6 @@ namespace VPetLLM.Core.ChatCore
         {
             _openAISetting = openAISetting;
             _setting = setting;
-            _httpClient = new HttpClient(CreateHttpClientHandler());
-            if (!string.IsNullOrEmpty(openAISetting.ApiKey))
-            {
-                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {openAISetting.ApiKey}");
-            }
         }
 
         public override Task<string> Chat(string prompt)
@@ -68,7 +62,7 @@ namespace VPetLLM.Core.ChatCore
                 };
             }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-            
+
             // 处理OpenAI URL兼容性：自动补全后缀
             string apiUrl = _openAISetting.Url;
             if (!apiUrl.Contains("/chat/completions"))
@@ -81,12 +75,20 @@ namespace VPetLLM.Core.ChatCore
                 }
                 apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
             }
-            
-            var response = await _httpClient.PostAsync(apiUrl, content);
-            response.EnsureSuccessStatusCode();
-            var responseString = await response.Content.ReadAsStringAsync();
-            var responseObject = JObject.Parse(responseString);
-            var message = responseObject["choices"][0]["message"]["content"].ToString();
+
+            string message;
+            using (var client = GetClient())
+            {
+                if (!string.IsNullOrEmpty(_openAISetting.ApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openAISetting.ApiKey}");
+                }
+                var response = await client.PostAsync(apiUrl, content);
+                response.EnsureSuccessStatusCode();
+                var responseString = await response.Content.ReadAsStringAsync();
+                var responseObject = JObject.Parse(responseString);
+                message = responseObject["choices"][0]["message"]["content"].ToString();
+            }
             // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (_keepContext)
             {
@@ -140,12 +142,18 @@ namespace VPetLLM.Core.ChatCore
                 }
                 apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
             }
-
-            var response = await _httpClient.PostAsync(apiUrl, content);
-            response.EnsureSuccessStatusCode();
-            var responseString = await response.Content.ReadAsStringAsync();
-            var responseObject = JObject.Parse(responseString);
-            return responseObject["choices"][0]["message"]["content"].ToString();
+            using (var client = GetClient())
+            {
+                if (!string.IsNullOrEmpty(_openAISetting.ApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openAISetting.ApiKey}");
+                }
+                var response = await client.PostAsync(apiUrl, content);
+                response.EnsureSuccessStatusCode();
+                var responseString = await response.Content.ReadAsStringAsync();
+                var responseObject = JObject.Parse(responseString);
+                return responseObject["choices"][0]["message"]["content"].ToString();
+            }
         }
 
         private List<Message> GetCoreHistory()
@@ -173,26 +181,33 @@ namespace VPetLLM.Core.ChatCore
                 }
                 apiUrl = baseUrl.TrimEnd('/') + "/models";
             }
-            
+
             var url = new System.Uri(new System.Uri(apiUrl), "");
-            var response = _httpClient.GetAsync(url).Result;
-            response.EnsureSuccessStatusCode();
-            var responseString = response.Content.ReadAsStringAsync().Result;
-            JObject responseObject;
-            try
+            using (var client = GetClient())
             {
-                responseObject = JObject.Parse(responseString);
+                if (!string.IsNullOrEmpty(_openAISetting.ApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openAISetting.ApiKey}");
+                }
+                var response = client.GetAsync(url).Result;
+                response.EnsureSuccessStatusCode();
+                var responseString = response.Content.ReadAsStringAsync().Result;
+                JObject responseObject;
+                try
+                {
+                    responseObject = JObject.Parse(responseString);
+                }
+                catch (JsonReaderException)
+                {
+                    throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
+                }
+                var models = new List<string>();
+                foreach (var model in responseObject["data"])
+                {
+                    models.Add(model["id"].ToString());
+                }
+                return models;
             }
-            catch (JsonReaderException)
-            {
-                throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
-            }
-            var models = new List<string>();
-            foreach (var model in responseObject["data"])
-            {
-                models.Add(model["id"].ToString());
-            }
-            return models;
         }
 
         public new List<string> GetModels()

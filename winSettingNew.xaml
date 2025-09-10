@@ -245,6 +245,7 @@
                         <DataGrid.Columns>
                             <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled}" Width="Auto"/>
                             <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="作者" Binding="{Binding Author}" Width="*" IsReadOnly="True"/>
                             <DataGridTextColumn Header="描述" Binding="{Binding Description}" Width="2*" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>

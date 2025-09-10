@@ -1,0 +1,38 @@
+{
+    "RefreshPluginStore.Fail": {
+        "zh-hans": "刷新插件商店失败，多次失败请配置代理",
+        "en": "Failed to refresh plugin store"
+    },
+    "InstallPlugin.Fail": {
+        "zh-hans": "安装插件失败，多次失败请配置代理",
+        "en": "Failed to install plugin"
+    },
+    "InstallPlugin.FileValidationError": {
+        "zh-hans": "文件校验失败，请稍后重试",
+        "en": "File validation failed, please try again later"
+    },
+    "InstallPlugin.Success": {
+        "zh-hans": "插件安装成功，请重启桌宠以加载新插件",
+        "en": "Plugin installed successfully, please restart VPet to load the new plugin"
+    },
+    "RefreshOllamaModels.Fail": {
+        "zh-hans": "刷新Ollama模型失败",
+        "en": "Failed to refresh Ollama models"
+    },
+    "RefreshOpenAIModels.Fail": {
+        "zh-hans": "刷新OpenAI模型失败",
+        "en": "Failed to refresh OpenAI models"
+    },
+    "RefreshGeminiModels.Fail": {
+        "zh-hans": "刷新Gemini模型失败",
+        "en": "Failed to refresh Gemini models"
+    },
+    "Error": {
+        "zh-hans": "错误",
+        "en": "Error"
+    },
+    "Success": {
+        "zh-hans": "成功",
+        "en": "Success"
+    }
+}

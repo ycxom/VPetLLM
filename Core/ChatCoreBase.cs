@@ -130,14 +130,15 @@ namespace VPetLLM.Core
             SystemMessageProvider.RemovePlugin(plugin);
         }
         
-        public IWebProxy GetProxy()
+        public IWebProxy GetProxy(string? requestType = null)
         {
             if (Settings.Proxy.IsEnabled)
             {
                 bool useProxy = Settings.Proxy.ForAllAPI;
                 if (!useProxy)
                 {
-                    switch (Name)
+                    string type = requestType ?? Name;
+                    switch (type)
                     {
                         case "Ollama":
                             useProxy = Settings.Proxy.ForOllama;
@@ -148,8 +149,11 @@ namespace VPetLLM.Core
                         case "Gemini":
                             useProxy = Settings.Proxy.ForGemini;
                             break;
-                        default:
+                        case "Plugin":
                             useProxy = Settings.Proxy.ForPlugin;
+                            break;
+                        case "MCP":
+                            useProxy = Settings.Proxy.ForMcp;
                             break;
                     }
                 }
@@ -162,7 +166,12 @@ namespace VPetLLM.Core
                     }
                     else
                     {
-                        return new WebProxy(Settings.Proxy.Address);
+                        if (string.IsNullOrEmpty(Settings.Proxy.Protocol))
+                        {
+                            Settings.Proxy.Protocol = "http";
+                        }
+                        var protocol = Settings.Proxy.Protocol.ToLower() == "socks" ? "socks5" : "http";
+                        return new WebProxy(new Uri($"{protocol}://{Settings.Proxy.Address}"));
                     }
                 }
             }
@@ -174,6 +183,12 @@ namespace VPetLLM.Core
             var handler = new HttpClientHandler();
             handler.Proxy = GetProxy();
             return handler;
+        }
+
+        protected HttpClient GetClient()
+        {
+            var handler = CreateHttpClientHandler();
+            return new HttpClient(handler);
         }
   }
 

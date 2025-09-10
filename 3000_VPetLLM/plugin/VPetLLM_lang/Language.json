@@ -17,13 +17,13 @@
             "zh-hans": "AI提示词语言",
             "zh-hant": "AI提示詞語言",
             "jp": "AIプロンプト言語"
-       },
-       "PromptLanguageTooltip": {
-           "en": "Set according to the model's preferred language. For Chinese models like DeepSeek, '简体中文' is recommended.",
-           "zh-hans": "根据模型偏好语言进行设定，若DeepSeek等中国ai 偏向使用 '简体中文'",
-           "zh-hant": "根據模型偏好語言進行設定，若DeepSeek等中國ai 偏向使用 '简体中文'",
-           "jp": "モデルの好みの言語に合わせて設定してください。DeepSeekのような中国のAIモデルには「简体中文」を推奨します。"
-       }
+        },
+        "PromptLanguageTooltip": {
+            "en": "Set according to the model's preferred language. For Chinese models like DeepSeek, '简体中文' is recommended.",
+            "zh-hans": "根据模型偏好语言进行设定，若DeepSeek等中国ai 偏向使用 '简体中文'",
+            "zh-hant": "根據模型偏好語言進行設定，若DeepSeek等中國ai 偏向使用 '简体中文'",
+            "jp": "モデルの好みの言語に合わせて設定してください。DeepSeekのような中国のAIモデルには「简体中文」を推奨します。"
+        }
     },
     "LLM_Settings": {
         "Tab": {
@@ -453,6 +453,12 @@
             "zh-hans": "描述",
             "zh-hant": "描述",
             "jp": "説明"
+        },
+        "Author": {
+            "en": "Author",
+            "zh-hans": "作者",
+            "zh-hant": "作者",
+            "jp": "作者"
         }
     },
     "Proxy": {

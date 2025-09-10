@@ -14,7 +14,6 @@ namespace VPetLLM.Core.ChatCore
     public class GeminiChatCore : ChatCoreBase
     {
         public override string Name => "Gemini";
-        private readonly HttpClient _httpClient;
         private readonly Setting.GeminiSetting _geminiSetting;
         private readonly Setting _setting;
         public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
@@ -22,9 +21,6 @@ namespace VPetLLM.Core.ChatCore
         {
             _geminiSetting = geminiSetting;
             _setting = setting;
-            var handler = CreateHttpClientHandler();
-            handler.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli;
-            _httpClient = new HttpClient(handler);
         }
 
         public override Task<string> Chat(string prompt)
@@ -75,22 +71,24 @@ namespace VPetLLM.Core.ChatCore
             var modelName = _geminiSetting.Model;
             var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
             
-            var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
-            request.Content = content;
-            request.Headers.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-            request.Headers.Add("Connection", "keep-alive");
-            request.Headers.Add("Accept", "*/*");
-            request.Headers.Add("Accept-Encoding", "gzip, deflate, br");
-            if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
+            string message;
+            using (var client = GetClient())
             {
-                request.Headers.Add("x-goog-api-key", _geminiSetting.ApiKey);
+                if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
+                {
+                    client.DefaultRequestHeaders.Remove("User-Agent");
+                }
+                client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
+                if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("x-goog-api-key", _geminiSetting.ApiKey);
+                }
+                var response = await client.PostAsync(apiEndpoint, content);
+                response.EnsureSuccessStatusCode();
+                var responseString = await response.Content.ReadAsStringAsync();
+                var responseObject = JObject.Parse(responseString);
+                message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
             }
-            
-            var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-            var responseString = await response.Content.ReadAsStringAsync();
-            var responseObject = JObject.Parse(responseString);
-            var message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
             
             if (_keepContext)
             {
@@ -124,20 +122,23 @@ namespace VPetLLM.Core.ChatCore
             }
             var modelName = _geminiSetting.Model;
             var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
-
-            var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint);
-            request.Content = content;
-            request.Headers.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-            if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
+            using (var client = GetClient())
             {
-                request.Headers.Add("x-goog-api-key", _geminiSetting.ApiKey);
+                if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
+                {
+                    client.DefaultRequestHeaders.Remove("User-Agent");
+                }
+                client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
+                if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("x-goog-api-key", _geminiSetting.ApiKey);
+                }
+                var response = await client.PostAsync(apiEndpoint, content);
+                response.EnsureSuccessStatusCode();
+                var responseString = await response.Content.ReadAsStringAsync();
+                var responseObject = JObject.Parse(responseString);
+                return responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
             }
-
-            var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-            var responseString = await response.Content.ReadAsStringAsync();
-            var responseObject = JObject.Parse(responseString);
-            return responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
         }
         private List<Message> GetCoreHistory()
         {
@@ -169,64 +170,67 @@ namespace VPetLLM.Core.ChatCore
             
             System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Request URL: {requestUrl}");
             System.Diagnostics.Debug.WriteLine($"[GeminiDebug] API Key present: {!string.IsNullOrEmpty(_geminiSetting.ApiKey)}");
-            
-            var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
-            request.Headers.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-            request.Headers.Add("Connection", "keep-alive");
-            request.Headers.Add("Accept", "*/*");
-            request.Headers.Add("Accept-Encoding", "gzip, deflate, br");
-            if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
-            {
-                request.Headers.Add("x-goog-api-key", _geminiSetting.ApiKey);
-            }
-            
-            var response = _httpClient.SendAsync(request).Result;
-            
-            System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Response Status: {(int)response.StatusCode} {response.StatusCode}");
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = response.Content.ReadAsStringAsync().Result;
-                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Error Response: {errorContent}");
-                throw new System.Exception($"Failed to refresh Gemini models: {response.StatusCode}. URL: {requestUrl}, Response: {errorContent}");
-            }
-            
-            var responseString = response.Content.ReadAsStringAsync().Result;
-            var models = new List<string>();
-            try
-            {
-                var jsonToken = JToken.Parse(responseString);
 
-                // Handle official Gemini format: { "models": [...] }
-                if (jsonToken is JObject responseObject && responseObject["models"] is JArray modelsArray)
+            using (var client = GetClient())
+            {
+                if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
                 {
-                    foreach (var model in modelsArray)
-                    {
-                        models.Add(model["name"].ToString().Replace("models/", ""));
-                    }
+                    client.DefaultRequestHeaders.Remove("User-Agent");
                 }
-                // Handle old format: [...]
-                else if (jsonToken is JArray responseArray)
+                client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
+                if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
                 {
-                    foreach (var model in responseArray)
+                    client.DefaultRequestHeaders.Add("x-goog-api-key", _geminiSetting.ApiKey);
+                }
+
+                var response = client.GetAsync(requestUrl).Result;
+
+                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Response Status: {(int)response.StatusCode} {response.StatusCode}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = response.Content.ReadAsStringAsync().Result;
+                    System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Error Response: {errorContent}");
+                    throw new System.Exception($"Failed to refresh Gemini models: {response.StatusCode}. URL: {requestUrl}, Response: {errorContent}");
+                }
+
+                var responseString = response.Content.ReadAsStringAsync().Result;
+                var models = new List<string>();
+                try
+                {
+                    var jsonToken = JToken.Parse(responseString);
+
+                    // Handle official Gemini format: { "models": [...] }
+                    if (jsonToken is JObject responseObject && responseObject["models"] is JArray modelsArray)
                     {
-                        // The user's old format returns an array of objects with an 'id' or 'name'
-                        var modelName = model["id"]?.ToString() ?? model["name"]?.ToString();
-                        if (!string.IsNullOrEmpty(modelName))
+                        foreach (var model in modelsArray)
                         {
-                            models.Add(modelName.Replace("models/", ""));
+                            models.Add(model["name"].ToString().Replace("models/", ""));
+                        }
+                    }
+                    // Handle old format: [...]
+                    else if (jsonToken is JArray responseArray)
+                    {
+                        foreach (var model in responseArray)
+                        {
+                            // The user's old format returns an array of objects with an 'id' or 'name'
+                            var modelName = model["id"]?.ToString() ?? model["name"]?.ToString();
+                            if (!string.IsNullOrEmpty(modelName))
+                            {
+                                models.Add(modelName.Replace("models/", ""));
+                            }
                         }
                     }
                 }
+                catch (JsonReaderException)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[GeminiDebug] JSON Parse Error: {responseString}");
+                    throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
+                }
+
+                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Models found: {models.Count}");
+                return models;
             }
-            catch (JsonReaderException)
-            {
-                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] JSON Parse Error: {responseString}");
-                throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
-            }
-            
-            System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Models found: {models.Count}");
-            return models;
         }
 
         public new List<string> GetModels()

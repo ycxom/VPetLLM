@@ -347,7 +347,8 @@ namespace VPetLLM
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"刷新Ollama模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshOllamaModels.Fail", _plugin.Settings.Language, "刷新Ollama模型失败", ex),
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -363,7 +364,8 @@ namespace VPetLLM
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"刷新OpenAI模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshOpenAIModels.Fail", _plugin.Settings.Language, "刷新OpenAI模型失败", ex),
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -379,7 +381,8 @@ namespace VPetLLM
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"刷新Gemini模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshGeminiModels.Fail", _plugin.Settings.Language, "刷新Gemini模型失败", ex),
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -628,7 +631,8 @@ namespace VPetLLM
             {
                 dataGridPlugins.Columns[0].Header = LanguageHelper.Get("Plugin.Enabled", langCode);
                 dataGridPlugins.Columns[1].Header = LanguageHelper.Get("Plugin.Name", langCode);
-                dataGridPlugins.Columns[2].Header = LanguageHelper.Get("Plugin.Description", langCode);
+                dataGridPlugins.Columns[2].Header = LanguageHelper.Get("Plugin.Author", langCode);
+                dataGridPlugins.Columns[3].Header = LanguageHelper.Get("Plugin.Description", langCode);
             }
 
             if (FindName("Tab_Ollama") is TabItem tabOllama) tabOllama.Header = LanguageHelper.Get("Ollama.Header", langCode);
@@ -678,7 +682,7 @@ namespace VPetLLM
         {
             try
             {
-                using (var client = new HttpClient(new HttpClientHandler() { Proxy = _plugin.ChatCore.GetProxy() }))
+                using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
                 {
                     var json = await client.GetStringAsync("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
                     var pluginList = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
@@ -712,7 +716,8 @@ namespace VPetLLM
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"刷新插件商店失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshPluginStore.Fail", _plugin.Settings.Language, "刷新插件商店失败", ex),
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -722,7 +727,7 @@ namespace VPetLLM
             {
                 try
                 {
-                    using (var client = new HttpClient(new HttpClientHandler() { Proxy = _plugin.ChatCore.GetProxy() }))
+                    using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
                     {
                         var data = await client.GetByteArrayAsync(plugin.File);
                         using (var sha256 = SHA256.Create())
@@ -731,7 +736,8 @@ namespace VPetLLM
                             var hashString = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
                             if (hashString != plugin.SHA256.ToLowerInvariant())
                             {
-                                MessageBox.Show("文件校验失败，请稍后重试", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                                MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.FileValidationError", _plugin.Settings.Language, "文件校验失败，请稍后重试"),
+                                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
                                 return;
                             }
                         }
@@ -742,15 +748,42 @@ namespace VPetLLM
                         }
                         var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
                         File.WriteAllBytes(filePath, data);
-                        MessageBox.Show("插件安装成功，请重启桌宠以加载新插件", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", _plugin.Settings.Language, "插件安装成功，请重启桌宠以加载新插件"),
+                            ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"安装插件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedError("InstallPlugin.Fail", _plugin.Settings.Language, "安装插件失败", ex),
+                        ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
 
+        private System.Net.IWebProxy GetPluginStoreProxy()
+        {
+            var proxySettings = _plugin.Settings.Proxy;
+            if (proxySettings != null && proxySettings.IsEnabled)
+            {
+                bool useProxy = proxySettings.ForAllAPI || proxySettings.ForPlugin;
+                if (useProxy)
+                {
+                    if (proxySettings.FollowSystemProxy)
+                    {
+                        return System.Net.WebRequest.GetSystemWebProxy();
+                    }
+                    else if (!string.IsNullOrEmpty(proxySettings.Address))
+                    {
+                        if (string.IsNullOrEmpty(proxySettings.Protocol))
+                        {
+                            proxySettings.Protocol = "http";
+                        }
+                        var protocol = proxySettings.Protocol.ToLower() == "socks" ? "socks5" : "http";
+                        return new System.Net.WebProxy(new Uri($"{protocol}://{proxySettings.Address}"));
+                    }
+                }
+            }
+            return null;
+        }
     }
 }

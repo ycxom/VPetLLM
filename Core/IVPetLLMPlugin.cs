@@ -5,6 +5,7 @@ namespace VPetLLM.Core
     public interface IVPetLLMPlugin
     {
         string Name { get; }
+        string Author { get; }
         string Description { get; }
         string Parameters { get; }
         string Examples { get; }
