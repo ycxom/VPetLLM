@@ -28,6 +28,7 @@ namespace VPetLLM
         public ActionProcessor? ActionProcessor;
         private System.Timers.Timer _syncTimer;
         public List<IVPetLLMPlugin> Plugins => PluginManager.Plugins;
+        public List<FailedPlugin> FailedPlugins => PluginManager.FailedPlugins;
         public string PluginPath => PluginManager.PluginPath;
         public winSettingNew? SettingWindow;
 
@@ -222,6 +223,11 @@ namespace VPetLLM
         {
             PluginManager.ImportPlugin(filePath);
             LoadPlugins();
+        }
+
+        public async Task<bool> DeletePluginFile(string pluginFilePath)
+        {
+            return await PluginManager.DeletePluginFile(pluginFilePath);
         }
     
         public void Log(string message)

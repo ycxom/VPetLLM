@@ -238,45 +238,82 @@
             <TabItem Header="插件" x:Name="Tab_Plugin">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <DataGrid x:Name="DataGrid_Plugins" AutoGenerateColumns="False" CanUserAddRows="False" Margin="5">
-                        <DataGrid.Columns>
-                            <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled}" Width="Auto"/>
-                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="作者" Binding="{Binding Author}" Width="*" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="描述" Binding="{Binding Description}" Width="2*" IsReadOnly="True"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <TextBlock x:Name="TextBlock_HowToUse" VerticalAlignment="Center" Margin="0,0,10,0">
                             <Run Text="如何使用？查看"/>
                             <Hyperlink NavigateUri="https://github.com/ycxom/VPetLLM_Plugin" RequestNavigate="Hyperlink_RequestNavigate">
                                 <Run Text="https://github.com/ycxom/VPetLLM_Plugin"/>
                             </Hyperlink>
                         </TextBlock>
-                        <Button Content="加载插件" Click="Button_LoadPlugins_Click" Margin="5" x:Name="Button_LoadPlugins"/>
-                        <Button Content="导入插件" Click="Button_ImportPlugin_Click" Margin="5" x:Name="Button_ImportPlugin"/>
-                        <Button Content="卸载插件" Click="Button_UnloadPlugin_Click" Margin="5" x:Name="Button_UnloadPlugin"/>
+                        <Button x:Name="Button_RefreshPlugins" Content="刷新" Margin="5" Click="Button_RefreshPlugins_Click"/>
+                        <Button x:Name="Button_ImportPlugin" Content="导入插件" Margin="5" Click="Button_ImportPlugin_Click"/>
                     </StackPanel>
-                </Grid>
-            </TabItem>
-            <TabItem Header="插件商店" x:Name="Tab_PluginStore">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <Button x:Name="Button_RefreshPluginStore" Content="刷新商店" HorizontalAlignment="Right" Margin="5" Click="Button_RefreshPluginStore_Click"/>
-                    <DataGrid x:Name="DataGrid_PluginStore" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" Margin="5">
+                    <DataGrid x:Name="DataGrid_Plugins" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" Margin="5">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" IsReadOnly="True"/>
+                            <DataGridTemplateColumn Header="启用" Width="Auto">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsFailed, Converter={StaticResource BoolInverter}}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="Auto">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Icon}" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                                                <Setter Property="Foreground" Value="Red"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="作者" Binding="{Binding Author}" Width="*" IsReadOnly="True"/>
                             <DataGridTextColumn Header="描述" Binding="{Binding Description}" Width="2*" IsReadOnly="True"/>
                             <DataGridTemplateColumn Header="操作" Width="Auto">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Content="安装" Click="Button_InstallPlugin_Click"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="{Binding ActionText}" Click="Button_PluginAction_Click" />
+                                            <Button Content="卸载" Click="Button_UninstallPlugin_Click" Margin="5,0,0,0">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <MultiDataTrigger>
+                                                                <MultiDataTrigger.Conditions>
+                                                                    <Condition Binding="{Binding IsLocal}" Value="True"/>
+                                                                    <Condition Binding="{Binding IsUpdatable}" Value="True"/>
+                                                                </MultiDataTrigger.Conditions>
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </MultiDataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <TextBlock Text="{Binding UpdateAvailableText}" Foreground="Green" Margin="5,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsUpdatable}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>

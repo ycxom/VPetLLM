@@ -436,6 +436,60 @@
             "zh-hant": "卸載插件",
             "jp": "プラグインをアンロードする"
         },
+        "Refresh": {
+            "en": "Refresh",
+            "zh-hans": "刷新",
+            "zh-hant": "刷新",
+            "jp": "更新"
+        },
+        "Action": {
+            "en": "Action",
+            "zh-hans": "操作",
+            "zh-hant": "操作",
+            "jp": "アクション"
+        },
+        "Update": {
+            "en": "Update",
+            "zh-hans": "更新",
+            "zh-hant": "更新",
+            "jp": "更新"
+        },
+        "Outdated": {
+            "en": "Outdated",
+            "zh-hans": "旧版插件",
+            "zh-hant": "舊版插件",
+            "jp": "旧版"
+        },
+        "Delete": {
+            "en": "Delete",
+            "zh-hans": "删除",
+            "zh-hant": "刪除",
+            "jp": "削除"
+        },
+        "LoadFailed": {
+            "en": "Load Failed",
+            "zh-hans": "加载失败",
+            "zh-hant": "加載失敗",
+            "jp": "読み込み失敗"
+        },
+        "UnknownVersion": {
+            "en": "Unknown",
+            "zh-hans": "未知版本",
+            "zh-hant": "未知版本",
+            "jp": "不明なバージョン"
+        },
+        "LocalOnly": {
+            "en": "Local Only",
+            "zh-hans": "仅本地",
+            "zh-hant": "僅本地",
+            "jp": "ローカルのみ"
+        },
+        "UpdateAvailable": {
+            "en": "Update Available",
+            "zh-hans": "可更新",
+            "zh-hant": "可更新",
+            "jp": "更新可能"
+        },
         "Enabled": {
             "en": "Enabled",
             "zh-hans": "启用",
@@ -659,6 +713,12 @@
             "zh-hans": "安装",
             "zh-hant": "安裝",
             "jp": "インストール"
+        },
+        "Author": {
+            "en": "Author",
+            "zh-hans": "作者",
+            "zh-hant": "作者",
+            "jp": "作者"
         }
     }
 }

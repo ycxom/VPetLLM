@@ -16,13 +16,26 @@ using Newtonsoft.Json.Linq;
 
 namespace VPetLLM
 {
-    public class PluginStoreItem
+    public class UnifiedPluginItem
     {
+        public bool IsLocal { get; set; }
+        public bool IsFailed { get; set; }
         public string Id { get; set; }
         public string Name { get; set; }
+        public string OriginalName { get; set; }
+        public string Author { get; set; }
         public string Description { get; set; }
-        public string File { get; set; }
+        public bool IsEnabled { get; set; }
+        public string ActionText { get; set; }
+        public string Icon { get; set; }
+        public string FileUrl { get; set; }
         public string SHA256 { get; set; }
+        public IVPetLLMPlugin LocalPlugin { get; set; }
+        public FailedPlugin FailedPlugin { get; set; }
+        public string Version { get; set; }
+        public string RemoteVersion { get; set; }
+        public bool IsUpdatable { get; set; }
+        public string UpdateAvailableText { get; set; }
     }
 
     public partial class winSettingNew : Window
@@ -36,7 +49,10 @@ namespace VPetLLM
             _plugin.SettingWindow = this;
             LoadSettings();
             Closed += Window_Closed;
-            Loaded += (s, e) => UpdateUIForLanguage();
+            Loaded += (s, e) => {
+                UpdateUIForLanguage();
+                Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+            };
             ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Control_ValueChanged;
@@ -91,9 +107,9 @@ namespace VPetLLM
             ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).Click += Control_Click;
-
-            // Plugin Store
-            ((Button)this.FindName("Button_RefreshPluginStore")).Click += Button_RefreshPluginStore_Click;
+            
+            ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
+            ((Button)this.FindName("Button_ImportPlugin")).Click += Button_ImportPlugin_Click;
         }
 
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => SaveSettings();
@@ -159,7 +175,6 @@ namespace VPetLLM
             ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).Text = _plugin.Settings.Gemini.MaxTokens.ToString();
             ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
             ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
-            ((DataGrid)this.FindName("DataGrid_Plugins")).ItemsSource = _plugin.Plugins;
 
             // Proxy settings
             if (_plugin.Settings.Proxy == null)
@@ -438,49 +453,6 @@ namespace VPetLLM
             }
         }
 
-        private void Button_LoadPlugins_Click(object sender, RoutedEventArgs e)
-        {
-            _plugin.LoadPlugins();
-            RefreshPluginList();
-        }
-
-        private async void Button_UnloadPlugin_Click(object sender, RoutedEventArgs e)
-        {
-            var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
-            if (dataGrid.SelectedItem is IVPetLLMPlugin selectedPlugin)
-            {
-                if (_plugin.Settings.ShowUninstallWarning)
-                {
-                    var confirmDialog = new winUninstallConfirm();
-                    if (confirmDialog.ShowDialog() == true)
-                    {
-                        if (confirmDialog.DoNotShowAgain)
-                        {
-                            _plugin.Settings.ShowUninstallWarning = false;
-                            _plugin.Settings.Save();
-                        }
-                    }
-                    else
-                    {
-                        return;
-                    }
-                }
-
-                string pluginFilePath = selectedPlugin.FilePath;
-                bool deleted = await _plugin.UnloadAndTryDeletePlugin(selectedPlugin);
-                
-                RefreshPluginList();
-
-                if (!deleted)
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        MessageBox.Show($"无法删除插件文件: {pluginFilePath}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                    });
-                }
-            }
-        }
-
         private void Button_ImportPlugin_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
@@ -490,7 +462,6 @@ namespace VPetLLM
             if (dialog.ShowDialog() == true)
             {
                 _plugin.ImportPlugin(dialog.FileName);
-                RefreshPluginList();
             }
         }
 
@@ -503,6 +474,11 @@ namespace VPetLLM
             };
             System.Diagnostics.Process.Start(psi);
             e.Handled = true;
+        }
+
+        public void RefreshPluginList()
+        {
+            Button_RefreshPlugins_Click(this, new RoutedEventArgs());
         }
 
         private void DataGrid_Plugins_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
@@ -529,15 +505,6 @@ namespace VPetLLM
                 }
             }
         }
-        public void RefreshPluginList()
-        {
-            var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
-            if (dataGrid != null)
-            {
-                dataGrid.ItemsSource = null;
-                dataGrid.ItemsSource = _plugin.Plugins;
-            }
-        }
 
         private void Window_Closed(object? sender, EventArgs e)
         {
@@ -555,16 +522,7 @@ namespace VPetLLM
             if (FindName("Tab_Log") is TabItem tabLog) tabLog.Header = LanguageHelper.Get("Log.Tab", langCode);
             if (FindName("Tab_Plugin") is TabItem tabPlugin) tabPlugin.Header = LanguageHelper.Get("Plugin.Tab", langCode);
             if (FindName("Tab_Proxy") is TabItem tabProxy) tabProxy.Header = LanguageHelper.Get("Proxy.Tab", langCode);
-            if (FindName("Tab_PluginStore") is TabItem tabPluginStore) tabPluginStore.Header = LanguageHelper.Get("PluginStore.Tab", langCode);
-
-            if (FindName("Button_RefreshPluginStore") is Button buttonRefreshPluginStore) buttonRefreshPluginStore.Content = LanguageHelper.Get("PluginStore.Refresh", langCode);
-            if (FindName("DataGrid_PluginStore") is DataGrid dataGridPluginStore)
-            {
-                dataGridPluginStore.Columns[0].Header = LanguageHelper.Get("PluginStore.Name", langCode);
-                dataGridPluginStore.Columns[1].Header = LanguageHelper.Get("PluginStore.Description", langCode);
-                dataGridPluginStore.Columns[2].Header = LanguageHelper.Get("PluginStore.Action", langCode);
-            }
-
+            
             if (FindName("Label_Language") is Label labelLanguage) labelLanguage.Content = LanguageHelper.Get("Language.Select", langCode);
             if (FindName("Label_PromptLanguage") is Label labelPromptLanguage) labelPromptLanguage.Content = LanguageHelper.Get("Language.PromptLanguage", langCode);
             if (FindName("TextBlock_PromptLanguageTooltip") is TextBlock textBlockPromptLanguageTooltip) textBlockPromptLanguageTooltip.Text = LanguageHelper.Get("Language.PromptLanguageTooltip", langCode);
@@ -624,15 +582,16 @@ namespace VPetLLM
                 hyperlink.RequestNavigate += Hyperlink_RequestNavigate;
                 howToUseTextBlock.Inlines.Add(hyperlink);
             }
-            if (FindName("Button_LoadPlugins") is Button buttonLoadPlugins) buttonLoadPlugins.Content = LanguageHelper.Get("Plugin.LoadPlugins", langCode);
+            if (FindName("Button_RefreshPlugins") is Button buttonRefreshPlugins) buttonRefreshPlugins.Content = LanguageHelper.Get("Plugin.Refresh", langCode);
             if (FindName("Button_ImportPlugin") is Button buttonImportPlugin) buttonImportPlugin.Content = LanguageHelper.Get("Plugin.ImportPlugin", langCode);
-            if (FindName("Button_UnloadPlugin") is Button buttonUnloadPlugin) buttonUnloadPlugin.Content = LanguageHelper.Get("Plugin.UnloadPlugin", langCode);
             if (FindName("DataGrid_Plugins") is DataGrid dataGridPlugins)
             {
                 dataGridPlugins.Columns[0].Header = LanguageHelper.Get("Plugin.Enabled", langCode);
-                dataGridPlugins.Columns[1].Header = LanguageHelper.Get("Plugin.Name", langCode);
-                dataGridPlugins.Columns[2].Header = LanguageHelper.Get("Plugin.Author", langCode);
-                dataGridPlugins.Columns[3].Header = LanguageHelper.Get("Plugin.Description", langCode);
+                // Column 1 is icon, no header
+                dataGridPlugins.Columns[2].Header = LanguageHelper.Get("Plugin.Name", langCode);
+                dataGridPlugins.Columns[3].Header = LanguageHelper.Get("Plugin.Author", langCode);
+                dataGridPlugins.Columns[4].Header = LanguageHelper.Get("Plugin.Description", langCode);
+                dataGridPlugins.Columns[5].Header = LanguageHelper.Get("Plugin.Action", langCode);
             }
 
             if (FindName("Tab_Ollama") is TabItem tabOllama) tabOllama.Header = LanguageHelper.Get("Ollama.Header", langCode);
@@ -678,40 +637,21 @@ namespace VPetLLM
             if (FindName("CheckBox_Proxy_ForPlugin") is CheckBox checkBoxProxyForPlugin) checkBoxProxyForPlugin.Content = LanguageHelper.Get("Proxy.ForPlugin", langCode);
         }
 
-        private async void Button_RefreshPluginStore_Click(object sender, RoutedEventArgs e)
+        private async void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
+            var langCode = _plugin.Settings.Language;
+            var pluginItems = new Dictionary<string, UnifiedPluginItem>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, JObject> remotePlugins = new Dictionary<string, JObject>();
+            // Load local plugins (both successful and failed)
+            _plugin.LoadPlugins();
+
+            // Fetch remote plugin list first to get the correct IDs
             try
             {
                 using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
                 {
                     var json = await client.GetStringAsync("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
-                    var pluginList = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
-                    var displayList = new List<PluginStoreItem>();
-                    var langCode = _plugin.Settings.Language;
-
-                    foreach (var item in pluginList)
-                    {
-                        var p = new PluginStoreItem
-                        {
-                            Id = item.Key,
-                            Name = item.Value["Name"]?.ToString() ?? string.Empty,
-                            File = item.Value["File"]?.ToString() ?? string.Empty,
-                            SHA256 = item.Value["SHA256"]?.ToString() ?? string.Empty
-                        };
-
-                        var des = item.Value["Description"]?.ToObject<Dictionary<string, string>>();
-                        if (des != null)
-                        {
-                            p.Description = des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty);
-                        }
-                        else
-                        {
-                            p.Description = string.Empty;
-                        }
-
-                        displayList.Add(p);
-                    }
-                    ((DataGrid)this.FindName("DataGrid_PluginStore")).ItemsSource = displayList;
+                    remotePlugins = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
                 }
             }
             catch (Exception ex)
@@ -719,44 +659,260 @@ namespace VPetLLM
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshPluginStore.Fail", _plugin.Settings.Language, "刷新插件商店失败", ex),
                     ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
-        }
 
-        private async void Button_InstallPlugin_Click(object sender, RoutedEventArgs e)
-        {
-            if (((Button)sender).DataContext is PluginStoreItem plugin)
+            // First pass: Add all local plugins to the dictionary using the remote key if available
+            foreach (var localPlugin in _plugin.Plugins)
             {
-                try
+                var sha = PluginManager.GetFileSha256(localPlugin.FilePath);
+                var remoteEntry = remotePlugins.FirstOrDefault(kvp => kvp.Value["Name"]?.ToString() == localPlugin.Name);
+                var id = !string.IsNullOrEmpty(remoteEntry.Key) ? remoteEntry.Key : localPlugin.Name;
+
+                pluginItems[id] = new UnifiedPluginItem
                 {
-                    using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
+                    IsLocal = true,
+                    Id = id,
+                    Name = localPlugin.Name,
+                    OriginalName = localPlugin.Name,
+                    Author = localPlugin.Author,
+                    Description = localPlugin.Description,
+                    IsEnabled = localPlugin.Enabled,
+                    ActionText = LanguageHelper.Get("Plugin.UnloadPlugin", langCode),
+                    Icon = "\uE8A5", // Folder icon
+                    LocalPlugin = localPlugin,
+                    Version = sha
+                };
+            }
+            foreach (var failedPlugin in _plugin.FailedPlugins)
+            {
+                var remoteEntry = remotePlugins.FirstOrDefault(kvp => kvp.Value["Name"]?.ToString() == failedPlugin.Name);
+                var id = !string.IsNullOrEmpty(remoteEntry.Key) ? remoteEntry.Key : failedPlugin.Name;
+                pluginItems[id] = new UnifiedPluginItem
+                {
+                    IsFailed = true,
+                    IsLocal = true,
+                    Id = id,
+                    Name = $"{failedPlugin.Name} ({LanguageHelper.Get("Plugin.Outdated", langCode)})",
+                    OriginalName = failedPlugin.Name,
+                    Author = failedPlugin.Author,
+                    Description = $"{LanguageHelper.Get("Plugin.LoadFailed", langCode)}: {failedPlugin.Description}",
+                    IsEnabled = false,
+                    ActionText = LanguageHelper.Get("Plugin.Delete", langCode),
+                    Icon = "\uE783", // Error icon
+                    FailedPlugin = failedPlugin,
+                    Version = LanguageHelper.Get("Plugin.UnknownVersion", langCode)
+                };
+            }
+
+            // Second pass: Update with remote info or add new remote plugins
+            foreach (var item in remotePlugins)
+            {
+                var id = item.Key;
+                var remoteInfo = item.Value;
+                var remoteSha256 = remoteInfo["SHA256"]?.ToString() ?? string.Empty;
+
+                if (pluginItems.TryGetValue(id, out var existingItem))
+                {
+                    // Plugin exists locally, check for update
+                    existingItem.RemoteVersion = remoteSha256;
+                    existingItem.FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty;
+                    existingItem.SHA256 = remoteSha256;
+                    
+                    bool isUpdatable = !string.IsNullOrEmpty(existingItem.Version) &&
+                                       !string.IsNullOrEmpty(remoteSha256) &&
+                                       !existingItem.Version.Equals(remoteSha256, StringComparison.OrdinalIgnoreCase);
+
+                    if (isUpdatable)
                     {
-                        var data = await client.GetByteArrayAsync(plugin.File);
-                        using (var sha256 = SHA256.Create())
-                        {
-                            var hash = sha256.ComputeHash(data);
-                            var hashString = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                            if (hashString != plugin.SHA256.ToLowerInvariant())
-                            {
-                                MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.FileValidationError", _plugin.Settings.Language, "文件校验失败，请稍后重试"),
-                                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
-                                return;
-                            }
-                        }
-                        var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");;
-                        if (!Directory.Exists(pluginDir))
-                        {
-                            Directory.CreateDirectory(pluginDir);
-                        }
-                        var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
-                        File.WriteAllBytes(filePath, data);
-                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", _plugin.Settings.Language, "插件安装成功，请重启桌宠以加载新插件"),
-                            ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
+                        existingItem.IsUpdatable = true;
+                        existingItem.UpdateAvailableText = LanguageHelper.Get("Plugin.UpdateAvailable", langCode);
+                        existingItem.ActionText = LanguageHelper.Get("Plugin.Update", langCode);
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    MessageBox.Show(ErrorMessageHelper.GetLocalizedError("InstallPlugin.Fail", _plugin.Settings.Language, "安装插件失败", ex),
-                        ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    // Plugin is only remote, add it for installation
+                    var des = remoteInfo["Description"]?.ToObject<Dictionary<string, string>>();
+                    var description = des != null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
+                    
+                    pluginItems[id] = new UnifiedPluginItem
+                    {
+                        IsLocal = false,
+                        Id = id,
+                        Name = remoteInfo["Name"]?.ToString() ?? string.Empty,
+                        Author = remoteInfo["Author"]?.ToString() ?? string.Empty,
+                        Description = description,
+                        IsEnabled = false,
+                        ActionText = LanguageHelper.Get("PluginStore.Install", langCode),
+                        Icon = "\uE753", // Cloud download icon
+                        FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty,
+                        SHA256 = remoteSha256,
+                        RemoteVersion = remoteSha256
+                    };
                 }
+            }
+
+            // Final pass to mark local-only plugins and source
+            foreach (var item in pluginItems.Values)
+            {
+                if (item.IsLocal)
+                {
+                    if (string.IsNullOrEmpty(item.RemoteVersion))
+                    {
+                        item.Description = $"({LanguageHelper.Get("Plugin.LocalOnly", langCode)}) {item.Description}";
+                    }
+                    else
+                    {
+                        item.Icon = "\uE955"; // Cloud with checkmark
+                        var localSource = LanguageHelper.Get("Plugin.Source.Local", langCode);
+                        item.Description = $"({(localSource == "[Plugin.Source.Local]" ? "本地" : localSource)}) {item.Description}";
+                    }
+                }
+                else
+                {
+                    var cloudSource = LanguageHelper.Get("Plugin.Source.Cloud", langCode);
+                    item.Description = $"({(cloudSource == "[Plugin.Source.Cloud]" ? "云端" : cloudSource)}) {item.Description}";
+                }
+
+                if (item.IsUpdatable)
+                {
+                    item.Icon = "\uE948"; // Sync icon
+                }
+            }
+            
+            ((DataGrid)this.FindName("DataGrid_Plugins")).ItemsSource = pluginItems.Values.ToList();
+        }
+
+        private async void Button_PluginAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (((Button)sender).DataContext is UnifiedPluginItem plugin)
+            {
+                var langCode = _plugin.Settings.Language;
+                string action = plugin.ActionText;
+
+                if (action == LanguageHelper.Get("Plugin.Delete", langCode))
+                {
+                    await HandleDeletePlugin(plugin);
+                }
+                else if (action == LanguageHelper.Get("Plugin.UnloadPlugin", langCode))
+                {
+                    await HandleUninstallPlugin(plugin);
+                }
+                else if (action == LanguageHelper.Get("PluginStore.Install", langCode) || action == LanguageHelper.Get("Plugin.Update", langCode))
+                {
+                    await HandleInstallOrUpdatePlugin(plugin);
+                }
+            }
+        }
+
+        private async void Button_UninstallPlugin_Click(object sender, RoutedEventArgs e)
+        {
+            if (((Button)sender).DataContext is UnifiedPluginItem plugin)
+            {
+                await HandleUninstallPlugin(plugin);
+            }
+        }
+
+        private async Task HandleUninstallPlugin(UnifiedPluginItem plugin)
+        {
+            if (_plugin.Settings.ShowUninstallWarning)
+            {
+                var confirmDialog = new winUninstallConfirm();
+                if (confirmDialog.ShowDialog() == true)
+                {
+                    if (confirmDialog.DoNotShowAgain)
+                    {
+                        _plugin.Settings.ShowUninstallWarning = false;
+                        _plugin.Settings.Save();
+                    }
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            var pluginNameToFind = plugin.OriginalName ?? plugin.Name;
+            var localPlugin = plugin.LocalPlugin ?? _plugin.Plugins.FirstOrDefault(p => p.Name == pluginNameToFind);
+
+            if (localPlugin != null)
+            {
+                string pluginFilePath = localPlugin.FilePath;
+                bool uninstalled = await _plugin.UnloadAndTryDeletePlugin(localPlugin);
+                if (!uninstalled)
+                {
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),
+                                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                var failedPlugin = plugin.FailedPlugin ?? _plugin.FailedPlugins.FirstOrDefault(p => p.Name == pluginNameToFind);
+                if (failedPlugin != null)
+                {
+                    string pluginFilePath = failedPlugin.FilePath;
+                    bool deleted = await _plugin.DeletePluginFile(pluginFilePath);
+                    if (!deleted)
+                    {
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),
+                                        ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.FindPluginFail", _plugin.Settings.Language, "找不到本地插件实例"),
+                                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+
+            Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+        }
+        
+        private async Task HandleDeletePlugin(UnifiedPluginItem plugin)
+        {
+            string pluginFilePath = plugin.FailedPlugin.FilePath;
+            bool deleted = await _plugin.DeletePluginFile(pluginFilePath);
+            Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+            if (!deleted)
+            {
+                 MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),
+                                ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task HandleInstallOrUpdatePlugin(UnifiedPluginItem plugin)
+        {
+            try
+            {
+                using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
+                {
+                    var data = await client.GetByteArrayAsync(plugin.FileUrl);
+                    using (var sha256 = SHA256.Create())
+                    {
+                        var hash = sha256.ComputeHash(data);
+                        var hashString = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                        if (hashString != plugin.SHA256.ToLowerInvariant())
+                        {
+                            MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.FileValidationError", _plugin.Settings.Language, "文件校验失败，请稍后重试"),
+                                ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
+                        }
+                    }
+                    var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
+                    if (!Directory.Exists(pluginDir))
+                    {
+                        Directory.CreateDirectory(pluginDir);
+                    }
+                    var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
+                    File.WriteAllBytes(filePath, data);
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", _plugin.Settings.Language, "插件安装成功，请重启桌宠以加载新插件"),
+                        ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("InstallPlugin.Fail", _plugin.Settings.Language, "安装插件失败", ex),
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
