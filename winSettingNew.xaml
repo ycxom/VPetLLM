@@ -285,7 +285,7 @@
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
                                             <Button Content="{Binding ActionText}" Click="Button_PluginAction_Click" />
-                                            <Button Content="卸载" Click="Button_UninstallPlugin_Click" Margin="5,0,0,0">
+                                            <Button Content="{Binding UninstallActionText}" Click="Button_UninstallPlugin_Click" Margin="5,0,0,0">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
                                                         <Setter Property="Visibility" Value="Collapsed"/>

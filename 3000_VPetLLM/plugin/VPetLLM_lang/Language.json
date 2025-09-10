@@ -436,6 +436,12 @@
             "zh-hant": "卸載插件",
             "jp": "プラグインをアンロードする"
         },
+        "Uninstall": {
+            "en": "Uninstall",
+            "zh-hans": "卸载",
+            "zh-hant": "卸載",
+            "jp": "アンインストール"
+        },
         "Refresh": {
             "en": "Refresh",
             "zh-hans": "刷新",
@@ -483,6 +489,20 @@
             "zh-hans": "仅本地",
             "zh-hant": "僅本地",
             "jp": "ローカルのみ"
+        },
+        "Source": {
+            "Local": {
+                "en": "Local",
+                "zh-hans": "本地",
+                "zh-hant": "本地",
+                "jp": "ローカル"
+            },
+            "Cloud": {
+                "en": "Cloud",
+                "zh-hans": "云端",
+                "zh-hant": "雲端",
+                "jp": "クラウド"
+            }
         },
         "UpdateAvailable": {
             "en": "Update Available",

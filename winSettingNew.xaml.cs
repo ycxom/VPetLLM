@@ -36,6 +36,7 @@ namespace VPetLLM
         public string RemoteVersion { get; set; }
         public bool IsUpdatable { get; set; }
         public string UpdateAvailableText { get; set; }
+        public string UninstallActionText { get; set; }
     }
 
     public partial class winSettingNew : Window
@@ -768,13 +769,18 @@ namespace VPetLLM
                     {
                         item.Icon = "\uE955"; // Cloud with checkmark
                         var localSource = LanguageHelper.Get("Plugin.Source.Local", langCode);
-                        item.Description = $"({(localSource == "[Plugin.Source.Local]" ? "本地" : localSource)}) {item.Description}";
+                        item.Description = $"({localSource}) {item.Description}";
                     }
                 }
                 else
                 {
                     var cloudSource = LanguageHelper.Get("Plugin.Source.Cloud", langCode);
-                    item.Description = $"({(cloudSource == "[Plugin.Source.Cloud]" ? "云端" : cloudSource)}) {item.Description}";
+                    item.Description = $"({cloudSource}) {item.Description}";
+                }
+
+                if (item.IsLocal)
+                {
+                    item.UninstallActionText = LanguageHelper.Get("Plugin.Uninstall", langCode);
                 }
 
                 if (item.IsUpdatable)
