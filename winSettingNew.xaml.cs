@@ -77,7 +77,6 @@ namespace VPetLLM
             ((CheckBox)this.FindName("CheckBox_KeepContext")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).Click += Control_Click;
-            ((CheckBox)this.FindName("CheckBox_AutoMigrateChatHistory")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableAction")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableBuy")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableState")).Click += Control_Click;
@@ -128,7 +127,12 @@ namespace VPetLLM
             }
         }
         private void Control_TextChanged(object sender, TextChangedEventArgs e) => SaveSettings();
-        private void Control_Click(object sender, RoutedEventArgs e) => SaveSettings();
+        private void Control_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.Name == "CheckBox_AutoMigrateChatHistory")
+                return;
+            SaveSettings();
+        }
 
         private void LoadSettings()
         {
@@ -155,7 +159,6 @@ namespace VPetLLM
             ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked = _plugin.Settings.KeepContext;
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked = _plugin.Settings.SeparateChatByProvider;
-            ((CheckBox)this.FindName("CheckBox_AutoMigrateChatHistory")).IsChecked = _plugin.Settings.AutoMigrateChatHistory;
             ((CheckBox)this.FindName("CheckBox_EnableAction")).IsChecked = _plugin.Settings.EnableAction;
             ((CheckBox)this.FindName("CheckBox_EnableBuy")).IsChecked = _plugin.Settings.EnableBuy;
             ((CheckBox)this.FindName("CheckBox_EnableState")).IsChecked = _plugin.Settings.EnableState;
@@ -226,7 +229,6 @@ namespace VPetLLM
             var keepContextCheckBox = (CheckBox)this.FindName("CheckBox_KeepContext");
             var enableChatHistoryCheckBox = (CheckBox)this.FindName("CheckBox_EnableChatHistory");
             var separateChatByProviderCheckBox = (CheckBox)this.FindName("CheckBox_SeparateChatByProvider");
-            var autoMigrateChatHistoryCheckBox = (CheckBox)this.FindName("CheckBox_AutoMigrateChatHistory");
             var enableActionCheckBox = (CheckBox)this.FindName("CheckBox_EnableAction");
             var enableBuyCheckBox = (CheckBox)this.FindName("CheckBox_EnableBuy");
             var enableStateCheckBox = (CheckBox)this.FindName("CheckBox_EnableState");
@@ -272,7 +274,6 @@ namespace VPetLLM
             _plugin.Settings.KeepContext = keepContextCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableChatHistory = enableChatHistoryCheckBox.IsChecked ?? true;
             _plugin.Settings.SeparateChatByProvider = separateChatByProviderCheckBox.IsChecked ?? true;
-            _plugin.Settings.AutoMigrateChatHistory = autoMigrateChatHistoryCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableAction = enableActionCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableBuy = enableBuyCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableState = enableStateCheckBox.IsChecked ?? true;
@@ -546,7 +547,6 @@ namespace VPetLLM
             if (FindName("CheckBox_KeepContext") is CheckBox checkBoxKeepContext) checkBoxKeepContext.Content = LanguageHelper.Get("LLM_Settings.KeepContext", langCode);
             if (FindName("CheckBox_EnableChatHistory") is CheckBox checkBoxEnableChatHistory) checkBoxEnableChatHistory.Content = LanguageHelper.Get("LLM_Settings.EnableChatHistory", langCode);
             if (FindName("CheckBox_SeparateChatByProvider") is CheckBox checkBoxSeparateChatByProvider) checkBoxSeparateChatByProvider.Content = LanguageHelper.Get("LLM_Settings.SeparateChatByProvider", langCode);
-            if (FindName("CheckBox_AutoMigrateChatHistory") is CheckBox checkBoxAutoMigrateChatHistory) checkBoxAutoMigrateChatHistory.Content = LanguageHelper.Get("LLM_Settings.AutoMigrateChatHistory", langCode);
             if (FindName("Button_ClearContext") is Button buttonClearContext) buttonClearContext.Content = LanguageHelper.Get("LLM_Settings.ClearContext", langCode);
             if (FindName("Button_EditContext") is Button buttonEditContext) buttonEditContext.Content = LanguageHelper.Get("LLM_Settings.EditContext", langCode);
 

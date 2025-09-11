@@ -20,7 +20,6 @@ namespace VPetLLM
         public bool KeepContext { get; set; } = true;
         public bool EnableChatHistory { get; set; } = true;
         public bool SeparateChatByProvider { get; set; } = false;
-        public bool AutoMigrateChatHistory { get; set; } = false;
         public bool LogAutoScroll { get; set; } = true;
         public int MaxLogCount { get; set; } = 1000;
         public bool EnableAction { get; set; } = true;
