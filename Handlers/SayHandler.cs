@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Utils;
 using static VPet_Simulator.Core.IGameSave;
+using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers
 {
@@ -14,7 +15,7 @@ namespace VPetLLM.Handlers
         public ActionType ActionType => ActionType.Talk;
         public string Description => PromptHelper.Get("Handler_Say_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
-       public async Task Execute(string value, IMainWindow mainWindow)
+        public async Task Execute(string value, IMainWindow mainWindow)
         {
             Utils.Logger.Log($"SayHandler executed with value: {value}");
             try
@@ -35,35 +36,65 @@ namespace VPetLLM.Handlers
                     text = value;
                 }
 
-                if (!string.IsNullOrEmpty(bodyAnimation))
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
                 {
-                    var actionHandler = new ActionHandler();
-                    await actionHandler.Execute(bodyAnimation, mainWindow);
-                }
-
-                // If a body animation is present, disable the talk animation to avoid conflicts.
-                if (!string.IsNullOrEmpty(bodyAnimation))
-                {
-                    mainWindow.Main.Say(text, "say", true);
-                }
-                else
-                {
-                    var availableSayAnimations = VPetLLM.Instance.GetAvailableSayAnimations().Select(a => a.ToLower());
-                    if (string.IsNullOrEmpty(animation) || !availableSayAnimations.Contains(animation.ToLower()))
+                    if (!string.IsNullOrEmpty(bodyAnimation))
                     {
-                        if (!string.IsNullOrEmpty(animation))
+                        // Play body animation AND show the speech bubble without a conflicting talk animation.
+                        var action = bodyAnimation.ToLower();
+                        Utils.Logger.Log($"SayHandler performing body animation: {action} while talking.");
+                        
+                        // 1. Start the body animation. It will manage its own lifecycle.
+                        switch (action)
                         {
-                            Logger.Log($"Say animation '{animation}' not found. Using random say animation.");
+                            case "touch_head":
+                            case "touchhead":
+                                mainWindow.Main.DisplayTouchHead();
+                                break;
+                            case "touch_body":
+                            case "touchbody":
+                                mainWindow.Main.DisplayTouchBody();
+                                break;
+                            case "move":
+                                mainWindow.Main.DisplayMove();
+                                break;
+                            case "sleep":
+                                mainWindow.Main.DisplaySleep();
+                                break;
+                            case "idel":
+                                mainWindow.Main.DisplayIdel();
+                                break;
+                            default:
+                                mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                                break;
                         }
-                        mainWindow.Main.Say(text, "say", true);
+                        
+                        // 2. Show the speech bubble ONLY by passing a null animation name.
+                        mainWindow.Main.Say(text, null, false);
                     }
                     else
                     {
-                        mainWindow.Main.Say(text, animation, true);
+                        // No body animation, so just perform the talk animation.
+                        var sayAnimation = animation;
+                        var availableSayAnimations = VPetLLM.Instance.GetAvailableSayAnimations().Select(a => a.ToLower());
+                        if (string.IsNullOrEmpty(sayAnimation) || !availableSayAnimations.Contains(sayAnimation.ToLower()))
+                        {
+                            if (!string.IsNullOrEmpty(animation))
+                            {
+                                Logger.Log($"Say animation '{animation}' not found. Using default say animation.");
+                            }
+                            sayAnimation = "say";
+                        }
+                        
+                        // Force the talk animation to loop.
+                        mainWindow.Main.Say(text, sayAnimation, true);
+                        Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: {sayAnimation}");
+
+                        // Wait, then interrupt the loop to return to normal.
+                        await Task.Delay(Math.Max(text.Length * 200, 2000));
+                        mainWindow.Main.DisplayToNomal();
                     }
-                }
-                Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: {animation ?? "none"}, bodyAnimation: {bodyAnimation ?? "none"}");
-                await Task.Delay(Math.Max(text.Length * 200, 2000)); // Wait for the text to be displayed and animation to play
+                });
             }
             catch (Exception e)
             {

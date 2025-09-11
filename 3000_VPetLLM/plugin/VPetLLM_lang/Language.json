@@ -86,12 +86,6 @@
             "zh-hant": "按供應商分離聊天記錄",
             "jp": "プロバイダー別にチャットを分離する"
         },
-        "AutoMigrateChatHistory": {
-            "en": "Auto Migrate Chat History",
-            "zh-hans": "自动迁移聊天历史",
-            "zh-hant": "自動遷移聊天歷史",
-            "jp": "チャット履歴を自動移行する"
-        },
         "ClearContext": {
             "en": "Clear Context",
             "zh-hans": "清除上下文",
