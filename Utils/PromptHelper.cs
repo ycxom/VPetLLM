@@ -8,17 +8,26 @@ namespace VPetLLM.Utils
     {
         private static JObject _prompts;
 
+        private static string _promptFilePath;
+
         public static void LoadPrompts(string path)
         {
-            var promptPath = Path.Combine(Path.GetDirectoryName(path), "Prompt.json");
-            if (File.Exists(promptPath))
+            _promptFilePath = Path.Combine(Path.GetDirectoryName(path), "Prompt.json");
+            ReloadPrompts();
+        }
+
+        public static void ReloadPrompts()
+        {
+            if (File.Exists(_promptFilePath))
             {
-                var json = File.ReadAllText(promptPath);
+                var json = File.ReadAllText(_promptFilePath);
                 _prompts = JObject.Parse(json);
+                Logger.Log("Prompts reloaded successfully.");
             }
             else
             {
                 _prompts = new JObject();
+                Logger.Log("Prompt file not found, initialized with empty prompts.");
             }
         }
 

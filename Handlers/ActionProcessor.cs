@@ -19,8 +19,9 @@ namespace VPetLLM.Handlers
             RegisterHandlers();
         }
 
-        private void RegisterHandlers()
+        public void RegisterHandlers()
         {
+            Handlers.Clear();
             Handlers.Add(new HappyHandler());
             Handlers.Add(new HealthHandler());
             Handlers.Add(new ExpHandler());

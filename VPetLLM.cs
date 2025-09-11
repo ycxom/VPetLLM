@@ -172,6 +172,8 @@ namespace VPetLLM
             Settings = new Setting(ExtensionValue.BaseDirectory);
             Settings.Save();
         }
+
+
         public override string PluginName => "VPetLLM";
 
 
@@ -181,6 +183,7 @@ namespace VPetLLM
             {
                 return "错误：聊天核心未初始化。";
             }
+            PromptHelper.ReloadPrompts();
             return await ChatCore.Chat(prompt);
         }
 
@@ -243,6 +246,11 @@ namespace VPetLLM
                 // This can be a no-op if the system message is always fetched fresh,
                 // but it's good practice to have a method for explicit updates.
             }
+        }
+
+        public void UpdateActionProcessor()
+        {
+            ActionProcessor?.RegisterHandlers();
         }
 
         public IEnumerable<string> GetAvailableAnimations()

@@ -119,7 +119,12 @@ namespace VPetLLM
             SaveSettings();
             if (sender == FindName("ComboBox_Language"))
             {
+                LanguageHelper.ReloadLanguages();
                 UpdateUIForLanguage();
+            }
+            if(sender == FindName("ComboBox_PromptLanguage"))
+            {
+                PromptHelper.ReloadPrompts();
             }
         }
         private void Control_TextChanged(object sender, TextChangedEventArgs e) => SaveSettings();
@@ -348,6 +353,7 @@ namespace VPetLLM
                 }
                 _plugin.UpdateChatCore(updatedChatCore);
             }
+            _plugin.UpdateActionProcessor();
         }
         private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
 

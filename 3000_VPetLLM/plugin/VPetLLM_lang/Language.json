@@ -740,5 +740,15 @@
             "zh-hant": "作者",
             "jp": "作者"
         }
+    },
+    "ReloadPrompts": {
+        "Success": {
+            "en": "Prompts reloaded successfully.",
+            "zh-hans": "提示词已成功重载。"
+        }
+    },
+    "Success": {
+        "en": "Success",
+        "zh-hans": "成功"
     }
 }

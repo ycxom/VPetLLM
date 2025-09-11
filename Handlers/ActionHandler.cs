@@ -15,16 +15,22 @@ namespace VPetLLM.Handlers
         public async Task Execute(string actionName, IMainWindow mainWindow)
         {
             Utils.Logger.Log($"ActionHandler executed with value: {actionName}");
-            var action = string.IsNullOrEmpty(actionName) ? "idel" : actionName.ToLower();
+            var action = string.IsNullOrEmpty(actionName) ? "idel" : actionName;
 
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
             {
-                switch (action)
+                switch (action.ToLower())
                 {
                     case "touch_head":
                         mainWindow.Main.DisplayTouchHead();
                         break;
+                    case "touchhead":
+                        mainWindow.Main.DisplayTouchHead();
+                        break;
                     case "touch_body":
+                        mainWindow.Main.DisplayTouchBody();
+                        break;
+                    case "touchbody":
                         mainWindow.Main.DisplayTouchBody();
                         break;
                     case "move":
