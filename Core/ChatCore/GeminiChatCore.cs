@@ -29,20 +29,14 @@ namespace VPetLLM.Core.ChatCore
         }
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
-            if (!_keepContext)
+            if (!Settings.KeepContext)
             {
                 ClearContext();
             }
-            else
+            if (!string.IsNullOrEmpty(prompt))
             {
-                if (!string.IsNullOrEmpty(prompt))
-                {
-                    if (!string.IsNullOrEmpty(prompt))
-                    {
-                        //无论是用户输入还是插件返回，都作为user角色
-                        await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
-                    }
-                }
+                //无论是用户输入还是插件返回，都作为user角色
+                await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
             }
             
             List<Message> history = GetCoreHistory();
@@ -90,11 +84,11 @@ namespace VPetLLM.Core.ChatCore
                 message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
             }
             
-            if (_keepContext)
+            if (Settings.KeepContext)
             {
                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
             }
-            if (_keepContext)
+            if (Settings.KeepContext)
             {
                 SaveHistory();
             }

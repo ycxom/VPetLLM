@@ -106,7 +106,7 @@ namespace VPetLLM.Core
            }
 
            var systemMessage = string.Join("\n", parts);
-           Logger.Log("System Message Generated:\n" + systemMessage); // System Role 查看用的
+        //    Logger.Log("System Message Generated:\n" + systemMessage); // System Role 查看用的
            return systemMessage;
        }
 

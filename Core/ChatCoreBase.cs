@@ -31,9 +31,6 @@ namespace VPetLLM.Core
             return SystemMessageProvider.GetSystemMessage();
         }
 
-        // 统一的上下文模式状态，确保切换提供商时状态保持一致
-        protected bool _keepContext = true;
-        
       protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
       {
           Settings = settings;
@@ -42,22 +39,6 @@ namespace VPetLLM.Core
           HistoryManager = new HistoryManager(settings, Name, this);
           SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
       }
-        
-        /// <summary>
-        /// 设置是否保持上下文（统一管理，确保切换提供商时状态一致）
-        /// </summary>
-        public virtual void SetContextMode(bool keepContext)
-        {
-            _keepContext = keepContext;
-        }
-        
-        /// <summary>
-        /// 获取当前上下文模式状态
-        /// </summary>
-        public virtual bool GetContextMode()
-        {
-            return _keepContext;
-        }
 
         public virtual List<string> GetModels()
         {
