@@ -71,6 +71,7 @@ namespace VPetLLM.Handlers
                         
                         // 2. Show the speech bubble ONLY by passing a null animation name.
                         mainWindow.Main.Say(text, null, false);
+                        await Task.Delay(Math.Max(text.Length * 200, 2000));
                     }
                     else
                     {
