@@ -37,6 +37,7 @@ namespace VPetLLM
         public bool IsUpdatable { get; set; }
         public string UpdateAvailableText { get; set; }
         public string UninstallActionText { get; set; }
+        public string LocalFilePath { get; set; }
     }
 
     public partial class winSettingNew : Window
@@ -474,6 +475,7 @@ namespace VPetLLM
             if (dialog.ShowDialog() == true)
             {
                 _plugin.ImportPlugin(dialog.FileName);
+                Button_RefreshPlugins_Click(this, new RoutedEventArgs());
             }
         }
 
@@ -690,7 +692,8 @@ namespace VPetLLM
                     ActionText = LanguageHelper.Get("Plugin.UnloadPlugin", langCode),
                     Icon = "\uE8A5", // Folder icon
                     LocalPlugin = localPlugin,
-                    Version = sha
+                    Version = sha,
+                    LocalFilePath = localPlugin.FilePath
                 };
             }
             foreach (var failedPlugin in _plugin.FailedPlugins)
@@ -710,7 +713,8 @@ namespace VPetLLM
                     ActionText = LanguageHelper.Get("Plugin.Delete", langCode),
                     Icon = "\uE783", // Error icon
                     FailedPlugin = failedPlugin,
-                    Version = LanguageHelper.Get("Plugin.UnknownVersion", langCode)
+                    Version = LanguageHelper.Get("Plugin.UnknownVersion", langCode),
+                    LocalFilePath = failedPlugin.FilePath
                 };
             }
 
@@ -848,21 +852,20 @@ namespace VPetLLM
             }
 
             var pluginNameToFind = plugin.OriginalName ?? plugin.Name;
-            var localPlugin = plugin.LocalPlugin ?? _plugin.Plugins.FirstOrDefault(p => p.Name == pluginNameToFind);
+            var localPlugin = _plugin.Plugins.FirstOrDefault(p => p.FilePath == plugin.LocalFilePath);
 
             if (localPlugin != null)
             {
-                string pluginFilePath = localPlugin.FilePath;
                 bool uninstalled = await _plugin.UnloadAndTryDeletePlugin(localPlugin);
                 if (!uninstalled)
                 {
-                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(plugin.LocalFilePath)}"),
                                     ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             else
             {
-                var failedPlugin = plugin.FailedPlugin ?? _plugin.FailedPlugins.FirstOrDefault(p => p.Name == pluginNameToFind);
+                var failedPlugin = _plugin.FailedPlugins.FirstOrDefault(p => p.Name == pluginNameToFind);
                 if (failedPlugin != null)
                 {
                     string pluginFilePath = failedPlugin.FilePath;

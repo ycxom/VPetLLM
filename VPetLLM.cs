@@ -226,6 +226,7 @@ namespace VPetLLM
         {
             PluginManager.ImportPlugin(filePath);
             LoadPlugins();
+            RefreshPluginList();
         }
 
         public async Task<bool> DeletePluginFile(string pluginFilePath)

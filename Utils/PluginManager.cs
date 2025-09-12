@@ -98,9 +98,9 @@ namespace VPetLLM.Utils
         public static async Task<bool> UnloadAndTryDeletePlugin(IVPetLLMPlugin plugin, IChatCore chatCore)
         {
             string filePath = plugin.FilePath;
-            if (string.IsNullOrEmpty(filePath))
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
-                Logger.Log($"Plugin file path is empty for {plugin.Name}.");
+                Logger.Log($"Plugin file path is invalid or does not exist for {plugin.Name}: '{filePath}'");
                 return false;
             }
 
@@ -117,57 +117,43 @@ namespace VPetLLM.Utils
                 _pluginContexts.Remove(filePath);
                 Logger.Log($"Unloaded AssemblyLoadContext for {plugin.Name}.");
             }
-            
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
 
+            // Force garbage collection to release file handles
+            for (int i = 0; i < 3; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                await Task.Delay(100);
+            }
+
+            // Retry deleting the shadow copy directory
             if (_shadowCopyDirectories.TryGetValue(filePath, out var shadowDir) && Directory.Exists(shadowDir))
             {
-                try
+                bool shadowDeleted = false;
+                for (int i = 0; i < 5; i++)
                 {
-                    Directory.Delete(shadowDir, true);
-                    _shadowCopyDirectories.Remove(filePath);
-                    Logger.Log($"Deleted shadow copy directory for {plugin.Name}: {shadowDir}");
+                    try
+                    {
+                        Directory.Delete(shadowDir, true);
+                        _shadowCopyDirectories.Remove(filePath);
+                        Logger.Log($"Successfully deleted shadow copy directory for {plugin.Name}: {shadowDir}");
+                        shadowDeleted = true;
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Attempt {i + 1} to delete shadow copy directory {shadowDir} failed: {ex.Message}. Retrying...");
+                        await Task.Delay(200);
+                    }
                 }
-                catch (Exception ex)
+                if (!shadowDeleted)
                 {
-                    Logger.Log($"Failed to delete shadow copy directory {shadowDir}: {ex.Message}");
+                     Logger.Log($"Failed to delete shadow copy directory after multiple attempts: {shadowDir}");
                 }
             }
             
-            if (!File.Exists(filePath))
-            {
-                Logger.Log($"Plugin file does not exist, no need to delete: '{filePath}'");
-                return true;
-            }
-
-            for (int i = 0; i < 5; i++)
-            {
-                try
-                {
-                    File.Delete(filePath);
-                    var pdbPath = Path.ChangeExtension(filePath, ".pdb");
-                    if (File.Exists(pdbPath))
-                    {
-                        File.Delete(pdbPath);
-                    }
-                    Logger.Log($"Successfully deleted plugin files: {Path.GetFileName(filePath)}");
-                    return true;
-                }
-                catch (IOException)
-                {
-                    Logger.Log($"Attempt {i + 1} to delete {Path.GetFileName(filePath)} failed, retrying...");
-                    await Task.Delay(500);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"An unexpected error occurred while deleting plugin {Path.GetFileName(filePath)}: {ex.Message}");
-                    return false;
-                }
-            }
-
-            Logger.Log($"Failed to delete plugin after multiple attempts: {Path.GetFileName(filePath)}");
-            return false;
+            // Retry deleting the original plugin file
+            return await DeletePluginFile(filePath);
         }
         public static void UnloadAllPlugins(IChatCore chatCore)
         {

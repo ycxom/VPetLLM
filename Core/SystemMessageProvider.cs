@@ -60,6 +60,18 @@ namespace VPetLLM.Core
                    }
                    parts.Add(status);
                }
+   
+               // Add dynamic info from plugins
+               var dynamicPluginInfos = VPetLLM.Instance.Plugins
+                   .OfType<IDynamicInfoPlugin>()
+                   .Where(p => p.Enabled)
+                   .Select(p => p.GetDynamicInfo())
+                   .Where(info => !string.IsNullOrEmpty(info));
+
+               if (dynamicPluginInfos.Any())
+               {
+                   parts.AddRange(dynamicPluginInfos);
+               }
 
                var instructions = new List<string>();
                foreach (var handler in _actionProcessor.Handlers)
