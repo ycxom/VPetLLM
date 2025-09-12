@@ -930,9 +930,15 @@ namespace VPetLLM
                     }
                     var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
                     File.WriteAllBytes(filePath, data);
-                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", _plugin.Settings.Language, "插件安装成功，请重启桌宠以加载新插件"),
-                        ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    
+                    // Force reload plugins to recognize the new dll
+                    _plugin.LoadPlugins();
+                    
+                    // Now refresh the UI
                     Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", _plugin.Settings.Language, "插件安装/更新成功！"),
+                        ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
