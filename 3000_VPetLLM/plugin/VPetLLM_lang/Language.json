@@ -527,6 +527,12 @@
             "zh-hans": "作者",
             "zh-hant": "作者",
             "jp": "作者"
+        },
+        "Setting": {
+            "en": "Setting",
+            "zh-hans": "设置",
+            "zh-hant": "設置",
+            "jp": "設定"
         }
     },
     "Proxy": {

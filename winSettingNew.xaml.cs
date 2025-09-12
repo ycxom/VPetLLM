@@ -38,6 +38,8 @@ namespace VPetLLM
         public string UpdateAvailableText { get; set; }
         public string UninstallActionText { get; set; }
         public string LocalFilePath { get; set; }
+        public bool HasSettingAction { get; set; }
+        public string SettingActionText { get; set; }
     }
 
     public partial class winSettingNew : Window
@@ -679,7 +681,7 @@ namespace VPetLLM
                 var remoteEntry = remotePlugins.FirstOrDefault(kvp => kvp.Value["Name"]?.ToString() == localPlugin.Name);
                 var id = !string.IsNullOrEmpty(remoteEntry.Key) ? remoteEntry.Key : localPlugin.Name;
 
-                pluginItems[id] = new UnifiedPluginItem
+                var item = new UnifiedPluginItem
                 {
                     IsLocal = true,
                     Id = id,
@@ -694,6 +696,12 @@ namespace VPetLLM
                     Version = sha,
                     LocalFilePath = localPlugin.FilePath
                 };
+                if (localPlugin is IActionPlugin && localPlugin.Parameters.Contains("setting"))
+                {
+                    item.HasSettingAction = true;
+                    item.SettingActionText = LanguageHelper.Get("Plugin.Setting", langCode);
+                }
+                pluginItems[id] = item;
             }
             foreach (var failedPlugin in _plugin.FailedPlugins)
             {
@@ -931,6 +939,17 @@ namespace VPetLLM
             {
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedError("InstallPlugin.Fail", _plugin.Settings.Language, "安装插件失败", ex),
                     ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void Button_PluginSetting_Click(object sender, RoutedEventArgs e)
+        {
+            if (((Button)sender).DataContext is UnifiedPluginItem plugin)
+            {
+                if (plugin.LocalPlugin is IActionPlugin actionPlugin)
+                {
+                    actionPlugin.Function("action(setting)");
+                }
             }
         }
 

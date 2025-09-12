@@ -566,7 +566,7 @@
                             </DataGridTextColumn>
                             <DataGridTextColumn Header="作者"
                                     Binding="{Binding Author}"
-                                    Width="*"
+                                    Width="0.8*"
                                     IsReadOnly="True"/>
                             <DataGridTextColumn Header="描述"
                                     Binding="{Binding Description}"
@@ -576,12 +576,26 @@
                                     Width="Auto">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
+                                        <WrapPanel Orientation="Horizontal" MaxWidth="120">
                                             <Button Content="{Binding ActionText}"
-                                                    Click="Button_PluginAction_Click"/>
+                                                    Click="Button_PluginAction_Click" Margin="0,2,5,2"/>
+                                            <Button Content="{Binding SettingActionText}"
+                                                    Click="Button_PluginSetting_Click"
+                                                    Margin="0,2,5,2">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasSettingAction}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
                                             <Button Content="{Binding UninstallActionText}"
                                                     Click="Button_UninstallPlugin_Click"
-                                                    Margin="5,0,0,0">
+                                                    Margin="0,2,5,2">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
                                                         <Setter Property="Visibility"
@@ -619,7 +633,7 @@
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
-                                        </StackPanel>
+                                        </WrapPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
