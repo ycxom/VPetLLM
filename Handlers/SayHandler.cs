@@ -36,66 +36,63 @@ namespace VPetLLM.Handlers
                     text = value;
                 }
 
-                await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+                if (!string.IsNullOrEmpty(bodyAnimation))
                 {
-                    if (!string.IsNullOrEmpty(bodyAnimation))
-                    {
-                        // Play body animation AND show the speech bubble without a conflicting talk animation.
-                        var action = bodyAnimation.ToLower();
-                        Utils.Logger.Log($"SayHandler performing body animation: {action} while talking.");
-                        
-                        // 1. Start the body animation. It will manage its own lifecycle.
-                        switch (action)
-                        {
-                            case "touch_head":
-                            case "touchhead":
-                                mainWindow.Main.DisplayTouchHead();
-                                break;
-                            case "touch_body":
-                            case "touchbody":
-                                mainWindow.Main.DisplayTouchBody();
-                                break;
-                            case "move":
-                                mainWindow.Main.DisplayMove();
-                                break;
-                            case "sleep":
-                                mainWindow.Main.DisplaySleep();
-                                break;
-                            case "idel":
-                                mainWindow.Main.DisplayIdel();
-                                break;
-                            default:
-                                mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                                break;
-                        }
-                        
-                        // 2. Show the speech bubble ONLY by passing a null animation name.
-                        mainWindow.Main.Say(text, null, false);
-                        await Task.Delay(Math.Max(text.Length * 200, 2000));
-                    }
-                    else
-                    {
-                        // No body animation, so just perform the talk animation.
-                        var sayAnimation = animation;
-                        var availableSayAnimations = VPetLLM.Instance.GetAvailableSayAnimations().Select(a => a.ToLower());
-                        if (string.IsNullOrEmpty(sayAnimation) || !availableSayAnimations.Contains(sayAnimation.ToLower()))
-                        {
-                            if (!string.IsNullOrEmpty(animation))
-                            {
-                                Logger.Log($"Say animation '{animation}' not found. Using default say animation.");
-                            }
-                            sayAnimation = "say";
-                        }
-                        
-                        // Force the talk animation to loop.
-                        mainWindow.Main.Say(text, sayAnimation, true);
-                        Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: {sayAnimation}");
+                    // Play body animation AND show the speech bubble without a conflicting talk animation.
+                    var action = bodyAnimation.ToLower();
+                    Utils.Logger.Log($"SayHandler performing body animation: {action} while talking.");
 
-                        // Wait, then interrupt the loop to return to normal.
-                        await Task.Delay(Math.Max(text.Length * 200, 2000));
-                        mainWindow.Main.DisplayToNomal();
+                    // 1. Start the body animation. It will manage its own lifecycle.
+                    switch (action)
+                    {
+                        case "touch_head":
+                        case "touchhead":
+                            mainWindow.Main.DisplayTouchHead();
+                            break;
+                        case "touch_body":
+                        case "touchbody":
+                            mainWindow.Main.DisplayTouchBody();
+                            break;
+                        case "move":
+                            mainWindow.Main.DisplayMove();
+                            break;
+                        case "sleep":
+                            mainWindow.Main.DisplaySleep();
+                            break;
+                        case "idel":
+                            mainWindow.Main.DisplayIdel();
+                            break;
+                        default:
+                            mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            break;
                     }
-                });
+
+                    // 2. Show the speech bubble ONLY by passing a null animation name.
+                    mainWindow.Main.Say(text, null, false);
+                    await Task.Delay(Math.Max(text.Length * VPetLLM.Instance.Settings.SayTimeMultiplier, VPetLLM.Instance.Settings.SayTimeMin));
+                }
+                else
+                {
+                    // No body animation, so just perform the talk animation.
+                    var sayAnimation = animation;
+                    var availableSayAnimations = VPetLLM.Instance.GetAvailableSayAnimations().Select(a => a.ToLower());
+                    if (string.IsNullOrEmpty(sayAnimation) || !availableSayAnimations.Contains(sayAnimation.ToLower()))
+                    {
+                        if (!string.IsNullOrEmpty(animation))
+                        {
+                            Logger.Log($"Say animation '{animation}' not found. Using default say animation.");
+                        }
+                        sayAnimation = "say";
+                    }
+
+                    // Force the talk animation to loop.
+                    mainWindow.Main.Say(text, sayAnimation, true);
+                    Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: {sayAnimation}");
+
+                    // Wait, then interrupt the loop to return to normal.
+                    await Task.Delay(Math.Max(text.Length * VPetLLM.Instance.Settings.SayTimeMultiplier, VPetLLM.Instance.Settings.SayTimeMin));
+                    mainWindow.Main.DisplayToNomal();
+                }
             }
             catch (Exception e)
             {

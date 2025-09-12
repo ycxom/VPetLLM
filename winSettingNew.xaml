@@ -40,13 +40,15 @@
                                     Margin="0,10,0,0"
                                     x:Name="Label_AiName"/>
                             <TextBox x:Name="TextBox_AiName"
-                                    MaxWidth="300"/>
+                                     MaxWidth="300"
+                                     IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
                             <Label Content="用户名称"
-                                    VerticalAlignment="Top"
-                                    Margin="0,10,0,0"
-                                    x:Name="Label_UserName"/>
+                                     VerticalAlignment="Top"
+                                     Margin="0,10,0,0"
+                                     x:Name="Label_UserName"/>
                             <TextBox x:Name="TextBox_UserName"
-                                    MaxWidth="300"/>
+                                     MaxWidth="300"
+                                     IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
                             <CheckBox x:Name="CheckBox_FollowVPetName"
                                     Content="名字与主人名字设置跟着桌面宠物设置"
                                     Margin="0,5,0,0"/>

@@ -261,9 +261,12 @@ namespace VPetLLM
                 _plugin.Settings.Language = selectedLangCode;
             }
             _plugin.Settings.PromptLanguage = (string)promptlanguageComboBox.SelectedItem == "English" ? "en" : "zh";
-            _plugin.Settings.AiName = aiNameTextBox.Text;
-            _plugin.Settings.UserName = userNameTextBox.Text;
             _plugin.Settings.FollowVPetName = followVPetNameCheckBox.IsChecked ?? true;
+            if(!_plugin.Settings.FollowVPetName)
+            {
+                _plugin.Settings.AiName = aiNameTextBox.Text;
+                _plugin.Settings.UserName = userNameTextBox.Text;
+            }
             _plugin.Settings.Role = roleTextBox.Text;
             _plugin.Settings.Ollama.Url = ollamaUrlTextBox.Text;
             _plugin.Settings.Ollama.Model = ollamaModelComboBox.Text;
