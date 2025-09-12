@@ -63,6 +63,12 @@ namespace VPetLLM.Utils
                         {
                             var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
                             plugin.FilePath = file;
+                            if (plugin is IPluginWithData pluginWithData)
+                            {
+                                var pluginDataDir = Path.Combine(pluginDir, "PluginData", plugin.Name);
+                                Directory.CreateDirectory(pluginDataDir);
+                                pluginWithData.PluginDataDir = pluginDataDir;
+                            }
                             plugin.Enabled = pluginStates.TryGetValue(plugin.Name, out var enabled) ? enabled : true;
                             Plugins.Add(plugin);
                             if (plugin.Enabled)
