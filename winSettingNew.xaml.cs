@@ -51,7 +51,8 @@ namespace VPetLLM
             _plugin.SettingWindow = this;
             LoadSettings();
             Closed += Window_Closed;
-            Loaded += (s, e) => {
+            Loaded += (s, e) =>
+            {
                 UpdateUIForLanguage();
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
             };
@@ -94,7 +95,6 @@ namespace VPetLLM
             ((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).TextChanged += Control_TextChanged;
-            ((DataGrid)this.FindName("DataGrid_Plugins")).CellEditEnding += DataGrid_Plugins_CellEditEnding;
 
             // Proxy settings
             ((CheckBox)this.FindName("CheckBox_Proxy_IsEnabled")).Click += Control_Click;
@@ -108,9 +108,8 @@ namespace VPetLLM
             ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).Click += Control_Click;
-            
+
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
-            ((Button)this.FindName("Button_ImportPlugin")).Click += Button_ImportPlugin_Click;
         }
 
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => SaveSettings();
@@ -122,7 +121,7 @@ namespace VPetLLM
                 LanguageHelper.ReloadLanguages();
                 UpdateUIForLanguage();
             }
-            if(sender == FindName("ComboBox_PromptLanguage"))
+            if (sender == FindName("ComboBox_PromptLanguage"))
             {
                 PromptHelper.ReloadPrompts();
             }
@@ -495,28 +494,28 @@ namespace VPetLLM
             Button_RefreshPlugins_Click(this, new RoutedEventArgs());
         }
 
-        private void DataGrid_Plugins_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        private void PluginEnabled_Click(object sender, RoutedEventArgs e)
         {
-            if (e.EditAction == DataGridEditAction.Commit)
+            if (sender is CheckBox checkBox && checkBox.DataContext is UnifiedPluginItem item && item.LocalPlugin != null)
             {
-                if (e.Column is DataGridCheckBoxColumn)
+                bool isEnabled = checkBox.IsChecked ?? false;
+                item.IsEnabled = isEnabled;
+                item.LocalPlugin.Enabled = isEnabled;
+
+                if (isEnabled)
                 {
-                    var plugin = e.Row.Item as IVPetLLMPlugin;
-                    if (plugin != null)
-                    {
-                        // The binding automatically updates the `Enabled` property.
-                        // Now, we need to add/remove the plugin from the ChatCore and save the state.
-                        if (plugin.Enabled)
-                        {
-                            _plugin.ChatCore.AddPlugin(plugin);
-                        }
-                        else
-                        {
-                            _plugin.ChatCore.RemovePlugin(plugin);
-                        }
-                        _plugin.SavePluginStates();
-                    }
+                    item.LocalPlugin.Initialize(_plugin);
+                    _plugin.ChatCore?.AddPlugin(item.LocalPlugin);
+                    Logger.Log($"Plugin '{item.LocalPlugin.Name}' has been enabled and initialized.");
                 }
+                else
+                {
+                    item.LocalPlugin.Unload();
+                    _plugin.ChatCore?.RemovePlugin(item.LocalPlugin);
+                    Logger.Log($"Plugin '{item.LocalPlugin.Name}' has been disabled and unloaded.");
+                }
+                _plugin.SavePluginStates();
+                Logger.Log("Plugin states have been saved.");
             }
         }
 
@@ -536,7 +535,7 @@ namespace VPetLLM
             if (FindName("Tab_Log") is TabItem tabLog) tabLog.Header = LanguageHelper.Get("Log.Tab", langCode);
             if (FindName("Tab_Plugin") is TabItem tabPlugin) tabPlugin.Header = LanguageHelper.Get("Plugin.Tab", langCode);
             if (FindName("Tab_Proxy") is TabItem tabProxy) tabProxy.Header = LanguageHelper.Get("Proxy.Tab", langCode);
-            
+
             if (FindName("Label_Language") is Label labelLanguage) labelLanguage.Content = LanguageHelper.Get("Language.Select", langCode);
             if (FindName("Label_PromptLanguage") is Label labelPromptLanguage) labelPromptLanguage.Content = LanguageHelper.Get("Language.PromptLanguage", langCode);
             if (FindName("TextBlock_PromptLanguageTooltip") is TextBlock textBlockPromptLanguageTooltip) textBlockPromptLanguageTooltip.Text = LanguageHelper.Get("Language.PromptLanguageTooltip", langCode);
@@ -731,7 +730,7 @@ namespace VPetLLM
                     existingItem.RemoteVersion = remoteSha256;
                     existingItem.FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty;
                     existingItem.SHA256 = remoteSha256;
-                    
+
                     bool isUpdatable = !string.IsNullOrEmpty(existingItem.Version) &&
                                        !string.IsNullOrEmpty(remoteSha256) &&
                                        !existingItem.Version.Equals(remoteSha256, StringComparison.OrdinalIgnoreCase);
@@ -748,7 +747,7 @@ namespace VPetLLM
                     // Plugin is only remote, add it for installation
                     var des = remoteInfo["Description"]?.ToObject<Dictionary<string, string>>();
                     var description = des != null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
-                    
+
                     pluginItems[id] = new UnifiedPluginItem
                     {
                         IsLocal = false,
@@ -798,7 +797,7 @@ namespace VPetLLM
                     item.Icon = "\uE948"; // Sync icon
                 }
             }
-            
+
             ((DataGrid)this.FindName("DataGrid_Plugins")).ItemsSource = pluginItems.Values.ToList();
         }
 
@@ -885,7 +884,7 @@ namespace VPetLLM
 
             Button_RefreshPlugins_Click(this, new RoutedEventArgs());
         }
-        
+
         private async Task HandleDeletePlugin(UnifiedPluginItem plugin)
         {
             string pluginFilePath = plugin.FailedPlugin.FilePath;
@@ -893,8 +892,8 @@ namespace VPetLLM
             Button_RefreshPlugins_Click(this, new RoutedEventArgs());
             if (!deleted)
             {
-                 MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),
-                                ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),
+                               ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

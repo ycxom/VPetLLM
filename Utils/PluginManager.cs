@@ -64,11 +64,14 @@ namespace VPetLLM.Utils
                             var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
                             plugin.FilePath = file;
                             plugin.Enabled = pluginStates.TryGetValue(plugin.Name, out var enabled) ? enabled : true;
-                            plugin.Initialize(VPetLLM.Instance);
                             Plugins.Add(plugin);
-                            if (plugin.Enabled && chatCore != null)
+                            if (plugin.Enabled)
                             {
-                                chatCore.AddPlugin(plugin);
+                                plugin.Initialize(VPetLLM.Instance);
+                                if (chatCore != null)
+                                {
+                                    chatCore.AddPlugin(plugin);
+                                }
                             }
                             Logger.Log($"Loaded plugin: {plugin.Name}, Enabled: {plugin.Enabled}");
                         }
@@ -104,6 +107,16 @@ namespace VPetLLM.Utils
                 return false;
             }
 
+            var configFile = Path.Combine(PluginPath, "plugins.json");
+            if (File.Exists(configFile))
+            {
+                var pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
+                if (pluginStates.Remove(plugin.Name))
+                {
+                    File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
+                }
+            }
+
             if (chatCore != null)
             {
                 chatCore.RemovePlugin(plugin);
@@ -113,17 +126,27 @@ namespace VPetLLM.Utils
 
             if (_pluginContexts.TryGetValue(filePath, out var context))
             {
+                var weakContext = new WeakReference(context);
                 context.Unload();
                 _pluginContexts.Remove(filePath);
-                Logger.Log($"Unloaded AssemblyLoadContext for {plugin.Name}.");
-            }
+                Logger.Log($"Unloaded AssemblyLoadContext for {plugin.Name}. Waiting for garbage collection...");
 
-            // Force garbage collection to release file handles
-            for (int i = 0; i < 3; i++)
-            {
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                await Task.Delay(100);
+                // Wait for the context to be actually collected
+                for (int i = 0; weakContext.IsAlive && (i < 10); i++)
+                {
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    await Task.Delay(100);
+                }
+
+                if (weakContext.IsAlive)
+                {
+                    Logger.Log($"Warning: AssemblyLoadContext for {plugin.Name} could not be fully unloaded. File handles may remain locked.");
+                }
+                else
+                {
+                    Logger.Log($"AssemblyLoadContext for {plugin.Name} has been garbage collected.");
+                }
             }
 
             // Retry deleting the shadow copy directory
