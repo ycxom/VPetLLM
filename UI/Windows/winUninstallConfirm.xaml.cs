@@ -1,7 +1,7 @@
 using System.Windows;
 using VPetLLM.Utils;
 
-namespace VPetLLM
+namespace VPetLLM.UI.Windows
 {
     public partial class winUninstallConfirm : Window
     {

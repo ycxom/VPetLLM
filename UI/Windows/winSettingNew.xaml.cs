@@ -14,7 +14,7 @@ using System.Security.Cryptography;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace VPetLLM
+namespace VPetLLM.UI.Windows
 {
     public class UnifiedPluginItem
     {

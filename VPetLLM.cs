@@ -16,6 +16,7 @@ using VPetLLM.Core.ChatCore;
 using VPetLLM.Handlers;
 using VPetLLM.Utils;
 using VPetLLM.Windows;
+using VPetLLM.UI.Windows;
 
 namespace VPetLLM
 {

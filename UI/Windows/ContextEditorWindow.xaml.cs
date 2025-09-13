@@ -5,7 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using VPetLLM.Core;
 
-namespace VPetLLM
+namespace VPetLLM.UI.Windows
 {
     public partial class ContextEditorWindow : Window
     {

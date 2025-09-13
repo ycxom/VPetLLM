@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using VPetLLM.Core;
 using VPetLLM.Utils;
 
-namespace VPetLLM
+namespace VPetLLM.UI.Windows
 {
     public class ContextEditorItem
     {

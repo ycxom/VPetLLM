@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Controls;
 using VPetLLM.Core;
 using VPetLLM.Windows;
+using VPetLLM.UI.Windows;
 
 namespace VPetLLM.Utils
 {
