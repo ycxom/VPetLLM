@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Media.Animation;
+using System.Windows.Media;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
 using VPetLLM.Utils;
@@ -114,7 +116,27 @@ namespace VPetLLM.UI.Windows
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
         }
 
-        private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => SaveSettings();
+        private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // 实时更新温度值显示
+            if (sender is Slider slider)
+            {
+                if (slider.Name == "Slider_Ollama_Temperature")
+                {
+                    ((TextBlock)this.FindName("TextBlock_Ollama_TemperatureValue")).Text = slider.Value.ToString("F2");
+                }
+                else if (slider.Name == "Slider_OpenAI_Temperature")
+                {
+                    ((TextBlock)this.FindName("TextBlock_OpenAI_TemperatureValue")).Text = slider.Value.ToString("F2");
+                }
+                else if (slider.Name == "Slider_Gemini_Temperature")
+                {
+                    ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = slider.Value.ToString("F2");
+                }
+            }
+            
+            SaveSettings();
+        }
         private void Control_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             SaveSettings();
@@ -363,6 +385,9 @@ namespace VPetLLM.UI.Windows
 
         private async void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
         {
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
             try
             {
                 var ollamaCore = new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
@@ -376,10 +401,17 @@ namespace VPetLLM.UI.Windows
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshOllamaModels.Fail", _plugin.Settings.Language, "刷新Ollama模型失败", ex),
                     ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
         }
 
         private async void Button_RefreshOpenAIModels_Click(object sender, RoutedEventArgs e)
         {
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
             try
             {
                 var openAICore = new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
@@ -393,10 +425,17 @@ namespace VPetLLM.UI.Windows
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshOpenAIModels.Fail", _plugin.Settings.Language, "刷新OpenAI模型失败", ex),
                     ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
         }
 
         private async void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
         {
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
             try
             {
                 var geminiCore = new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
@@ -409,6 +448,10 @@ namespace VPetLLM.UI.Windows
             {
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshGeminiModels.Fail", _plugin.Settings.Language, "刷新Gemini模型失败", ex),
                     ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
             }
         }
 
@@ -450,21 +493,55 @@ namespace VPetLLM.UI.Windows
         {
             Logger.Clear();
         }
-        private void Button_AddTool_Click(object sender, RoutedEventArgs e)
+        private async void Button_AddTool_Click(object sender, RoutedEventArgs e)
         {
-            var newTool = new Setting.ToolSetting();
-            _plugin.Settings.Tools.Add(newTool);
-            ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
-            ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    var newTool = new Setting.ToolSetting();
+                    _plugin.Settings.Tools.Add(newTool);
+                });
+
+                Dispatcher.Invoke(() =>
+                {
+                    ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
+                    ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+                });
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
         }
 
-        private void Button_DeleteTool_Click(object sender, RoutedEventArgs e)
+        private async void Button_DeleteTool_Click(object sender, RoutedEventArgs e)
         {
-            if (((DataGrid)this.FindName("DataGrid_Tools")).SelectedItem is Setting.ToolSetting selectedTool)
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
+            try
             {
-                _plugin.Settings.Tools.Remove(selectedTool);
-                ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
-                ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+                await Task.Run(() =>
+                {
+                    if (((DataGrid)this.FindName("DataGrid_Tools")).SelectedItem is Setting.ToolSetting selectedTool)
+                    {
+                        _plugin.Settings.Tools.Remove(selectedTool);
+                    }
+                });
+
+                Dispatcher.Invoke(() =>
+                {
+                    ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
+                    ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+                });
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
             }
         }
 
@@ -474,16 +551,25 @@ namespace VPetLLM.UI.Windows
             // 这里可以添加需要的逻辑，目前保持空实现以避免编译错误
         }
 
-        private void Button_ImportPlugin_Click(object sender, RoutedEventArgs e)
+        private async void Button_ImportPlugin_Click(object sender, RoutedEventArgs e)
         {
+            var button = sender as Button;
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
                 Filter = "插件文件 (*.dll)|*.dll"
             };
             if (dialog.ShowDialog() == true)
             {
-                _plugin.ImportPlugin(dialog.FileName);
-                Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+                StartButtonLoadingAnimation(button);
+                try
+                {
+                    await Task.Run(() => _plugin.ImportPlugin(dialog.FileName));
+                    Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+                }
+                finally
+                {
+                    StopButtonLoadingAnimation(button);
+                }
             }
         }
 
@@ -531,6 +617,65 @@ namespace VPetLLM.UI.Windows
         private void Window_Closed(object? sender, EventArgs e)
         {
             _plugin.SettingWindow = null;
+        }
+
+        // 旋转动画辅助方法
+        private void StartButtonLoadingAnimation(Button button)
+        {
+            if (button == null) return;
+
+            // 保存原始内容
+            button.Tag = button.Content;
+            
+            // 创建旋转图标
+            var rotateIcon = new TextBlock
+            {
+                Text = "⟳",
+                FontSize = 14,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                RenderTransformOrigin = new Point(0.5, 0.5)
+            };
+
+            // 创建旋转变换
+            var rotateTransform = new RotateTransform();
+            rotateIcon.RenderTransform = rotateTransform;
+
+            // 创建旋转动画
+            var rotateAnimation = new DoubleAnimation
+            {
+                From = 0,
+                To = 360,
+                Duration = TimeSpan.FromSeconds(1),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+
+            // 设置按钮内容为旋转图标
+            button.Content = rotateIcon;
+            button.IsEnabled = false;
+
+            // 开始动画
+            rotateTransform.BeginAnimation(RotateTransform.AngleProperty, rotateAnimation);
+        }
+
+        private void StopButtonLoadingAnimation(Button button)
+        {
+            if (button == null) return;
+
+            // 停止动画
+            if (button.Content is TextBlock rotateIcon && rotateIcon.RenderTransform is RotateTransform transform)
+            {
+                transform.BeginAnimation(RotateTransform.AngleProperty, null);
+            }
+
+            // 恢复原始内容
+            if (button.Tag != null)
+            {
+                button.Content = button.Tag;
+                button.Tag = null;
+            }
+            
+            button.IsEnabled = true;
         }
 
         private void UpdateUIForLanguage()
@@ -664,19 +809,24 @@ namespace VPetLLM.UI.Windows
 
         private async void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
-            var langCode = _plugin.Settings.Language;
-            var pluginItems = new Dictionary<string, UnifiedPluginItem>(StringComparer.OrdinalIgnoreCase);
-            Dictionary<string, JObject> remotePlugins = new Dictionary<string, JObject>();
-            // Load local plugins (both successful and failed)
-            _plugin.LoadPlugins();
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
 
-            // Fetch remote plugin list first to get the correct IDs
             try
             {
-                using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
+                var langCode = _plugin.Settings.Language;
+                var pluginItems = new Dictionary<string, UnifiedPluginItem>(StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, JObject> remotePlugins = new Dictionary<string, JObject>();
+                // Load local plugins (both successful and failed)
+                _plugin.LoadPlugins();
+
+                // Fetch remote plugin list first to get the correct IDs
+                try
                 {
-                    var json = await client.GetStringAsync("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
-                    remotePlugins = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
+                    using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
+                    {
+                        var json = await client.GetStringAsync("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
+                        remotePlugins = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
                 }
             }
             catch (Exception ex)
@@ -817,36 +967,66 @@ namespace VPetLLM.UI.Windows
                 }
             }
 
-            ((DataGrid)this.FindName("DataGrid_Plugins")).ItemsSource = pluginItems.Values.ToList();
+                ((DataGrid)this.FindName("DataGrid_Plugins")).ItemsSource = pluginItems.Values.ToList();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshPlugins.Fail", _plugin.Settings.Language, "刷新插件列表失败", ex),
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
         }
 
         private async void Button_PluginAction_Click(object sender, RoutedEventArgs e)
         {
-            if (((Button)sender).DataContext is UnifiedPluginItem plugin)
-            {
-                var langCode = _plugin.Settings.Language;
-                string action = plugin.ActionText;
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
 
-                if (action == LanguageHelper.Get("Plugin.Delete", langCode))
+            try
+            {
+                if (((Button)sender).DataContext is UnifiedPluginItem plugin)
                 {
-                    await HandleDeletePlugin(plugin);
+                    var langCode = _plugin.Settings.Language;
+                    string action = plugin.ActionText;
+
+                    if (action == LanguageHelper.Get("Plugin.Delete", langCode))
+                    {
+                        await HandleDeletePlugin(plugin);
+                    }
+                    else if (action == LanguageHelper.Get("Plugin.UnloadPlugin", langCode))
+                    {
+                        await HandleUninstallPlugin(plugin);
+                    }
+                    else if (action == LanguageHelper.Get("PluginStore.Install", langCode) || action == LanguageHelper.Get("Plugin.Update", langCode))
+                    {
+                        await HandleInstallOrUpdatePlugin(plugin);
+                    }
                 }
-                else if (action == LanguageHelper.Get("Plugin.UnloadPlugin", langCode))
-                {
-                    await HandleUninstallPlugin(plugin);
-                }
-                else if (action == LanguageHelper.Get("PluginStore.Install", langCode) || action == LanguageHelper.Get("Plugin.Update", langCode))
-                {
-                    await HandleInstallOrUpdatePlugin(plugin);
-                }
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
             }
         }
 
         private async void Button_UninstallPlugin_Click(object sender, RoutedEventArgs e)
         {
-            if (((Button)sender).DataContext is UnifiedPluginItem plugin)
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
+            try
             {
-                await HandleUninstallPlugin(plugin);
+                if (((Button)sender).DataContext is UnifiedPluginItem plugin)
+                {
+                    await HandleUninstallPlugin(plugin);
+                }
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
             }
         }
 
