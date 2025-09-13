@@ -7,19 +7,91 @@
         xmlns:utils="clr-namespace:VPetLLM.Utils"
         mc:Ignorable="d"
         Title="VPetLLM"
-        Height="640"
-        Width="900">
+        Height="731"
+        Width="910"
+        Background="{DynamicResource BackgroundBrush}">
     <Window.Resources>
-        <utils:BoolInverter x:Key="BoolInverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <utils:BoolInverter x:Key="BoolInverter"/>
+
+            <!-- 现代化TabControl样式 -->
+            <Style x:Key="ModernTabControl" TargetType="TabControl">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+            </Style>
+
+            <Style x:Key="ModernTabItem" TargetType="TabItem">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+                <Setter Property="Padding" Value="16,12"/>
+                <Setter Property="Margin" Value="0,0,2,0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderThickness="0,0,0,2"
+                                    BorderBrush="Transparent"
+                                    CornerRadius="4,4,0,0">
+                                <ContentPresenter x:Name="ContentSite"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Center"
+                                                ContentSource="Header"
+                                                Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="#FFFFFF"/>
+                                    <Setter Property="Foreground" Value="#0078D4"/>
+                                    <Setter TargetName="ContentSite" Property="TextElement.FontWeight" Value="SemiBold"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#F3F2F1"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- 设置组样式 -->
+            <Style x:Key="SettingGroup" TargetType="StackPanel">
+                <Setter Property="Margin" Value="0,0,0,20"/>
+            </Style>
+
+            <Style x:Key="SettingLabel" TargetType="Label">
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="FontWeight" Value="Medium"/>
+                <Setter Property="Margin" Value="0,0,0,8"/>
+            </Style>
+
+            <!-- DataGrid列头样式 -->
+            <Style x:Key="ModernDataGridColumnHeader" TargetType="DataGridColumnHeader">
+                <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Padding" Value="12,8"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            </Style>
+        </ResourceDictionary>
     </Window.Resources>
-    <Grid Margin="10">
+    <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0">
+        <TabControl Grid.Row="0" Style="{StaticResource ModernTabControl}">
             <TabItem Header="LLM设置"
-                    x:Name="Tab_LLM">
+                    x:Name="Tab_LLM"
+                    Style="{StaticResource ModernTabItem}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -28,620 +100,906 @@
 
                     <ScrollViewer Grid.Column="0"
                             VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="0,0,10,0">
-                            <Label Content="LLM 提供商"
-                                    x:Name="Label_Provider"/>
-                            <ComboBox x:Name="ComboBox_Provider"
-                                    Margin="0,0,0,10"
-                                    SelectionChanged="ComboBox_Provider_SelectionChanged"/>
+                        <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
+                            <StackPanel Style="{StaticResource SettingGroup}">
+                                <Label Content="LLM 提供商"
+                                        x:Name="Label_Provider"
+                                        Style="{StaticResource SettingLabel}"/>
+                                <ComboBox x:Name="ComboBox_Provider"
+                                        Margin="0,0,0,16"
+                                        SelectionChanged="ComboBox_Provider_SelectionChanged"/>
 
-                            <Label Content="AI名称"
-                                    VerticalAlignment="Top"
-                                    Margin="0,10,0,0"
-                                    x:Name="Label_AiName"/>
-                            <TextBox x:Name="TextBox_AiName"
-                                     MaxWidth="300"
-                                     IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
-                            <Label Content="用户名称"
-                                     VerticalAlignment="Top"
-                                     Margin="0,10,0,0"
-                                     x:Name="Label_UserName"/>
-                            <TextBox x:Name="TextBox_UserName"
-                                     MaxWidth="300"
-                                     IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
-                            <CheckBox x:Name="CheckBox_FollowVPetName"
-                                    Content="名字与主人名字设置跟着桌面宠物设置"
-                                    Margin="0,5,0,0"/>
-                            <Label Content="角色设定"
-                                    VerticalAlignment="Top"
-                                    Margin="0,10,0,0"
-                                    x:Name="Label_Role"/>
-                            <TextBox x:Name="TextBox_Role"
-                                    TextWrapping="Wrap"
-                                    AcceptsReturn="True"
-                                    VerticalScrollBarVisibility="Auto"
-                                    HorizontalScrollBarVisibility="Auto"
-                                    Height="120"
-                                    Width="300"/>
+                                <Label Content="AI名称"
+                                        VerticalAlignment="Top"
+                                        Margin="0,0,0,0"
+                                        x:Name="Label_AiName"
+                                        Style="{StaticResource SettingLabel}"/>
+                                <TextBox x:Name="TextBox_AiName"
+                                         MaxWidth="300"
+                                         Margin="0,0,0,16"
+                                         Style="{StaticResource ModernTextBox}"
+                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
+                                <Label Content="用户名称"
+                                         VerticalAlignment="Top"
+                                         Margin="0,0,0,0"
+                                         x:Name="Label_UserName"
+                                         Style="{StaticResource SettingLabel}"/>
+                                <TextBox x:Name="TextBox_UserName"
+                                         MaxWidth="300"
+                                         Margin="0,0,0,16"
+                                         Style="{StaticResource ModernTextBox}"
+                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
+                                <CheckBox x:Name="CheckBox_FollowVPetName"
+                                        Content="名字与主人名字设置跟着桌面宠物设置"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <Label Content="角色设定"
+                                        VerticalAlignment="Top"
+                                        Margin="0,0,0,0"
+                                        x:Name="Label_Role"
+                                        Style="{StaticResource SettingLabel}"/>
+                                <TextBox x:Name="TextBox_Role"
+                                        TextWrapping="Wrap"
+                                        AcceptsReturn="True"
+                                        VerticalScrollBarVisibility="Auto"
+                                        HorizontalScrollBarVisibility="Auto"
+                                        Height="120"
+                                        Width="300"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernTextBox}"/>
 
-                            <Label Content="上下文控制"
-                                    Margin="0,10,0,0"
-                                    x:Name="Label_ContextControl"/>
-                            <CheckBox x:Name="CheckBox_KeepContext"
-                                    Content="保持聊天上下文"
-                                    Margin="0,0,0,5"
-                                    IsChecked="True"/>
-                            <CheckBox x:Name="CheckBox_EnableChatHistory"
-                                    Content="保存聊天历史"
-                                    Margin="0,0,0,5"
-                                    IsChecked="True"/>
-                            <CheckBox x:Name="CheckBox_SeparateChatByProvider"
-                                    Content="按提供商分离聊天记录"
-                                    Margin="0,0,0,5"
-                                    IsChecked="True"/>
-                            <WrapPanel HorizontalAlignment="Right"
-                                    Margin="0,10,0,0">
-                                <Button x:Name="Button_ClearContext"
-                                        Content="清除上下文"
-                                        Click="Button_ClearContext_Click"
-                                        Margin="5"/>
-                                <Button x:Name="Button_EditContext"
-                                        Content="编辑上下文"
-                                        Click="Button_EditContext_Click"
-                                        Margin="5"/>
-                            </WrapPanel>
-                        </StackPanel>
+                                <Label Content="上下文控制"
+                                        Margin="0,0,0,0"
+                                        x:Name="Label_ContextControl"
+                                        Style="{StaticResource SettingLabel}"/>
+                                <CheckBox x:Name="CheckBox_KeepContext"
+                                        Content="保持聊天上下文"
+                                        Margin="0,0,0,8"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableChatHistory"
+                                        Content="保存聊天历史"
+                                        Margin="0,0,0,8"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_SeparateChatByProvider"
+                                        Content="按提供商分离聊天记录"
+                                        Margin="0,0,0,16"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <WrapPanel HorizontalAlignment="Right"
+                                        Margin="0,0,0,0">
+                                    <Button x:Name="Button_ClearContext"
+                                            Content="清除上下文"
+                                            Click="Button_ClearContext_Click"
+                                            Margin="0,0,10,0"
+                                            Style="{StaticResource SecondaryButton}"/>
+                                    <Button x:Name="Button_EditContext"
+                                            Content="编辑上下文"
+                                            Click="Button_EditContext_Click"
+                                            Style="{StaticResource ModernButton}"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
                     </ScrollViewer>
 
                     <TabControl Grid.Column="1">
                         <TabItem Header="Ollama"
-                                x:Name="Tab_Ollama">
-                            <StackPanel>
-                                <Label Content="URL"
-                                        x:Name="Label_OllamaUrl"/>
-                                <TextBox x:Name="TextBox_OllamaUrl"/>
-                                <Label Content="模型"
-                                        x:Name="Label_OllamaModel"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ComboBox_OllamaModel"
-                                            Grid.Column="0"
-                                            IsEditable="True"/>
-                                    <Button x:Name="Button_RefreshOllamaModels"
-                                            Grid.Column="1"
-                                            Content="刷新"
-                                            Click="Button_RefreshOllamaModels_Click"
-                                            Margin="5,0,0,0"/>
-                                </Grid>
-                                <CheckBox x:Name="CheckBox_Ollama_EnableAdvanced"
-                                        Content="启用高级配置"
-                                        Margin="0,10,0,5"/>
-                                <StackPanel x:Name="StackPanel_Ollama_Advanced"
-                                        IsEnabled="{Binding ElementName=CheckBox_Ollama_EnableAdvanced, Path=IsChecked}">
-                                    <StackPanel Orientation="Horizontal"
-                                            Margin="0,0,0,5">
-                                        <TextBlock Text="温度:"
-                                                Width="60"
-                                                VerticalAlignment="Center"
-                                                x:Name="TextBlock_Ollama_Temperature"/>
-                                        <Slider x:Name="Slider_Ollama_Temperature"
-                                                Minimum="0"
-                                                Maximum="2"
-                                                Width="100"
-                                                Margin="5,0"
-                                                VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TextBlock_Ollama_TemperatureValue"
-                                                Width="30"
-                                                VerticalAlignment="Center"/>
+                                x:Name="Tab_Ollama"
+                                Style="{StaticResource ModernTabItem}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Border Style="{StaticResource CardContainer}">
+                                    <StackPanel Style="{StaticResource SettingGroup}">
+                                        <Label Content="URL"
+                                                x:Name="Label_OllamaUrl"
+                                                Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_OllamaUrl"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernTextBox}"/>
+                                        <Label Content="模型"
+                                                x:Name="Label_OllamaModel"
+                                                Style="{StaticResource SettingLabel}"/>
+                                        <Grid Margin="0,0,0,16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="ComboBox_OllamaModel"
+                                                    Grid.Column="0"
+                                                    IsEditable="True"/>
+                                            <Button x:Name="Button_RefreshOllamaModels"
+                                                    Grid.Column="1"
+                                                    Content="刷新"
+                                                    Click="Button_RefreshOllamaModels_Click"
+                                                    Margin="10,0,0,0"
+                                                    Style="{StaticResource SecondaryButton}"/>
+                                        </Grid>
+                                        <CheckBox x:Name="CheckBox_Ollama_EnableAdvanced"
+                                                Content="启用高级配置"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernCheckBox}"/>
+                                        <StackPanel x:Name="StackPanel_Ollama_Advanced"
+                                                Margin="20,0,0,0"
+                                                IsEnabled="{Binding ElementName=CheckBox_Ollama_EnableAdvanced, Path=IsChecked}">
+                                            <StackPanel Orientation="Horizontal"
+                                                    Margin="0,0,0,12">
+                                                <TextBlock Text="温度:"
+                                                        Width="80"
+                                                        VerticalAlignment="Center"
+                                                        x:Name="TextBlock_Ollama_Temperature"
+                                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                                        FontSize="14"/>
+                                                <Slider x:Name="Slider_Ollama_Temperature"
+                                                        Minimum="0"
+                                                        Maximum="2"
+                                                        Width="120"
+                                                        Margin="10,0"
+                                                        VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="TextBlock_Ollama_TemperatureValue"
+                                                        Width="40"
+                                                        VerticalAlignment="Center"
+                                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                                        FontSize="14"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal"
+                                                    Margin="0,0,0,0">
+                                                <TextBlock Text="最大Token:"
+                                                        Width="80"
+                                                        VerticalAlignment="Center"
+                                                        x:Name="TextBlock_Ollama_MaxTokens"
+                                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                                        FontSize="14"/>
+                                                <TextBox x:Name="TextBox_Ollama_MaxTokens"
+                                                        Width="100"
+                                                        Margin="10,0"
+                                                        VerticalAlignment="Center"
+                                                        Style="{StaticResource ModernTextBox}"/>
+                                            </StackPanel>
+                                        </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal"
-                                            Margin="0,0,0,5">
-                                        <TextBlock Text="最大Token:"
-                                                Width="60"
-                                                VerticalAlignment="Center"
-                                                x:Name="TextBlock_Ollama_MaxTokens"/>
-                                        <TextBox x:Name="TextBox_Ollama_MaxTokens"
-                                                Width="80"
-                                                Margin="5,0"
-                                                VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </StackPanel>
+                                </Border>
+                            </ScrollViewer>
                         </TabItem>
                         <TabItem Header="OpenAI"
-                                x:Name="Tab_OpenAI">
-                            <StackPanel>
-                                <Label Content="API 密钥"
-                                        x:Name="Label_OpenAIApiKey"/>
-                                <TextBox x:Name="TextBox_OpenAIApiKey"/>
-                                <Label Content="模型"
-                                        x:Name="Label_OpenAIModel"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ComboBox_OpenAIModel"
-                                            Grid.Column="0"
-                                            IsEditable="True"/>
-                                    <Button x:Name="Button_RefreshOpenAIModels"
-                                            Grid.Column="1"
-                                            Content="刷新"
-                                            Click="Button_RefreshOpenAIModels_Click"
-                                            Margin="5,0,0,0"/>
-                                </Grid>
-                                <Label Content="API 地址"
-                                        x:Name="Label_OpenAIUrl"/>
-                                <TextBox x:Name="TextBox_OpenAIUrl"/>
-                                <CheckBox x:Name="CheckBox_OpenAI_EnableAdvanced"
-                                        Content="启用高级配置"
-                                        Margin="0,10,0,5"/>
-                                <StackPanel x:Name="StackPanel_OpenAI_Advanced"
-                                        IsEnabled="{Binding ElementName=CheckBox_OpenAI_EnableAdvanced, Path=IsChecked}">
-                                    <StackPanel Orientation="Horizontal"
-                                            Margin="0,0,0,5">
-                                        <TextBlock Text="温度:"
-                                                Width="60"
-                                                VerticalAlignment="Center"
-                                                x:Name="TextBlock_OpenAI_Temperature"/>
-                                        <Slider x:Name="Slider_OpenAI_Temperature"
-                                                Minimum="0"
-                                                Maximum="2"
-                                                Width="100"
-                                                Margin="5,0"
-                                                VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TextBlock_OpenAI_TemperatureValue"
-                                                Width="30"
-                                                VerticalAlignment="Center"/>
+                                x:Name="Tab_OpenAI"
+                                Style="{StaticResource ModernTabItem}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Border Style="{StaticResource CardContainer}">
+                                    <StackPanel Style="{StaticResource SettingGroup}">
+                                        <Label Content="API 密钥"
+                                                x:Name="Label_OpenAIApiKey"
+                                                Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_OpenAIApiKey"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernTextBox}"/>
+                                        <Label Content="模型"
+                                                x:Name="Label_OpenAIModel"
+                                                Style="{StaticResource SettingLabel}"/>
+                                        <Grid Margin="0,0,0,16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="ComboBox_OpenAIModel"
+                                                    Grid.Column="0"
+                                                    IsEditable="True"/>
+                                            <Button x:Name="Button_RefreshOpenAIModels"
+                                                    Grid.Column="1"
+                                                    Content="刷新"
+                                                    Click="Button_RefreshOpenAIModels_Click"
+                                                    Margin="10,0,0,0"
+                                                    Style="{StaticResource SecondaryButton}"/>
+                                        </Grid>
+                                        <Label Content="API 地址"
+                                                x:Name="Label_OpenAIUrl"
+                                                Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_OpenAIUrl"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernTextBox}"/>
+                                        <CheckBox x:Name="CheckBox_OpenAI_EnableAdvanced"
+                                                Content="启用高级配置"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernCheckBox}"/>
+                                        <StackPanel x:Name="StackPanel_OpenAI_Advanced"
+                                                Margin="20,0,0,0"
+                                                IsEnabled="{Binding ElementName=CheckBox_OpenAI_EnableAdvanced, Path=IsChecked}">
+                                            <StackPanel Orientation="Horizontal"
+                                                    Margin="0,0,0,12">
+                                                <TextBlock Text="温度:"
+                                                        Width="80"
+                                                        VerticalAlignment="Center"
+                                                        x:Name="TextBlock_OpenAI_Temperature"
+                                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                                        FontSize="14"/>
+                                                <Slider x:Name="Slider_OpenAI_Temperature"
+                                                        Minimum="0"
+                                                        Maximum="2"
+                                                        Width="120"
+                                                        Margin="10,0"
+                                                        VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="TextBlock_OpenAI_TemperatureValue"
+                                                        Width="40"
+                                                        VerticalAlignment="Center"
+                                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                                        FontSize="14"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal"
+                                                    Margin="0,0,0,0">
+                                                <TextBlock Text="最大Token:"
+                                                        Width="80"
+                                                        VerticalAlignment="Center"
+                                                        x:Name="TextBlock_OpenAI_MaxTokens"
+                                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                                        FontSize="14"/>
+                                                <TextBox x:Name="TextBox_OpenAI_MaxTokens"
+                                                        Width="100"
+                                                        Margin="10,0"
+                                                        VerticalAlignment="Center"
+                                                        Style="{StaticResource ModernTextBox}"/>
+                                            </StackPanel>
+                                        </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal"
-                                            Margin="0,0,0,5">
-                                        <TextBlock Text="最大Token:"
-                                                Width="60"
-                                                VerticalAlignment="Center"
-                                                x:Name="TextBlock_OpenAI_MaxTokens"/>
-                                        <TextBox x:Name="TextBox_OpenAI_MaxTokens"
-                                                Width="80"
-                                                Margin="5,0"
-                                                VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </StackPanel>
+                                </Border>
+                            </ScrollViewer>
                         </TabItem>
                         <TabItem Header="Gemini"
-                                x:Name="Tab_Gemini">
-                            <StackPanel>
-                                <Label Content="API 密钥"
-                                        x:Name="Label_GeminiApiKey"/>
-                                <TextBox x:Name="TextBox_GeminiApiKey"/>
-                                <Label Content="模型"
-                                        x:Name="Label_GeminiModel"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ComboBox_GeminiModel"
-                                            Grid.Column="0"
-                                            IsEditable="True"/>
-                                    <Button x:Name="Button_RefreshGeminiModels"
-                                            Grid.Column="1"
-                                            Content="刷新"
-                                            Click="Button_RefreshGeminiModels_Click"
-                                            Margin="5,0,0,0"/>
-                                </Grid>
-                                <Label Content="API 地址"
-                                        x:Name="Label_GeminiUrl"/>
-                                <TextBox x:Name="TextBox_GeminiUrl"/>
-                                <TextBlock Text="注意：请提供正确的 API 端点 URL。"
-                                        TextWrapping="Wrap"
-                                        Foreground="Gray"
-                                        x:Name="TextBlock_GeminiApiEndpointNote"/>
-                                <CheckBox x:Name="CheckBox_Gemini_EnableAdvanced"
-                                        Content="启用高级配置"
-                                        Margin="0,10,0,5"/>
-                                <StackPanel x:Name="StackPanel_Gemini_Advanced"
-                                        IsEnabled="{Binding ElementName=CheckBox_Gemini_EnableAdvanced, Path=IsChecked}">
-                                    <StackPanel Orientation="Horizontal"
-                                            Margin="0,0,0,5">
-                                        <TextBlock Text="温度:"
-                                                Width="60"
-                                                VerticalAlignment="Center"
-                                                x:Name="TextBlock_Gemini_Temperature"/>
-                                        <Slider x:Name="Slider_Gemini_Temperature"
-                                                Minimum="0"
-                                                Maximum="2"
-                                                Width="100"
-                                                Margin="5,0"
-                                                VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TextBlock_Gemini_TemperatureValue"
-                                                Width="30"
-                                                VerticalAlignment="Center"/>
+                                x:Name="Tab_Gemini"
+                                Style="{StaticResource ModernTabItem}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Border Style="{StaticResource CardContainer}">
+                                    <StackPanel Style="{StaticResource SettingGroup}">
+                                        <Label Content="API 密钥"
+                                                x:Name="Label_GeminiApiKey"
+                                                Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_GeminiApiKey"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernTextBox}"/>
+                                        <Label Content="模型"
+                                                x:Name="Label_GeminiModel"
+                                                Style="{StaticResource SettingLabel}"/>
+                                        <Grid Margin="0,0,0,16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="ComboBox_GeminiModel"
+                                                    Grid.Column="0"
+                                                    IsEditable="True"/>
+                                            <Button x:Name="Button_RefreshGeminiModels"
+                                                    Grid.Column="1"
+                                                    Content="刷新"
+                                                    Click="Button_RefreshGeminiModels_Click"
+                                                    Margin="10,0,0,0"
+                                                    Style="{StaticResource SecondaryButton}"/>
+                                        </Grid>
+                                        <Label Content="API 地址"
+                                                x:Name="Label_GeminiUrl"
+                                                Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_GeminiUrl"
+                                                Margin="0,0,0,8"
+                                                Style="{StaticResource ModernTextBox}"/>
+                                        <TextBlock Text="注意：请提供正确的 API 端点 URL。"
+                                                TextWrapping="Wrap"
+                                                Foreground="{StaticResource SecondaryTextBrush}"
+                                                x:Name="TextBlock_GeminiApiEndpointNote"
+                                                FontSize="12"
+                                                Margin="0,0,0,16"/>
+                                        <CheckBox x:Name="CheckBox_Gemini_EnableAdvanced"
+                                                Content="启用高级配置"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernCheckBox}"/>
+                                        <StackPanel x:Name="StackPanel_Gemini_Advanced"
+                                                Margin="20,0,0,0"
+                                                IsEnabled="{Binding ElementName=CheckBox_Gemini_EnableAdvanced, Path=IsChecked}">
+                                            <StackPanel Orientation="Horizontal"
+                                                    Margin="0,0,0,12">
+                                                <TextBlock Text="温度:"
+                                                        Width="80"
+                                                        VerticalAlignment="Center"
+                                                        x:Name="TextBlock_Gemini_Temperature"
+                                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                                        FontSize="14"/>
+                                                <Slider x:Name="Slider_Gemini_Temperature"
+                                                        Minimum="0"
+                                                        Maximum="2"
+                                                        Width="120"
+                                                        Margin="10,0"
+                                                        VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="TextBlock_Gemini_TemperatureValue"
+                                                        Width="40"
+                                                        VerticalAlignment="Center"
+                                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                                        FontSize="14"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal"
+                                                    Margin="0,0,0,0">
+                                                <TextBlock Text="最大Token:"
+                                                        Width="80"
+                                                        VerticalAlignment="Center"
+                                                        x:Name="TextBlock_Gemini_MaxTokens"
+                                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                                        FontSize="14"/>
+                                                <TextBox x:Name="TextBox_Gemini_MaxTokens"
+                                                        Width="100"
+                                                        Margin="10,0"
+                                                        VerticalAlignment="Center"
+                                                        Style="{StaticResource ModernTextBox}"/>
+                                            </StackPanel>
+                                        </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal"
-                                            Margin="0,0,0,5">
-                                        <TextBlock Text="最大Token:"
-                                                Width="60"
-                                                VerticalAlignment="Center"
-                                                x:Name="TextBlock_Gemini_MaxTokens"/>
-                                        <TextBox x:Name="TextBox_Gemini_MaxTokens"
-                                                Width="80"
-                                                Margin="5,0"
-                                                VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </StackPanel>
+                                </Border>
+                            </ScrollViewer>
                         </TabItem>
                     </TabControl>
                 </Grid>
             </TabItem>
             <TabItem Header="代理"
-                    x:Name="Tab_Proxy">
-                <StackPanel Margin="10">
-                    <CheckBox x:Name="CheckBox_Proxy_IsEnabled"
-                            Content="启用代理"
-                            Margin="0,0,0,10"/>
-                    <StackPanel Margin="20,0,0,0"
-                            IsEnabled="{Binding ElementName=CheckBox_Proxy_IsEnabled, Path=IsChecked}">
-                        <CheckBox x:Name="CheckBox_Proxy_FollowSystemProxy"
-                                Content="跟随系统代理"
-                                Margin="0,0,0,10"/>
-                        <StackPanel IsEnabled="{Binding ElementName=CheckBox_Proxy_FollowSystemProxy, Path=IsChecked, Converter={StaticResource BoolInverter}}">
-                            <Label Content="协议"
-                                    x:Name="Label_Proxy_Protocol"/>
-                            <StackPanel Orientation="Horizontal"
-                                    Margin="0,0,0,10">
-                                <RadioButton x:Name="RadioButton_Proxy_Http"
-                                        Content="HTTP"
-                                        GroupName="ProxyProtocol"
-                                        IsChecked="True"/>
-                                <RadioButton x:Name="RadioButton_Proxy_Socks"
-                                        Content="SOCKS5"
-                                        GroupName="ProxyProtocol"
-                                        Margin="10,0,0,0"/>
+                    x:Name="Tab_Proxy"
+                    Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Style="{StaticResource CardContainer}">
+                        <StackPanel Style="{StaticResource SettingGroup}">
+                            <CheckBox x:Name="CheckBox_Proxy_IsEnabled"
+                                    Content="启用代理"
+                                    Margin="0,0,0,16"
+                                    Style="{StaticResource ModernCheckBox}"/>
+                            <StackPanel Margin="20,0,0,0"
+                                    IsEnabled="{Binding ElementName=CheckBox_Proxy_IsEnabled, Path=IsChecked}">
+                                <CheckBox x:Name="CheckBox_Proxy_FollowSystemProxy"
+                                        Content="跟随系统代理"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <StackPanel IsEnabled="{Binding ElementName=CheckBox_Proxy_FollowSystemProxy, Path=IsChecked, Converter={StaticResource BoolInverter}}">
+                                    <Label Content="协议"
+                                            x:Name="Label_Proxy_Protocol"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,0,16">
+                                        <RadioButton x:Name="RadioButton_Proxy_Http"
+                                                Content="HTTP"
+                                                GroupName="ProxyProtocol"
+                                                IsChecked="True"
+                                                Style="{StaticResource ModernRadioButton}"/>
+                                        <RadioButton x:Name="RadioButton_Proxy_Socks"
+                                                Content="SOCKS5"
+                                                GroupName="ProxyProtocol"
+                                                Margin="20,0,0,0"
+                                                Style="{StaticResource ModernRadioButton}"/>
+                                    </StackPanel>
+                                    <Label Content="代理地址"
+                                            x:Name="Label_Proxy_Address"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_Proxy_Address"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+                                <Label Content="代理范围"
+                                        Margin="0,8,0,0"
+                                        x:Name="Label_Proxy_Scope"
+                                        Style="{StaticResource SettingLabel}"/>
+                                <CheckBox x:Name="CheckBox_Proxy_ForAllAPI"
+                                        Content="全部API代理"
+                                        Margin="0,0,0,12"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <StackPanel Margin="20,0,0,0"
+                                        IsEnabled="{Binding ElementName=CheckBox_Proxy_ForAllAPI, Path=IsChecked, Converter={StaticResource BoolInverter}}">
+                                    <CheckBox x:Name="CheckBox_Proxy_ForOllama"
+                                            Content="Ollama"
+                                            Margin="0,0,0,8"
+                                            IsChecked="True"
+                                            Style="{StaticResource ModernCheckBox}"/>
+                                    <CheckBox x:Name="CheckBox_Proxy_ForOpenAI"
+                                            Content="OpenAI"
+                                            Margin="0,0,0,8"
+                                            IsChecked="True"
+                                            Style="{StaticResource ModernCheckBox}"/>
+                                    <CheckBox x:Name="CheckBox_Proxy_ForGemini"
+                                            Content="Gemini"
+                                            Margin="0,0,0,8"
+                                            IsChecked="True"
+                                            Style="{StaticResource ModernCheckBox}"/>
+                                </StackPanel>
+                                <CheckBox x:Name="CheckBox_Proxy_ForMcp"
+                                        Content="MCP"
+                                        Margin="0,0,0,8"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_Proxy_ForPlugin"
+                                        Content="插件"
+                                        Margin="0,0,0,0"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
                             </StackPanel>
-                            <Label Content="代理地址"
-                                    x:Name="Label_Proxy_Address"/>
-                            <TextBox x:Name="TextBox_Proxy_Address"
-                                    Margin="0,0,0,10"/>
                         </StackPanel>
-                        <Label Content="代理范围"
-                                Margin="0,10,0,0"
-                                x:Name="Label_Proxy_Scope"/>
-                        <CheckBox x:Name="CheckBox_Proxy_ForAllAPI"
-                                Content="全部API代理"
-                                Margin="0,5,0,0"
-                                IsChecked="True"/>
-                        <StackPanel Margin="20,0,0,0"
-                                IsEnabled="{Binding ElementName=CheckBox_Proxy_ForAllAPI, Path=IsChecked, Converter={StaticResource BoolInverter}}">
-                            <CheckBox x:Name="CheckBox_Proxy_ForOllama"
-                                    Content="Ollama"
-                                    Margin="0,5,0,0"
-                                    IsChecked="True"/>
-                            <CheckBox x:Name="CheckBox_Proxy_ForOpenAI"
-                                    Content="OpenAI"
-                                    Margin="0,5,0,0"
-                                    IsChecked="True"/>
-                            <CheckBox x:Name="CheckBox_Proxy_ForGemini"
-                                    Content="Gemini"
-                                    Margin="0,5,0,0"
-                                    IsChecked="True"/>
-                        </StackPanel>
-                        <CheckBox x:Name="CheckBox_Proxy_ForMcp"
-                                Content="MCP"
-                                Margin="0,5,0,0"
-                                IsChecked="True"/>
-                        <CheckBox x:Name="CheckBox_Proxy_ForPlugin"
-                                Content="插件"
-                                Margin="0,5,0,0"
-                                IsChecked="True"/>
-                    </StackPanel>
-                </StackPanel>
+                    </Border>
+                </ScrollViewer>
             </TabItem>
             <TabItem Header="语言"
-                    x:Name="Tab_Language">
-                <StackPanel>
-                    <Label Content="界面语言"
-                            x:Name="Label_Language"/>
-                    <ComboBox x:Name="ComboBox_Language"
-                            Margin="0,0,0,10"/>
-                    <Label Content="AI提示词语言"
-                            x:Name="Label_PromptLanguage"/>
-                    <ComboBox x:Name="ComboBox_PromptLanguage"
-                            Margin="0,0,0,10"/>
-                    <TextBlock x:Name="TextBlock_PromptLanguageTooltip"
-                            TextWrapping="Wrap"
-                            Foreground="Gray"/>
-                </StackPanel>
+                    x:Name="Tab_Language"
+                    Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Style="{StaticResource CardContainer}">
+                        <StackPanel Style="{StaticResource SettingGroup}">
+                            <Label Content="界面语言"
+                                    x:Name="Label_Language"
+                                    Style="{StaticResource SettingLabel}"/>
+                            <ComboBox x:Name="ComboBox_Language"
+                                    Margin="0,0,0,16"/>
+                            <Label Content="AI提示词语言"
+                                    x:Name="Label_PromptLanguage"
+                                    Style="{StaticResource SettingLabel}"/>
+                            <ComboBox x:Name="ComboBox_PromptLanguage"
+                                    Margin="0,0,0,8"/>
+                            <TextBlock x:Name="TextBlock_PromptLanguageTooltip"
+                                    TextWrapping="Wrap"
+                                    Foreground="{StaticResource SecondaryTextBrush}"
+                                    FontSize="12"
+                                    Margin="0,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
             </TabItem>
             <TabItem Header="高级选项"
-                    x:Name="Tab_Advanced">
-                <StackPanel>
-                    <CheckBox x:Name="CheckBox_EnableAction"
-                            Content="启动智能桌面宠物"
-                            Margin="0,10,0,5"
-                            IsChecked="True">
-                        <CheckBox.ToolTip>
-                            <ToolTip>
-                                <TextBlock Text="启用此功能会增加 Token 消耗，因为它会向 AI 发送额外的数据。"/>
-                            </ToolTip>
-                        </CheckBox.ToolTip>
-                    </CheckBox>
-                    <StackPanel Margin="20,0,0,0">
-                        <CheckBox x:Name="CheckBox_EnableBuy"
-                                Content="允许宠物购买东西"
-                                IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
-                                IsChecked="True"/>
-                        <CheckBox x:Name="CheckBox_EnableState"
-                                Content="允许获取宠物状态"
-                                IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
-                                IsChecked="True"/>
-                        <CheckBox x:Name="CheckBox_EnableActionExecution"
-                                Content="允许宠物执行动作"
-                                IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
-                                IsChecked="True"/>
-                        <CheckBox x:Name="CheckBox_EnableMove"
-                                Content="允许宠物移动"
-                                IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
-                                IsChecked="True"/>
-                        <CheckBox x:Name="CheckBox_EnableTime"
-                                Content="允许获取当前时间"
-                                IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
-                                IsChecked="True"/>
-                        <CheckBox x:Name="CheckBox_EnableHistoryCompression"
-                                Content="启用聊天记录压缩"
-                                Margin="0,10,0,5"/>
-                        <StackPanel Orientation="Horizontal"
-                                Margin="20,0,0,0">
-                            <TextBlock Text="压缩阈值:"
-                                    VerticalAlignment="Center"
-                                    x:Name="TextBlock_HistoryCompressionThreshold"/>
-                            <TextBox x:Name="TextBox_HistoryCompressionThreshold"
-                                    Width="50"
-                                    Margin="5,0"/>
-                            <TextBlock Text="当前上下文长度:"
-                                    VerticalAlignment="Center"
-                                    Margin="10,0,0,0"
-                                    x:Name="TextBlock_CurrentContextLengthLabel"/>
-                            <TextBlock x:Name="TextBlock_CurrentContextLength"
-                                    VerticalAlignment="Center"/>
+                    x:Name="Tab_Advanced"
+                    Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Style="{StaticResource CardContainer}">
+                        <StackPanel Style="{StaticResource SettingGroup}">
+                            <CheckBox x:Name="CheckBox_EnableAction"
+                                    Content="启动智能桌面宠物"
+                                    Margin="0,0,0,16"
+                                    IsChecked="True"
+                                    Style="{StaticResource ModernCheckBox}">
+                                <CheckBox.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock Text="启用此功能会增加 Token 消耗，因为它会向 AI 发送额外的数据。"/>
+                                    </ToolTip>
+                                </CheckBox.ToolTip>
+                            </CheckBox>
+                            <StackPanel Margin="20,0,0,0">
+                                <CheckBox x:Name="CheckBox_EnableBuy"
+                                        Content="允许宠物购买东西"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
+                                        IsChecked="True"
+                                        Margin="0,0,0,8"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableState"
+                                        Content="允许获取宠物状态"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
+                                        IsChecked="True"
+                                        Margin="0,0,0,8"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableActionExecution"
+                                        Content="允许宠物执行动作"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
+                                        IsChecked="True"
+                                        Margin="0,0,0,8"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableMove"
+                                        Content="允许宠物移动"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
+                                        IsChecked="True"
+                                        Margin="0,0,0,8"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableTime"
+                                        Content="允许获取当前时间"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
+                                        IsChecked="True"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableHistoryCompression"
+                                        Content="启用聊天记录压缩"
+                                        Margin="0,0,0,12"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="20,0,0,0">
+                                    <TextBlock Text="压缩阈值:"
+                                            VerticalAlignment="Center"
+                                            x:Name="TextBlock_HistoryCompressionThreshold"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="80"/>
+                                    <TextBox x:Name="TextBox_HistoryCompressionThreshold"
+                                            Width="60"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="当前上下文长度:"
+                                            VerticalAlignment="Center"
+                                            Margin="20,0,5,0"
+                                            x:Name="TextBlock_CurrentContextLengthLabel"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"/>
+                                    <TextBlock x:Name="TextBlock_CurrentContextLength"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                            FontSize="14"/>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
-                </StackPanel>
+                    </Border>
+                </ScrollViewer>
             </TabItem>
             <TabItem Header="工具列表"
-                    x:Name="Tab_Tools">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <DataGrid x:Name="DataGrid_Tools"
-                            AutoGenerateColumns="False"
-                            CanUserAddRows="False"
-                            Margin="5">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="名称"
+                    x:Name="Tab_Tools"
+                    Style="{StaticResource ModernTabItem}">
+                <Border Style="{StaticResource CardContainer}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <DataGrid x:Name="DataGrid_Tools"
+                                AutoGenerateColumns="False"
+                                CanUserAddRows="False"
+                                Margin="0"
+                                RowHeight="60"
+                                GridLinesVisibility="Horizontal"
+                                HeadersVisibility="Column"
+                                AlternatingRowBackground="#F8F9FA"
+                                Style="{StaticResource ModernDataGrid}"
+                                ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="名称"
                                     Binding="{Binding Name}"
-                                    Width="*"/>
-                            <DataGridTextColumn Header="URL"
+                                    Width="120"
+                                    MinWidth="100">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Padding" Value="12,8"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="URL"
                                     Binding="{Binding Url}"
-                                    Width="2*"/>
-                            <DataGridTextColumn Header="API Key"
+                                    Width="200"
+                                    MinWidth="150">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Padding" Value="12,8"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="ToolTip" Value="{Binding Url}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="API Key"
                                     Binding="{Binding ApiKey}"
-                                    Width="2*"/>
-                            <DataGridCheckBoxColumn Header="启用"
-                                    Binding="{Binding IsEnabled}"
-                                    Width="Auto"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                    <TextBlock Text="此列表用于配置 MCP (Model-Controlled Plugin) 工具"
-                            Grid.Row="1"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Center"
-                            Margin="5"
-                            x:Name="TextBlock_ToolsDescription"/>
-                    <StackPanel Grid.Row="1"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Right"
-                            Margin="5">
-                        <Button Content="添加"
-                                Click="Button_AddTool_Click"
-                                Margin="5"
-                                x:Name="Button_AddTool"/>
-                        <Button Content="删除"
-                                Click="Button_DeleteTool_Click"
-                                Margin="5"
-                                x:Name="Button_DeleteTool"/>
-                    </StackPanel>
-                </Grid>
+                                    Width="150"
+                                    MinWidth="120">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Padding" Value="12,8"/>
+                                            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="FontFamily" Value="Consolas"/>
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="ToolTip" Value="{Binding ApiKey}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="描述"
+                                    Binding="{Binding Description}"
+                                    Width="*"
+                                    MinWidth="200">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Padding" Value="12,8"/>
+                                            <Setter Property="TextWrapping" Value="Wrap"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                                            <Setter Property="LineHeight" Value="18"/>
+                                            <Setter Property="MaxHeight" Value="44"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTemplateColumn Header="启用"
+                                    Width="80">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Style="{StaticResource ModernCheckBox}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Grid Grid.Row="1" Margin="0,16,0,0">
+                            <TextBlock Text="此列表用于配置 MCP (Model-Controlled Plugin) 工具"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    x:Name="TextBlock_ToolsDescription"
+                                    Foreground="{StaticResource SecondaryTextBrush}"
+                                    FontSize="12"/>
+                            <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right">
+                                <Button Content="添加"
+                                        Click="Button_AddTool_Click"
+                                        Margin="0,0,8,0"
+                                        x:Name="Button_AddTool"
+                                        Style="{StaticResource PrimaryButton}"/>
+                                <Button Content="删除"
+                                        Click="Button_DeleteTool_Click"
+                                        x:Name="Button_DeleteTool"
+                                        Style="{StaticResource SecondaryButton}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
             </TabItem>
             <TabItem Header="日志"
-                    x:Name="Tab_Log">
-                <GroupBox Header="日志"
-                        Margin="0,10,0,0">
+                    x:Name="Tab_Log"
+                    Style="{StaticResource ModernTabItem}">
+                <Border Style="{StaticResource CardContainer}">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Top"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Left"
-                                Margin="5">
+                                Margin="0,0,0,16">
                             <CheckBox x:Name="CheckBox_LogAutoScroll"
                                     Content="自动滚动"
-                                    Margin="0,0,10,0"/>
+                                    Margin="0,0,20,0"
+                                    Style="{StaticResource ModernCheckBox}"/>
                             <TextBlock Text="最大日志数量:"
                                     VerticalAlignment="Center"
-                                    Margin="0,0,5,0"
-                                    x:Name="TextBlock_MaxLogCount"/>
+                                    Margin="0,0,8,0"
+                                    x:Name="TextBlock_MaxLogCount"
+                                    Foreground="{StaticResource PrimaryTextBrush}"
+                                    FontSize="14"/>
                             <TextBox x:Name="TextBox_MaxLogCount"
-                                    Width="60"
+                                    Width="80"
                                     VerticalAlignment="Center"
-                                    Margin="0,0,10,0"/>
+                                    Style="{StaticResource ModernTextBox}"/>
                         </StackPanel>
                         <StackPanel DockPanel.Dock="Bottom"
                                 Orientation="Horizontal"
-                                HorizontalAlignment="Right">
+                                HorizontalAlignment="Right"
+                                Margin="0,16,0,0">
                             <Button x:Name="Button_CopyLog"
                                     Content="复制"
                                     Click="Button_CopyLog_Click"
-                                    Margin="5"/>
+                                    Margin="0,0,8,0"
+                                    Style="{StaticResource SecondaryButton}"/>
                             <Button x:Name="Button_ClearLog"
                                     Content="清空"
                                     Click="Button_ClearLog_Click"
-                                    Margin="5"/>
+                                    Style="{StaticResource SecondaryButton}"/>
                         </StackPanel>
                         <ListBox x:Name="LogBox"
-                                MinHeight="100"/>
+                                MinHeight="200"
+                                Background="{StaticResource BackgroundBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"/>
                     </DockPanel>
-                </GroupBox>
+                </Border>
             </TabItem>
             <TabItem Header="插件"
-                    x:Name="Tab_Plugin">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Right">
-                        <TextBlock x:Name="TextBlock_HowToUse"
-                                VerticalAlignment="Center"
-                                Margin="0,0,10,0">
-                            <Run Text="如何使用？查看"/>
-                            <Hyperlink NavigateUri="https://github.com/ycxom/VPetLLM_Plugin"
-                                    RequestNavigate="Hyperlink_RequestNavigate">
-                                <Run Text="https://github.com/ycxom/VPetLLM_Plugin"/>
-                            </Hyperlink>
-                        </TextBlock>
-                        <Button x:Name="Button_RefreshPlugins"
-                                Content="刷新"
-                                Margin="5"
-                                Click="Button_RefreshPlugins_Click"/>
-                        <Button x:Name="Button_ImportPlugin"
-                                Content="导入插件"
-                                Margin="5"
-                                Click="Button_ImportPlugin_Click"/>
-                    </StackPanel>
-                    <DataGrid x:Name="DataGrid_Plugins"
-                            Grid.Row="1"
-                            AutoGenerateColumns="False"
-                            CanUserAddRows="False"
-                            Margin="5">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="启用"
-                                    Width="Auto">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
+                    x:Name="Tab_Plugin"
+                    Style="{StaticResource ModernTabItem}">
+                <Border Style="{StaticResource CardContainer}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" MinHeight="51.78"/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Margin="0,0,0,16" Width="510">
+                            <TextBlock x:Name="TextBlock_HowToUse"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,16,0"
+                                    Foreground="{StaticResource SecondaryTextBrush}"
+                                    FontSize="12">
+                                <Run Text="如何使用？查看"/>
+                                <Hyperlink NavigateUri="https://github.com/ycxom/VPetLLM_Plugin"
+                                        RequestNavigate="Hyperlink_RequestNavigate"
+                                        Foreground="{StaticResource AccentBrush}">
+                                    <Run Text="https://github.com/ycxom/VPetLLM_Plugin"/>
+                                </Hyperlink>
+                            </TextBlock>
+                            <Button x:Name="Button_RefreshPlugins"
+                                    Content="刷新"
+                                    Margin="0,0,8,0"
+                                    Click="Button_RefreshPlugins_Click"
+                                    Style="{StaticResource SecondaryButton}"/>
+                            <Button x:Name="Button_ImportPlugin"
+                                    Content="导入插件"
+                                    Click="Button_ImportPlugin_Click"
+                                    Style="{StaticResource PrimaryButton}"/>
+                        </StackPanel>
+                        <DataGrid x:Name="DataGrid_Plugins"
+                                Grid.Row="1"
+                                AutoGenerateColumns="False"
+                                CanUserAddRows="False"
+                                SelectionChanged="DataGrid_Plugins_SelectionChanged"
+                                RowHeight="80"
+                                GridLinesVisibility="Horizontal"
+                                HeadersVisibility="Column"
+                                AlternatingRowBackground="#F8F9FA"
+                                Style="{StaticResource ModernDataGrid}"
+                                ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="启用"
+                                    Width="60">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
                                                 IsEnabled="{Binding IsFailed, Converter={StaticResource BoolInverter}}"
-                                                Click="PluginEnabled_Click"/>
-
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Width="Auto">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Icon}"
-                                                FontFamily="Segoe MDL2 Assets"
-                                                VerticalAlignment="Center"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="名称"
-                                    Binding="{Binding Name}"
-                                    Width="*"
-                                    IsReadOnly="True">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsFailed}"
-                                                    Value="True">
-                                                <Setter Property="Foreground"
-                                                        Value="Red"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="作者"
-                                    Binding="{Binding Author}"
-                                    Width="0.8*"
-                                    IsReadOnly="True"/>
-                            <DataGridTextColumn Header="描述"
-                                    Binding="{Binding Description}"
-                                    Width="2*"
-                                    IsReadOnly="True"/>
-                            <DataGridTemplateColumn Header="操作"
-                                    Width="Auto">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <WrapPanel Orientation="Horizontal" MaxWidth="120">
-                                            <Button Content="{Binding ActionText}"
-                                                    Click="Button_PluginAction_Click" Margin="0,2,5,2"/>
-                                            <Button Content="{Binding SettingActionText}"
-                                                    Click="Button_PluginSetting_Click"
-                                                    Margin="0,2,5,2">
-                                                <Button.Style>
-                                                    <Style TargetType="Button">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding HasSettingAction}" Value="True">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
-                                            <Button Content="{Binding UninstallActionText}"
-                                                    Click="Button_UninstallPlugin_Click"
-                                                    Margin="0,2,5,2">
-                                                <Button.Style>
-                                                    <Style TargetType="Button">
-                                                        <Setter Property="Visibility"
-                                                                Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <MultiDataTrigger>
-                                                                <MultiDataTrigger.Conditions>
-                                                                    <Condition Binding="{Binding IsLocal}"
-                                                                            Value="True"/>
-                                                                    <Condition Binding="{Binding IsUpdatable}"
-                                                                            Value="True"/>
-                                                                </MultiDataTrigger.Conditions>
-                                                                <Setter Property="Visibility"
-                                                                        Value="Visible"/>
-                                                            </MultiDataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
-                                            <TextBlock Text="{Binding UpdateAvailableText}"
-                                                    Foreground="Green"
-                                                    Margin="5,0,0,0"
+                                                Click="PluginEnabled_Click"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Style="{StaticResource ModernCheckBox}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="图标" Width="50">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{StaticResource AccentBrush}"
+                                                    CornerRadius="20"
+                                                    Width="32"
+                                                    Height="32"
+                                                    HorizontalAlignment="Center"
                                                     VerticalAlignment="Center">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Visibility"
-                                                                Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsUpdatable}"
-                                                                    Value="True">
-                                                                <Setter Property="Visibility"
-                                                                        Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                        </WrapPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Grid>
+                                                <TextBlock Text="{Binding Icon}"
+                                                    FontFamily="Segoe MDL2 Assets"
+                                                    FontSize="16"
+                                                    Foreground="White"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="名称"
+                                    Binding="{Binding Name}"
+                                    Width="150"
+                                    MinWidth="120"
+                                    IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Padding" Value="12,8"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="ToolTip" Value="{Binding Name}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsFailed}"
+                                                    Value="True">
+                                                    <Setter Property="Foreground"
+                                                        Value="#E74C3C"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsFailed}"
+                                                    Value="False">
+                                                    <Setter Property="Foreground"
+                                                        Value="{StaticResource PrimaryTextBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="作者"
+                                    Binding="{Binding Author}"
+                                    Width="120"
+                                    MinWidth="100"
+                                    IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Padding" Value="12,8"/>
+                                            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="ToolTip" Value="{Binding Author}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="描述"
+                                    Binding="{Binding Description}"
+                                    Width="*"
+                                    MinWidth="250"
+                                    IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Padding" Value="12,8"/>
+                                            <Setter Property="TextWrapping" Value="Wrap"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                                            <Setter Property="LineHeight" Value="18"/>
+                                            <Setter Property="MaxHeight" Value="64"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTemplateColumn Header="操作"
+                                    Width="180"
+                                    MinWidth="160">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Vertical" 
+                                                       Margin="8,4"
+                                                       VerticalAlignment="Center">
+                                                <WrapPanel Orientation="Horizontal" 
+                                                          HorizontalAlignment="Left">
+                                                    <Button Content="{Binding ActionText}"
+                                                        Click="Button_PluginAction_Click" 
+                                                        Margin="0,2,4,2"
+                                                        Padding="8,4"
+                                                        FontSize="12"
+                                                        MinWidth="60"
+                                                        Style="{StaticResource PrimaryButton}"/>
+                                                    <Button Content="{Binding SettingActionText}"
+                                                        Click="Button_PluginSetting_Click"
+                                                        Margin="0,2,4,2">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Setter Property="Padding" Value="8,4"/>
+                                                                <Setter Property="FontSize" Value="12"/>
+                                                                <Setter Property="MinWidth" Value="50"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasSettingAction}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                    <Button Content="{Binding UninstallActionText}"
+                                                        Click="Button_UninstallPlugin_Click"
+                                                        Margin="0,2,0,2">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Setter Property="Padding" Value="8,4"/>
+                                                                <Setter Property="FontSize" Value="12"/>
+                                                                <Setter Property="MinWidth" Value="50"/>
+                                                                <Style.Triggers>
+                                                                    <MultiDataTrigger>
+                                                                        <MultiDataTrigger.Conditions>
+                                                                            <Condition Binding="{Binding IsLocal}" Value="True"/>
+                                                                            <Condition Binding="{Binding IsUpdatable}" Value="True"/>
+                                                                        </MultiDataTrigger.Conditions>
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </MultiDataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                </WrapPanel>
+                                                <Border Background="#E8F5E8"
+                                                       CornerRadius="12"
+                                                       Padding="8,4"
+                                                       Margin="0,4,0,0"
+                                                       HorizontalAlignment="Left">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsUpdatable}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding UpdateAvailableText}"
+                                                              Foreground="#27AE60"
+                                                              FontSize="11"
+                                                              FontWeight="Medium"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </Border>
             </TabItem>
         </TabControl>
     </Grid>

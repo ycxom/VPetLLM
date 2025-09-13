@@ -1,13 +1,44 @@
 <Window x:Class="VPetLLM.UI.Windows.winUninstallConfirm"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="确认卸载" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterScreen">
-    <StackPanel Margin="15">
-        <TextBlock Text="确定要卸载此插件吗？此操作将删除插件文件，且不可恢复。" TextWrapping="Wrap" MaxWidth="300" Margin="0,0,0,15" x:Name="TextBlock_Message"/>
-        <CheckBox x:Name="CheckBox_DoNotShowAgain" Content="不再提醒" Margin="0,0,0,15"/>
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="Button_Yes" Content="是" Width="75" Margin="5" Click="Button_Yes_Click"/>
-            <Button x:Name="Button_No" Content="否" Width="75" Margin="5" IsCancel="True" Click="Button_No_Click"/>
+        Title="确认卸载" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource PrimaryBackgroundBrush}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    
+    <Border Style="{StaticResource CardContainer}" Margin="20">
+        <StackPanel>
+            <TextBlock Text="确定要卸载此插件吗？此操作将删除插件文件，且不可恢复。" 
+                       TextWrapping="Wrap" 
+                       MaxWidth="300" 
+                       Margin="0,0,0,20" 
+                       x:Name="TextBlock_Message"
+                       Foreground="{DynamicResource PrimaryTextBrush}"
+                       FontSize="14"
+                       LineHeight="20"/>
+            <CheckBox x:Name="CheckBox_DoNotShowAgain" 
+                      Content="不再提醒" 
+                      Margin="0,0,0,20"
+                      Style="{StaticResource ModernCheckBox}"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="Button_Yes" 
+                        Content="确认卸载" 
+                        Width="90" 
+                        Margin="0,0,10,0" 
+                        Click="Button_Yes_Click"
+                        Style="{StaticResource ModernButton}"/>
+                <Button x:Name="Button_No" 
+                        Content="取消" 
+                        Width="75" 
+                        IsCancel="True" 
+                        Click="Button_No_Click"
+                        Style="{StaticResource SecondaryButton}"/>
+            </StackPanel>
         </StackPanel>
-    </StackPanel>
+    </Border>
 </Window>

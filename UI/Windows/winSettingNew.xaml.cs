@@ -262,11 +262,9 @@ namespace VPetLLM.UI.Windows
             }
             _plugin.Settings.PromptLanguage = (string)promptlanguageComboBox.SelectedItem == "English" ? "en" : "zh";
             _plugin.Settings.FollowVPetName = followVPetNameCheckBox.IsChecked ?? true;
-            if(!_plugin.Settings.FollowVPetName)
-            {
-                _plugin.Settings.AiName = aiNameTextBox.Text;
-                _plugin.Settings.UserName = userNameTextBox.Text;
-            }
+            // 始终保存AI名称和用户名，让程序逻辑决定是否使用
+            _plugin.Settings.AiName = aiNameTextBox.Text;
+            _plugin.Settings.UserName = userNameTextBox.Text;
             _plugin.Settings.Role = roleTextBox.Text;
             _plugin.Settings.Ollama.Url = ollamaUrlTextBox.Text;
             _plugin.Settings.Ollama.Model = ollamaModelComboBox.Text;
@@ -470,6 +468,12 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+        private void DataGrid_Plugins_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // 插件选择变化时的处理逻辑
+            // 这里可以添加需要的逻辑，目前保持空实现以避免编译错误
+        }
+
         private void Button_ImportPlugin_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
@@ -579,10 +583,14 @@ namespace VPetLLM.UI.Windows
             if (FindName("Button_DeleteTool") is Button buttonDeleteTool) buttonDeleteTool.Content = LanguageHelper.Get("Tools.Delete", langCode);
             if (FindName("DataGrid_Tools") is DataGrid dataGridTools)
             {
-                dataGridTools.Columns[0].Header = LanguageHelper.Get("Tools.Name", langCode);
-                dataGridTools.Columns[1].Header = LanguageHelper.Get("Tools.URL", langCode);
-                dataGridTools.Columns[2].Header = LanguageHelper.Get("Tools.ApiKey", langCode);
-                dataGridTools.Columns[3].Header = LanguageHelper.Get("Tools.Enabled", langCode);
+                if (dataGridTools.Columns.Count >= 5)
+                {
+                    dataGridTools.Columns[0].Header = LanguageHelper.Get("Tools.Name", langCode);
+                    dataGridTools.Columns[1].Header = LanguageHelper.Get("Tools.URL", langCode);
+                    dataGridTools.Columns[2].Header = LanguageHelper.Get("Tools.ApiKey", langCode);
+                    dataGridTools.Columns[3].Header = LanguageHelper.Get("Tools.Description", langCode);
+                    dataGridTools.Columns[4].Header = LanguageHelper.Get("Tools.Enabled", langCode);
+                }
             }
 
             if (FindName("CheckBox_LogAutoScroll") is CheckBox checkBoxLogAutoScroll) checkBoxLogAutoScroll.Content = LanguageHelper.Get("Log.AutoScroll", langCode);
