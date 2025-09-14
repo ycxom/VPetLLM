@@ -36,6 +36,7 @@ namespace VPetLLM
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         public bool ShowUninstallWarning { get; set; } = true;
         public ProxySetting Proxy { get; set; } = new ProxySetting();
+        public PluginStoreSetting PluginStore { get; set; } = new PluginStoreSetting();
         private readonly string _path;
 
         public Setting(string path)
@@ -49,6 +50,10 @@ namespace VPetLLM
             if (Proxy == null)
             {
                 Proxy = new ProxySetting();
+            }
+            if (PluginStore == null)
+            {
+                PluginStore = new PluginStoreSetting();
             }
         }
 
@@ -113,6 +118,12 @@ namespace VPetLLM
             public bool ForGemini { get; set; } = true;
             public bool ForMcp { get; set; } = true;
             public bool ForPlugin { get; set; } = true;
+        }
+
+        public class PluginStoreSetting
+        {
+            public bool UseProxy { get; set; } = true;
+            public string ProxyUrl { get; set; } = "https://ghfast.top";
         }
     }
 }

@@ -113,6 +113,10 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).Click += Control_Click;
 
+            // Plugin Store Proxy settings
+            ((CheckBox)this.FindName("CheckBox_PluginStore_UseProxy")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).TextChanged += Control_TextChanged;
+
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
         }
 
@@ -231,6 +235,14 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked = _plugin.Settings.Proxy.ForGemini;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked = _plugin.Settings.Proxy.ForMcp;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked = _plugin.Settings.Proxy.ForPlugin;
+
+            // Plugin Store Proxy settings
+            if (_plugin.Settings.PluginStore == null)
+            {
+                _plugin.Settings.PluginStore = new Setting.PluginStoreSetting();
+            }
+            ((CheckBox)this.FindName("CheckBox_PluginStore_UseProxy")).IsChecked = _plugin.Settings.PluginStore.UseProxy;
+            ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).Text = _plugin.Settings.PluginStore.ProxyUrl;
         }
 
         private void SaveSettings()
@@ -343,6 +355,10 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Proxy.ForGemini = ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForMcp = ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForPlugin = ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked ?? true;
+
+            // Plugin Store Proxy settings
+            _plugin.Settings.PluginStore.UseProxy = ((CheckBox)this.FindName("CheckBox_PluginStore_UseProxy")).IsChecked ?? true;
+            _plugin.Settings.PluginStore.ProxyUrl = ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).Text;
 
             _plugin.Settings.Save();
 
@@ -805,6 +821,12 @@ namespace VPetLLM.UI.Windows
             if (FindName("CheckBox_Proxy_ForGemini") is CheckBox checkBoxProxyForGemini) checkBoxProxyForGemini.Content = LanguageHelper.Get("Proxy.ForGemini", langCode);
             if (FindName("CheckBox_Proxy_ForMcp") is CheckBox checkBoxProxyForMcp) checkBoxProxyForMcp.Content = LanguageHelper.Get("Proxy.ForMcp", langCode);
             if (FindName("CheckBox_Proxy_ForPlugin") is CheckBox checkBoxProxyForPlugin) checkBoxProxyForPlugin.Content = LanguageHelper.Get("Proxy.ForPlugin", langCode);
+
+            // Plugin Store Proxy UI
+            if (FindName("Label_PluginStore_Proxy") is Label labelPluginStoreProxy) labelPluginStoreProxy.Content = LanguageHelper.Get("PluginStore.ProxySettings", langCode);
+            if (FindName("CheckBox_PluginStore_UseProxy") is CheckBox checkBoxPluginStoreUseProxy) checkBoxPluginStoreUseProxy.Content = LanguageHelper.Get("PluginStore.EnableProxy", langCode);
+            if (FindName("Label_PluginStore_ProxyUrl") is Label labelPluginStoreProxyUrl) labelPluginStoreProxyUrl.Content = LanguageHelper.Get("PluginStore.ProxyUrl", langCode);
+            if (FindName("TextBlock_PluginStore_ProxyUrlNote") is TextBlock textBlockPluginStoreProxyUrlNote) textBlockPluginStoreProxyUrlNote.Text = LanguageHelper.Get("PluginStore.ProxyUrlNote", langCode);
         }
 
         private async void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
@@ -825,7 +847,8 @@ namespace VPetLLM.UI.Windows
                 {
                     using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
                     {
-                        var json = await client.GetStringAsync("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
+                        var pluginListUrl = GetPluginStoreUrl("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
+                        var json = await client.GetStringAsync(pluginListUrl);
                         remotePlugins = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
                 }
             }
@@ -1102,7 +1125,8 @@ namespace VPetLLM.UI.Windows
             {
                 using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
                 {
-                    var data = await client.GetByteArrayAsync(plugin.FileUrl);
+                    var downloadUrl = GetPluginStoreUrl(plugin.FileUrl);
+                    var data = await client.GetByteArrayAsync(downloadUrl);
                     using (var sha256 = SHA256.Create())
                     {
                         var hash = sha256.ComputeHash(data);
@@ -1150,29 +1174,48 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+        private string GetPluginStoreUrl(string originalUrl)
+        {
+            var pluginStoreSettings = _plugin.Settings.PluginStore;
+            if (pluginStoreSettings != null && pluginStoreSettings.UseProxy && !string.IsNullOrEmpty(pluginStoreSettings.ProxyUrl))
+            {
+                // 移除原URL中的协议部分，然后拼接代理地址
+                var uri = new Uri(originalUrl);
+                var pathAndQuery = originalUrl.Substring(uri.Scheme.Length + 3); // 移除 "https://" 或 "http://"
+                return $"{pluginStoreSettings.ProxyUrl.TrimEnd('/')}/{pathAndQuery}";
+            }
+            return originalUrl;
+        }
+
         private System.Net.IWebProxy GetPluginStoreProxy()
         {
-            var proxySettings = _plugin.Settings.Proxy;
-            if (proxySettings != null && proxySettings.IsEnabled)
+            var pluginStoreSettings = _plugin.Settings.PluginStore;
+            
+            // 插件商店代理独立于常规代理设置，不受CheckBox_Proxy_IsEnabled约束
+            // 如果插件商店代理启用且设置了代理地址，但不是URL拼接类型的代理
+            if (pluginStoreSettings != null && pluginStoreSettings.UseProxy && !string.IsNullOrEmpty(pluginStoreSettings.ProxyUrl))
             {
-                bool useProxy = proxySettings.ForAllAPI || proxySettings.ForPlugin;
-                if (useProxy)
+                var proxyUrl = pluginStoreSettings.ProxyUrl.Trim();
+                
+                // 如果是URL拼接类型的代理（如ghfast.top），不使用HttpClient代理
+                if (proxyUrl.StartsWith("http://") || proxyUrl.StartsWith("https://"))
                 {
-                    if (proxySettings.FollowSystemProxy)
+                    // 检查是否是GitHub加速服务（URL拼接类型）
+                    if (proxyUrl.Contains("ghfast.top") || proxyUrl.Contains("github") || proxyUrl.Contains("raw.githubusercontent"))
                     {
-                        return System.Net.WebRequest.GetSystemWebProxy();
+                        return null; // 使用URL拼接方式
                     }
-                    else if (!string.IsNullOrEmpty(proxySettings.Address))
-                    {
-                        if (string.IsNullOrEmpty(proxySettings.Protocol))
-                        {
-                            proxySettings.Protocol = "http";
-                        }
-                        var protocol = proxySettings.Protocol.ToLower() == "socks" ? "socks5" : "http";
-                        return new System.Net.WebProxy(new Uri($"{protocol}://{proxySettings.Address}"));
-                    }
+                    
+                    // 其他HTTP/HTTPS代理，使用传统代理方式
+                    return new System.Net.WebProxy(proxyUrl);
+                }
+                else
+                {
+                    // 假设是 IP:Port 格式的代理
+                    return new System.Net.WebProxy($"http://{proxyUrl}");
                 }
             }
+            
             return null;
         }
     }

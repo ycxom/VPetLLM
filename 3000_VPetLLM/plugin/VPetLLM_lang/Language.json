@@ -739,6 +739,30 @@
             "zh-hans": "作者",
             "zh-hant": "作者",
             "jp": "作者"
+        },
+        "ProxySettings": {
+            "en": "Plugin Store Proxy Settings",
+            "zh-hans": "插件商店代理设置",
+            "zh-hant": "插件商店代理設置",
+            "jp": "プラグインストアプロキシ設定"
+        },
+        "EnableProxy": {
+            "en": "Enable Plugin Store Proxy",
+            "zh-hans": "启用插件商店代理",
+            "zh-hant": "啟用插件商店代理",
+            "jp": "プラグインストアプロキシを有効にする"
+        },
+        "ProxyUrl": {
+            "en": "Proxy Address",
+            "zh-hans": "代理地址",
+            "zh-hant": "代理地址",
+            "jp": "プロキシアドレス"
+        },
+        "ProxyUrlNote": {
+            "en": "Example: https://ghfast.top (for accelerating GitHub access in regions with connectivity issues)",
+            "zh-hans": "示例: https://ghfast.top (用于加速中国大陆等访问GitHub困难使用)",
+            "zh-hant": "示例: https://ghfast.top (用於加速中國大陸等訪問GitHub困難使用)",
+            "jp": "例: https://ghfast.top (中国本土などGitHubアクセスが困難な地域での高速化用)"
         }
     },
     "ReloadPrompts": {
