@@ -15,6 +15,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Windows.Threading;
 
 namespace VPetLLM.UI.Windows
 {
@@ -47,6 +48,11 @@ namespace VPetLLM.UI.Windows
     public partial class winSettingNew : Window
     {
         private readonly VPetLLM _plugin;
+        
+        // 自动保存相关字段
+        private DispatcherTimer? _autoSaveTimer;
+        private bool _hasUnsavedChanges = false;
+        private readonly object _saveLock = new object();
 
         public winSettingNew(VPetLLM plugin)
         {
@@ -118,6 +124,9 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).TextChanged += Control_TextChanged;
 
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
+            
+            // 初始化自动保存定时器
+            InitializeAutoSaveTimer();
         }
 
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -139,11 +148,13 @@ namespace VPetLLM.UI.Windows
                 }
             }
             
-            SaveSettings();
+            // 立即保存重要配置
+            ScheduleAutoSave();
         }
+        
         private void Control_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            SaveSettings();
+            // 先处理特殊逻辑
             if (sender == FindName("ComboBox_Language"))
             {
                 LanguageHelper.ReloadLanguages();
@@ -153,13 +164,63 @@ namespace VPetLLM.UI.Windows
             {
                 PromptHelper.ReloadPrompts();
             }
+            
+            // 对于关键配置项，使用Dispatcher确保UI更新完成后再保存
+            if (sender is ComboBox comboBox)
+            {
+                string name = comboBox.Name ?? "";
+                bool isImportantConfig = name.Contains("Provider") || name.Contains("Model");
+                
+                if (isImportantConfig)
+                {
+                    // 使用Dispatcher.BeginInvoke确保在UI更新完成后保存
+                    Dispatcher.BeginInvoke(new Action(() => {
+                        SaveSettings();
+                    }), System.Windows.Threading.DispatcherPriority.Background);
+                }
+                else
+                {
+                    ScheduleAutoSave();
+                }
+            }
+            else
+            {
+                ScheduleAutoSave();
+            }
         }
-        private void Control_TextChanged(object sender, TextChangedEventArgs e) => SaveSettings();
+        
+        private void Control_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // 对于关键配置字段，立即保存
+            if (sender is TextBox textBox)
+            {
+                string[] criticalFields = {
+                    "TextBox_OpenAIApiKey", "TextBox_GeminiApiKey",
+                    "TextBox_OllamaUrl", "TextBox_OpenAIUrl", "TextBox_GeminiUrl"
+                };
+                
+                if (criticalFields.Contains(textBox.Name))
+                {
+                    // 关键字段使用Dispatcher确保UI更新完成后保存
+                    Dispatcher.BeginInvoke(new Action(() => {
+                        SaveSettings();
+                    }), System.Windows.Threading.DispatcherPriority.Background);
+                }
+                else
+                {
+                    // 其他字段延迟保存
+                    ScheduleAutoSave();
+                }
+            }
+        }
+        
         private void Control_Click(object sender, RoutedEventArgs e)
         {
             if (sender is CheckBox cb && cb.Name == "CheckBox_AutoMigrateChatHistory")
                 return;
-            SaveSettings();
+            
+            // 立即保存重要配置
+            ScheduleAutoSave();
         }
 
         private void LoadSettings()
@@ -396,6 +457,12 @@ namespace VPetLLM.UI.Windows
                 _plugin.UpdateChatCore(updatedChatCore);
             }
             _plugin.UpdateActionProcessor();
+            
+            // 重置未保存更改标志
+            lock (_saveLock)
+            {
+                _hasUnsavedChanges = false;
+            }
         }
         private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
 
@@ -632,8 +699,66 @@ namespace VPetLLM.UI.Windows
 
         private void Window_Closed(object? sender, EventArgs e)
         {
+            // 停止并清理定时器
+            _autoSaveTimer?.Stop();
+            _autoSaveTimer = null;
+            
             _plugin.SettingWindow = null;
         }
+
+        #region 自动保存逻辑
+
+        /// <summary>
+        /// 初始化自动保存定时器
+        /// </summary>
+        private void InitializeAutoSaveTimer()
+        {
+            _autoSaveTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(500) // 500ms延迟
+            };
+            _autoSaveTimer.Tick += AutoSaveTimer_Tick;
+        }
+
+        /// <summary>
+        /// 调度自动保存
+        /// </summary>
+        /// <param name="immediate">是否立即保存</param>
+        private void ScheduleAutoSave(bool immediate = false)
+        {
+            lock (_saveLock)
+            {
+                _hasUnsavedChanges = true;
+                
+                if (immediate)
+                {
+                    // 立即保存
+                    _autoSaveTimer?.Stop();
+                    SaveSettings();
+                }
+                else
+                {
+                    // 重启定时器，实现防抖动
+                    _autoSaveTimer?.Stop();
+                    _autoSaveTimer?.Start();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 自动保存定时器事件
+        /// </summary>
+        private void AutoSaveTimer_Tick(object sender, EventArgs e)
+        {
+            _autoSaveTimer?.Stop();
+            
+            if (_hasUnsavedChanges)
+            {
+                SaveSettings();
+            }
+        }
+
+        #endregion
 
         // 旋转动画辅助方法
         private void StartButtonLoadingAnimation(Button button)

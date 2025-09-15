@@ -107,7 +107,57 @@
                                         Style="{StaticResource SettingLabel}"/>
                                 <ComboBox x:Name="ComboBox_Provider"
                                         Margin="0,0,0,16"
-                                        SelectionChanged="ComboBox_Provider_SelectionChanged"/>
+                                        SelectionChanged="ComboBox_Provider_SelectionChanged"
+                                        Style="{StaticResource ModernComboBox}">
+                                    <!-- 简化的ComboBoxItem样式 -->
+                                    <ComboBox.ItemContainerStyle>
+                                        <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                                            <Setter Property="Padding" Value="12,8"/>
+                                            <Setter Property="FontSize" Value="14"/>
+                                            <Setter Property="ContentTemplate">
+                                                <Setter.Value>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <!-- 提供商图标 -->
+                                                            <Border x:Name="ItemIcon"
+                                                                    Background="{StaticResource AccentBrush}"
+                                                                    CornerRadius="3"
+                                                                    Width="18"
+                                                                    Height="18"
+                                                                    Margin="0,0,8,0">
+                                                                <TextBlock x:Name="ItemIconText"
+                                                                        Text="⚡"
+                                                                        FontSize="9"
+                                                                        Foreground="White"
+                                                                        HorizontalAlignment="Center"
+                                                                        VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            
+                                                            <!-- 提供商名称 -->
+                                                            <TextBlock Text="{Binding}"
+                                                                    VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <DataTemplate.Triggers>
+                                                            <!-- 根据不同提供商设置图标 -->
+                                                            <DataTrigger Binding="{Binding}" Value="Ollama">
+                                                                <Setter TargetName="ItemIconText" Property="Text" Value="O"/>
+                                                                <Setter TargetName="ItemIcon" Property="Background" Value="#FF6B35"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding}" Value="OpenAI">
+                                                                <Setter TargetName="ItemIconText" Property="Text" Value="AI"/>
+                                                                <Setter TargetName="ItemIcon" Property="Background" Value="#10A37F"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding}" Value="Gemini">
+                                                                <Setter TargetName="ItemIconText" Property="Text" Value="G"/>
+                                                                <Setter TargetName="ItemIcon" Property="Background" Value="#4285F4"/>
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ComboBox.ItemContainerStyle>
+                                </ComboBox>
 
                                 <Label Content="AI名称"
                                         VerticalAlignment="Top"
@@ -206,7 +256,8 @@
                                             </Grid.ColumnDefinitions>
                                             <ComboBox x:Name="ComboBox_OllamaModel"
                                                     Grid.Column="0"
-                                                    IsEditable="True"/>
+                                                    IsEditable="True"
+                                                    Style="{StaticResource ModelComboBox}"/>
                                             <Button x:Name="Button_RefreshOllamaModels"
                                                     Grid.Column="1"
                                                     Content="刷新"
@@ -232,7 +283,7 @@
                                                 <Slider x:Name="Slider_Ollama_Temperature"
                                                         Minimum="0"
                                                         Maximum="2"
-                                                        Width="120"
+                                                        Width="125"
                                                         Margin="10,0"
                                                         VerticalAlignment="Center"/>
                                                 <TextBlock x:Name="TextBlock_Ollama_TemperatureValue"
@@ -250,7 +301,7 @@
                                                         Foreground="{StaticResource PrimaryTextBrush}"
                                                         FontSize="14"/>
                                                 <TextBox x:Name="TextBox_Ollama_MaxTokens"
-                                                        Width="100"
+                                                        Width="125"
                                                         Margin="10,0"
                                                         VerticalAlignment="Center"
                                                         Style="{StaticResource ModernTextBox}"/>
@@ -282,7 +333,8 @@
                                             </Grid.ColumnDefinitions>
                                             <ComboBox x:Name="ComboBox_OpenAIModel"
                                                     Grid.Column="0"
-                                                    IsEditable="True"/>
+                                                    IsEditable="True"
+                                                    Style="{StaticResource ModelComboBox}"/>
                                             <Button x:Name="Button_RefreshOpenAIModels"
                                                     Grid.Column="1"
                                                     Content="刷新"
@@ -314,7 +366,7 @@
                                                 <Slider x:Name="Slider_OpenAI_Temperature"
                                                         Minimum="0"
                                                         Maximum="2"
-                                                        Width="120"
+                                                        Width="125"
                                                         Margin="10,0"
                                                         VerticalAlignment="Center"/>
                                                 <TextBlock x:Name="TextBlock_OpenAI_TemperatureValue"
@@ -332,7 +384,7 @@
                                                         Foreground="{StaticResource PrimaryTextBrush}"
                                                         FontSize="14"/>
                                                 <TextBox x:Name="TextBox_OpenAI_MaxTokens"
-                                                        Width="100"
+                                                        Width="125"
                                                         Margin="10,0"
                                                         VerticalAlignment="Center"
                                                         Style="{StaticResource ModernTextBox}"/>
@@ -364,7 +416,8 @@
                                             </Grid.ColumnDefinitions>
                                             <ComboBox x:Name="ComboBox_GeminiModel"
                                                     Grid.Column="0"
-                                                    IsEditable="True"/>
+                                                    IsEditable="True"
+                                                    Style="{StaticResource ModelComboBox}"/>
                                             <Button x:Name="Button_RefreshGeminiModels"
                                                     Grid.Column="1"
                                                     Content="刷新"
@@ -402,7 +455,7 @@
                                                 <Slider x:Name="Slider_Gemini_Temperature"
                                                         Minimum="0"
                                                         Maximum="2"
-                                                        Width="120"
+                                                        Width="125"
                                                         Margin="10,0"
                                                         VerticalAlignment="Center"/>
                                                 <TextBlock x:Name="TextBlock_Gemini_TemperatureValue"
@@ -420,7 +473,7 @@
                                                         Foreground="{StaticResource PrimaryTextBrush}"
                                                         FontSize="14"/>
                                                 <TextBox x:Name="TextBox_Gemini_MaxTokens"
-                                                        Width="100"
+                                                        Width="125"
                                                         Margin="10,0"
                                                         VerticalAlignment="Center"
                                                         Style="{StaticResource ModernTextBox}"/>
@@ -551,12 +604,14 @@
                                     x:Name="Label_Language"
                                     Style="{StaticResource SettingLabel}"/>
                             <ComboBox x:Name="ComboBox_Language"
-                                    Margin="0,0,0,16"/>
+                                    Margin="0,0,0,16"
+                                    Style="{StaticResource LanguageComboBox}"/>
                             <Label Content="AI提示词语言"
                                     x:Name="Label_PromptLanguage"
                                     Style="{StaticResource SettingLabel}"/>
                             <ComboBox x:Name="ComboBox_PromptLanguage"
-                                    Margin="0,0,0,8"/>
+                                    Margin="0,0,0,8"
+                                    Style="{StaticResource LanguageComboBox}"/>
                             <TextBlock x:Name="TextBlock_PromptLanguageTooltip"
                                     TextWrapping="Wrap"
                                     Foreground="{StaticResource SecondaryTextBrush}"
@@ -627,7 +682,7 @@
                                             FontSize="14"
                                             Width="80"/>
                                     <TextBox x:Name="TextBox_HistoryCompressionThreshold"
-                                            Width="60"
+                                            Width="110"
                                             Margin="10,0"
                                             Style="{StaticResource ModernTextBox}"/>
                                     <TextBlock Text="当前上下文长度:"
@@ -842,7 +897,7 @@
                                     Foreground="{StaticResource PrimaryTextBrush}"
                                     FontSize="14"/>
                             <TextBox x:Name="TextBox_MaxLogCount"
-                                    Width="80"
+                                    Width="185"
                                     VerticalAlignment="Center"
                                     Style="{StaticResource ModernTextBox}"/>
                         </StackPanel>

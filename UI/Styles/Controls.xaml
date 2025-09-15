@@ -215,4 +215,238 @@
         <Setter Property="Margin" Value="0,0,0,8"/>
     </Style>
 
+    <!-- Modern ComboBox Style -->
+    <Style x:Key="ModernComboBox" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+        <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="MinHeight" Value="36"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource HoverBorderBrush}"/>
+            </Trigger>
+            <Trigger Property="IsFocused" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Language ComboBox Style -->
+    <Style x:Key="LanguageComboBox" TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}">
+        <Setter Property="ItemContainerStyle">
+            <Setter.Value>
+                <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                    <Setter Property="Padding" Value="12,8"/>
+                    <Setter Property="FontSize" Value="14"/>
+                    <Setter Property="ContentTemplate">
+                        <Setter.Value>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- 语言图标/国旗 -->
+                                    <Border x:Name="LanguageIcon"
+                                            Background="{StaticResource AccentBrush}"
+                                            CornerRadius="3"
+                                            Width="20"
+                                            Height="20"
+                                            Margin="0,0,8,0">
+                                        <TextBlock x:Name="LanguageIconText"
+                                                Text="🌐"
+                                                FontSize="10"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"/>
+                                    </Border>
+                                    
+                                    <!-- 语言名称 -->
+                                    <TextBlock Text="{Binding}"
+                                            VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <DataTemplate.Triggers>
+                                    <!-- 根据不同语言设置图标 -->
+                                    <DataTrigger Binding="{Binding}" Value="简体中文">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇨🇳"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#DE2910"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="繁體中文">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇹🇼"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#FE0000"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="English">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇺🇸"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#B22234"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="日本語">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇯🇵"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#BC002D"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="한국어">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇰🇷"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#CD2E3A"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="Français">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇫🇷"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#0055A4"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="Deutsch">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇩🇪"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#000000"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="Español">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇪🇸"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#AA151B"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="Русский">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇷🇺"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#0039A6"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="Português">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇵🇹"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#046A38"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="Italiano">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="🇮🇹"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#009246"/>
+                                    </DataTrigger>
+                                    <!-- 通用语言选项 -->
+                                    <DataTrigger Binding="{Binding}" Value="中文">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="中"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#DE2910"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="英文">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="EN"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#B22234"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="日文">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="日"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#BC002D"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="韩文">
+                                        <Setter TargetName="LanguageIconText" Property="Text" Value="한"/>
+                                        <Setter TargetName="LanguageIcon" Property="Background" Value="#CD2E3A"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Model ComboBox Style -->
+    <Style x:Key="ModelComboBox" TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}">
+        <Setter Property="ItemContainerStyle">
+            <Setter.Value>
+                <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                    <Setter Property="Padding" Value="12,8"/>
+                    <Setter Property="FontSize" Value="14"/>
+                    <Setter Property="ContentTemplate">
+                        <Setter.Value>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- 模型图标 -->
+                                    <Border x:Name="ModelIcon"
+                                            Background="{StaticResource AccentBrush}"
+                                            CornerRadius="3"
+                                            Width="20"
+                                            Height="20"
+                                            Margin="0,0,8,0">
+                                        <TextBlock x:Name="ModelIconText"
+                                                Text="🤖"
+                                                FontSize="10"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"/>
+                                    </Border>
+                                    
+                                    <!-- 模型名称 -->
+                                    <TextBlock Text="{Binding}"
+                                            VerticalAlignment="Center"
+                                            FontFamily="Consolas, 'Courier New', monospace"/>
+                                </StackPanel>
+                                <DataTemplate.Triggers>
+                                    <!-- GPT-4 系列 -->
+                                    <DataTrigger Binding="{Binding}" Value="gpt-4">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="4"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#10A37F"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="gpt-4-turbo">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="4T"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#10A37F"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="gpt-4o">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="4o"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#10A37F"/>
+                                    </DataTrigger>
+                                    
+                                    <!-- GPT-3.5 系列 -->
+                                    <DataTrigger Binding="{Binding}" Value="gpt-3.5-turbo">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="3.5"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#10A37F"/>
+                                    </DataTrigger>
+                                    
+                                    <!-- Gemini 系列 -->
+                                    <DataTrigger Binding="{Binding}" Value="gemini-pro">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="💎"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#4285F4"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="gemini-1.5-pro">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="💎"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#4285F4"/>
+                                    </DataTrigger>
+                                    
+                                    <!-- Llama 系列 -->
+                                    <DataTrigger Binding="{Binding}" Value="llama2">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="🦙"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#FF6B35"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="llama3">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="🦙"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#FF6B35"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="llama3.1">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="🦙"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#FF6B35"/>
+                                    </DataTrigger>
+                                    
+                                    <!-- CodeLlama 系列 -->
+                                    <DataTrigger Binding="{Binding}" Value="codellama">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="💻"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#059669"/>
+                                    </DataTrigger>
+                                    
+                                    <!-- Mistral 系列 -->
+                                    <DataTrigger Binding="{Binding}" Value="mistral">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="🌪️"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#7C3AED"/>
+                                    </DataTrigger>
+                                    
+                                    <!-- Phi 系列 -->
+                                    <DataTrigger Binding="{Binding}" Value="phi3">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="Φ"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#0078D4"/>
+                                    </DataTrigger>
+                                    
+                                    <!-- Qwen 系列 -->
+                                    <DataTrigger Binding="{Binding}" Value="qwen">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="通"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#FF6600"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding}" Value="qwen2">
+                                        <Setter TargetName="ModelIconText" Property="Text" Value="通"/>
+                                        <Setter TargetName="ModelIcon" Property="Background" Value="#FF6600"/>
+                                    </DataTrigger>
+                                    
+                                    <!-- 通用模式匹配 - 使用包含判断 -->
+                                    <!-- 这些会在具体匹配失败后作为后备选项 -->
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
