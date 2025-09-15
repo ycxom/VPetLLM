@@ -564,31 +564,32 @@
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 
-                                <!-- 插件商店代理设置 -->
-                                <Label Content="插件商店代理设置"
-                                        Margin="0,8,0,0"
-                                        x:Name="Label_PluginStore_Proxy"
+                            </StackPanel>
+                            
+                            <!-- 插件商店代理设置 - 独立区域 -->
+                            <Label Content="插件商店代理设置"
+                                    Margin="0,16,0,0"
+                                    x:Name="Label_PluginStore_Proxy"
+                                    Style="{StaticResource SettingLabel}"/>
+                            <CheckBox x:Name="CheckBox_PluginStore_UseProxy"
+                                    Content="启用插件商店代理"
+                                    Margin="0,0,0,12"
+                                    IsChecked="True"
+                                    Style="{StaticResource ModernCheckBox}"/>
+                            <StackPanel Margin="20,0,0,0"
+                                    IsEnabled="{Binding ElementName=CheckBox_PluginStore_UseProxy, Path=IsChecked}">
+                                <Label Content="代理地址"
+                                        x:Name="Label_PluginStore_ProxyUrl"
                                         Style="{StaticResource SettingLabel}"/>
-                                <CheckBox x:Name="CheckBox_PluginStore_UseProxy"
-                                        Content="启用插件商店代理"
-                                        Margin="0,0,0,12"
-                                        IsChecked="True"
-                                        Style="{StaticResource ModernCheckBox}"/>
-                                <StackPanel Margin="20,0,0,0"
-                                        IsEnabled="{Binding ElementName=CheckBox_PluginStore_UseProxy, Path=IsChecked}">
-                                    <Label Content="代理地址"
-                                            x:Name="Label_PluginStore_ProxyUrl"
-                                            Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_PluginStore_ProxyUrl"
-                                            Margin="0,0,0,8"
-                                            Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="示例: https://ghfast.top (用于加速GitHub访问)"
-                                            TextWrapping="Wrap"
-                                            Foreground="{StaticResource SecondaryTextBrush}"
-                                            x:Name="TextBlock_PluginStore_ProxyUrlNote"
-                                            FontSize="12"
-                                            Margin="0,0,0,0"/>
-                                </StackPanel>
+                                <TextBox x:Name="TextBox_PluginStore_ProxyUrl"
+                                        Margin="0,0,0,8"
+                                        Style="{StaticResource ModernTextBox}"/>
+                                <TextBlock Text="示例: https://ghfast.top (用于加速GitHub访问)"
+                                        TextWrapping="Wrap"
+                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                        x:Name="TextBlock_PluginStore_ProxyUrlNote"
+                                        FontSize="12"
+                                        Margin="0,0,0,0"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>

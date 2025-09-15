@@ -675,10 +675,10 @@
             "jp": "MCP"
         },
         "ForPlugin": {
-            "en": "Plugin",
-            "zh-hans": "插件",
-            "zh-hant": "插件",
-            "jp": "プラグイン"
+            "en": "Plugin store",
+            "zh-hans": "插件商店",
+            "zh-hant": "插件商店",
+            "jp": "プラグインストア"
         }
     },
     "ContextEditor": {
