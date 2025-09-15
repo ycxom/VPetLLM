@@ -564,32 +564,32 @@
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 
-                            </StackPanel>
-                            
-                            <!-- 插件商店代理设置 - 独立区域 -->
-                            <Label Content="插件商店代理设置"
-                                    Margin="0,16,0,0"
-                                    x:Name="Label_PluginStore_Proxy"
-                                    Style="{StaticResource SettingLabel}"/>
-                            <CheckBox x:Name="CheckBox_PluginStore_UseProxy"
-                                    Content="启用插件商店代理"
-                                    Margin="0,0,0,12"
-                                    IsChecked="True"
-                                    Style="{StaticResource ModernCheckBox}"/>
-                            <StackPanel Margin="20,0,0,0"
-                                    IsEnabled="{Binding ElementName=CheckBox_PluginStore_UseProxy, Path=IsChecked}">
-                                <Label Content="代理地址"
-                                        x:Name="Label_PluginStore_ProxyUrl"
+                                <!-- 插件商店代理设置 - 独立区域 -->
+                                <Label Content="插件商店代理设置"
+                                        Margin="0,16,0,0"
+                                        x:Name="Label_PluginStore_Proxy"
                                         Style="{StaticResource SettingLabel}"/>
-                                <TextBox x:Name="TextBox_PluginStore_ProxyUrl"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource ModernTextBox}"/>
-                                <TextBlock Text="示例: https://ghfast.top (用于加速GitHub访问)"
-                                        TextWrapping="Wrap"
-                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                        x:Name="TextBlock_PluginStore_ProxyUrlNote"
-                                        FontSize="12"
-                                        Margin="0,0,0,0"/>
+                                <CheckBox x:Name="CheckBox_PluginStore_UseProxy"
+                                        Content="启用插件商店代理"
+                                        Margin="0,0,0,12"
+                                        IsChecked="True"
+                                        IsEnabled="{Binding ElementName=CheckBox_Proxy_IsEnabled, Path=IsChecked}"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <StackPanel Margin="20,0,0,0"
+                                        IsEnabled="{Binding ElementName=CheckBox_PluginStore_UseProxy, Path=IsChecked}">
+                                    <Label Content="代理地址"
+                                            x:Name="Label_PluginStore_ProxyUrl"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_PluginStore_ProxyUrl"
+                                            Margin="0,0,0,8"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="示例: https://ghfast.top (用于加速GitHub访问)"
+                                            TextWrapping="Wrap"
+                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                            x:Name="TextBlock_PluginStore_ProxyUrlNote"
+                                            FontSize="12"
+                                            Margin="0,0,0,0"/>
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -752,7 +752,7 @@
                                     Style="{StaticResource ModernDataGrid}"
                                     ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="名称"
+                                    <DataGridTextColumn Header=""
                                     Binding="{Binding Name}"
                                     Width="120"
                                     MinWidth="100">
@@ -766,7 +766,7 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header="URL"
+                                    <DataGridTextColumn Header=""
                                     Binding="{Binding Url}"
                                     Width="200"
                                     MinWidth="150">
@@ -780,7 +780,7 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header="API Key"
+                                    <DataGridTextColumn Header=""
                                     Binding="{Binding ApiKey}"
                                     Width="150"
                                     MinWidth="120">
@@ -795,7 +795,7 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header="描述"
+                                    <DataGridTextColumn Header=""
                                     Binding="{Binding Description}"
                                     Width="*"
                                     MinWidth="200">
@@ -1004,7 +1004,7 @@
                                     SelectionUnit="FullRow">
                                 <DataGrid.Columns>
                                     <!-- 简化的启用状态列 -->
-                                    <DataGridTemplateColumn Header="启用" Width="60">
+                                    <DataGridTemplateColumn Header="" Width="60">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
@@ -1023,7 +1023,7 @@
                                     </DataGridTemplateColumn>
                                     
                                     <!-- 优化的插件状态列 -->
-                                    <DataGridTemplateColumn Header="状态" Width="80">
+                                    <DataGridTemplateColumn Header="" Width="80">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" 
@@ -1038,8 +1038,8 @@
                                                             VerticalAlignment="Center"/>
                                                     
                                                     <!-- 状态文字 -->
-                                                    <TextBlock x:Name="StatusText"
-                                                              Text="运行中"
+                                                    <TextBlock x:Name="StatusTextDisplay"
+                                                              Text="{Binding StatusText}"
                                                               FontSize="11"
                                                               Foreground="#38B2AC"
                                                               FontWeight="Medium"
@@ -1050,15 +1050,13 @@
                                                     <!-- 错误状态 -->
                                                     <DataTrigger Binding="{Binding IsFailed}" Value="True">
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#E53E3E"/>
-                                                        <Setter TargetName="StatusText" Property="Text" Value="错误"/>
-                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#E53E3E"/>
+                                                        <Setter TargetName="StatusTextDisplay" Property="Foreground" Value="#E53E3E"/>
                                                     </DataTrigger>
                                                     
                                                     <!-- 禁用状态 -->
                                                     <DataTrigger Binding="{Binding IsEnabled}" Value="False">
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#A0AEC0"/>
-                                                        <Setter TargetName="StatusText" Property="Text" Value="已禁用"/>
-                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#A0AEC0"/>
+                                                        <Setter TargetName="StatusTextDisplay" Property="Foreground" Value="#A0AEC0"/>
                                                     </DataTrigger>
                                                     
                                                     <!-- 待启动状态 -->
@@ -1068,8 +1066,7 @@
                                                             <Condition Binding="{Binding IsLoaded}" Value="False"/>
                                                         </MultiDataTrigger.Conditions>
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#F6AD55"/>
-                                                        <Setter TargetName="StatusText" Property="Text" Value="待启动"/>
-                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#F6AD55"/>
+                                                        <Setter TargetName="StatusTextDisplay" Property="Foreground" Value="#F6AD55"/>
                                                     </MultiDataTrigger>
                                                     
                                                     <!-- 正常运行状态 -->
@@ -1079,15 +1076,13 @@
                                                             <Condition Binding="{Binding IsFailed}" Value="False"/>
                                                         </MultiDataTrigger.Conditions>
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#38B2AC"/>
-                                                        <Setter TargetName="StatusText" Property="Text" Value="运行中"/>
-                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#38B2AC"/>
+                                                        <Setter TargetName="StatusTextDisplay" Property="Foreground" Value="#38B2AC"/>
                                                     </MultiDataTrigger>
                                                     
                                                     <!-- 未下载状态 (最后处理，确保优先级最高) -->
                                                     <DataTrigger Binding="{Binding IsLocal}" Value="False">
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#718096"/>
-                                                        <Setter TargetName="StatusText" Property="Text" Value="未下载"/>
-                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#718096"/>
+                                                        <Setter TargetName="StatusTextDisplay" Property="Foreground" Value="#718096"/>
                                                     </DataTrigger>
                                                 </DataTemplate.Triggers>
                                             </DataTemplate>
@@ -1099,7 +1094,7 @@
                                         </DataGridTemplateColumn.HeaderStyle>
                                     </DataGridTemplateColumn>
                                     <!-- 简化的插件信息列 -->
-                                    <DataGridTemplateColumn Header="插件信息" Width="*" MinWidth="200">
+                                    <DataGridTemplateColumn Header="" Width="200" MinWidth="180">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Margin="8,6" VerticalAlignment="Center">
@@ -1122,8 +1117,26 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
+                                    
+                                    <!-- 插件描述列 -->
+                                    <DataGridTemplateColumn Header="" Width="*" MinWidth="250">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Description}"
+                                                          Margin="8,6"
+                                                          FontSize="12"
+                                                          Foreground="{StaticResource PrimaryTextBrush}"
+                                                          TextWrapping="Wrap"
+                                                          TextTrimming="CharacterEllipsis"
+                                                          VerticalAlignment="Center"
+                                                          MaxHeight="44"
+                                                          LineHeight="16"
+                                                          ToolTip="{Binding Description}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <!-- 简化的操作列 -->
-                                    <DataGridTemplateColumn Header="操作" Width="160" MinWidth="140">
+                                    <DataGridTemplateColumn Header="" Width="160" MinWidth="140">
                                         <DataGridTemplateColumn.HeaderStyle>
                                             <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource ModernDataGridColumnHeader}">
                                                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -1141,16 +1154,31 @@
                                                            Content="{Binding ActionText}"
                                                            Margin="0,0,4,0"
                                                            Padding="8,4"
-                                                           FontSize="12"
-                                                           Style="{StaticResource PrimaryButton}"/>
+                                                           FontSize="12">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                <Style.Triggers>
+                                                                    <MultiDataTrigger>
+                                                                        <MultiDataTrigger.Conditions>
+                                                                            <Condition Binding="{Binding IsLocal}" Value="True"/>
+                                                                            <Condition Binding="{Binding IsFailed}" Value="False"/>
+                                                                            <Condition Binding="{Binding IsUpdatable}" Value="False"/>
+                                                                        </MultiDataTrigger.Conditions>
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </MultiDataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
 
                                                     <!-- 设置按钮 -->
                                                     <Button Click="Button_PluginSetting_Click"
-                                                           Content="设置"
+                                                           Content="{Binding SettingActionText}"
                                                            Margin="0,0,4,0"
                                                            Padding="8,4"
                                                            FontSize="12"
-                                                           ToolTip="插件设置">
+                                                           ToolTip="{Binding SettingActionText}">
                                                         <Button.Style>
                                                             <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
                                                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -1165,26 +1193,23 @@
                                                     
                                                     <!-- 卸载按钮 -->
                                                     <Button Click="Button_UninstallPlugin_Click"
-                                                           Content="卸载"
+                                                           Content="{Binding UninstallActionText}"
                                                            Padding="8,4"
                                                            FontSize="12"
-                                                           ToolTip="卸载插件">
+                                                           ToolTip="{Binding UninstallActionText}">
                                                         <Button.Style>
                                                             <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
                                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                                 <Setter Property="Foreground" Value="#E53E3E"/>
                                                                 <Style.Triggers>
-                                                                    <MultiDataTrigger>
-                                                                        <MultiDataTrigger.Conditions>
-                                                                            <Condition Binding="{Binding IsLocal}" Value="True"/>
-                                                                            <Condition Binding="{Binding IsUpdatable}" Value="True"/>
-                                                                        </MultiDataTrigger.Conditions>
+                                                                    <DataTrigger Binding="{Binding IsLocal}" Value="True">
                                                                         <Setter Property="Visibility" Value="Visible"/>
-                                                                    </MultiDataTrigger>
+                                                                    </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </Button.Style>
                                                     </Button>
+
                                                 </StackPanel>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>

@@ -534,6 +534,30 @@
             "zh-hant": "啟用",
             "jp": "有効"
         },
+        "Status": {
+            "en": "Status",
+            "zh-hans": "状态",
+            "zh-hant": "狀態",
+            "jp": "ステータス"
+        },
+        "StatusRunning": {
+            "en": "Running",
+            "zh-hans": "运行中",
+            "zh-hant": "運行中",
+            "jp": "実行中"
+        },
+        "StatusDisabled": {
+            "en": "Disabled",
+            "zh-hans": "已禁用",
+            "zh-hant": "已禁用",
+            "jp": "無効"
+        },
+        "StatusNotDownloaded": {
+            "en": "Not Downloaded",
+            "zh-hans": "未下载",
+            "zh-hant": "未下載",
+            "jp": "未ダウンロード"
+        },
         "Icon": {
             "en": "Icon",
             "zh-hans": "图标",
