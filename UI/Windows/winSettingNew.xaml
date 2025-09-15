@@ -720,12 +720,14 @@
                                 Padding="20,16"
                                 Margin="0,0,0,20">
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="工具管理"
+                                <TextBlock x:Name="TextBlock_ToolsManagement"
+                                        Text="工具管理"
                                         FontSize="18"
                                         FontWeight="SemiBold"
                                         Foreground="{StaticResource PrimaryTextBrush}"
                                         Margin="0,0,0,4"/>
-                                <TextBlock Text="配置和管理您的AI工具。添加自定义API端点和工具配置。"
+                                <TextBlock x:Name="TextBlock_ToolsManagementDescription"
+                                        Text="配置和管理您的AI工具。添加自定义API端点和工具配置。"
                                         Foreground="{StaticResource SecondaryTextBrush}"
                                         FontSize="13"/>
                             </StackPanel>
@@ -846,7 +848,8 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="MCP 工具配置"
+                                    <TextBlock x:Name="TextBlock_MCPToolsConfig"
+                                            Text="MCP 工具配置"
                                             FontWeight="Medium"
                                             Foreground="{StaticResource PrimaryTextBrush}"
                                             FontSize="14"
@@ -923,97 +926,92 @@
                     </DockPanel>
                 </Border>
             </TabItem>
-            <TabItem Header="插件"
+            <TabItem Header="插件商店"
                     x:Name="Tab_Plugin"
                     Style="{StaticResource ModernTabItem}">
                 <Border Style="{StaticResource CardContainer}">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" MinHeight="51.78"/>
-                            <RowDefinition/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
+                        
+                        <!-- 简化的插件管理头部 -->
                         <Border Background="{StaticResource ControlBackgroundBrush}"
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
-                                CornerRadius="8"
-                                Padding="20,16"
-                                Margin="0,0,0,20">
+                                CornerRadius="6"
+                                Padding="16,12"
+                                Margin="0,0,0,16">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- 左侧信息区域 -->
+                                <!-- 标题区域 -->
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="插件管理"
-                                            FontSize="18"
+                                    <TextBlock x:Name="TextBlock_PluginManagementCenter"
+                                            Text="插件管理"
+                                            FontSize="16"
                                             FontWeight="SemiBold"
                                             Foreground="{StaticResource PrimaryTextBrush}"
-                                            Margin="0,0,0,4"/>
+                                            Margin="0,0,0,2"/>
                                     <TextBlock x:Name="TextBlock_HowToUse"
                                             Foreground="{StaticResource SecondaryTextBrush}"
-                                            FontSize="13">
-                                        <Run Text="管理和配置您的插件。"/>
-                                        <Run Text="如何使用？查看"/>
-                                        <Hyperlink NavigateUri="https://github.com/ycxom/VPetLLM_Plugin"
-                                                RequestNavigate="Hyperlink_RequestNavigate"
-                                                Foreground="{StaticResource AccentBrush}">
-                                            <Run Text="插件开发文档"/>
-                                        </Hyperlink>
-                                    </TextBlock>
+                                            FontSize="12"/>
                                 </StackPanel>
 
-                                <!-- 右侧操作按钮 -->
+                                <!-- 操作按钮 -->
                                 <StackPanel Grid.Column="1" 
                                            Orientation="Horizontal" 
                                            VerticalAlignment="Center">
                                     <Button x:Name="Button_RefreshPlugins"
-                                            Content="🔄 刷新"
-                                            Margin="0,0,12,0"
-                                            Padding="16,8"
+                                            Content="刷新"
+                                            Margin="0,0,8,0"
+                                            Padding="12,6"
                                             Click="Button_RefreshPlugins_Click"
                                             Style="{StaticResource SecondaryButton}"/>
                                     <Button x:Name="Button_ImportPlugin"
-                                            Content="📦 导入插件"
-                                            Padding="16,8"
+                                            Content="导入插件"
+                                            Padding="12,6"
                                             Click="Button_ImportPlugin_Click"
                                             Style="{StaticResource PrimaryButton}"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
-                        <Border Background="White"
+                        <!-- 简化的插件列表容器 -->
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
-                                CornerRadius="8"
+                                CornerRadius="6"
                                 Grid.Row="1">
                             <DataGrid x:Name="DataGrid_Plugins"
                                     AutoGenerateColumns="False"
                                     CanUserAddRows="False"
                                     SelectionChanged="DataGrid_Plugins_SelectionChanged"
-                                    RowHeight="90"
+                                    RowHeight="60"
                                     GridLinesVisibility="Horizontal"
                                     HeadersVisibility="Column"
-                                    AlternatingRowBackground="#FAFBFC"
+                                    AlternatingRowBackground="{StaticResource SecondaryBrush}"
                                     Background="Transparent"
                                     BorderThickness="0"
                                     Style="{StaticResource ModernDataGrid}"
-                                    ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}">
+                                    ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+                                    HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                                    SelectionMode="Single"
+                                    SelectionUnit="FullRow">
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn Header="启用"
-                                    Width="70">
+                                    <!-- 简化的启用状态列 -->
+                                    <DataGridTemplateColumn Header="启用" Width="60">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <Grid HorizontalAlignment="Stretch" 
-                                                  VerticalAlignment="Stretch">
-                                                    <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
-                                                    IsEnabled="{Binding IsFailed, Converter={StaticResource BoolInverter}}"
-                                                    Click="PluginEnabled_Click"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"
-                                                    Margin="0"
-                                                    Style="{StaticResource ModernCheckBox}"/>
-                                                </Grid>
+                                                <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
+                                                         IsEnabled="{Binding IsFailed, Converter={StaticResource BoolInverter}}"
+                                                         Click="PluginEnabled_Click"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"
+                                                         Style="{StaticResource ModernCheckBox}"/>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                         <DataGridTemplateColumn.HeaderStyle>
@@ -1022,32 +1020,75 @@
                                             </Style>
                                         </DataGridTemplateColumn.HeaderStyle>
                                     </DataGridTemplateColumn>
-                                    <DataGridTemplateColumn Header="图标" Width="80">
+                                    
+                                    <!-- 优化的插件状态列 -->
+                                    <DataGridTemplateColumn Header="状态" Width="80">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <Grid HorizontalAlignment="Stretch" 
-                                                  VerticalAlignment="Stretch">
-                                                    <Border Background="{StaticResource AccentBrush}"
-                                                        CornerRadius="22"
-                                                        Width="44"
-                                                        Height="44"
-                                                        HorizontalAlignment="Center"
-                                                        VerticalAlignment="Center">
-                                                        <Border.Effect>
-                                                            <DropShadowEffect Color="#40000000" 
-                                                                        BlurRadius="8" 
-                                                                        ShadowDepth="2" 
-                                                                        Opacity="0.3"/>
-                                                        </Border.Effect>
-                                                        <TextBlock Text="{Binding Icon}"
-                                                        FontFamily="Segoe MDL2 Assets"
-                                                        FontSize="20"
-                                                        Foreground="White"
-                                                        HorizontalAlignment="Center"
-                                                        VerticalAlignment="Center"
-                                                        TextAlignment="Center"/>
-                                                    </Border>
-                                                </Grid>
+                                                <StackPanel Orientation="Horizontal" 
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center">
+                                                    <!-- 状态指示器 -->
+                                                    <Ellipse x:Name="StatusIndicator"
+                                                            Width="8"
+                                                            Height="8"
+                                                            Fill="#38B2AC"
+                                                            Margin="0,0,6,0"
+                                                            VerticalAlignment="Center"/>
+                                                    
+                                                    <!-- 状态文字 -->
+                                                    <TextBlock x:Name="StatusText"
+                                                              Text="运行中"
+                                                              FontSize="11"
+                                                              Foreground="#38B2AC"
+                                                              FontWeight="Medium"
+                                                              VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                
+                                                <DataTemplate.Triggers>
+                                                    <!-- 错误状态 -->
+                                                    <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                                                        <Setter TargetName="StatusIndicator" Property="Fill" Value="#E53E3E"/>
+                                                        <Setter TargetName="StatusText" Property="Text" Value="错误"/>
+                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#E53E3E"/>
+                                                    </DataTrigger>
+                                                    
+                                                    <!-- 禁用状态 -->
+                                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                        <Setter TargetName="StatusIndicator" Property="Fill" Value="#A0AEC0"/>
+                                                        <Setter TargetName="StatusText" Property="Text" Value="已禁用"/>
+                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#A0AEC0"/>
+                                                    </DataTrigger>
+                                                    
+                                                    <!-- 待启动状态 -->
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsEnabled}" Value="True"/>
+                                                            <Condition Binding="{Binding IsLoaded}" Value="False"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter TargetName="StatusIndicator" Property="Fill" Value="#F6AD55"/>
+                                                        <Setter TargetName="StatusText" Property="Text" Value="待启动"/>
+                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#F6AD55"/>
+                                                    </MultiDataTrigger>
+                                                    
+                                                    <!-- 正常运行状态 -->
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsEnabled}" Value="True"/>
+                                                            <Condition Binding="{Binding IsFailed}" Value="False"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter TargetName="StatusIndicator" Property="Fill" Value="#38B2AC"/>
+                                                        <Setter TargetName="StatusText" Property="Text" Value="运行中"/>
+                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#38B2AC"/>
+                                                    </MultiDataTrigger>
+                                                    
+                                                    <!-- 未下载状态 (最后处理，确保优先级最高) -->
+                                                    <DataTrigger Binding="{Binding IsLocal}" Value="False">
+                                                        <Setter TargetName="StatusIndicator" Property="Fill" Value="#718096"/>
+                                                        <Setter TargetName="StatusText" Property="Text" Value="未下载"/>
+                                                        <Setter TargetName="StatusText" Property="Foreground" Value="#718096"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                         <DataGridTemplateColumn.HeaderStyle>
@@ -1056,67 +1097,32 @@
                                             </Style>
                                         </DataGridTemplateColumn.HeaderStyle>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn Header="名称"
-                                    Binding="{Binding Name}"
-                                    Width="150"
-                                    MinWidth="120"
-                                    IsReadOnly="True">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Padding" Value="12,8"/>
-                                                <Setter Property="FontWeight" Value="SemiBold"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                                <Setter Property="ToolTip" Value="{Binding Name}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsFailed}"
-                                                    Value="True">
-                                                        <Setter Property="Foreground"
-                                                        Value="#E74C3C"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsFailed}"
-                                                    Value="False">
-                                                        <Setter Property="Foreground"
-                                                        Value="{StaticResource PrimaryTextBrush}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="作者"
-                                    Binding="{Binding Author}"
-                                    Width="120"
-                                    MinWidth="100"
-                                    IsReadOnly="True">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Padding" Value="12,8"/>
-                                                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                                <Setter Property="ToolTip" Value="{Binding Author}"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="描述"
-                                    Binding="{Binding Description}"
-                                    Width="*"
-                                    MinWidth="250"
-                                    IsReadOnly="True">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Padding" Value="12,8"/>
-                                                <Setter Property="TextWrapping" Value="Wrap"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-                                                <Setter Property="LineHeight" Value="18"/>
-                                                <Setter Property="MaxHeight" Value="64"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTemplateColumn Header="操作"
-                                    Width="200"
-                                    MinWidth="180">
+                                    <!-- 简化的插件信息列 -->
+                                    <DataGridTemplateColumn Header="插件信息" Width="*" MinWidth="200">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="8,6" VerticalAlignment="Center">
+                                                    <!-- 插件名称 -->
+                                                    <TextBlock Text="{Binding Name}"
+                                                              FontSize="14"
+                                                              FontWeight="SemiBold"
+                                                              Foreground="{StaticResource PrimaryTextBrush}"
+                                                              TextTrimming="CharacterEllipsis"
+                                                              ToolTip="{Binding Name}"
+                                                              Margin="0,0,0,2"/>
+                                                    
+                                                    <!-- 作者信息 -->
+                                                    <TextBlock Text="{Binding Author}"
+                                                              FontSize="12"
+                                                              Foreground="{StaticResource SecondaryTextBrush}"
+                                                              TextTrimming="CharacterEllipsis"
+                                                              ToolTip="{Binding Author}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <!-- 简化的操作列 -->
+                                    <DataGridTemplateColumn Header="操作" Width="160" MinWidth="140">
                                         <DataGridTemplateColumn.HeaderStyle>
                                             <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource ModernDataGridColumnHeader}">
                                                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -1124,97 +1130,60 @@
                                         </DataGridTemplateColumn.HeaderStyle>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <StackPanel Orientation="Vertical" 
-                                                       Margin="12,8"
-                                                       VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" 
+                                                           Margin="8,6"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center">
+                                                    
                                                     <!-- 主要操作按钮 -->
-                                                    <Button Content="{Binding ActionText}"
-                                                    Click="Button_PluginAction_Click" 
-                                                    Margin="0,0,0,6"
-                                                    Padding="12,6"
-                                                    FontSize="13"
-                                                    FontWeight="Medium"
-                                                    MinWidth="80"
-                                                    HorizontalAlignment="Stretch"
-                                                    Style="{StaticResource PrimaryButton}"/>
+                                                    <Button Click="Button_PluginAction_Click" 
+                                                           Content="{Binding ActionText}"
+                                                           Margin="0,0,4,0"
+                                                           Padding="8,4"
+                                                           FontSize="12"
+                                                           Style="{StaticResource PrimaryButton}"/>
 
-                                                    <!-- 次要操作按钮组 -->
-                                                    <StackPanel Orientation="Horizontal" 
-                                                           HorizontalAlignment="Left">
-                                                        <Button Content="{Binding SettingActionText}"
-                                                        Click="Button_PluginSetting_Click"
-                                                        Margin="0,0,6,0">
-                                                            <Button.Style>
-                                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                    <Setter Property="Padding" Value="10,5"/>
-                                                                    <Setter Property="FontSize" Value="12"/>
-                                                                    <Setter Property="MinWidth" Value="60"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding HasSettingAction}" Value="True">
-                                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Button.Style>
-                                                        </Button>
-                                                        <Button Content="{Binding UninstallActionText}"
-                                                        Click="Button_UninstallPlugin_Click"
-                                                        Margin="0,0,0,0">
-                                                            <Button.Style>
-                                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                    <Setter Property="Padding" Value="10,5"/>
-                                                                    <Setter Property="FontSize" Value="12"/>
-                                                                    <Setter Property="MinWidth" Value="60"/>
-                                                                    <Setter Property="Background" Value="#FFF5F5"/>
-                                                                    <Setter Property="BorderBrush" Value="#FFE5E5"/>
-                                                                    <Setter Property="Foreground" Value="#E74C3C"/>
-                                                                    <Style.Triggers>
-                                                                        <MultiDataTrigger>
-                                                                            <MultiDataTrigger.Conditions>
-                                                                                <Condition Binding="{Binding IsLocal}" Value="True"/>
-                                                                                <Condition Binding="{Binding IsUpdatable}" Value="True"/>
-                                                                            </MultiDataTrigger.Conditions>
-                                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                                        </MultiDataTrigger>
-                                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter Property="Background" Value="#FFE5E5"/>
-                                                                        </Trigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Button.Style>
-                                                        </Button>
-                                                    </StackPanel>
-
-                                                    <!-- 更新可用标签 -->
-                                                    <Border Background="#E8F5E8"
-                                                       CornerRadius="12"
-                                                       Padding="10,4"
-                                                       Margin="0,6,0,0"
-                                                       HorizontalAlignment="Left">
-                                                        <Border.Style>
-                                                            <Style TargetType="Border">
+                                                    <!-- 设置按钮 -->
+                                                    <Button Click="Button_PluginSetting_Click"
+                                                           Content="设置"
+                                                           Margin="0,0,4,0"
+                                                           Padding="8,4"
+                                                           FontSize="12"
+                                                           ToolTip="插件设置">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
                                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                                 <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsUpdatable}" Value="True">
+                                                                    <DataTrigger Binding="{Binding HasSettingAction}" Value="True">
                                                                         <Setter Property="Visibility" Value="Visible"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
-                                                        </Border.Style>
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="🔄"
-                                                                  FontSize="10"
-                                                                  Margin="0,0,4,0"
-                                                                  VerticalAlignment="Center"/>
-                                                            <TextBlock Text="{Binding UpdateAvailableText}"
-                                                                  Foreground="#27AE60"
-                                                                  FontSize="11"
-                                                                  FontWeight="Medium"
-                                                                  VerticalAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
+                                                        </Button.Style>
+                                                    </Button>
+                                                    
+                                                    <!-- 卸载按钮 -->
+                                                    <Button Click="Button_UninstallPlugin_Click"
+                                                           Content="卸载"
+                                                           Padding="8,4"
+                                                           FontSize="12"
+                                                           ToolTip="卸载插件">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Setter Property="Foreground" Value="#E53E3E"/>
+                                                                <Style.Triggers>
+                                                                    <MultiDataTrigger>
+                                                                        <MultiDataTrigger.Conditions>
+                                                                            <Condition Binding="{Binding IsLocal}" Value="True"/>
+                                                                            <Condition Binding="{Binding IsUpdatable}" Value="True"/>
+                                                                        </MultiDataTrigger.Conditions>
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </MultiDataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
                                                 </StackPanel>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>

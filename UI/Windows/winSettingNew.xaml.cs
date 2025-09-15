@@ -157,11 +157,48 @@ namespace VPetLLM.UI.Windows
             // 先处理特殊逻辑
             if (sender == FindName("ComboBox_Language"))
             {
+                // 立即保存语言设置
+                SaveSettings();
+                // 重新加载语言资源
                 LanguageHelper.ReloadLanguages();
+                // 立即更新UI（同步调用）
                 UpdateUIForLanguage();
+                // 使用Dispatcher确保在下一个UI周期再次更新界面，以防有遗漏
+                Dispatcher.BeginInvoke(new Action(() => {
+                    UpdateUIForLanguage();
+                    // 强制刷新插件列表的列标题
+                    if (FindName("DataGrid_Plugins") is DataGrid dataGridPluginsAsync)
+                    {
+                        var langCodeAsync = _plugin.Settings.Language;
+                        if (dataGridPluginsAsync.Columns.Count > 0)
+                            dataGridPluginsAsync.Columns[0].Header = LanguageHelper.Get("Plugin.Enabled", langCodeAsync) ?? "启用";
+                        if (dataGridPluginsAsync.Columns.Count > 1)
+                            dataGridPluginsAsync.Columns[1].Header = LanguageHelper.Get("Plugin.Icon", langCodeAsync) ?? "图标";
+                        if (dataGridPluginsAsync.Columns.Count > 2)
+                            dataGridPluginsAsync.Columns[2].Header = LanguageHelper.Get("Plugin.Name", langCodeAsync) ?? "名称";
+                        if (dataGridPluginsAsync.Columns.Count > 3)
+                            dataGridPluginsAsync.Columns[3].Header = LanguageHelper.Get("Plugin.Action", langCodeAsync) ?? "操作";
+                        
+                        // 强制刷新DataGrid显示
+                        dataGridPluginsAsync.Items.Refresh();
+                        dataGridPluginsAsync.UpdateLayout();
+                    }
+                    
+                    // 强制更新Tab标题
+                    if (FindName("Tab_Plugin") is TabItem tabPlugin)
+                    {
+                        var langCodeForTab = _plugin.Settings.Language;
+                        tabPlugin.Header = LanguageHelper.Get("Settings.Plugin", langCodeForTab) ?? "插件";
+                    }
+                    
+                    // 强制刷新整个窗口
+                    this.UpdateLayout();
+                }), System.Windows.Threading.DispatcherPriority.Background);
             }
             if (sender == FindName("ComboBox_PromptLanguage"))
             {
+                // 立即保存提示词语言设置
+                SaveSettings();
                 PromptHelper.ReloadPrompts();
             }
             
@@ -864,7 +901,17 @@ namespace VPetLLM.UI.Windows
             if (FindName("TextBlock_CurrentContextLengthLabel") is TextBlock textBlockCurrentContextLengthLabel) textBlockCurrentContextLengthLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentContextLength", langCode);
             if (FindName("TextBlock_CurrentContextLength") is TextBlock textBlockCurrentContextLength) textBlockCurrentContextLength.Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
 
-            if (FindName("TextBlock_ToolsDescription") is TextBlock textBlockToolsDescription) textBlockToolsDescription.Text = LanguageHelper.Get("Tools.Description", langCode);
+            // 更新工具管理头部区域的多语言文本
+            if (FindName("TextBlock_ToolsManagement") is TextBlock textBlockToolsManagement) 
+                textBlockToolsManagement.Text = LanguageHelper.Get("Tools.Management", langCode);
+            
+            if (FindName("TextBlock_ToolsManagementDescription") is TextBlock textBlockToolsManagementDescription) 
+                textBlockToolsManagementDescription.Text = LanguageHelper.Get("Tools.ManagementDescription", langCode);
+            
+            if (FindName("TextBlock_MCPToolsConfig") is TextBlock textBlockMCPToolsConfig) 
+                textBlockMCPToolsConfig.Text = LanguageHelper.Get("Tools.MCPConfig", langCode);
+            
+            if (FindName("TextBlock_ToolsDescription") is TextBlock textBlockToolsDescription) textBlockToolsDescription.Text = LanguageHelper.Get("Tools.ToolsDescription", langCode);
             if (FindName("Button_AddTool") is Button buttonAddTool) buttonAddTool.Content = LanguageHelper.Get("Tools.Add", langCode);
             if (FindName("Button_DeleteTool") is Button buttonDeleteTool) buttonDeleteTool.Content = LanguageHelper.Get("Tools.Delete", langCode);
             if (FindName("DataGrid_Tools") is DataGrid dataGridTools)
@@ -884,25 +931,45 @@ namespace VPetLLM.UI.Windows
             if (FindName("Button_CopyLog") is Button buttonCopyLog) buttonCopyLog.Content = LanguageHelper.Get("Log.Copy", langCode);
             if (FindName("Button_ClearLog") is Button buttonClearLog) buttonClearLog.Content = LanguageHelper.Get("Log.Clear", langCode);
 
+            // 更新插件管理头部区域的多语言文本
+            if (FindName("TextBlock_PluginManagementCenter") is TextBlock textBlockPluginManagementCenter) 
+                textBlockPluginManagementCenter.Text = LanguageHelper.Get("Plugin.ManagementCenter", langCode);
+            
+            // 动态构建插件描述文本（包含超链接）
             if (FindName("TextBlock_HowToUse") is TextBlock howToUseTextBlock)
             {
                 howToUseTextBlock.Inlines.Clear();
-                howToUseTextBlock.Inlines.Add(new Run(LanguageHelper.Get("Plugin.HowToUse", langCode)));
-                var hyperlink = new Hyperlink(new Run("https://github.com/ycxom/VPetLLM_Plugin"));
+                howToUseTextBlock.Inlines.Add(new Run(LanguageHelper.Get("Plugin.ManagementDescription", langCode)));
+                howToUseTextBlock.Inlines.Add(new LineBreak());
+                howToUseTextBlock.Inlines.Add(new Run(LanguageHelper.Get("Plugin.NeedHelp", langCode)));
+                var hyperlink = new Hyperlink(new Run(LanguageHelper.Get("Plugin.PluginDocs", langCode)));
                 hyperlink.NavigateUri = new Uri("https://github.com/ycxom/VPetLLM_Plugin");
                 hyperlink.RequestNavigate += Hyperlink_RequestNavigate;
+                hyperlink.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#667EEA"));
+                hyperlink.TextDecorations = null;
                 howToUseTextBlock.Inlines.Add(hyperlink);
+                howToUseTextBlock.Inlines.Add(new Run(LanguageHelper.Get("Plugin.LearnMore", langCode)));
             }
+            
+            if (FindName("TextBlock_RefreshButton") is TextBlock textBlockRefreshButton) 
+                textBlockRefreshButton.Text = LanguageHelper.Get("Plugin.Refresh", langCode);
+            
+            if (FindName("TextBlock_ImportButton") is TextBlock textBlockImportButton) 
+                textBlockImportButton.Text = LanguageHelper.Get("Plugin.ImportPlugin", langCode);
+            
             if (FindName("Button_RefreshPlugins") is Button buttonRefreshPlugins) buttonRefreshPlugins.Content = LanguageHelper.Get("Plugin.Refresh", langCode);
             if (FindName("Button_ImportPlugin") is Button buttonImportPlugin) buttonImportPlugin.Content = LanguageHelper.Get("Plugin.ImportPlugin", langCode);
             if (FindName("DataGrid_Plugins") is DataGrid dataGridPlugins)
             {
-                dataGridPlugins.Columns[0].Header = LanguageHelper.Get("Plugin.Enabled", langCode);
-                // Column 1 is icon, no header
-                dataGridPlugins.Columns[2].Header = LanguageHelper.Get("Plugin.Name", langCode);
-                dataGridPlugins.Columns[3].Header = LanguageHelper.Get("Plugin.Author", langCode);
-                dataGridPlugins.Columns[4].Header = LanguageHelper.Get("Plugin.Description", langCode);
-                dataGridPlugins.Columns[5].Header = LanguageHelper.Get("Plugin.Action", langCode);
+                // 修复列标题的多语言显示，与XAML中的列顺序保持一致
+                if (dataGridPlugins.Columns.Count > 0)
+                    dataGridPlugins.Columns[0].Header = LanguageHelper.Get("Plugin.Enabled", langCode) ?? "启用";
+                if (dataGridPlugins.Columns.Count > 1)
+                    dataGridPlugins.Columns[1].Header = LanguageHelper.Get("Plugin.Icon", langCode) ?? "图标";
+                if (dataGridPlugins.Columns.Count > 2)
+                    dataGridPlugins.Columns[2].Header = LanguageHelper.Get("Plugin.Name", langCode) ?? "名称";
+                if (dataGridPlugins.Columns.Count > 3)
+                    dataGridPlugins.Columns[3].Header = LanguageHelper.Get("Plugin.Action", langCode) ?? "操作";
             }
 
             if (FindName("Tab_Ollama") is TabItem tabOllama) tabOllama.Header = LanguageHelper.Get("Ollama.Header", langCode);

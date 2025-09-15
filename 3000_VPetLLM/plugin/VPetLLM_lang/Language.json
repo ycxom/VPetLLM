@@ -325,6 +325,12 @@
             "jp": "ツール"
         },
         "Description": {
+            "en": "Description",
+            "zh-hans": "描述",
+            "zh-hant": "描述",
+            "jp": "説明"
+        },
+        "ToolsDescription": {
             "en": "This list is for configuring MCP (Model-Controlled Plugin) tools",
             "zh-hans": "此列表用于配置 MCP (Model-Controlled Plugin) 工具",
             "zh-hant": "此列表用於配置 MCP (Model-Controlled Plugin) 工具",
@@ -365,6 +371,24 @@
             "zh-hans": "启用",
             "zh-hant": "啟用",
             "jp": "有効"
+        },
+        "Management": {
+            "en": "Tools Management",
+            "zh-hans": "工具管理",
+            "zh-hant": "工具管理",
+            "jp": "ツール管理"
+        },
+        "ManagementDescription": {
+            "en": "Configure and manage your AI tools. Add custom API endpoints and tool configurations.",
+            "zh-hans": "配置和管理您的AI工具。添加自定义API端点和工具配置。",
+            "zh-hant": "配置和管理您的AI工具。添加自定義API端點和工具配置。",
+            "jp": "AIツールを設定・管理します。カスタムAPIエンドポイントとツール設定を追加します。"
+        },
+        "MCPConfig": {
+            "en": "MCP Tools Configuration",
+            "zh-hans": "MCP 工具配置",
+            "zh-hant": "MCP 工具配置",
+            "jp": "MCPツール設定"
         }
     },
     "Log": {
@@ -401,10 +425,10 @@
     },
     "Plugin": {
         "Tab": {
-            "en": "Plugin",
-            "zh-hans": "插件",
-            "zh-hant": "插件",
-            "jp": "プラグイン"
+            "en": "Plugin store",
+            "zh-hans": "插件商店",
+            "zh-hant": "插件商店",
+            "jp": "プラグインストア"
         },
         "HowToUse": {
             "en": "How to use? View",
@@ -510,6 +534,12 @@
             "zh-hant": "啟用",
             "jp": "有効"
         },
+        "Icon": {
+            "en": "Icon",
+            "zh-hans": "图标",
+            "zh-hant": "圖標",
+            "jp": "アイコン"
+        },
         "Name": {
             "en": "Name",
             "zh-hans": "名称",
@@ -533,6 +563,36 @@
             "zh-hans": "设置",
             "zh-hant": "設置",
             "jp": "設定"
+        },
+        "ManagementCenter": {
+            "en": "Plugin Management Center",
+            "zh-hans": "插件管理中心",
+            "zh-hant": "插件管理中心",
+            "jp": "プラグイン管理センター"
+        },
+        "ManagementDescription": {
+            "en": "Extend your AI assistant functionality by installing and managing various plugins.",
+            "zh-hans": "扩展您的AI助手功能，安装和管理各种插件。",
+            "zh-hant": "擴展您的AI助手功能，安裝和管理各種插件。",
+            "jp": "さまざまなプラグインをインストールして管理し、AIアシスタントの機能を拡張します。"
+        },
+        "NeedHelp": {
+            "en": "💡 Need help? View",
+            "zh-hans": "💡 需要帮助？查看",
+            "zh-hant": "💡 需要幫助？查看",
+            "jp": "💡 ヘルプが必要ですか？表示"
+        },
+        "PluginDocs": {
+            "en": "Plugin Development Documentation",
+            "zh-hans": "插件开发文档",
+            "zh-hant": "插件開發文檔",
+            "jp": "プラグイン開発ドキュメント"
+        },
+        "LearnMore": {
+            "en": "to learn more",
+            "zh-hans": "了解更多",
+            "zh-hant": "了解更多",
+            "jp": "詳細を確認"
         }
     },
     "Proxy": {
@@ -774,5 +834,13 @@
     "Success": {
         "en": "Success",
         "zh-hans": "成功"
+    },
+    "Settings": {
+        "Plugin": {
+            "en": "Plugin store",
+            "zh-hans": "插件商店",
+            "zh-hant": "插件商店",
+            "jp": "プラグインストア"
+        }
     }
 }
