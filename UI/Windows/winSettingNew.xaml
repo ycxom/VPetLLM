@@ -772,7 +772,7 @@
                                     <Label x:Name="Label_TTS_URL_BaseUrl"
                                             Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_TTS_URL_BaseUrl"
-                                            Text="https://doubaotts.zeabur.app"
+                                            Text="https://www.example.com"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 

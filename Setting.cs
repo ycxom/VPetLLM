@@ -150,7 +150,7 @@ namespace VPetLLM
 
         public class URLTTSSetting
         {
-            public string BaseUrl { get; set; } = "https://doubaotts.zeabur.app";
+            public string BaseUrl { get; set; } = "https://www.example.com";
             public string Voice { get; set; } = "36";
             public string Method { get; set; } = "GET"; // GET 或 POST
         }
