@@ -81,28 +81,31 @@ namespace VPetLLM.Windows
             {
                 if (!tool.IsEnabled) continue;
 
-                var client = new HttpClient();
-                var requestData = new { prompt = text };
-                var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
-
-                try
+                // 使用正确的代理设置创建HttpClient
+                using (var client = CreateHttpClientWithProxy())
                 {
-                    var response = await client.PostAsync(tool.Url, content);
-                    response.EnsureSuccessStatusCode();
-                    var responseString = await response.Content.ReadAsStringAsync();
-                    var actionQueue = _plugin.ActionProcessor.Process(responseString, _plugin.Settings);
+                    var requestData = new { prompt = text };
+                    var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
 
-                    await Application.Current.Dispatcher.InvokeAsync(async () =>
+                    try
                     {
-                        foreach (var item in actionQueue)
+                        var response = await client.PostAsync(tool.Url, content);
+                        response.EnsureSuccessStatusCode();
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var actionQueue = _plugin.ActionProcessor.Process(responseString, _plugin.Settings);
+
+                        await Application.Current.Dispatcher.InvokeAsync(async () =>
                         {
-                           await item.Handler.Execute(item.Value, _plugin.MW);
-                        }
-                    });
-                }
-                catch (Exception e)
-                {
-                    Logger.Log($"An error occurred in ProcessTools: {e}");
+                            foreach (var item in actionQueue)
+                            {
+                                await item.Handler.Execute(item.Value, _plugin.MW);
+                            }
+                        });
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"An error occurred in ProcessTools: {e}");
+                    }
                 }
             }
         }
@@ -110,6 +113,76 @@ namespace VPetLLM.Windows
         public override void Setting()
         {
             _plugin.Setting();
+        }
+
+        /// <summary>
+        /// 创建带有正确代理设置的HttpClient
+        /// </summary>
+        private HttpClient CreateHttpClientWithProxy()
+        {
+            var handler = new HttpClientHandler();
+            
+            // 获取插件代理设置
+            var proxy = GetPluginProxy();
+            if (proxy != null)
+            {
+                handler.Proxy = proxy;
+                handler.UseProxy = true;
+            }
+            else
+            {
+                // 明确禁用代理，防止使用系统默认代理
+                handler.UseProxy = false;
+                handler.Proxy = null;
+            }
+            
+            return new HttpClient(handler);
+        }
+
+        /// <summary>
+        /// 获取插件专用的代理设置
+        /// </summary>
+        private System.Net.IWebProxy GetPluginProxy()
+        {
+            var proxySettings = _plugin.Settings.Proxy;
+            
+            // 如果代理未启用，返回null
+            if (proxySettings == null || !proxySettings.IsEnabled)
+            {
+                return null;
+            }
+
+            bool useProxy = false;
+            
+            // 如果ForAllAPI为true，则对所有API使用代理
+            if (proxySettings.ForAllAPI)
+            {
+                useProxy = true;
+            }
+            else
+            {
+                // 如果ForAllAPI为false，则根据ForPlugin设置决定
+                useProxy = proxySettings.ForPlugin;
+            }
+
+            if (useProxy)
+            {
+                if (proxySettings.FollowSystemProxy)
+                {
+                    return System.Net.WebRequest.GetSystemWebProxy();
+                }
+                else if (!string.IsNullOrEmpty(proxySettings.Address))
+                {
+                    if (string.IsNullOrEmpty(proxySettings.Protocol))
+                    {
+                        proxySettings.Protocol = "http";
+                    }
+                    var protocol = proxySettings.Protocol.ToLower() == "socks" ? "socks5" : "http";
+                    return new System.Net.WebProxy(new Uri($"{protocol}://{proxySettings.Address}"));
+                }
+            }
+            
+            return null;
         }
     }
 }

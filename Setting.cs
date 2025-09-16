@@ -114,16 +114,16 @@ namespace VPetLLM
         public class ProxySetting
         {
             public bool IsEnabled { get; set; } = false;
-            public bool FollowSystemProxy { get; set; } = true;
+            public bool FollowSystemProxy { get; set; } = false;
             public string Protocol { get; set; } = "http";
             public string Address { get; set; } = "127.0.0.1:8080";
-            public bool ForAllAPI { get; set; } = true;
-            public bool ForOllama { get; set; } = true;
-            public bool ForOpenAI { get; set; } = true;
-            public bool ForGemini { get; set; } = true;
-            public bool ForTTS { get; set; } = true;
-            public bool ForMcp { get; set; } = true;
-            public bool ForPlugin { get; set; } = true;
+            public bool ForAllAPI { get; set; } = false;
+            public bool ForOllama { get; set; } = false;
+            public bool ForOpenAI { get; set; } = false;
+            public bool ForGemini { get; set; } = false;
+            public bool ForTTS { get; set; } = false;
+            public bool ForMcp { get; set; } = false;
+            public bool ForPlugin { get; set; } = false;
         }
 
         public class PluginStoreSetting

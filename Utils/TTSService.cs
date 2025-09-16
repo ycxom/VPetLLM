@@ -33,9 +33,16 @@ namespace VPetLLM.Utils
         {
             HttpClientHandler handler = new HttpClientHandler();
             
-            // 配置代理 - 检查是否启用了TTS代理
-            if (_proxySettings != null && _proxySettings.IsEnabled && 
-                (_proxySettings.ForAllAPI || _proxySettings.ForTTS))
+            // 检查是否应该使用代理
+            bool useProxy = false;
+            
+            if (_proxySettings != null && _proxySettings.IsEnabled)
+            {
+                // TTS只根据ForTTS设置决定，不受ForAllAPI影响
+                useProxy = _proxySettings.ForTTS;
+            }
+            
+            if (useProxy)
             {
                 Logger.Log($"TTS: 配置代理设置 (ForAllAPI: {_proxySettings.ForAllAPI}, ForTTS: {_proxySettings.ForTTS})");
                 
@@ -72,6 +79,9 @@ namespace VPetLLM.Utils
             else
             {
                 Logger.Log($"TTS: 不使用代理 (代理未启用或TTS代理被禁用)");
+                // 明确禁用代理，防止使用系统默认代理
+                handler.UseProxy = false;
+                handler.Proxy = null;
             }
 
             var client = new HttpClient(handler);

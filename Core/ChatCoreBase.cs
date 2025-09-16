@@ -113,56 +113,105 @@ namespace VPetLLM.Core
         
         public IWebProxy GetProxy(string? requestType = null)
         {
-            if (Settings.Proxy.IsEnabled)
+            // 如果Settings或Proxy为null，直接返回null
+            if (Settings?.Proxy == null)
             {
-                bool useProxy = Settings.Proxy.ForAllAPI;
-                if (!useProxy)
-                {
-                    string type = requestType ?? Name;
-                    switch (type)
-                    {
-                        case "Ollama":
-                            useProxy = Settings.Proxy.ForOllama;
-                            break;
-                        case "OpenAI":
-                            useProxy = Settings.Proxy.ForOpenAI;
-                            break;
-                        case "Gemini":
-                            useProxy = Settings.Proxy.ForGemini;
-                            break;
-                        case "Plugin":
-                            useProxy = Settings.Proxy.ForPlugin;
-                            break;
-                        case "MCP":
-                            useProxy = Settings.Proxy.ForMcp;
-                            break;
-                    }
-                }
+                System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Settings.Proxy is null, returning null proxy");
+                return null;
+            }
 
-                if (useProxy)
+            // 如果代理未启用，直接返回null
+            if (!Settings.Proxy.IsEnabled)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Proxy not enabled, returning null proxy");
+                return null;
+            }
+
+            bool useProxy = false;
+            string type = requestType ?? Name;
+            
+            System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Checking proxy for {type}");
+            System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForAllAPI: {Settings.Proxy.ForAllAPI}");
+            
+            // 如果ForAllAPI为true，则对所有API使用代理
+            if (Settings.Proxy.ForAllAPI)
+            {
+                useProxy = true;
+                System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Using proxy because ForAllAPI is true");
+            }
+            else
+            {
+                // 如果ForAllAPI为false，则根据具体的API设置决定
+                switch (type)
                 {
-                    if (Settings.Proxy.FollowSystemProxy)
-                    {
-                        return WebRequest.GetSystemWebProxy();
-                    }
-                    else
-                    {
-                        if (string.IsNullOrEmpty(Settings.Proxy.Protocol))
-                        {
-                            Settings.Proxy.Protocol = "http";
-                        }
-                        var protocol = Settings.Proxy.Protocol.ToLower() == "socks" ? "socks5" : "http";
-                        return new WebProxy(new Uri($"{protocol}://{Settings.Proxy.Address}"));
-                    }
+                    case "Ollama":
+                        useProxy = Settings.Proxy.ForOllama;
+                        System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForOllama: {Settings.Proxy.ForOllama}");
+                        break;
+                    case "OpenAI":
+                        useProxy = Settings.Proxy.ForOpenAI;
+                        System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForOpenAI: {Settings.Proxy.ForOpenAI}");
+                        break;
+                    case "Gemini":
+                        useProxy = Settings.Proxy.ForGemini;
+                        System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForGemini: {Settings.Proxy.ForGemini}");
+                        break;
+                    case "Plugin":
+                        useProxy = Settings.Proxy.ForPlugin;
+                        System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForPlugin: {Settings.Proxy.ForPlugin}");
+                        break;
+                    case "MCP":
+                        useProxy = Settings.Proxy.ForMcp;
+                        System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForMcp: {Settings.Proxy.ForMcp}");
+                        break;
                 }
             }
+
+            System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Final useProxy decision: {useProxy}");
+
+            // 只有当useProxy为true时才返回代理
+            if (useProxy)
+            {
+                if (Settings.Proxy.FollowSystemProxy)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Using system proxy");
+                    return WebRequest.GetSystemWebProxy();
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(Settings.Proxy.Protocol))
+                    {
+                        Settings.Proxy.Protocol = "http";
+                    }
+                    var protocol = Settings.Proxy.Protocol.ToLower() == "socks" ? "socks5" : "http";
+                    var proxyUri = $"{protocol}://{Settings.Proxy.Address}";
+                    System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Using custom proxy: {proxyUri}");
+                    return new WebProxy(new Uri(proxyUri));
+                }
+            }
+            
+            // 如果不应该使用代理，返回null
+            System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Not using proxy, returning null");
             return null;
         }
 
         public HttpClientHandler CreateHttpClientHandler()
         {
             var handler = new HttpClientHandler();
-            handler.Proxy = GetProxy();
+            var proxy = GetProxy();
+            
+            if (proxy != null)
+            {
+                handler.Proxy = proxy;
+                handler.UseProxy = true;
+            }
+            else
+            {
+                // 明确禁用代理，防止使用系统默认代理
+                handler.UseProxy = false;
+                handler.Proxy = null;
+            }
+            
             return handler;
         }
 

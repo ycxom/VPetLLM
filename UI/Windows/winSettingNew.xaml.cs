@@ -1305,33 +1305,18 @@ namespace VPetLLM.UI.Windows
             {
                 var langCode = _plugin.Settings.Language;
                 var pluginItems = new Dictionary<string, UnifiedPluginItem>(StringComparer.OrdinalIgnoreCase);
-                Dictionary<string, JObject> remotePlugins = new Dictionary<string, JObject>();
 
-                // Load local plugins (both successful and failed)
+                // 第一步：立即加载并显示本地插件
                 _plugin.LoadPlugins();
+                
+                System.Diagnostics.Debug.WriteLine($"[PluginStore] 加载的插件数量: {_plugin.Plugins.Count}");
+                System.Diagnostics.Debug.WriteLine($"[PluginStore] 失败的插件数量: {_plugin.FailedPlugins.Count}");
 
-                // Fetch remote plugin list first to get the correct IDs
-                try
-                {
-                    using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
-                    {
-                        var pluginListUrl = GetPluginStoreUrl("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
-                        var json = await client.GetStringAsync(pluginListUrl);
-                        remotePlugins = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshPluginStore.Fail", _plugin.Settings.Language, "刷新插件商店失败", ex),
-                        ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-
-                // First pass: Add all local plugins to the dictionary using the remote key if available
+                // 添加本地成功插件
                 foreach (var localPlugin in _plugin.Plugins)
                 {
                     var sha = PluginManager.GetFileSha256(localPlugin.FilePath);
-                    var remoteEntry = remotePlugins.FirstOrDefault(kvp => kvp.Value["Name"]?.ToString() == localPlugin.Name);
-                    var id = !string.IsNullOrEmpty(remoteEntry.Key) ? remoteEntry.Key : localPlugin.Name;
+                    var id = localPlugin.Name; // 先用本地名称作为ID
 
                     var item = new UnifiedPluginItem
                     {
@@ -1353,6 +1338,7 @@ namespace VPetLLM.UI.Windows
                             LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用",
                         UninstallActionText = LanguageHelper.Get("Plugin.Uninstall", langCode) ?? "卸载"
                     };
+                    
                     if (localPlugin is IActionPlugin && localPlugin.Parameters.Contains("setting"))
                     {
                         item.HasSettingAction = true;
@@ -1361,10 +1347,10 @@ namespace VPetLLM.UI.Windows
                     pluginItems[id] = item;
                 }
 
+                // 添加本地失败插件
                 foreach (var failedPlugin in _plugin.FailedPlugins)
                 {
-                    var remoteEntry = remotePlugins.FirstOrDefault(kvp => kvp.Value["Name"]?.ToString() == failedPlugin.Name);
-                    var id = !string.IsNullOrEmpty(remoteEntry.Key) ? remoteEntry.Key : failedPlugin.Name;
+                    var id = failedPlugin.Name;
                     pluginItems[id] = new UnifiedPluginItem
                     {
                         IsFailed = true,
@@ -1386,107 +1372,111 @@ namespace VPetLLM.UI.Windows
                     };
                 }
 
-                // Second pass: Update with remote info or add new remote plugins
-                foreach (var item in remotePlugins)
-                {
-                    var id = item.Key;
-                    var remoteInfo = item.Value;
-                    var remoteSha256 = remoteInfo["SHA256"]?.ToString() ?? string.Empty;
-
-                    if (pluginItems.TryGetValue(id, out var existingItem))
-                    {
-                        // Plugin exists locally, check for update
-                        existingItem.RemoteVersion = remoteSha256;
-                        existingItem.FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty;
-                        existingItem.SHA256 = remoteSha256;
-
-                        bool isUpdatable = !string.IsNullOrEmpty(existingItem.Version) &&
-                                           !string.IsNullOrEmpty(remoteSha256) &&
-                                           !existingItem.Version.Equals(remoteSha256, StringComparison.OrdinalIgnoreCase);
-
-                        if (isUpdatable)
-                        {
-                            existingItem.IsUpdatable = true;
-                            existingItem.UpdateAvailableText = LanguageHelper.Get("Plugin.UpdateAvailable", langCode);
-                            existingItem.ActionText = LanguageHelper.Get("Plugin.Update", langCode);
-                        }
-                    }
-                    else
-                    {
-                        // Plugin is only remote, add it for installation
-                        var des = remoteInfo["Description"]?.ToObject<Dictionary<string, string>>();
-                        var description = des != null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
-
-                        pluginItems[id] = new UnifiedPluginItem
-                        {
-                            IsLocal = false,
-                            Id = id,
-                            Name = remoteInfo["Name"]?.ToString() ?? string.Empty,
-                            Author = remoteInfo["Author"]?.ToString() ?? string.Empty,
-                            Description = description,
-                            OriginalDescription = description,
-                            IsEnabled = false,
-                            ActionText = LanguageHelper.Get("PluginStore.Install", langCode),
-                            Icon = "\uE753", // Cloud download icon
-                            FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty,
-                            SHA256 = remoteSha256,
-                            RemoteVersion = remoteSha256,
-                            StatusText = LanguageHelper.Get("Plugin.StatusNotDownloaded", langCode) ?? "未下载"
-                        };
-                    }
-                }
-
-                // Final pass to mark local-only plugins and source
-                foreach (var item in pluginItems.Values)
-                {
-                    if (item.IsLocal)
-                    {
-                        if (string.IsNullOrEmpty(item.RemoteVersion))
-                        {
-                            item.Description = $"({LanguageHelper.Get("Plugin.LocalOnly", langCode)}) {item.OriginalDescription}";
-                        }
-                        else
-                        {
-                            item.Icon = "\uE955"; // Cloud with checkmark
-                            var localSource = LanguageHelper.Get("Plugin.Source.Local", langCode);
-                            item.Description = $"({localSource}) {item.OriginalDescription}";
-                        }
-                    }
-                    else
-                    {
-                        var cloudSource = LanguageHelper.Get("Plugin.Source.Cloud", langCode);
-                        item.Description = $"({cloudSource}) {item.OriginalDescription}";
-                    }
-
-
-
-                    if (item.IsUpdatable)
-                    {
-                        item.Icon = "\uE948"; // Sync icon
-                    }
-                }
-
-                // 确保在UI线程上更新DataGrid
+                // 立即显示本地插件
                 Dispatcher.Invoke(() =>
                 {
                     var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
-                    dataGrid.ItemsSource = null; // 先清空
-                    dataGrid.Items.Refresh(); // 强制刷新
-                    dataGrid.ItemsSource = pluginItems.Values.ToList(); // 重新设置
-                    dataGrid.Items.Refresh(); // 再次刷新
+                    dataGrid.ItemsSource = pluginItems.Values.ToList();
+                    System.Diagnostics.Debug.WriteLine($"[PluginStore] 立即显示本地插件数量: {pluginItems.Count}");
+                });
 
-                    // 重新设置列标题（因为设置ItemsSource可能会重置列标题）
-                    var langCode = _plugin.Settings.Language;
-                    if (dataGrid.Columns.Count > 0)
-                        dataGrid.Columns[0].Header = LanguageHelper.Get("Plugin.Enabled", langCode) ?? "启用";
-                    if (dataGrid.Columns.Count > 1)
-                        dataGrid.Columns[1].Header = LanguageHelper.Get("Plugin.Status", langCode) ?? "状态";
-                    if (dataGrid.Columns.Count > 2)
-                        dataGrid.Columns[2].Header = LanguageHelper.Get("Plugin.Name", langCode) ?? "插件信息";
-                    if (dataGrid.Columns.Count > 3)
-                        dataGrid.Columns[3].Header = LanguageHelper.Get("Plugin.Description", langCode) ?? "描述";
-                    if (dataGrid.Columns.Count > 4)
-                        dataGrid.Columns[4].Header = LanguageHelper.Get("Plugin.Action", langCode) ?? "操作";
+                // 第二步：异步加载在线插件（不阻塞UI）
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        Dictionary<string, JObject> remotePlugins = new Dictionary<string, JObject>();
+                        
+                        using (var client = CreatePluginStoreHttpClient())
+                        {
+                            var pluginListUrl = GetPluginStoreUrl("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
+                            var json = await client.GetStringAsync(pluginListUrl);
+                            remotePlugins = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
+                        }
+
+                        System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载成功，数量: {remotePlugins.Count}");
+
+                        // 更新本地插件的远程信息
+                        foreach (var item in remotePlugins)
+                        {
+                            var id = item.Key;
+                            var remoteInfo = item.Value;
+                            var remoteSha256 = remoteInfo["SHA256"]?.ToString() ?? string.Empty;
+                            var pluginName = remoteInfo["Name"]?.ToString() ?? string.Empty;
+
+                            // 查找对应的本地插件
+                            var localItem = pluginItems.Values.FirstOrDefault(p => p.OriginalName == pluginName);
+                            if (localItem != null)
+                            {
+                                // 更新本地插件的远程信息
+                                localItem.RemoteVersion = remoteSha256;
+                                localItem.FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty;
+                                localItem.SHA256 = remoteSha256;
+
+                                bool isUpdatable = !string.IsNullOrEmpty(localItem.Version) &&
+                                                   !string.IsNullOrEmpty(remoteSha256) &&
+                                                   !localItem.Version.Equals(remoteSha256, StringComparison.OrdinalIgnoreCase);
+
+                                if (isUpdatable)
+                                {
+                                    localItem.IsUpdatable = true;
+                                    localItem.UpdateAvailableText = LanguageHelper.Get("Plugin.UpdateAvailable", langCode);
+                                    localItem.ActionText = LanguageHelper.Get("Plugin.Update", langCode);
+                                    localItem.Icon = "\uE948"; // Sync icon
+                                }
+
+                                // 更新描述
+                                var des = remoteInfo["Description"]?.ToObject<Dictionary<string, string>>();
+                                var remoteDescription = des != null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
+                                if (!string.IsNullOrEmpty(remoteDescription))
+                                {
+                                    var localSource = LanguageHelper.Get("Plugin.Source.Local", langCode);
+                                    localItem.Description = $"({localSource}) {remoteDescription}";
+                                }
+                            }
+                            else
+                            {
+                                // 添加纯在线插件
+                                var des = remoteInfo["Description"]?.ToObject<Dictionary<string, string>>();
+                                var description = des != null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
+
+                                pluginItems[id] = new UnifiedPluginItem
+                                {
+                                    IsLocal = false,
+                                    Id = id,
+                                    Name = pluginName,
+                                    Author = remoteInfo["Author"]?.ToString() ?? string.Empty,
+                                    Description = $"({LanguageHelper.Get("Plugin.Source.Cloud", langCode)}) {description}",
+                                    OriginalDescription = description,
+                                    IsEnabled = false,
+                                    ActionText = LanguageHelper.Get("PluginStore.Install", langCode),
+                                    Icon = "\uE753", // Cloud download icon
+                                    FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty,
+                                    SHA256 = remoteSha256,
+                                    RemoteVersion = remoteSha256,
+                                    StatusText = LanguageHelper.Get("Plugin.StatusNotDownloaded", langCode) ?? "未下载"
+                                };
+                            }
+                        }
+
+                        // 更新UI
+                        Dispatcher.Invoke(() =>
+                        {
+                            var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
+                            dataGrid.ItemsSource = pluginItems.Values.ToList();
+                            System.Diagnostics.Debug.WriteLine($"[PluginStore] 更新后总插件数量: {pluginItems.Count}");
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载失败，继续使用离线模式: {ex.Message}");
+                        
+                        Dispatcher.Invoke(() =>
+                        {
+                            // 可以在这里显示离线状态提示
+                            System.Diagnostics.Debug.WriteLine("[PluginStore] 当前为离线模式，仅显示本地插件");
+                        });
+                    }
                 });
             }
             catch (Exception ex)
@@ -1620,7 +1610,7 @@ namespace VPetLLM.UI.Windows
         {
             try
             {
-                using (var client = new HttpClient(new HttpClientHandler() { Proxy = GetPluginStoreProxy() }))
+                using (var client = CreatePluginStoreHttpClient())
                 {
                     var downloadUrl = GetPluginStoreUrl(plugin.FileUrl);
                     var data = await client.GetByteArrayAsync(downloadUrl);
@@ -1666,7 +1656,21 @@ namespace VPetLLM.UI.Windows
             {
                 if (plugin.LocalPlugin is IActionPlugin actionPlugin)
                 {
-                    actionPlugin.Function("action(setting)");
+                    try
+                    {
+                        actionPlugin.Function("action(setting)");
+                    }
+                    catch (Exception ex)
+                    {
+                        var langCode = _plugin.Settings.Language;
+                        var errorMessage = $"{LanguageHelper.Get("Plugin.SettingError", langCode) ?? "插件设置打开失败"}: {ex.Message}";
+                        var errorTitle = LanguageHelper.Get("Error", langCode) ?? "错误";
+                        
+                        MessageBox.Show(errorMessage, errorTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+                        
+                        // 记录详细错误信息到调试日志
+                        System.Diagnostics.Debug.WriteLine($"[PluginSetting] 插件 {plugin.Name} 设置打开失败: {ex}");
+                    }
                 }
             }
         }
@@ -1817,10 +1821,8 @@ namespace VPetLLM.UI.Windows
 
         private System.Net.IWebProxy GetPluginStoreProxy()
         {
+            // 优先检查插件商店专用代理设置
             var pluginStoreSettings = _plugin.Settings.PluginStore;
-
-            // 插件商店代理独立于常规代理设置，不受CheckBox_Proxy_IsEnabled约束
-            // 如果插件商店代理启用且设置了代理地址，但不是URL拼接类型的代理
             if (pluginStoreSettings != null && pluginStoreSettings.UseProxy && !string.IsNullOrEmpty(pluginStoreSettings.ProxyUrl))
             {
                 var proxyUrl = pluginStoreSettings.ProxyUrl.Trim();
@@ -1844,7 +1846,69 @@ namespace VPetLLM.UI.Windows
                 }
             }
 
+            // 如果插件商店专用代理未设置，则检查通用代理设置
+            var proxySettings = _plugin.Settings.Proxy;
+            
+            // 如果通用代理未启用，返回null
+            if (proxySettings == null || !proxySettings.IsEnabled)
+            {
+                return null;
+            }
+
+            bool useProxy = false;
+            
+            // 如果ForAllAPI为true，则对所有API使用代理
+            if (proxySettings.ForAllAPI)
+            {
+                useProxy = true;
+            }
+            else
+            {
+                // 如果ForAllAPI为false，则根据ForPlugin设置决定
+                useProxy = proxySettings.ForPlugin;
+            }
+
+            if (useProxy)
+            {
+                if (proxySettings.FollowSystemProxy)
+                {
+                    return System.Net.WebRequest.GetSystemWebProxy();
+                }
+                else if (!string.IsNullOrEmpty(proxySettings.Address))
+                {
+                    if (string.IsNullOrEmpty(proxySettings.Protocol))
+                    {
+                        proxySettings.Protocol = "http";
+                    }
+                    var protocol = proxySettings.Protocol.ToLower() == "socks" ? "socks5" : "http";
+                    return new System.Net.WebProxy(new Uri($"{protocol}://{proxySettings.Address}"));
+                }
+            }
+            
             return null;
+        }
+
+        /// <summary>
+        /// 创建带有正确插件商店代理设置的HttpClient
+        /// </summary>
+        private HttpClient CreatePluginStoreHttpClient()
+        {
+            var handler = new HttpClientHandler();
+            var proxy = GetPluginStoreProxy();
+            
+            if (proxy != null)
+            {
+                handler.Proxy = proxy;
+                handler.UseProxy = true;
+            }
+            else
+            {
+                // 明确禁用代理，防止使用系统默认代理
+                handler.UseProxy = false;
+                handler.Proxy = null;
+            }
+            
+            return new HttpClient(handler);
         }
     }
 }
