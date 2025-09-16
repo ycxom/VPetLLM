@@ -39,10 +39,17 @@ namespace VPetLLM.Handlers
 
             Logger.Log($"SmartMessageProcessor: 解析出 {messageSegments.Count} 个消息片段");
 
-            // 按顺序处理每个片段
+            // 预下载所有TTS音频（保留您的优化策略）
+            var audioCache = new Dictionary<string, string>();
+            if (_plugin.Settings.TTS.IsEnabled)
+            {
+                await PredownloadTTSAudioAsync(messageSegments, audioCache);
+            }
+
+            // 按顺序处理每个片段，确保TTS播放完整
             foreach (var segment in messageSegments)
             {
-                await ProcessSegmentAsync(segment);
+                await ProcessSegmentAsync(segment, audioCache);
             }
         }
 
@@ -138,10 +145,65 @@ namespace VPetLLM.Handlers
             };
         }
 
+
+
+        /// <summary>
+        /// 预下载所有TTS音频
+        /// </summary>
+        private async Task PredownloadTTSAudioAsync(List<MessageSegment> segments, Dictionary<string, string> audioCache)
+        {
+            Logger.Log($"SmartMessageProcessor: 开始预下载TTS音频");
+            
+            var downloadTasks = new List<Task>();
+            
+            foreach (var segment in segments)
+            {
+                if (segment.Type == SegmentType.Talk)
+                {
+                    var talkText = ExtractTalkText(segment.ActionValue);
+                    if (!string.IsNullOrEmpty(talkText) && !audioCache.ContainsKey(talkText))
+                    {
+                        downloadTasks.Add(DownloadSingleTTSAsync(talkText, audioCache));
+                    }
+                }
+            }
+            
+            if (downloadTasks.Count > 0)
+            {
+                Logger.Log($"SmartMessageProcessor: 并行下载 {downloadTasks.Count} 个TTS音频");
+                await Task.WhenAll(downloadTasks);
+                Logger.Log($"SmartMessageProcessor: 所有TTS音频下载完成");
+            }
+        }
+
+        /// <summary>
+        /// 下载单个TTS音频
+        /// </summary>
+        private async Task DownloadSingleTTSAsync(string text, Dictionary<string, string> audioCache)
+        {
+            try
+            {
+                Logger.Log($"SmartMessageProcessor: 下载TTS音频: {text.Substring(0, Math.Min(text.Length, 20))}...");
+                var audioFile = await _plugin.TTSService.DownloadTTSAudioAsync(text);
+                if (!string.IsNullOrEmpty(audioFile))
+                {
+                    lock (audioCache)
+                    {
+                        audioCache[text] = audioFile;
+                    }
+                    Logger.Log($"SmartMessageProcessor: TTS音频下载成功: {text.Substring(0, Math.Min(text.Length, 20))}...");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: TTS音频下载失败: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// 处理单个消息片段
         /// </summary>
-        private async Task ProcessSegmentAsync(MessageSegment segment)
+        private async Task ProcessSegmentAsync(MessageSegment segment, Dictionary<string, string> audioCache = null)
         {
             Logger.Log($"SmartMessageProcessor: 处理片段类型: {segment.Type}, 内容: {segment.Content}");
 
@@ -152,7 +214,7 @@ namespace VPetLLM.Handlers
                     break;
 
                 case SegmentType.Talk:
-                    await ProcessTalkSegmentAsync(segment);
+                    await ProcessTalkSegmentAsync(segment, audioCache);
                     break;
 
                 case SegmentType.State:
@@ -223,7 +285,7 @@ namespace VPetLLM.Handlers
         /// <summary>
         /// 处理talk动作片段
         /// </summary>
-        private async Task ProcessTalkSegmentAsync(MessageSegment segment)
+        private async Task ProcessTalkSegmentAsync(MessageSegment segment, Dictionary<string, string> audioCache = null)
         {
             Logger.Log($"SmartMessageProcessor: 处理talk动作: {segment.Content}");
 
@@ -232,24 +294,48 @@ namespace VPetLLM.Handlers
 
             if (!string.IsNullOrEmpty(talkText))
             {
-                // 如果启用了TTS，音频开始播放后立即显示气泡
+                // 如果启用了TTS，音频和气泡同步显示
                 if (_plugin.Settings.TTS.IsEnabled)
                 {
                     Logger.Log($"SmartMessageProcessor: TTS和气泡同步播放: {talkText}");
                     
                     try
                     {
-                        // 启动TTS播放，音频开始播放时立即返回
-                        await _plugin.TTSService.StartPlayTextAsync(talkText);
-                        Logger.Log($"SmartMessageProcessor: TTS已开始播放");
+                        Task audioTask = null;
                         
-                        // TTS开始播放后立即显示气泡
-                        await ExecuteActionAsync(segment.Content);
-                        Logger.Log($"SmartMessageProcessor: TTS和气泡同步完成");
+                        // 检查是否有预下载的音频
+                        if (audioCache != null && audioCache.TryGetValue(talkText, out var audioFile))
+                        {
+                            Logger.Log($"SmartMessageProcessor: 使用预下载的音频文件");
+                            // 启动音频播放（不等待完成）
+                            audioTask = _plugin.TTSService.PlayAudioFileDirectAsync(audioFile);
+                            Logger.Log($"SmartMessageProcessor: 预下载音频开始播放");
+                        }
+                        else
+                        {
+                            Logger.Log($"SmartMessageProcessor: 未找到预下载音频，实时播放");
+                            // 启动音频播放并获取播放任务
+                            audioTask = await _plugin.TTSService.StartPlayTextAsyncWithTask(talkText);
+                            Logger.Log($"SmartMessageProcessor: TTS开始播放");
+                        }
+                        
+                        // 立即显示气泡（与音频同步）
+                        var bubbleTask = ExecuteActionAsync(segment.Content);
+                        
+                        // 等待音频播放完成，确保不被下一个音频中断
+                        if (audioTask != null)
+                        {
+                            await audioTask;
+                            Logger.Log($"SmartMessageProcessor: TTS播放完成");
+                        }
+                        
+                        // 等待气泡显示完成
+                        await bubbleTask;
+                        Logger.Log($"SmartMessageProcessor: TTS和气泡同步处理完成");
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"SmartMessageProcessor: TTS启动失败: {ex.Message}");
+                        Logger.Log($"SmartMessageProcessor: TTS播放失败: {ex.Message}");
                         // TTS失败时仍然显示气泡
                         await ExecuteActionAsync(segment.Content);
                     }

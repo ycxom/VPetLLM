@@ -16,6 +16,9 @@ namespace VPetLLM.Utils
         private MediaPlayer? _mediaPlayer;
         private Setting.TTSSetting _settings;
         private Setting.ProxySetting? _proxySettings;
+        private readonly object _playbackLock = new object();
+        private bool _isPlaying = false;
+        private TaskCompletionSource<bool>? _currentPlaybackTask;
 
         public TTSService(Setting.TTSSetting settings, Setting.ProxySetting? proxySettings = null)
         {
@@ -77,7 +80,113 @@ namespace VPetLLM.Utils
         }
 
         /// <summary>
-        /// 开始播放文本转语音（音频开始播放时立即返回）
+        /// 仅下载TTS音频文件（不播放）
+        /// </summary>
+        /// <param name="text">要转换的文本</param>
+        /// <returns>音频文件路径，失败时返回null</returns>
+        public async Task<string> DownloadTTSAudioAsync(string text)
+        {
+            if (!_settings.IsEnabled || string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            try
+            {
+                Logger.Log($"TTS: 开始下载音频: {text.Substring(0, Math.Min(text.Length, 50))}...");
+                
+                byte[] audioData;
+                string fileExtension;
+
+                // 根据提供商获取音频数据
+                switch (_settings.Provider)
+                {
+                    case "OpenAI":
+                        audioData = await GetOpenAITTSAsync(text);
+                        fileExtension = _settings.OpenAI.Format;
+                        break;
+                    case "URL":
+                    default:
+                        audioData = await GetURLTTSAsync(text);
+                        fileExtension = "mp3";
+                        break;
+                }
+
+                if (audioData == null || audioData.Length == 0)
+                {
+                    Logger.Log("TTS: 未获取到音频数据");
+                    return null;
+                }
+
+                Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
+
+                // 保存到临时文件
+                var tempDir = Path.GetTempPath();
+                var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
+                var tempFile = Path.Combine(tempDir, tempFileName);
+                await File.WriteAllBytesAsync(tempFile, audioData);
+                Logger.Log($"TTS: 音频文件已下载到: {tempFile}");
+
+                return tempFile;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"TTS下载错误: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 直接播放音频文件
+        /// </summary>
+        /// <param name="filePath">音频文件路径</param>
+        /// <returns></returns>
+        public async Task PlayAudioFileDirectAsync(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                Logger.Log($"TTS: 音频文件不存在: {filePath}");
+                return;
+            }
+
+            try
+            {
+                Logger.Log($"TTS: 直接播放预下载音频: {filePath}");
+                await PlayAudioFileAsync(filePath);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"TTS直接播放错误: {ex.Message}");
+            }
+        }
+
+
+
+        /// <summary>
+        /// 等待当前播放完成
+        /// </summary>
+        private async Task WaitForCurrentPlaybackAsync()
+        {
+            TaskCompletionSource<bool>? currentTask = null;
+            
+            lock (_playbackLock)
+            {
+                if (_isPlaying && _currentPlaybackTask != null)
+                {
+                    currentTask = _currentPlaybackTask;
+                }
+            }
+            
+            if (currentTask != null)
+            {
+                Logger.Log("TTS: 等待当前播放完成...");
+                await currentTask.Task;
+                Logger.Log("TTS: 当前播放已完成");
+            }
+        }
+
+        /// <summary>
+        /// 开始播放文本转语音（等待当前播放完成后再播放新音频，但立即返回）
         /// </summary>
         /// <param name="text">要转换的文本</param>
         /// <returns></returns>
@@ -87,6 +196,9 @@ namespace VPetLLM.Utils
             {
                 return false;
             }
+
+            // 等待当前播放完成
+            await WaitForCurrentPlaybackAsync();
 
             try
             {
@@ -124,7 +236,7 @@ namespace VPetLLM.Utils
                 await File.WriteAllBytesAsync(tempFile, audioData);
                 Logger.Log($"TTS: 音频文件保存到: {tempFile}");
 
-                // 开始播放音频（不等待播放完成）
+                // 开始播放音频（不等待播放完成，但设置播放状态）
                 _ = Task.Run(async () => await PlayAudioFileAsync(tempFile));
                 Logger.Log($"TTS: 音频开始播放，立即返回");
 
@@ -134,6 +246,70 @@ namespace VPetLLM.Utils
             {
                 Logger.Log($"TTS播放错误: {ex.Message}");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// 开始播放文本转语音并返回可等待的任务
+        /// </summary>
+        /// <param name="text">要转换的文本</param>
+        /// <returns>可等待的播放任务</returns>
+        public async Task<Task> StartPlayTextAsyncWithTask(string text)
+        {
+            if (!_settings.IsEnabled || string.IsNullOrWhiteSpace(text))
+            {
+                return Task.CompletedTask;
+            }
+
+            // 等待当前播放完成
+            await WaitForCurrentPlaybackAsync();
+
+            try
+            {
+                Logger.Log($"TTS: 开始转换文本: {text.Substring(0, Math.Min(text.Length, 50))}...");
+                
+                byte[] audioData;
+                string fileExtension;
+
+                // 根据提供商获取音频数据
+                switch (_settings.Provider)
+                {
+                    case "OpenAI":
+                        audioData = await GetOpenAITTSAsync(text);
+                        fileExtension = _settings.OpenAI.Format;
+                        break;
+                    case "URL":
+                    default:
+                        audioData = await GetURLTTSAsync(text);
+                        fileExtension = "mp3";
+                        break;
+                }
+
+                if (audioData == null || audioData.Length == 0)
+                {
+                    Logger.Log("TTS: 未获取到音频数据");
+                    return Task.CompletedTask;
+                }
+
+                Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
+
+                // 保存到临时文件
+                var tempDir = Path.GetTempPath();
+                var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
+                var tempFile = Path.Combine(tempDir, tempFileName);
+                await File.WriteAllBytesAsync(tempFile, audioData);
+                Logger.Log($"TTS: 音频文件保存到: {tempFile}");
+
+                // 返回播放任务
+                var playTask = Task.Run(async () => await PlayAudioFileAsync(tempFile));
+                Logger.Log($"TTS: 音频开始播放，返回播放任务");
+
+                return playTask;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"TTS播放错误: {ex.Message}");
+                return Task.CompletedTask;
             }
         }
 
@@ -388,6 +564,12 @@ namespace VPetLLM.Utils
             {
                 Logger.Log($"TTS: 开始播放音频文件: {filePath}");
 
+                lock (_playbackLock)
+                {
+                    _isPlaying = true;
+                    _currentPlaybackTask = new TaskCompletionSource<bool>();
+                }
+
                 var tcs = new TaskCompletionSource<bool>();
                 
                 await Application.Current.Dispatcher.InvokeAsync(() =>
@@ -416,6 +598,13 @@ namespace VPetLLM.Utils
                             _mediaPlayer.MediaEnded -= mediaEndedHandler;
                             _mediaPlayer.MediaFailed -= mediaFailedHandler;
                             Logger.Log($"TTS: 音频播放完成: {filePath}");
+                            
+                            lock (_playbackLock)
+                            {
+                                _isPlaying = false;
+                                _currentPlaybackTask?.TrySetResult(true);
+                            }
+                            
                             tcs.TrySetResult(true);
                         };
                         
@@ -424,6 +613,13 @@ namespace VPetLLM.Utils
                             _mediaPlayer.MediaEnded -= mediaEndedHandler;
                             _mediaPlayer.MediaFailed -= mediaFailedHandler;
                             Logger.Log($"TTS: 音频播放失败: {filePath}, 错误: {e.ErrorException?.Message}");
+                            
+                            lock (_playbackLock)
+                            {
+                                _isPlaying = false;
+                                _currentPlaybackTask?.TrySetResult(false);
+                            }
+                            
                             tcs.TrySetResult(false);
                         };
                         
@@ -437,6 +633,13 @@ namespace VPetLLM.Utils
                     catch (Exception ex)
                     {
                         Logger.Log($"TTS: UI线程播放设置失败: {ex.Message}");
+                        
+                        lock (_playbackLock)
+                        {
+                            _isPlaying = false;
+                            _currentPlaybackTask?.TrySetResult(false);
+                        }
+                        
                         tcs.TrySetResult(false);
                     }
                 });
@@ -465,6 +668,12 @@ namespace VPetLLM.Utils
             catch (Exception ex)
             {
                 Logger.Log($"TTS播放错误: {ex.Message}");
+                
+                lock (_playbackLock)
+                {
+                    _isPlaying = false;
+                    _currentPlaybackTask?.TrySetResult(false);
+                }
             }
         }
 
@@ -475,12 +684,31 @@ namespace VPetLLM.Utils
         {
             try
             {
-                _mediaPlayer?.Stop();
+                lock (_playbackLock)
+                {
+                    _mediaPlayer?.Stop();
+                    _isPlaying = false;
+                    _currentPlaybackTask?.TrySetResult(false);
+                }
                 Logger.Log("TTS: 已停止播放");
             }
             catch (Exception ex)
             {
                 Logger.Log($"TTS停止播放错误: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 检查是否正在播放
+        /// </summary>
+        public bool IsPlaying
+        {
+            get
+            {
+                lock (_playbackLock)
+                {
+                    return _isPlaying;
+                }
             }
         }
 
