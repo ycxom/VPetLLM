@@ -920,41 +920,106 @@ namespace VPetLLM.UI.Windows
         {
             if (sender is CheckBox checkBox && checkBox.DataContext is UnifiedPluginItem item && item.LocalPlugin != null)
             {
-                bool isEnabled = checkBox.IsChecked ?? false;
-                item.IsEnabled = isEnabled;
-                item.LocalPlugin.Enabled = isEnabled;
-
-                if (isEnabled)
-                {
-                    item.LocalPlugin.Initialize(_plugin);
-                    _plugin.ChatCore?.AddPlugin(item.LocalPlugin);
-                    Logger.Log($"Plugin '{item.LocalPlugin.Name}' has been enabled and initialized.");
-                }
-                else
-                {
-                    item.LocalPlugin.Unload();
-                    _plugin.ChatCore?.RemovePlugin(item.LocalPlugin);
-                    Logger.Log($"Plugin '{item.LocalPlugin.Name}' has been disabled and unloaded.");
-                }
-
-                // 更新状态文本
                 var langCode = _plugin.Settings.Language;
-                item.StatusText = isEnabled ?
-                    LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行中" :
-                    LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用";
-
-                // 更新描述（因为启用/禁用状态可能影响多语言描述的获取）
-                item.Description = GetPluginDescription(item.LocalPlugin, langCode);
-                item.OriginalDescription = GetPluginDescription(item.LocalPlugin, langCode);
-
-                // 刷新DataGrid显示
-                if (FindName("DataGrid_Plugins") is DataGrid dataGrid)
+                
+                try
                 {
-                    dataGrid.Items.Refresh();
-                }
+                    bool isEnabled = checkBox.IsChecked ?? false;
+                    item.IsEnabled = isEnabled;
+                    item.LocalPlugin.Enabled = isEnabled;
 
-                _plugin.SavePluginStates();
-                Logger.Log("Plugin states have been saved.");
+                    if (isEnabled)
+                    {
+                        try
+                        {
+                            item.LocalPlugin.Initialize(_plugin);
+                            _plugin.ChatCore?.AddPlugin(item.LocalPlugin);
+                            Logger.Log($"Plugin '{item.LocalPlugin.Name}' has been enabled and initialized.");
+                        }
+                        catch (Exception ex)
+                        {
+                            // 如果初始化失败，回滚状态
+                            item.IsEnabled = false;
+                            item.LocalPlugin.Enabled = false;
+                            checkBox.IsChecked = false;
+                            
+                            var errorMsg = $"{LanguageHelper.Get("Plugin.InitializeFailed", langCode) ?? "插件初始化失败"}: {ex.Message}";
+                            MessageBox.Show(errorMsg, LanguageHelper.Get("Error", langCode) ?? "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                            Logger.Log($"Plugin '{item.LocalPlugin.Name}' initialization failed: {ex.Message}");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            item.LocalPlugin.Unload();
+                            _plugin.ChatCore?.RemovePlugin(item.LocalPlugin);
+                            Logger.Log($"Plugin '{item.LocalPlugin.Name}' has been disabled and unloaded.");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Warning: Plugin '{item.LocalPlugin.Name}' unload failed: {ex.Message}");
+                            // 卸载失败不回滚状态，因为插件可能已经部分卸载
+                        }
+                    }
+
+                    // 更新状态文本
+                    item.StatusText = isEnabled ?
+                        LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行中" :
+                        LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用";
+
+                    // 更新描述（因为启用/禁用状态可能影响多语言描述的获取）
+                    try
+                    {
+                        item.Description = GetPluginDescription(item.LocalPlugin, langCode);
+                        item.OriginalDescription = GetPluginDescription(item.LocalPlugin, langCode);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Warning: Failed to update plugin description for '{item.LocalPlugin.Name}': {ex.Message}");
+                    }
+
+                    // 刷新DataGrid显示
+                    try
+                    {
+                        if (FindName("DataGrid_Plugins") is DataGrid dataGrid)
+                        {
+                            dataGrid.Items.Refresh();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Warning: Failed to refresh plugin grid: {ex.Message}");
+                    }
+
+                    // 保存插件状态
+                    try
+                    {
+                        _plugin.SavePluginStates();
+                        Logger.Log("Plugin states have been saved.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Warning: Failed to save plugin states: {ex.Message}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var errorMsg = $"{LanguageHelper.Get("Plugin.OperationFailed", langCode) ?? "插件操作失败"}: {ex.Message}";
+                    MessageBox.Show(errorMsg, LanguageHelper.Get("Error", langCode) ?? "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Logger.Log($"Plugin operation failed for '{item.LocalPlugin?.Name}': {ex}");
+                    
+                    // 尝试重置复选框状态
+                    try
+                    {
+                        checkBox.IsChecked = item.LocalPlugin?.Enabled ?? false;
+                    }
+                    catch
+                    {
+                        // 忽略重置失败
+                    }
+                }
             }
         }
 
@@ -1663,7 +1728,20 @@ namespace VPetLLM.UI.Windows
                     catch (Exception ex)
                     {
                         var langCode = _plugin.Settings.Language;
-                        var errorMessage = $"{LanguageHelper.Get("Plugin.SettingError", langCode) ?? "插件设置打开失败"}: {ex.Message}";
+                        
+                        // 针对不同类型的错误提供更具体的提示
+                        string errorMessage;
+                        if (ex.Message.Contains("不具有由 URI") || ex.Message.Contains("识别的资源"))
+{
+                            errorMessage = $"{LanguageHelper.Get("Plugin.ResourceError", langCode) ?? "插件资源文件缺失或损坏"}\n\n" +
+                                         $"插件: {plugin.Name}\n" +
+                                         $"建议: 尝试重新安装此插件或联系插件开发者";
+                        }
+                        else
+                        {
+                            errorMessage = $"{LanguageHelper.Get("Plugin.SettingError", langCode) ?? "插件设置打开失败"}: {ex.Message}";
+                        }
+                        
                         var errorTitle = LanguageHelper.Get("Error", langCode) ?? "错误";
                         
                         MessageBox.Show(errorMessage, errorTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
