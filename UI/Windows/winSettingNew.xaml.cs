@@ -163,6 +163,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Proxy_ForOllama")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForOpenAI")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForTTS")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).Click += Control_Click;
 
@@ -174,8 +175,9 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).Click += Control_Click;
             ((ComboBox)this.FindName("ComboBox_TTS_Provider")).SelectionChanged += Control_SelectionChanged;
             ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).Click += Control_Click;
-            ((TextBox)this.FindName("TextBox_TTS_DouBao_BaseUrl")).TextChanged += Control_TextChanged;
-            ((ComboBox)this.FindName("ComboBox_TTS_DouBao_Voice")).SelectionChanged += Control_SelectionChanged;
+            ((TextBox)this.FindName("TextBox_TTS_URL_BaseUrl")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_URL_Voice")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_TTS_URL_RequestMethod")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_TTS_OpenAI_BaseUrl")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_TTS_OpenAI_ApiKey")).TextChanged += Control_TextChanged;
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Model")).SelectionChanged += Control_SelectionChanged;
@@ -407,6 +409,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Proxy_ForOllama")).IsChecked = _plugin.Settings.Proxy.ForOllama;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForOpenAI")).IsChecked = _plugin.Settings.Proxy.ForOpenAI;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked = _plugin.Settings.Proxy.ForGemini;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForTTS")).IsChecked = _plugin.Settings.Proxy.ForTTS;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked = _plugin.Settings.Proxy.ForMcp;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked = _plugin.Settings.Proxy.ForPlugin;
 
@@ -443,14 +446,17 @@ namespace VPetLLM.UI.Windows
                 }
             }
 
-            // 豆包TTS设置
-            ((TextBox)this.FindName("TextBox_TTS_DouBao_BaseUrl")).Text = _plugin.Settings.TTS.DouBao.BaseUrl;
-            var douBaoVoiceComboBox = (ComboBox)this.FindName("ComboBox_TTS_DouBao_Voice");
-            foreach (ComboBoxItem item in douBaoVoiceComboBox.Items)
+            // URL TTS设置
+            ((TextBox)this.FindName("TextBox_TTS_URL_BaseUrl")).Text = _plugin.Settings.TTS.URL.BaseUrl;
+            ((TextBox)this.FindName("TextBox_TTS_URL_Voice")).Text = _plugin.Settings.TTS.URL.Voice;
+
+            // 加载请求方法设置
+            var URLMethodComboBox = (ComboBox)this.FindName("ComboBox_TTS_URL_RequestMethod");
+            foreach (ComboBoxItem item in URLMethodComboBox.Items)
             {
-                if (item.Tag?.ToString() == _plugin.Settings.TTS.DouBao.Voice)
+                if (item.Tag?.ToString() == _plugin.Settings.TTS.URL.Method)
                 {
-                    douBaoVoiceComboBox.SelectedItem = item;
+                    URLMethodComboBox.SelectedItem = item;
                     break;
                 }
             }
@@ -484,7 +490,7 @@ namespace VPetLLM.UI.Windows
             ComboBox_TTS_Provider_SelectionChanged(providerComboBox, null);
 
             // 初始化TTS服务
-            _ttsService = new TTSService(_plugin.Settings.TTS);
+            _ttsService = new TTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
         }
 
         private void SaveSettings()
@@ -595,6 +601,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Proxy.ForOllama = ((CheckBox)this.FindName("CheckBox_Proxy_ForOllama")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForOpenAI = ((CheckBox)this.FindName("CheckBox_Proxy_ForOpenAI")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForGemini = ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked ?? true;
+            _plugin.Settings.Proxy.ForTTS = ((CheckBox)this.FindName("CheckBox_Proxy_ForTTS")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForMcp = ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForPlugin = ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked ?? true;
 
@@ -612,15 +619,18 @@ namespace VPetLLM.UI.Windows
             var selectedProviderItem = ((ComboBox)this.FindName("ComboBox_TTS_Provider")).SelectedItem as ComboBoxItem;
             if (selectedProviderItem != null)
             {
-                _plugin.Settings.TTS.Provider = selectedProviderItem.Tag?.ToString() ?? "DouBao";
+                _plugin.Settings.TTS.Provider = selectedProviderItem.Tag?.ToString() ?? "URL";
             }
 
-            // 豆包TTS设置
-            _plugin.Settings.TTS.DouBao.BaseUrl = ((TextBox)this.FindName("TextBox_TTS_DouBao_BaseUrl")).Text;
-            var selectedDouBaoVoiceItem = ((ComboBox)this.FindName("ComboBox_TTS_DouBao_Voice")).SelectedItem as ComboBoxItem;
-            if (selectedDouBaoVoiceItem != null)
+            // URL TTS设置
+            _plugin.Settings.TTS.URL.BaseUrl = ((TextBox)this.FindName("TextBox_TTS_URL_BaseUrl")).Text;
+            _plugin.Settings.TTS.URL.Voice = ((TextBox)this.FindName("TextBox_TTS_URL_Voice")).Text;
+
+            // 保存请求方法设置
+            var selectedURLMethodItem = ((ComboBox)this.FindName("ComboBox_TTS_URL_RequestMethod")).SelectedItem as ComboBoxItem;
+            if (selectedURLMethodItem != null)
             {
-                _plugin.Settings.TTS.DouBao.Voice = selectedDouBaoVoiceItem.Tag?.ToString() ?? "36";
+                _plugin.Settings.TTS.URL.Method = selectedURLMethodItem.Tag?.ToString() ?? "GET";
             }
 
             // OpenAI TTS设置
@@ -641,7 +651,7 @@ namespace VPetLLM.UI.Windows
             }
 
             // 更新TTS服务设置
-            _ttsService?.UpdateSettings(_plugin.Settings.TTS);
+            _ttsService?.UpdateSettings(_plugin.Settings.TTS, _plugin.Settings.Proxy);
             _plugin.UpdateTTSService();
 
             _plugin.Settings.Save();
@@ -1246,6 +1256,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("CheckBox_Proxy_ForOllama") is CheckBox checkBoxProxyForOllama) checkBoxProxyForOllama.Content = LanguageHelper.Get("Proxy.ForOllama", langCode);
             if (FindName("CheckBox_Proxy_ForOpenAI") is CheckBox checkBoxProxyForOpenAI) checkBoxProxyForOpenAI.Content = LanguageHelper.Get("Proxy.ForOpenAI", langCode);
             if (FindName("CheckBox_Proxy_ForGemini") is CheckBox checkBoxProxyForGemini) checkBoxProxyForGemini.Content = LanguageHelper.Get("Proxy.ForGemini", langCode);
+            if (FindName("CheckBox_Proxy_ForTTS") is CheckBox checkBoxProxyForTTS) checkBoxProxyForTTS.Content = LanguageHelper.Get("Proxy.ForTTS", langCode);
             if (FindName("CheckBox_Proxy_ForMcp") is CheckBox checkBoxProxyForMcp) checkBoxProxyForMcp.Content = LanguageHelper.Get("Proxy.ForMcp", langCode);
             if (FindName("CheckBox_Proxy_ForPlugin") is CheckBox checkBoxProxyForPlugin) checkBoxProxyForPlugin.Content = LanguageHelper.Get("Proxy.ForPlugin", langCode);
 
@@ -1255,15 +1266,29 @@ namespace VPetLLM.UI.Windows
             if (FindName("Label_PluginStore_ProxyUrl") is Label labelPluginStoreProxyUrl) labelPluginStoreProxyUrl.Content = LanguageHelper.Get("PluginStore.ProxyUrl", langCode);
             if (FindName("TextBlock_PluginStore_ProxyUrlNote") is TextBlock textBlockPluginStoreProxyUrlNote) textBlockPluginStoreProxyUrlNote.Text = LanguageHelper.Get("PluginStore.ProxyUrlNote", langCode);
 
-            // TTS UI
-            if (FindName("CheckBox_TTS_IsEnabled") is CheckBox checkBoxTTSIsEnabled2) checkBoxTTSIsEnabled2.Content = LanguageHelper.Get("TTS.Enable", langCode);
-            if (FindName("Label_TTS_BaseUrl") is Label labelTTSBaseUrl2) labelTTSBaseUrl2.Content = "TTS API地址";
-            if (FindName("Label_TTS_Voice") is Label labelTTSVoice2) labelTTSVoice2.Content = LanguageHelper.Get("TTS.Voice", langCode);
-            if (FindName("TextBlock_TTS_Volume") is TextBlock textBlockTTSVolume2) textBlockTTSVolume2.Text = LanguageHelper.Get("TTS.Volume", langCode);
-            if (FindName("TextBlock_TTS_Speed") is TextBlock textBlockTTSSpeed2) textBlockTTSSpeed2.Text = LanguageHelper.Get("TTS.Speed", langCode);
-            if (FindName("CheckBox_TTS_AutoPlay") is CheckBox checkBoxTTSAutoPlay2) checkBoxTTSAutoPlay2.Content = "自动播放";
-            if (FindName("CheckBox_TTS_OnlyPlayAIResponse") is CheckBox checkBoxTTSOnlyPlayAIResponse2) checkBoxTTSOnlyPlayAIResponse2.Content = LanguageHelper.Get("TTS.OnlyPlayAIResponse", langCode);
-            if (FindName("Button_TTS_Test") is Button buttonTTSTest2) buttonTTSTest2.Content = LanguageHelper.Get("TTS.TestTTS", langCode);
+            // TTS UI - 更新的多语言支持
+            if (FindName("Label_TTS_Provider") is Label labelTTSProvider) labelTTSProvider.Content = LanguageHelper.Get("TTS.Provider", langCode);
+            if (FindName("TextBlock_TTS_Volume") is TextBlock textBlockTTSVolume) textBlockTTSVolume.Text = LanguageHelper.Get("TTS.Volume", langCode);
+            if (FindName("TextBlock_TTS_Speed") is TextBlock textBlockTTSSpeed) textBlockTTSSpeed.Text = LanguageHelper.Get("TTS.Speed", langCode);
+
+            // URL TTS
+            if (FindName("Label_TTS_URL_BaseUrl") is Label labelTTSURLBaseUrl) labelTTSURLBaseUrl.Content = LanguageHelper.Get("TTS.URL.BaseUrl", langCode);
+            if (FindName("Label_TTS_URL_Voice") is Label labelTTSURLVoice) labelTTSURLVoice.Content = LanguageHelper.Get("TTS.URL.Voice", langCode);
+            if (FindName("Label_TTS_URL_RequestMethod") is Label labelTTSURLRequestMethod) labelTTSURLRequestMethod.Content = LanguageHelper.Get("TTS.URL.RequestMethod", langCode);
+            if (FindName("TextBlock_TTS_URL_Config") is TextBlock textBlockTTSURLConfig) textBlockTTSURLConfig.Text = LanguageHelper.Get("TTS.URL.Config", langCode);
+            if (FindName("TextBlock_TTS_URL_Description") is TextBlock textBlockTTSURLDescription) textBlockTTSURLDescription.Text = LanguageHelper.Get("TTS.URL.Description", langCode);
+            if (FindName("TextBlock_TTS_URL_Voice_Tip") is TextBlock textBlockTTSURLVoiceTip) textBlockTTSURLVoiceTip.Text = LanguageHelper.Get("TTS.URL.VoiceTip", langCode);
+            if (FindName("TextBlock_TTS_OpenAI_Config") is TextBlock textBlockTTSOpenAIConfig) textBlockTTSOpenAIConfig.Text = LanguageHelper.Get("TTS.OpenAI.Config", langCode);
+
+            // OpenAI TTS
+            if (FindName("Label_TTS_OpenAI_BaseUrl") is Label labelTTSOpenAIBaseUrl) labelTTSOpenAIBaseUrl.Content = LanguageHelper.Get("TTS.OpenAI.BaseUrl", langCode);
+            if (FindName("Label_TTS_OpenAI_ApiKey") is Label labelTTSOpenAIApiKey) labelTTSOpenAIApiKey.Content = LanguageHelper.Get("TTS.OpenAI.ApiKey", langCode);
+            if (FindName("Label_TTS_OpenAI_Model") is Label labelTTSOpenAIModel) labelTTSOpenAIModel.Content = LanguageHelper.Get("TTS.OpenAI.Model", langCode);
+            if (FindName("Label_TTS_OpenAI_Voice") is Label labelTTSOpenAIVoice) labelTTSOpenAIVoice.Content = LanguageHelper.Get("TTS.OpenAI.Voice", langCode);
+            if (FindName("Label_TTS_OpenAI_Format") is Label labelTTSOpenAIFormat) labelTTSOpenAIFormat.Content = LanguageHelper.Get("TTS.OpenAI.Format", langCode);
+            if (FindName("Button_TTS_OpenAI_RefreshModels") is Button buttonTTSOpenAIRefreshModels) buttonTTSOpenAIRefreshModels.Content = LanguageHelper.Get("TTS.OpenAI.RefreshModels", langCode);
+            if (FindName("TextBlock_TTS_OpenAI_BaseUrl_Tip") is TextBlock textBlockTTSOpenAIBaseUrlTip) textBlockTTSOpenAIBaseUrlTip.Text = LanguageHelper.Get("TTS.OpenAI.BaseUrlTip", langCode);
+            if (FindName("TextBlock_TTS_OpenAI_Description") is TextBlock textBlockTTSOpenAIDescription) textBlockTTSOpenAIDescription.Text = LanguageHelper.Get("TTS.OpenAI.Description", langCode);
         }
 
         private async void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
@@ -1653,8 +1678,8 @@ namespace VPetLLM.UI.Windows
                 var provider = selectedItem.Tag?.ToString();
 
                 // 显示/隐藏对应的配置面板
-                if (FindName("Panel_TTS_DouBao") is StackPanel douBaoPanel)
-                    douBaoPanel.Visibility = provider == "DouBao" ? Visibility.Visible : Visibility.Collapsed;
+                if (FindName("Panel_TTS_URL") is StackPanel URLPanel)
+                    URLPanel.Visibility = provider == "URL" ? Visibility.Visible : Visibility.Collapsed;
 
                 if (FindName("Panel_TTS_OpenAI") is StackPanel openAIPanel)
                     openAIPanel.Visibility = provider == "OpenAI" ? Visibility.Visible : Visibility.Collapsed;
@@ -1731,7 +1756,9 @@ namespace VPetLLM.UI.Windows
                 {
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
-                    var response = await client.GetAsync($"{baseUrl.TrimEnd('/')}/model");
+                    // 从TTS URL推导模型API URL
+                    var modelUrl = baseUrl.Replace("/v1/tts", "/model").Replace("/tts", "/model");
+                    var response = await client.GetAsync(modelUrl);
                     if (response.IsSuccessStatusCode)
                     {
                         var json = await response.Content.ReadAsStringAsync();

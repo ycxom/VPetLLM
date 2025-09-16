@@ -121,6 +121,7 @@ namespace VPetLLM
             public bool ForOllama { get; set; } = true;
             public bool ForOpenAI { get; set; } = true;
             public bool ForGemini { get; set; } = true;
+            public bool ForTTS { get; set; } = true;
             public bool ForMcp { get; set; } = true;
             public bool ForPlugin { get; set; } = true;
         }
@@ -134,23 +135,24 @@ namespace VPetLLM
         public class TTSSetting
         {
             public bool IsEnabled { get; set; } = false;
-            public string Provider { get; set; } = "DouBao";
+            public string Provider { get; set; } = "URL";
             public bool OnlyPlayAIResponse { get; set; } = true;
             public bool AutoPlay { get; set; } = true;
             public double Volume { get; set; } = 1.0;
             public double Speed { get; set; } = 1.0;
             
-            // DouBao TTS 设置
-            public DouBaoTTSSetting DouBao { get; set; } = new DouBaoTTSSetting();
+            // URL TTS 设置
+            public URLTTSSetting URL { get; set; } = new URLTTSSetting();
             
             // OpenAI TTS 设置 (fish.audio)
             public OpenAITTSSetting OpenAI { get; set; } = new OpenAITTSSetting();
         }
 
-        public class DouBaoTTSSetting
+        public class URLTTSSetting
         {
             public string BaseUrl { get; set; } = "https://doubaotts.zeabur.app";
             public string Voice { get; set; } = "36";
+            public string Method { get; set; } = "GET"; // GET 或 POST
         }
 
         public class OpenAITTSSetting

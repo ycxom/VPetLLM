@@ -81,7 +81,7 @@ namespace VPetLLM
             _syncTimer.Enabled = true;
 
             // 初始化TTS服务
-            TTSService = new TTSService(Settings.TTS);
+            TTSService = new TTSService(Settings.TTS, Settings.Proxy);
 
             LoadPlugins();
         }
@@ -286,7 +286,7 @@ namespace VPetLLM
 
         public void UpdateTTSService()
         {
-            TTSService?.UpdateSettings(Settings.TTS);
+            TTSService?.UpdateSettings(Settings.TTS, Settings.Proxy);
             Logger.Log("TTS服务设置已更新");
         }
 

@@ -580,6 +580,11 @@
                                             IsChecked="True"
                                             Style="{StaticResource ModernCheckBox}"/>
                                 </StackPanel>
+                                <CheckBox x:Name="CheckBox_Proxy_ForTTS"
+                                        Content="TTS"
+                                        Margin="0,0,0,12"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_Proxy_ForMcp"
                                         Content="MCP"
                                         Margin="0,0,0,8"
@@ -648,7 +653,7 @@
                                             Margin="0,0,0,16"
                                             SelectionChanged="ComboBox_TTS_Provider_SelectionChanged"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="DouBao" Tag="DouBao" IsSelected="True"/>
+                                        <ComboBoxItem Content="URL" Tag="URL" IsSelected="True"/>
                                         <ComboBoxItem Content="OpenAI" Tag="OpenAI"/>
                                         <ComboBox.ItemContainerStyle>
                                             <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
@@ -675,8 +680,8 @@
                                                                         VerticalAlignment="Center"/>
                                                             </StackPanel>
                                                             <DataTemplate.Triggers>
-                                                                <DataTrigger Binding="{Binding}" Value="DouBao">
-                                                                    <Setter TargetName="ItemIconText" Property="Text" Value="豆"/>
+                                                                <DataTrigger Binding="{Binding}" Value="URL">
+                                                                    <Setter TargetName="ItemIconText" Property="Text" Value="🌐"/>
                                                                     <Setter TargetName="ItemIcon" Property="Background" Value="#FF6B35"/>
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding}" Value="OpenAI">
@@ -756,35 +761,43 @@
                             VerticalScrollBarVisibility="Auto">
                         <Border Style="{StaticResource CardContainer}">
                             <StackPanel Style="{StaticResource SettingGroup}">
-                                <!-- DouBao TTS 配置 -->
-                                <StackPanel x:Name="Panel_TTS_DouBao"
+                                <!-- URL TTS 配置 -->
+                                <StackPanel x:Name="Panel_TTS_URL"
                                         Visibility="Visible">
-                                    <TextBlock Text="豆包 TTS 配置"
+                                    <TextBlock x:Name="TextBlock_TTS_URL_Config"
+                                            Text="URL TTS 配置"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="服务地址"
-                                            x:Name="Label_TTS_DouBao_BaseUrl"
+                                    <Label x:Name="Label_TTS_URL_BaseUrl"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_DouBao_BaseUrl"
+                                    <TextBox x:Name="TextBox_TTS_URL_BaseUrl"
                                             Text="https://doubaotts.zeabur.app"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="语音类型"
-                                            x:Name="Label_TTS_DouBao_Voice"
+                                    <Label x:Name="Label_TTS_URL_Voice"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_DouBao_Voice"
+                                    <TextBox x:Name="TextBox_TTS_URL_Voice"
+                                            Text="36"
+                                            Margin="0,0,0,8"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="请输入语音模型ID，用于切换不同的语音模型（如：36为女声1，37为男声1等）"
+                                            x:Name="TextBlock_TTS_URL_Voice_Tip"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Label x:Name="Label_TTS_URL_RequestMethod"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_TTS_URL_RequestMethod"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="女声1 (36)" Tag="36" IsSelected="True"/>
-                                        <ComboBoxItem Content="男声1 (37)" Tag="37"/>
-                                        <ComboBoxItem Content="女声2 (38)" Tag="38"/>
-                                        <ComboBoxItem Content="男声2 (39)" Tag="39"/>
+                                        <ComboBoxItem Content="GET" Tag="GET" IsSelected="True"/>
+                                        <ComboBoxItem Content="POST" Tag="POST"/>
                                     </ComboBox>
 
-                                    <TextBlock Text="豆包TTS使用简单的HTTP GET请求，支持多种语音类型。"
-                                            x:Name="TextBlock_TTS_DouBao_Description"
+                                    <TextBlock Text="URL TTS支持GET和POST请求方法，支持多种语音类型。"
+                                            x:Name="TextBlock_TTS_URL_Description"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
                                 </StackPanel>
@@ -792,27 +805,29 @@
                                 <!-- OpenAI TTS 配置 -->
                                 <StackPanel x:Name="Panel_TTS_OpenAI"
                                         Visibility="Collapsed">
-                                    <TextBlock Text="OpenAI TTS 配置"
+                                    <TextBlock x:Name="TextBlock_TTS_OpenAI_Config"
+                                            Text="OpenAI TTS 配置"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="API 地址"
-                                            x:Name="Label_TTS_OpenAI_BaseUrl"
+                                    <Label x:Name="Label_TTS_OpenAI_BaseUrl"
                                             Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_TTS_OpenAI_BaseUrl"
-                                            Text="https://api.fish.audio/v1"
-                                            Margin="0,0,0,16"
+                                            Text="https://api.fish.audio/v1/tts"
+                                            Margin="0,0,0,8"
                                             Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="请输入完整的TTS API地址，包含完整路径（如：https://api.fish.audio/v1/tts）"
+                                            x:Name="TextBlock_TTS_OpenAI_BaseUrl_Tip"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
 
-                                    <Label Content="API Key"
-                                            x:Name="Label_TTS_OpenAI_ApiKey"
+                                    <Label x:Name="Label_TTS_OpenAI_ApiKey"
                                             Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_TTS_OpenAI_ApiKey"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="模型"
-                                            x:Name="Label_TTS_OpenAI_Model"
+                                    <Label x:Name="Label_TTS_OpenAI_Model"
                                             Style="{StaticResource SettingLabel}"/>
                                     <Grid Margin="0,0,0,16">
                                         <Grid.ColumnDefinitions>
@@ -834,8 +849,7 @@
                                                 FontSize="12"/>
                                     </Grid>
 
-                                    <Label Content="语音"
-                                            x:Name="Label_TTS_OpenAI_Voice"
+                                    <Label x:Name="Label_TTS_OpenAI_Voice"
                                             Style="{StaticResource SettingLabel}"/>
                                     <ComboBox x:Name="ComboBox_TTS_OpenAI_Voice"
                                             Margin="0,0,0,16"
@@ -848,8 +862,7 @@
                                         <ComboBoxItem Content="shimmer" Tag="shimmer"/>
                                     </ComboBox>
 
-                                    <Label Content="音频格式"
-                                            x:Name="Label_TTS_OpenAI_Format"
+                                    <Label x:Name="Label_TTS_OpenAI_Format"
                                             Style="{StaticResource SettingLabel}"/>
                                     <ComboBox x:Name="ComboBox_TTS_OpenAI_Format"
                                             Margin="0,0,0,16"

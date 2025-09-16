@@ -692,6 +692,12 @@
             "zh-hant": "Gemini",
             "jp": "Gemini"
         },
+        "ForTTS": {
+            "en": "TTS",
+            "zh-hans": "TTS",
+            "zh-hant": "TTS",
+            "jp": "TTS"
+        },
         "ForMcp": {
             "en": "MCP",
             "zh-hans": "MCP",
@@ -830,12 +836,12 @@
             "zh-hant": "測試TTS",
             "jp": "TTSテスト"
         },
-        "DouBao": {
+        "URL": {
             "Config": {
-                "en": "DouBao TTS Configuration",
-                "zh-hans": "豆包 TTS 配置",
-                "zh-hant": "豆包 TTS 配置",
-                "jp": "DouBao TTS設定"
+                "en": "URL TTS Configuration",
+                "zh-hans": "URL TTS 配置",
+                "zh-hant": "URL TTS 配置",
+                "jp": "URL TTS設定"
             },
             "BaseUrl": {
                 "en": "Service URL",
@@ -844,16 +850,28 @@
                 "jp": "サービスURL"
             },
             "Voice": {
-                "en": "Voice Type",
-                "zh-hans": "语音类型",
-                "zh-hant": "語音類型",
-                "jp": "音声タイプ"
+                "en": "Voice Model",
+                "zh-hans": "语音模型",
+                "zh-hant": "語音模型",
+                "jp": "音声モデル"
+            },
+            "VoiceTip": {
+                "en": "Enter the voice model ID to switch between different voice models (e.g., 36 for female voice 1, 37 for male voice 1, etc.)",
+                "zh-hans": "请输入语音模型ID，用于切换不同的语音模型（如：36为女声1，37为男声1等）",
+                "zh-hant": "請輸入語音模型ID，用於切換不同的語音模型（如：36為女聲1，37為男聲1等）",
+                "jp": "音声モデルIDを入力して、異なる音声モデルを切り替えます（例：36は女性音声1、37は男性音声1など）"
+            },
+            "RequestMethod": {
+                "en": "Request Method",
+                "zh-hans": "请求方法",
+                "zh-hant": "請求方法",
+                "jp": "リクエスト方法"
             },
             "Description": {
-                "en": "DouBao TTS uses simple HTTP GET requests and supports multiple voice types.",
-                "zh-hans": "豆包TTS使用简单的HTTP GET请求，支持多种语音类型。",
-                "zh-hant": "豆包TTS使用簡單的HTTP GET請求，支援多種語音類型。",
-                "jp": "DouBao TTSはシンプルなHTTP GETリクエストを使用し、複数の音声タイプをサポートします。"
+                "en": "URL TTS supports GET and POST request methods and multiple voice types.",
+                "zh-hans": "URL TTS支持GET和POST请求方法，支持多种语音类型。",
+                "zh-hant": "URL TTS支援GET和POST請求方法，支援多種語音類型。",
+                "jp": "URL TTSはGETとPOSTリクエスト方法をサポートし、複数の音声タイプをサポートします。"
             }
         },
         "OpenAI": {
@@ -898,6 +916,42 @@
                 "zh-hans": "支持OpenAI TTS API格式的服务，如fish.audio等。需要提供有效的API Key。",
                 "zh-hant": "支援OpenAI TTS API格式的服務，如fish.audio等。需要提供有效的API Key。",
                 "jp": "fish.audioなどのOpenAI TTS API形式のサービスをサポートします。有効なAPI Keyが必要です。"
+            },
+            "RefreshModels": {
+                "en": "Refresh",
+                "zh-hans": "刷新",
+                "zh-hant": "刷新",
+                "jp": "更新"
+            },
+            "BaseUrlTip": {
+                "en": "Please enter the complete TTS API URL including the full path (e.g., https://api.fish.audio/v1/tts)",
+                "zh-hans": "请输入完整的TTS API地址，包含完整路径（如：https://api.fish.audio/v1/tts）",
+                "zh-hant": "請輸入完整的TTS API地址，包含完整路徑（如：https://api.fish.audio/v1/tts）",
+                "jp": "完全なパスを含む完全なTTS API URLを入力してください（例：https://api.fish.audio/v1/tts）"
+            },
+            "ApiKeyRequired": {
+                "en": "Please enter API Key first",
+                "zh-hans": "请先输入API Key",
+                "zh-hant": "請先輸入API Key",
+                "jp": "まずAPI Keyを入力してください"
+            },
+            "ModelsRefreshed": {
+                "en": "Model list refreshed",
+                "zh-hans": "模型列表已刷新",
+                "zh-hant": "模型列表已刷新",
+                "jp": "モデルリストが更新されました"
+            },
+            "RefreshModelsFail": {
+                "en": "Failed to get model list, please check API Key and network connection.",
+                "zh-hans": "获取模型列表失败，请检查API Key和网络连接。",
+                "zh-hant": "獲取模型列表失敗，請檢查API Key和網路連接。",
+                "jp": "モデルリストの取得に失敗しました。API Keyとネットワーク接続を確認してください。"
+            },
+            "RefreshModelsError": {
+                "en": "Error getting model list",
+                "zh-hans": "获取模型列表出错",
+                "zh-hant": "獲取模型列表出錯",
+                "jp": "モデルリスト取得エラー"
             }
         }
     },
