@@ -34,5 +34,25 @@
     "Success": {
         "zh-hans": "成功",
         "en": "Success"
+    },
+    "TTS.PlayFailed": {
+        "zh-hans": "TTS播放失败",
+        "en": "TTS playback failed"
+    },
+    "TTS.NetworkError": {
+        "zh-hans": "TTS网络连接失败",
+        "en": "TTS network connection failed"
+    },
+    "TTS.TestSuccess": {
+        "zh-hans": "TTS测试成功",
+        "en": "TTS test successful"
+    },
+    "TTS.TestFailed": {
+        "zh-hans": "TTS测试失败",
+        "en": "TTS test failed"
+    },
+    "TTS.InvalidSettings": {
+        "zh-hans": "TTS设置无效",
+        "en": "Invalid TTS settings"
     }
 }

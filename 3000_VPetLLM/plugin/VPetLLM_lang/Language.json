@@ -781,6 +781,126 @@
             "jp": "いいえ"
         }
     },
+    "TTS": {
+        "Tab": {
+            "en": "TTS Voice",
+            "zh-hans": "TTS语音",
+            "zh-hant": "TTS語音",
+            "jp": "TTS音声"
+        },
+        "Enable": {
+            "en": "Enable TTS Voice Synthesis",
+            "zh-hans": "启用TTS语音合成",
+            "zh-hant": "啟用TTS語音合成",
+            "jp": "TTS音声合成を有効にする"
+        },
+        "Provider": {
+            "en": "TTS Provider",
+            "zh-hans": "TTS 提供商",
+            "zh-hant": "TTS 提供商",
+            "jp": "TTSプロバイダー"
+        },
+        "OnlyPlayAIResponse": {
+            "en": "Only Play AI Response",
+            "zh-hans": "仅播放AI回复",
+            "zh-hant": "僅播放AI回復",
+            "jp": "AI応答のみ再生"
+        },
+        "Voice": {
+            "en": "Voice",
+            "zh-hans": "语音",
+            "zh-hant": "語音",
+            "jp": "音声"
+        },
+        "Speed": {
+            "en": "Speed",
+            "zh-hans": "语速",
+            "zh-hant": "語速",
+            "jp": "速度"
+        },
+        "Volume": {
+            "en": "Volume",
+            "zh-hans": "音量",
+            "zh-hant": "音量",
+            "jp": "音量"
+        },
+        "TestTTS": {
+            "en": "Test TTS",
+            "zh-hans": "测试TTS",
+            "zh-hant": "測試TTS",
+            "jp": "TTSテスト"
+        },
+        "DouBao": {
+            "Config": {
+                "en": "DouBao TTS Configuration",
+                "zh-hans": "豆包 TTS 配置",
+                "zh-hant": "豆包 TTS 配置",
+                "jp": "DouBao TTS設定"
+            },
+            "BaseUrl": {
+                "en": "Service URL",
+                "zh-hans": "服务地址",
+                "zh-hant": "服務地址",
+                "jp": "サービスURL"
+            },
+            "Voice": {
+                "en": "Voice Type",
+                "zh-hans": "语音类型",
+                "zh-hant": "語音類型",
+                "jp": "音声タイプ"
+            },
+            "Description": {
+                "en": "DouBao TTS uses simple HTTP GET requests and supports multiple voice types.",
+                "zh-hans": "豆包TTS使用简单的HTTP GET请求，支持多种语音类型。",
+                "zh-hant": "豆包TTS使用簡單的HTTP GET請求，支援多種語音類型。",
+                "jp": "DouBao TTSはシンプルなHTTP GETリクエストを使用し、複数の音声タイプをサポートします。"
+            }
+        },
+        "OpenAI": {
+            "Config": {
+                "en": "OpenAI TTS Configuration",
+                "zh-hans": "OpenAI TTS 配置",
+                "zh-hant": "OpenAI TTS 配置",
+                "jp": "OpenAI TTS設定"
+            },
+            "BaseUrl": {
+                "en": "API URL",
+                "zh-hans": "API 地址",
+                "zh-hant": "API 地址",
+                "jp": "API URL"
+            },
+            "ApiKey": {
+                "en": "API Key",
+                "zh-hans": "API Key",
+                "zh-hant": "API Key",
+                "jp": "API Key"
+            },
+            "Model": {
+                "en": "Model",
+                "zh-hans": "模型",
+                "zh-hant": "模型",
+                "jp": "モデル"
+            },
+            "Voice": {
+                "en": "Voice",
+                "zh-hans": "语音",
+                "zh-hant": "語音",
+                "jp": "音声"
+            },
+            "Format": {
+                "en": "Audio Format",
+                "zh-hans": "音频格式",
+                "zh-hant": "音頻格式",
+                "jp": "オーディオ形式"
+            },
+            "Description": {
+                "en": "Supports OpenAI TTS API format services like fish.audio. Requires a valid API Key.",
+                "zh-hans": "支持OpenAI TTS API格式的服务，如fish.audio等。需要提供有效的API Key。",
+                "zh-hant": "支援OpenAI TTS API格式的服務，如fish.audio等。需要提供有效的API Key。",
+                "jp": "fish.audioなどのOpenAI TTS API形式のサービスをサポートします。有効なAPI Keyが必要です。"
+            }
+        }
+    },
     "PluginStore": {
         "Tab": {
             "en": "Plugin Store",

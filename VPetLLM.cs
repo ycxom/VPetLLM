@@ -32,6 +32,7 @@ namespace VPetLLM
         public List<FailedPlugin> FailedPlugins => PluginManager.FailedPlugins;
         public string PluginPath => PluginManager.PluginPath;
         public winSettingNew? SettingWindow;
+        public TTSService? TTSService;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -79,6 +80,9 @@ namespace VPetLLM
             _syncTimer.AutoReset = true;
             _syncTimer.Enabled = true;
 
+            // 初始化TTS服务
+            TTSService = new TTSService(Settings.TTS);
+
             LoadPlugins();
         }
 
@@ -124,6 +128,13 @@ namespace VPetLLM
             Settings.Save();
             ChatCore?.SaveHistory();
             SavePluginStates();
+        }
+
+        public void Dispose()
+        {
+            TTSService?.Dispose();
+            _syncTimer?.Stop();
+            _syncTimer?.Dispose();
         }
 
         public void UpdateChatCore(IChatCore newChatCore)
@@ -185,7 +196,25 @@ namespace VPetLLM
                 return "错误：聊天核心未初始化。";
             }
             PromptHelper.ReloadPrompts();
-            return await ChatCore.Chat(prompt);
+            var response = await ChatCore.Chat(prompt);
+            
+            // 如果启用了TTS且设置为仅播放AI回复，则播放TTS
+            if (Settings.TTS.IsEnabled && Settings.TTS.OnlyPlayAIResponse && !string.IsNullOrWhiteSpace(response))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await TTSService?.PlayTextAsync(response);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"TTS播放失败: {ex.Message}");
+                    }
+                });
+            }
+            
+            return response;
         }
 
         public List<Message> GetChatHistory()
@@ -253,6 +282,27 @@ namespace VPetLLM
         public void UpdateActionProcessor()
         {
             ActionProcessor?.RegisterHandlers();
+        }
+
+        public void UpdateTTSService()
+        {
+            TTSService?.UpdateSettings(Settings.TTS);
+            Logger.Log("TTS服务设置已更新");
+        }
+
+        public async Task PlayTTSAsync(string text)
+        {
+            if (Settings.TTS.IsEnabled && TTSService != null && !string.IsNullOrWhiteSpace(text))
+            {
+                try
+                {
+                    await TTSService.PlayTextAsync(text);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"TTS播放失败: {ex.Message}");
+                }
+            }
         }
 
         public IEnumerable<string> GetAvailableAnimations()

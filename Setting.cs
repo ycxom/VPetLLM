@@ -35,6 +35,7 @@ namespace VPetLLM
         public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         public bool ShowUninstallWarning { get; set; } = true;
+        public TTSSetting TTS { get; set; } = new TTSSetting();
         public ProxySetting Proxy { get; set; } = new ProxySetting();
         public PluginStoreSetting PluginStore { get; set; } = new PluginStoreSetting();
         private readonly string _path;
@@ -54,6 +55,10 @@ namespace VPetLLM
             if (PluginStore == null)
             {
                 PluginStore = new PluginStoreSetting();
+            }
+            if (TTS == null)
+            {
+                TTS = new TTSSetting();
             }
         }
 
@@ -124,6 +129,37 @@ namespace VPetLLM
         {
             public bool UseProxy { get; set; } = true;
             public string ProxyUrl { get; set; } = "https://ghfast.top";
+        }
+
+        public class TTSSetting
+        {
+            public bool IsEnabled { get; set; } = false;
+            public string Provider { get; set; } = "DouBao";
+            public bool OnlyPlayAIResponse { get; set; } = true;
+            public bool AutoPlay { get; set; } = true;
+            public double Volume { get; set; } = 1.0;
+            public double Speed { get; set; } = 1.0;
+            
+            // DouBao TTS 设置
+            public DouBaoTTSSetting DouBao { get; set; } = new DouBaoTTSSetting();
+            
+            // OpenAI TTS 设置 (fish.audio)
+            public OpenAITTSSetting OpenAI { get; set; } = new OpenAITTSSetting();
+        }
+
+        public class DouBaoTTSSetting
+        {
+            public string BaseUrl { get; set; } = "https://doubaotts.zeabur.app";
+            public string Voice { get; set; } = "36";
+        }
+
+        public class OpenAITTSSetting
+        {
+            public string ApiKey { get; set; } = "";
+            public string BaseUrl { get; set; } = "https://api.fish.audio/v1";
+            public string Model { get; set; } = "tts-1";
+            public string Voice { get; set; } = "alloy";
+            public string Format { get; set; } = "mp3";
         }
     }
 }

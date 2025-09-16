@@ -71,6 +71,33 @@
                 <Setter Property="Margin" Value="0,0,0,8"/>
             </Style>
 
+            <!-- 节标题样式 -->
+            <Style x:Key="SectionHeader" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Margin" Value="0,0,0,12"/>
+            </Style>
+
+            <!-- 描述文本样式 -->
+            <Style x:Key="DescriptionText" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="LineHeight" Value="18"/>
+            </Style>
+
+            <!-- 现代化密码框样式 -->
+            <Style x:Key="ModernPasswordBox" TargetType="PasswordBox">
+                <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="12,8"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Height" Value="36"/>
+            </Style>
+
             <!-- DataGrid列头样式 -->
             <Style x:Key="ModernDataGridColumnHeader" TargetType="DataGridColumnHeader">
                 <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
@@ -594,6 +621,254 @@
                         </StackPanel>
                     </Border>
                 </ScrollViewer>
+            </TabItem>
+            <TabItem Header="TTS语音"
+                    x:Name="Tab_TTS"
+                    Style="{StaticResource ModernTabItem}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollViewer Grid.Column="0"
+                            VerticalScrollBarVisibility="Auto">
+                        <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
+                            <StackPanel Style="{StaticResource SettingGroup}">
+                                <CheckBox x:Name="CheckBox_TTS_IsEnabled"
+                                        Content="启用TTS语音合成"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernCheckBox}"/>
+
+                                <StackPanel IsEnabled="{Binding ElementName=CheckBox_TTS_IsEnabled, Path=IsChecked}">
+                                    <Label Content="TTS 提供商"
+                                            x:Name="Label_TTS_Provider"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_TTS_Provider"
+                                            Margin="0,0,0,16"
+                                            SelectionChanged="ComboBox_TTS_Provider_SelectionChanged"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="DouBao" Tag="DouBao" IsSelected="True"/>
+                                        <ComboBoxItem Content="OpenAI" Tag="OpenAI"/>
+                                        <ComboBox.ItemContainerStyle>
+                                            <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                                                <Setter Property="Padding" Value="12,8"/>
+                                                <Setter Property="FontSize" Value="14"/>
+                                                <Setter Property="ContentTemplate">
+                                                    <Setter.Value>
+                                                        <DataTemplate>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Border x:Name="ItemIcon"
+                                                                        Background="{StaticResource AccentBrush}"
+                                                                        CornerRadius="3"
+                                                                        Width="18"
+                                                                        Height="18"
+                                                                        Margin="0,0,8,0">
+                                                                    <TextBlock x:Name="ItemIconText"
+                                                                            Text="🔊"
+                                                                            FontSize="9"
+                                                                            Foreground="White"
+                                                                            HorizontalAlignment="Center"
+                                                                            VerticalAlignment="Center"/>
+                                                                </Border>
+                                                                <TextBlock Text="{Binding}"
+                                                                        VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                            <DataTemplate.Triggers>
+                                                                <DataTrigger Binding="{Binding}" Value="DouBao">
+                                                                    <Setter TargetName="ItemIconText" Property="Text" Value="豆"/>
+                                                                    <Setter TargetName="ItemIcon" Property="Background" Value="#FF6B35"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="OpenAI">
+                                                                    <Setter TargetName="ItemIconText" Property="Text" Value="AI"/>
+                                                                    <Setter TargetName="ItemIcon" Property="Background" Value="#10A37F"/>
+                                                                </DataTrigger>
+                                                            </DataTemplate.Triggers>
+                                                        </DataTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ComboBox.ItemContainerStyle>
+                                    </ComboBox>
+
+                                    <CheckBox x:Name="CheckBox_TTS_OnlyPlayAIResponse"
+                                            Content="仅播放AI回复"
+                                            Margin="0,0,0,16"
+                                            IsChecked="True"
+                                            Style="{StaticResource ModernCheckBox}"/>
+
+                                    <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,0,12">
+                                        <TextBlock Text="音量:"
+                                                Width="80"
+                                                VerticalAlignment="Center"
+                                                x:Name="TextBlock_TTS_Volume"
+                                                Foreground="{StaticResource PrimaryTextBrush}"
+                                                FontSize="14"/>
+                                        <Slider x:Name="Slider_TTS_Volume"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Value="1"
+                                                Width="125"
+                                                Margin="10,0"
+                                                VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TextBlock_TTS_VolumeValue"
+                                                Width="40"
+                                                VerticalAlignment="Center"
+                                                Foreground="{StaticResource SecondaryTextBrush}"
+                                                FontSize="14"/>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,0,16">
+                                        <TextBlock Text="语速:"
+                                                Width="80"
+                                                VerticalAlignment="Center"
+                                                x:Name="TextBlock_TTS_Speed"
+                                                Foreground="{StaticResource PrimaryTextBrush}"
+                                                FontSize="14"/>
+                                        <Slider x:Name="Slider_TTS_Speed"
+                                                Minimum="0.5"
+                                                Maximum="2.0"
+                                                Value="1"
+                                                Width="125"
+                                                Margin="10,0"
+                                                VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TextBlock_TTS_SpeedValue"
+                                                Width="40"
+                                                VerticalAlignment="Center"
+                                                Foreground="{StaticResource SecondaryTextBrush}"
+                                                FontSize="14"/>
+                                    </StackPanel>
+
+                                    <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
+                                        <Button x:Name="Button_TTS_Test"
+                                                Content="测试TTS"
+                                                Click="Button_TTS_Test_Click"
+                                                Style="{StaticResource ModernButton}"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+
+                    <ScrollViewer Grid.Column="1"
+                            VerticalScrollBarVisibility="Auto">
+                        <Border Style="{StaticResource CardContainer}">
+                            <StackPanel Style="{StaticResource SettingGroup}">
+                                <!-- DouBao TTS 配置 -->
+                                <StackPanel x:Name="Panel_TTS_DouBao"
+                                        Visibility="Visible">
+                                    <TextBlock Text="豆包 TTS 配置"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Label Content="服务地址"
+                                            x:Name="Label_TTS_DouBao_BaseUrl"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_TTS_DouBao_BaseUrl"
+                                            Text="https://doubaotts.zeabur.app"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernTextBox}"/>
+
+                                    <Label Content="语音类型"
+                                            x:Name="Label_TTS_DouBao_Voice"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_TTS_DouBao_Voice"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="女声1 (36)" Tag="36" IsSelected="True"/>
+                                        <ComboBoxItem Content="男声1 (37)" Tag="37"/>
+                                        <ComboBoxItem Content="女声2 (38)" Tag="38"/>
+                                        <ComboBoxItem Content="男声2 (39)" Tag="39"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="豆包TTS使用简单的HTTP GET请求，支持多种语音类型。"
+                                            x:Name="TextBlock_TTS_DouBao_Description"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+                                </StackPanel>
+
+                                <!-- OpenAI TTS 配置 -->
+                                <StackPanel x:Name="Panel_TTS_OpenAI"
+                                        Visibility="Collapsed">
+                                    <TextBlock Text="OpenAI TTS 配置"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Label Content="API 地址"
+                                            x:Name="Label_TTS_OpenAI_BaseUrl"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_TTS_OpenAI_BaseUrl"
+                                            Text="https://api.fish.audio/v1"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernTextBox}"/>
+
+                                    <Label Content="API Key"
+                                            x:Name="Label_TTS_OpenAI_ApiKey"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_TTS_OpenAI_ApiKey"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernTextBox}"/>
+
+                                    <Label Content="模型"
+                                            x:Name="Label_TTS_OpenAI_Model"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="ComboBox_TTS_OpenAI_Model"
+                                                Grid.Column="0"
+                                                IsEditable="True"
+                                                Text="tts-1"
+                                                Margin="0,0,8,0"
+                                                Style="{StaticResource ModernComboBox}"/>
+                                        <Button x:Name="Button_TTS_OpenAI_RefreshModels"
+                                                Grid.Column="1"
+                                                Content="刷新"
+                                                Click="Button_TTS_OpenAI_RefreshModels_Click"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="8,4"
+                                                FontSize="12"/>
+                                    </Grid>
+
+                                    <Label Content="语音"
+                                            x:Name="Label_TTS_OpenAI_Voice"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_TTS_OpenAI_Voice"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="alloy" Tag="alloy" IsSelected="True"/>
+                                        <ComboBoxItem Content="echo" Tag="echo"/>
+                                        <ComboBoxItem Content="fable" Tag="fable"/>
+                                        <ComboBoxItem Content="onyx" Tag="onyx"/>
+                                        <ComboBoxItem Content="nova" Tag="nova"/>
+                                        <ComboBoxItem Content="shimmer" Tag="shimmer"/>
+                                    </ComboBox>
+
+                                    <Label Content="音频格式"
+                                            x:Name="Label_TTS_OpenAI_Format"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_TTS_OpenAI_Format"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="mp3" Tag="mp3" IsSelected="True"/>
+                                        <ComboBoxItem Content="opus" Tag="opus"/>
+                                        <ComboBoxItem Content="aac" Tag="aac"/>
+                                        <ComboBoxItem Content="flac" Tag="flac"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="支持OpenAI TTS API格式的服务，如fish.audio等。需要提供有效的API Key。"
+                                            x:Name="TextBlock_TTS_OpenAI_Description"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+                </Grid>
             </TabItem>
             <TabItem Header="语言"
                     x:Name="Tab_Language"

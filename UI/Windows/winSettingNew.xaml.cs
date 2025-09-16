@@ -1,21 +1,17 @@
-using System;
-using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Net.Http;
+using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
-using System.Windows.Media.Animation;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
 using VPetLLM.Utils;
-using System.Net.Http;
-using System.Security.Cryptography;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System.Windows.Threading;
 
 namespace VPetLLM.UI.Windows
 {
@@ -69,13 +65,13 @@ namespace VPetLLM.UI.Windows
                         var wasEnabled = plugin.Enabled;
                         plugin.Initialize(_plugin);
                         var description = plugin.Description;
-                        
+
                         // 如果插件原本是禁用的，恢复禁用状态
                         if (!wasEnabled)
                         {
                             plugin.Unload();
                         }
-                        
+
                         return description;
                     }
                     catch (Exception ex)
@@ -94,11 +90,14 @@ namespace VPetLLM.UI.Windows
         }
 
         private readonly VPetLLM _plugin;
-        
+
         // 自动保存相关字段
         private DispatcherTimer? _autoSaveTimer;
         private bool _hasUnsavedChanges = false;
         private readonly object _saveLock = new object();
+
+        // TTS服务
+        private TTSService? _ttsService;
 
         public winSettingNew(VPetLLM plugin)
         {
@@ -115,6 +114,8 @@ namespace VPetLLM.UI.Windows
             ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Control_ValueChanged;
+            ((Slider)this.FindName("Slider_TTS_Volume")).ValueChanged += Control_ValueChanged;
+            ((Slider)this.FindName("Slider_TTS_Speed")).ValueChanged += Control_ValueChanged;
 
             // Add event handlers for all other controls
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectionChanged += Control_SelectionChanged;
@@ -169,8 +170,20 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_PluginStore_UseProxy")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).TextChanged += Control_TextChanged;
 
+            // TTS settings
+            ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).Click += Control_Click;
+            ((ComboBox)this.FindName("ComboBox_TTS_Provider")).SelectionChanged += Control_SelectionChanged;
+            ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_TTS_DouBao_BaseUrl")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_TTS_DouBao_Voice")).SelectionChanged += Control_SelectionChanged;
+            ((TextBox)this.FindName("TextBox_TTS_OpenAI_BaseUrl")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_OpenAI_ApiKey")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Model")).SelectionChanged += Control_SelectionChanged;
+            ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Voice")).SelectionChanged += Control_SelectionChanged;
+            ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Format")).SelectionChanged += Control_SelectionChanged;
+
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
-            
+
             // 初始化自动保存定时器
             InitializeAutoSaveTimer();
         }
@@ -192,12 +205,20 @@ namespace VPetLLM.UI.Windows
                 {
                     ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = slider.Value.ToString("F2");
                 }
+                else if (slider.Name == "Slider_TTS_Volume")
+                {
+                    ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = slider.Value.ToString("F2");
+                }
+                else if (slider.Name == "Slider_TTS_Speed")
+                {
+                    ((TextBlock)this.FindName("TextBlock_TTS_SpeedValue")).Text = slider.Value.ToString("F2");
+                }
             }
-            
+
             // 立即保存重要配置
             ScheduleAutoSave();
         }
-        
+
         private void Control_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             // 先处理特殊逻辑
@@ -210,7 +231,8 @@ namespace VPetLLM.UI.Windows
                 // 立即更新UI（同步调用）
                 UpdateUIForLanguage();
                 // 使用Dispatcher确保在下一个UI周期再次更新界面，以防有遗漏
-                Dispatcher.BeginInvoke(new Action(() => {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
                     UpdateUIForLanguage();
                     // 强制刷新插件列表的列标题
                     if (FindName("DataGrid_Plugins") is DataGrid dataGridPluginsAsync)
@@ -226,18 +248,18 @@ namespace VPetLLM.UI.Windows
                             dataGridPluginsAsync.Columns[3].Header = LanguageHelper.Get("Plugin.Description", langCodeAsync) ?? "描述";
                         if (dataGridPluginsAsync.Columns.Count > 4)
                             dataGridPluginsAsync.Columns[4].Header = LanguageHelper.Get("Plugin.Action", langCodeAsync) ?? "操作";
-                        
+
                         // 重新刷新插件列表以更新多语言文本
                         Button_RefreshPlugins_Click(this, new RoutedEventArgs());
                     }
-                    
+
                     // 强制更新Tab标题
                     if (FindName("Tab_Plugin") is TabItem tabPlugin)
                     {
                         var langCodeForTab = _plugin.Settings.Language;
                         tabPlugin.Header = LanguageHelper.Get("Settings.Plugin", langCodeForTab) ?? "插件";
                     }
-                    
+
                     // 强制刷新整个窗口
                     this.UpdateLayout();
                 }), System.Windows.Threading.DispatcherPriority.Background);
@@ -248,17 +270,18 @@ namespace VPetLLM.UI.Windows
                 SaveSettings();
                 PromptHelper.ReloadPrompts();
             }
-            
+
             // 对于关键配置项，使用Dispatcher确保UI更新完成后再保存
             if (sender is ComboBox comboBox)
             {
                 string name = comboBox.Name ?? "";
                 bool isImportantConfig = name.Contains("Provider") || name.Contains("Model");
-                
+
                 if (isImportantConfig)
                 {
                     // 使用Dispatcher.BeginInvoke确保在UI更新完成后保存
-                    Dispatcher.BeginInvoke(new Action(() => {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
                         SaveSettings();
                     }), System.Windows.Threading.DispatcherPriority.Background);
                 }
@@ -272,7 +295,7 @@ namespace VPetLLM.UI.Windows
                 ScheduleAutoSave();
             }
         }
-        
+
         private void Control_TextChanged(object sender, TextChangedEventArgs e)
         {
             // 对于关键配置字段，立即保存
@@ -282,11 +305,12 @@ namespace VPetLLM.UI.Windows
                     "TextBox_OpenAIApiKey", "TextBox_GeminiApiKey",
                     "TextBox_OllamaUrl", "TextBox_OpenAIUrl", "TextBox_GeminiUrl"
                 };
-                
+
                 if (criticalFields.Contains(textBox.Name))
                 {
                     // 关键字段使用Dispatcher确保UI更新完成后保存
-                    Dispatcher.BeginInvoke(new Action(() => {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
                         SaveSettings();
                     }), System.Windows.Threading.DispatcherPriority.Background);
                 }
@@ -297,13 +321,18 @@ namespace VPetLLM.UI.Windows
                 }
             }
         }
-        
+
         private void Control_Click(object sender, RoutedEventArgs e)
         {
             if (sender is CheckBox cb && cb.Name == "CheckBox_AutoMigrateChatHistory")
                 return;
-            
+
             // 立即保存重要配置
+            ScheduleAutoSave();
+        }
+
+        private void Control_PasswordChanged(object sender, RoutedEventArgs e)
+        {
             ScheduleAutoSave();
         }
 
@@ -388,6 +417,74 @@ namespace VPetLLM.UI.Windows
             }
             ((CheckBox)this.FindName("CheckBox_PluginStore_UseProxy")).IsChecked = _plugin.Settings.PluginStore.UseProxy;
             ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).Text = _plugin.Settings.PluginStore.ProxyUrl;
+
+            // TTS settings
+            if (_plugin.Settings.TTS == null)
+            {
+                _plugin.Settings.TTS = new Setting.TTSSetting();
+            }
+
+            // 基本TTS设置
+            ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).IsChecked = _plugin.Settings.TTS.IsEnabled;
+            ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked = _plugin.Settings.TTS.OnlyPlayAIResponse;
+            ((Slider)this.FindName("Slider_TTS_Volume")).Value = _plugin.Settings.TTS.Volume;
+            ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = _plugin.Settings.TTS.Volume.ToString("F2");
+            ((Slider)this.FindName("Slider_TTS_Speed")).Value = _plugin.Settings.TTS.Speed;
+            ((TextBlock)this.FindName("TextBlock_TTS_SpeedValue")).Text = _plugin.Settings.TTS.Speed.ToString("F2");
+
+            // TTS提供商设置
+            var providerComboBox = (ComboBox)this.FindName("ComboBox_TTS_Provider");
+            foreach (ComboBoxItem item in providerComboBox.Items)
+            {
+                if (item.Tag?.ToString() == _plugin.Settings.TTS.Provider)
+                {
+                    providerComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
+            // 豆包TTS设置
+            ((TextBox)this.FindName("TextBox_TTS_DouBao_BaseUrl")).Text = _plugin.Settings.TTS.DouBao.BaseUrl;
+            var douBaoVoiceComboBox = (ComboBox)this.FindName("ComboBox_TTS_DouBao_Voice");
+            foreach (ComboBoxItem item in douBaoVoiceComboBox.Items)
+            {
+                if (item.Tag?.ToString() == _plugin.Settings.TTS.DouBao.Voice)
+                {
+                    douBaoVoiceComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
+            // OpenAI TTS设置
+            ((TextBox)this.FindName("TextBox_TTS_OpenAI_BaseUrl")).Text = _plugin.Settings.TTS.OpenAI.BaseUrl;
+            ((TextBox)this.FindName("TextBox_TTS_OpenAI_ApiKey")).Text = _plugin.Settings.TTS.OpenAI.ApiKey;
+            ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Model")).Text = _plugin.Settings.TTS.OpenAI.Model;
+
+            var openAIVoiceComboBox = (ComboBox)this.FindName("ComboBox_TTS_OpenAI_Voice");
+            foreach (ComboBoxItem item in openAIVoiceComboBox.Items)
+            {
+                if (item.Tag?.ToString() == _plugin.Settings.TTS.OpenAI.Voice)
+                {
+                    openAIVoiceComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
+            var formatComboBox = (ComboBox)this.FindName("ComboBox_TTS_OpenAI_Format");
+            foreach (ComboBoxItem item in formatComboBox.Items)
+            {
+                if (item.Tag?.ToString() == _plugin.Settings.TTS.OpenAI.Format)
+                {
+                    formatComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
+            // 触发提供商切换事件来显示正确的面板
+            ComboBox_TTS_Provider_SelectionChanged(providerComboBox, null);
+
+            // 初始化TTS服务
+            _ttsService = new TTSService(_plugin.Settings.TTS);
         }
 
         private void SaveSettings()
@@ -505,6 +602,48 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.PluginStore.UseProxy = ((CheckBox)this.FindName("CheckBox_PluginStore_UseProxy")).IsChecked ?? true;
             _plugin.Settings.PluginStore.ProxyUrl = ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).Text;
 
+            // TTS settings
+            _plugin.Settings.TTS.IsEnabled = ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).IsChecked ?? false;
+            _plugin.Settings.TTS.OnlyPlayAIResponse = ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked ?? true;
+            _plugin.Settings.TTS.Volume = ((Slider)this.FindName("Slider_TTS_Volume")).Value;
+            _plugin.Settings.TTS.Speed = ((Slider)this.FindName("Slider_TTS_Speed")).Value;
+
+            // TTS提供商设置
+            var selectedProviderItem = ((ComboBox)this.FindName("ComboBox_TTS_Provider")).SelectedItem as ComboBoxItem;
+            if (selectedProviderItem != null)
+            {
+                _plugin.Settings.TTS.Provider = selectedProviderItem.Tag?.ToString() ?? "DouBao";
+            }
+
+            // 豆包TTS设置
+            _plugin.Settings.TTS.DouBao.BaseUrl = ((TextBox)this.FindName("TextBox_TTS_DouBao_BaseUrl")).Text;
+            var selectedDouBaoVoiceItem = ((ComboBox)this.FindName("ComboBox_TTS_DouBao_Voice")).SelectedItem as ComboBoxItem;
+            if (selectedDouBaoVoiceItem != null)
+            {
+                _plugin.Settings.TTS.DouBao.Voice = selectedDouBaoVoiceItem.Tag?.ToString() ?? "36";
+            }
+
+            // OpenAI TTS设置
+            _plugin.Settings.TTS.OpenAI.BaseUrl = ((TextBox)this.FindName("TextBox_TTS_OpenAI_BaseUrl")).Text;
+            _plugin.Settings.TTS.OpenAI.ApiKey = ((TextBox)this.FindName("TextBox_TTS_OpenAI_ApiKey")).Text;
+            _plugin.Settings.TTS.OpenAI.Model = ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Model")).Text;
+
+            var selectedOpenAIVoiceItem = ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Voice")).SelectedItem as ComboBoxItem;
+            if (selectedOpenAIVoiceItem != null)
+            {
+                _plugin.Settings.TTS.OpenAI.Voice = selectedOpenAIVoiceItem.Tag?.ToString() ?? "alloy";
+            }
+
+            var selectedFormatItem = ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Format")).SelectedItem as ComboBoxItem;
+            if (selectedFormatItem != null)
+            {
+                _plugin.Settings.TTS.OpenAI.Format = selectedFormatItem.Tag?.ToString() ?? "mp3";
+            }
+
+            // 更新TTS服务设置
+            _ttsService?.UpdateSettings(_plugin.Settings.TTS);
+            _plugin.UpdateTTSService();
+
             _plugin.Settings.Save();
 
             if (oldProvider != newProvider)
@@ -541,7 +680,7 @@ namespace VPetLLM.UI.Windows
                 _plugin.UpdateChatCore(updatedChatCore);
             }
             _plugin.UpdateActionProcessor();
-            
+
             // 重置未保存更改标志
             lock (_saveLock)
             {
@@ -574,7 +713,7 @@ namespace VPetLLM.UI.Windows
                 Dispatcher.Invoke(() =>
                 {
                     StopButtonLoadingAnimation(button);
-                    
+
                     // 额外的按钮状态重置
                     if (button != null)
                     {
@@ -787,23 +926,23 @@ namespace VPetLLM.UI.Windows
                     _plugin.ChatCore?.RemovePlugin(item.LocalPlugin);
                     Logger.Log($"Plugin '{item.LocalPlugin.Name}' has been disabled and unloaded.");
                 }
-                
+
                 // 更新状态文本
                 var langCode = _plugin.Settings.Language;
-                item.StatusText = isEnabled ? 
-                    LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行中" : 
+                item.StatusText = isEnabled ?
+                    LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行中" :
                     LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用";
-                
+
                 // 更新描述（因为启用/禁用状态可能影响多语言描述的获取）
                 item.Description = GetPluginDescription(item.LocalPlugin, langCode);
                 item.OriginalDescription = GetPluginDescription(item.LocalPlugin, langCode);
-                
+
                 // 刷新DataGrid显示
                 if (FindName("DataGrid_Plugins") is DataGrid dataGrid)
                 {
                     dataGrid.Items.Refresh();
                 }
-                
+
                 _plugin.SavePluginStates();
                 Logger.Log("Plugin states have been saved.");
             }
@@ -814,7 +953,11 @@ namespace VPetLLM.UI.Windows
             // 停止并清理定时器
             _autoSaveTimer?.Stop();
             _autoSaveTimer = null;
-            
+
+            // 释放TTS资源
+            _ttsService?.Dispose();
+            _ttsService = null;
+
             _plugin.SettingWindow = null;
         }
 
@@ -841,7 +984,7 @@ namespace VPetLLM.UI.Windows
             lock (_saveLock)
             {
                 _hasUnsavedChanges = true;
-                
+
                 if (immediate)
                 {
                     // 立即保存
@@ -863,7 +1006,7 @@ namespace VPetLLM.UI.Windows
         private void AutoSaveTimer_Tick(object sender, EventArgs e)
         {
             _autoSaveTimer?.Stop();
-            
+
             if (_hasUnsavedChanges)
             {
                 SaveSettings();
@@ -879,7 +1022,7 @@ namespace VPetLLM.UI.Windows
 
             // 保存原始内容
             button.Tag = button.Content;
-            
+
             // 创建旋转图标
             var rotateIcon = new TextBlock
             {
@@ -927,10 +1070,10 @@ namespace VPetLLM.UI.Windows
                 button.Content = button.Tag;
                 button.Tag = null;
             }
-            
+
             // 确保按钮重新启用
             button.IsEnabled = true;
-            
+
             // 强制更新按钮状态
             button.UpdateLayout();
         }
@@ -946,6 +1089,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("Tab_Log") is TabItem tabLog) tabLog.Header = LanguageHelper.Get("Log.Tab", langCode);
             if (FindName("Tab_Plugin") is TabItem tabPlugin) tabPlugin.Header = LanguageHelper.Get("Plugin.Tab", langCode);
             if (FindName("Tab_Proxy") is TabItem tabProxy) tabProxy.Header = LanguageHelper.Get("Proxy.Tab", langCode);
+            if (FindName("Tab_TTS") is TabItem tabTTS) tabTTS.Header = LanguageHelper.Get("TTS.Tab", langCode);
 
             if (FindName("Label_Language") is Label labelLanguage) labelLanguage.Content = LanguageHelper.Get("Language.Select", langCode);
             if (FindName("Label_PromptLanguage") is Label labelPromptLanguage) labelPromptLanguage.Content = LanguageHelper.Get("Language.PromptLanguage", langCode);
@@ -981,15 +1125,15 @@ namespace VPetLLM.UI.Windows
             if (FindName("TextBlock_CurrentContextLength") is TextBlock textBlockCurrentContextLength) textBlockCurrentContextLength.Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
 
             // 更新工具管理头部区域的多语言文本
-            if (FindName("TextBlock_ToolsManagement") is TextBlock textBlockToolsManagement) 
+            if (FindName("TextBlock_ToolsManagement") is TextBlock textBlockToolsManagement)
                 textBlockToolsManagement.Text = LanguageHelper.Get("Tools.Management", langCode);
-            
-            if (FindName("TextBlock_ToolsManagementDescription") is TextBlock textBlockToolsManagementDescription) 
+
+            if (FindName("TextBlock_ToolsManagementDescription") is TextBlock textBlockToolsManagementDescription)
                 textBlockToolsManagementDescription.Text = LanguageHelper.Get("Tools.ManagementDescription", langCode);
-            
-            if (FindName("TextBlock_MCPToolsConfig") is TextBlock textBlockMCPToolsConfig) 
+
+            if (FindName("TextBlock_MCPToolsConfig") is TextBlock textBlockMCPToolsConfig)
                 textBlockMCPToolsConfig.Text = LanguageHelper.Get("Tools.MCPConfig", langCode);
-            
+
             if (FindName("TextBlock_ToolsDescription") is TextBlock textBlockToolsDescription) textBlockToolsDescription.Text = LanguageHelper.Get("Tools.ToolsDescription", langCode);
             if (FindName("Button_AddTool") is Button buttonAddTool) buttonAddTool.Content = LanguageHelper.Get("Tools.Add", langCode);
             if (FindName("Button_DeleteTool") is Button buttonDeleteTool) buttonDeleteTool.Content = LanguageHelper.Get("Tools.Delete", langCode);
@@ -1010,9 +1154,9 @@ namespace VPetLLM.UI.Windows
             if (FindName("Button_ClearLog") is Button buttonClearLog) buttonClearLog.Content = LanguageHelper.Get("Log.Clear", langCode);
 
             // 更新插件管理头部区域的多语言文本
-            if (FindName("TextBlock_PluginManagementCenter") is TextBlock textBlockPluginManagementCenter) 
+            if (FindName("TextBlock_PluginManagementCenter") is TextBlock textBlockPluginManagementCenter)
                 textBlockPluginManagementCenter.Text = LanguageHelper.Get("Plugin.ManagementCenter", langCode);
-            
+
             // 动态构建插件描述文本（包含超链接）
             if (FindName("TextBlock_HowToUse") is TextBlock howToUseTextBlock)
             {
@@ -1028,15 +1172,24 @@ namespace VPetLLM.UI.Windows
                 howToUseTextBlock.Inlines.Add(hyperlink);
                 howToUseTextBlock.Inlines.Add(new Run(LanguageHelper.Get("Plugin.LearnMore", langCode)));
             }
-            
-            if (FindName("TextBlock_RefreshButton") is TextBlock textBlockRefreshButton) 
+
+            if (FindName("TextBlock_RefreshButton") is TextBlock textBlockRefreshButton)
                 textBlockRefreshButton.Text = LanguageHelper.Get("Plugin.Refresh", langCode);
-            
-            if (FindName("TextBlock_ImportButton") is TextBlock textBlockImportButton) 
+
+            if (FindName("TextBlock_ImportButton") is TextBlock textBlockImportButton)
                 textBlockImportButton.Text = LanguageHelper.Get("Plugin.ImportPlugin", langCode);
-            
+
             if (FindName("Button_RefreshPlugins") is Button buttonRefreshPlugins) buttonRefreshPlugins.Content = LanguageHelper.Get("Plugin.Refresh", langCode);
             if (FindName("Button_ImportPlugin") is Button buttonImportPlugin) buttonImportPlugin.Content = LanguageHelper.Get("Plugin.ImportPlugin", langCode);
+
+            // TTS 多语言支持
+            if (FindName("CheckBox_TTS_IsEnabled") is CheckBox checkBoxTTSIsEnabled) checkBoxTTSIsEnabled.Content = LanguageHelper.Get("TTS.Enable", langCode);
+            if (FindName("CheckBox_TTS_OnlyPlayAIResponse") is CheckBox checkBoxTTSOnlyPlayAIResponse) checkBoxTTSOnlyPlayAIResponse.Content = LanguageHelper.Get("TTS.OnlyPlayAIResponse", langCode);
+            if (FindName("Label_TTS_Voice") is Label labelTTSVoice) labelTTSVoice.Content = LanguageHelper.Get("TTS.Voice", langCode);
+            if (FindName("Label_TTS_Speed") is Label labelTTSSpeed) labelTTSSpeed.Content = LanguageHelper.Get("TTS.Speed", langCode);
+            if (FindName("Label_TTS_Volume") is Label labelTTSVolume) labelTTSVolume.Content = LanguageHelper.Get("TTS.Volume", langCode);
+            if (FindName("Button_TTS_Test") is Button buttonTTSTest) buttonTTSTest.Content = LanguageHelper.Get("TTS.TestTTS", langCode);
+            if (FindName("TextBlock_TTS_Description") is TextBlock textBlockTTSDescription) textBlockTTSDescription.Text = LanguageHelper.Get("TTS.Description", langCode);
             // 更新插件 DataGrid 的列标题
             if (FindName("DataGrid_Plugins") is DataGrid dataGridPlugins)
             {
@@ -1101,16 +1254,26 @@ namespace VPetLLM.UI.Windows
             if (FindName("CheckBox_PluginStore_UseProxy") is CheckBox checkBoxPluginStoreUseProxy) checkBoxPluginStoreUseProxy.Content = LanguageHelper.Get("PluginStore.EnableProxy", langCode);
             if (FindName("Label_PluginStore_ProxyUrl") is Label labelPluginStoreProxyUrl) labelPluginStoreProxyUrl.Content = LanguageHelper.Get("PluginStore.ProxyUrl", langCode);
             if (FindName("TextBlock_PluginStore_ProxyUrlNote") is TextBlock textBlockPluginStoreProxyUrlNote) textBlockPluginStoreProxyUrlNote.Text = LanguageHelper.Get("PluginStore.ProxyUrlNote", langCode);
+
+            // TTS UI
+            if (FindName("CheckBox_TTS_IsEnabled") is CheckBox checkBoxTTSIsEnabled2) checkBoxTTSIsEnabled2.Content = LanguageHelper.Get("TTS.Enable", langCode);
+            if (FindName("Label_TTS_BaseUrl") is Label labelTTSBaseUrl2) labelTTSBaseUrl2.Content = "TTS API地址";
+            if (FindName("Label_TTS_Voice") is Label labelTTSVoice2) labelTTSVoice2.Content = LanguageHelper.Get("TTS.Voice", langCode);
+            if (FindName("TextBlock_TTS_Volume") is TextBlock textBlockTTSVolume2) textBlockTTSVolume2.Text = LanguageHelper.Get("TTS.Volume", langCode);
+            if (FindName("TextBlock_TTS_Speed") is TextBlock textBlockTTSSpeed2) textBlockTTSSpeed2.Text = LanguageHelper.Get("TTS.Speed", langCode);
+            if (FindName("CheckBox_TTS_AutoPlay") is CheckBox checkBoxTTSAutoPlay2) checkBoxTTSAutoPlay2.Content = "自动播放";
+            if (FindName("CheckBox_TTS_OnlyPlayAIResponse") is CheckBox checkBoxTTSOnlyPlayAIResponse2) checkBoxTTSOnlyPlayAIResponse2.Content = LanguageHelper.Get("TTS.OnlyPlayAIResponse", langCode);
+            if (FindName("Button_TTS_Test") is Button buttonTTSTest2) buttonTTSTest2.Content = LanguageHelper.Get("TTS.TestTTS", langCode);
         }
 
         private async void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
-            
+
             // 防止重复点击
             if (button != null && !button.IsEnabled)
                 return;
-                
+
             StartButtonLoadingAnimation(button);
 
             try
@@ -1118,7 +1281,7 @@ namespace VPetLLM.UI.Windows
                 var langCode = _plugin.Settings.Language;
                 var pluginItems = new Dictionary<string, UnifiedPluginItem>(StringComparer.OrdinalIgnoreCase);
                 Dictionary<string, JObject> remotePlugins = new Dictionary<string, JObject>();
-                
+
                 // Load local plugins (both successful and failed)
                 _plugin.LoadPlugins();
 
@@ -1160,8 +1323,8 @@ namespace VPetLLM.UI.Windows
                         LocalPlugin = localPlugin,
                         Version = sha,
                         LocalFilePath = localPlugin.FilePath,
-                        StatusText = localPlugin.Enabled ? 
-                            LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行中" : 
+                        StatusText = localPlugin.Enabled ?
+                            LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行中" :
                             LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用",
                         UninstallActionText = LanguageHelper.Get("Plugin.Uninstall", langCode) ?? "卸载"
                     };
@@ -1172,7 +1335,7 @@ namespace VPetLLM.UI.Windows
                     }
                     pluginItems[id] = item;
                 }
-                
+
                 foreach (var failedPlugin in _plugin.FailedPlugins)
                 {
                     var remoteEntry = remotePlugins.FirstOrDefault(kvp => kvp.Value["Name"]?.ToString() == failedPlugin.Name);
@@ -1286,7 +1449,7 @@ namespace VPetLLM.UI.Windows
                     dataGrid.Items.Refresh(); // 强制刷新
                     dataGrid.ItemsSource = pluginItems.Values.ToList(); // 重新设置
                     dataGrid.Items.Refresh(); // 再次刷新
-                    
+
                     // 重新设置列标题（因为设置ItemsSource可能会重置列标题）
                     var langCode = _plugin.Settings.Language;
                     if (dataGrid.Columns.Count > 0)
@@ -1454,10 +1617,10 @@ namespace VPetLLM.UI.Windows
                     }
                     var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
                     File.WriteAllBytes(filePath, data);
-                    
+
                     // Force reload plugins to recognize the new dll
                     _plugin.LoadPlugins();
-                    
+
                     // Now refresh the UI
                     Button_RefreshPlugins_Click(this, new RoutedEventArgs());
 
@@ -1483,6 +1646,57 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+        private void ComboBox_TTS_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem selectedItem)
+            {
+                var provider = selectedItem.Tag?.ToString();
+
+                // 显示/隐藏对应的配置面板
+                if (FindName("Panel_TTS_DouBao") is StackPanel douBaoPanel)
+                    douBaoPanel.Visibility = provider == "DouBao" ? Visibility.Visible : Visibility.Collapsed;
+
+                if (FindName("Panel_TTS_OpenAI") is StackPanel openAIPanel)
+                    openAIPanel.Visibility = provider == "OpenAI" ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private async void Button_TTS_Test_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
+            try
+            {
+                // 保存当前设置到TTS服务
+                SaveSettings();
+
+                if (_ttsService != null)
+                {
+                    var success = await _ttsService.TestTTSAsync();
+                    if (success)
+                    {
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.TestSuccess", _plugin.Settings.Language, "TTS测试成功！"),
+                            ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.TestFail", _plugin.Settings.Language, "TTS测试失败，请检查设置。"),
+                            ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("TTS.TestError", _plugin.Settings.Language, "TTS测试出错", ex),
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
+        }
+
         private string GetPluginStoreUrl(string originalUrl)
         {
             var pluginStoreSettings = _plugin.Settings.PluginStore;
@@ -1496,16 +1710,94 @@ namespace VPetLLM.UI.Windows
             return originalUrl;
         }
 
+        private async void Button_TTS_OpenAI_RefreshModels_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
+            try
+            {
+                var apiKey = ((TextBox)this.FindName("TextBox_TTS_OpenAI_ApiKey")).Text;
+                var baseUrl = ((TextBox)this.FindName("TextBox_TTS_OpenAI_BaseUrl")).Text;
+
+                if (string.IsNullOrEmpty(apiKey))
+                {
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.ApiKeyRequired", _plugin.Settings.Language, "请先输入API Key"),
+                        ErrorMessageHelper.GetLocalizedTitle("Warning", _plugin.Settings.Language, "警告"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                using (var client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+
+                    var response = await client.GetAsync($"{baseUrl.TrimEnd('/')}/model");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync();
+                        var modelsResponse = JsonConvert.DeserializeObject<JObject>(json);
+                        var items = modelsResponse["items"] as JArray;
+
+                        var comboBox = (ComboBox)this.FindName("ComboBox_TTS_OpenAI_Model");
+                        var currentValue = comboBox.Text;
+
+                        comboBox.Items.Clear();
+
+                        if (items != null)
+                        {
+                            foreach (var item in items)
+                            {
+                                var modelId = item["_id"]?.ToString();
+                                var title = item["title"]?.ToString();
+                                var type = item["type"]?.ToString();
+
+                                if (!string.IsNullOrEmpty(modelId) && type == "tts")
+                                {
+                                    var displayName = !string.IsNullOrEmpty(title) ? $"{title} ({modelId})" : modelId;
+                                    var comboBoxItem = new ComboBoxItem
+                                    {
+                                        Content = displayName,
+                                        Tag = modelId
+                                    };
+                                    comboBox.Items.Add(comboBoxItem);
+                                }
+                            }
+                        }
+
+                        // 恢复之前选择的值
+                        comboBox.Text = currentValue;
+
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.ModelsRefreshed", _plugin.Settings.Language, "模型列表已刷新"),
+                            ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.RefreshModelsFail", _plugin.Settings.Language, "获取模型列表失败，请检查API Key和网络连接。"),
+                            ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("TTS.RefreshModelsError", _plugin.Settings.Language, "获取模型列表出错", ex),
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
+        }
+
         private System.Net.IWebProxy GetPluginStoreProxy()
         {
             var pluginStoreSettings = _plugin.Settings.PluginStore;
-            
+
             // 插件商店代理独立于常规代理设置，不受CheckBox_Proxy_IsEnabled约束
             // 如果插件商店代理启用且设置了代理地址，但不是URL拼接类型的代理
             if (pluginStoreSettings != null && pluginStoreSettings.UseProxy && !string.IsNullOrEmpty(pluginStoreSettings.ProxyUrl))
             {
                 var proxyUrl = pluginStoreSettings.ProxyUrl.Trim();
-                
+
                 // 如果是URL拼接类型的代理（如ghfast.top），不使用HttpClient代理
                 if (proxyUrl.StartsWith("http://") || proxyUrl.StartsWith("https://"))
                 {
@@ -1514,7 +1806,7 @@ namespace VPetLLM.UI.Windows
                     {
                         return null; // 使用URL拼接方式
                     }
-                    
+
                     // 其他HTTP/HTTPS代理，使用传统代理方式
                     return new System.Net.WebProxy(proxyUrl);
                 }
@@ -1524,7 +1816,7 @@ namespace VPetLLM.UI.Windows
                     return new System.Net.WebProxy($"http://{proxyUrl}");
                 }
             }
-            
+
             return null;
         }
     }
