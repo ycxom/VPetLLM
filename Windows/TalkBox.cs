@@ -18,12 +18,14 @@ namespace VPetLLM.Windows
     {
         public override string APIName { get; } = "VPetLLM";
         private readonly VPetLLM _plugin;
+        private readonly SmartMessageProcessor _messageProcessor;
         public event Action<string> OnSendMessage;
 
 
         public TalkBox(VPetLLM plugin) : base(plugin)
         {
             _plugin = plugin;
+            _messageProcessor = new SmartMessageProcessor(_plugin);
             _plugin.ChatCore.SetResponseHandler(HandleResponse);
             Logger.Log("TalkBox created.");
         }
@@ -34,42 +36,20 @@ namespace VPetLLM.Windows
         }
         public async void HandleResponse(string response)
         {
-
-            if (!_plugin.Settings.EnableAction)
-            {
-                _plugin.MW.Main.Say(response);
-                return;
-            }
-
-            // If action is enabled, process the actions
-            Logger.Log($"Handling response for actions: {response}");
-            var actionQueue = _plugin.ActionProcessor.Process(response, _plugin.Settings);
-            Logger.Log($"Found {actionQueue.Count} actions.");
-
-            if (actionQueue.Count == 0)
-            {
-                _plugin.MW.Main.Say(response);
-                return;
-            }
+            Logger.Log($"HandleResponse: 收到AI回复: {response}");
 
             await Application.Current.Dispatcher.InvokeAsync(async () =>
             {
                 try
                 {
-                    foreach (var item in actionQueue)
-                    {
-                        Logger.Log($"Executing action: {item.Keyword}, value: {item.Value}");
-                        if (string.IsNullOrEmpty(item.Value))
-                           await item.Handler.Execute(_plugin.MW);
-                        else if (int.TryParse(item.Value, out int intValue))
-                           await item.Handler.Execute(intValue, _plugin.MW);
-                        else
-                           await item.Handler.Execute(item.Value, _plugin.MW);
-                    }
+                    // 使用智能消息处理器处理回复
+                    await _messageProcessor.ProcessMessageAsync(response);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log($"An error occurred while executing actions: {ex}");
+                    Logger.Log($"HandleResponse: 处理AI回复时发生错误: {ex.Message}");
+                    // 发生错误时回退到简单显示
+                    _plugin.MW.Main.Say(response);
                 }
             });
         }

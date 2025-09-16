@@ -198,21 +198,8 @@ namespace VPetLLM
             PromptHelper.ReloadPrompts();
             var response = await ChatCore.Chat(prompt);
             
-            // 如果启用了TTS且设置为仅播放AI回复，则播放TTS
-            if (Settings.TTS.IsEnabled && Settings.TTS.OnlyPlayAIResponse && !string.IsNullOrWhiteSpace(response))
-            {
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await TTSService?.PlayTextAsync(response);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"TTS播放失败: {ex.Message}");
-                    }
-                });
-            }
+            // 注意：TTS和动作处理现在由SmartMessageProcessor在HandleResponse中统一处理
+            // 这里只返回原始回复，不再单独处理TTS
             
             return response;
         }

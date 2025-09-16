@@ -129,7 +129,7 @@ namespace VPetLLM.Utils
             }
             catch (Exception ex)
             {
-                Logger.Log($"TTS错误: {ex.Message}");
+                Logger.Log($"TTS播放错误: {ex.Message}");
                 return false;
             }
         }
@@ -323,33 +323,84 @@ namespace VPetLLM.Utils
         {
             try
             {
-                if (_mediaPlayer == null)
+                var playbackCompleted = new TaskCompletionSource<bool>();
+
+                // 确保在UI线程上执行所有MediaPlayer操作
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    _mediaPlayer = new MediaPlayer();
+                    try
+                    {
+                        // 确保MediaPlayer在UI线程上创建
+                        if (_mediaPlayer == null)
+                        {
+                            _mediaPlayer = new MediaPlayer();
+                            Logger.Log($"TTS: MediaPlayer已在UI线程上创建");
+                        }
+
+                        // 清除之前的事件处理器
+                        _mediaPlayer.MediaEnded -= OnMediaEnded;
+                        _mediaPlayer.MediaFailed -= OnMediaFailed;
+
+                        // 停止当前播放
+                        _mediaPlayer.Stop();
+
+                        // 设置音量和播放速度
+                        _mediaPlayer.Volume = _settings.Volume;
+                        _mediaPlayer.SpeedRatio = _settings.Speed;
+
+                        // 添加事件处理器
+                        void OnMediaEnded(object sender, EventArgs e)
+                        {
+                            Logger.Log($"TTS: 音频播放完成: {filePath}");
+                            playbackCompleted.TrySetResult(true);
+                        }
+
+                        void OnMediaFailed(object sender, System.Windows.Media.ExceptionEventArgs e)
+                        {
+                            Logger.Log($"TTS: 音频播放失败: {e.ErrorException?.Message}");
+                            playbackCompleted.TrySetResult(false);
+                        }
+
+                        _mediaPlayer.MediaEnded += OnMediaEnded;
+                        _mediaPlayer.MediaFailed += OnMediaFailed;
+
+                        // 打开并播放文件
+                        _mediaPlayer.Open(new Uri(filePath));
+                        _mediaPlayer.Play();
+
+                        Logger.Log($"TTS: 开始播放音频文件: {filePath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"TTS: UI线程播放设置失败: {ex.Message}");
+                        playbackCompleted.TrySetResult(false);
+                    }
+                });
+
+                // 等待播放完成或超时（最多30秒）
+                var timeoutTask = Task.Delay(30000);
+                var completedTask = await Task.WhenAny(playbackCompleted.Task, timeoutTask);
+
+                if (completedTask == timeoutTask)
+                {
+                    Logger.Log($"TTS: 播放超时，停止播放: {filePath}");
+                    await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        try
+                        {
+                            _mediaPlayer?.Stop();
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"TTS: 停止播放失败: {ex.Message}");
+                        }
+                    });
                 }
-
-                // 停止当前播放
-                _mediaPlayer.Stop();
-
-                // 设置音量
-                _mediaPlayer.Volume = _settings.Volume;
-
-                // 设置播放速度（如果支持）
-                _mediaPlayer.SpeedRatio = _settings.Speed;
-
-                // 打开并播放文件
-                _mediaPlayer.Open(new Uri(filePath));
-                _mediaPlayer.Play();
-
-                Logger.Log($"TTS: 开始播放音频文件: {filePath}");
-
-                // 等待播放完成（简单实现）
-                await Task.Delay(1000); // 给音频播放一些时间
 
                 // 清理临时文件（延迟删除）
                 _ = Task.Run(async () =>
                 {
-                    await Task.Delay(10000); // 等待10秒后删除
+                    await Task.Delay(2000); // 等待2秒后删除，确保播放完成
                     try
                     {
                         if (File.Exists(filePath))
