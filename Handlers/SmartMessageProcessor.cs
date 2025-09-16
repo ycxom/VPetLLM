@@ -232,28 +232,27 @@ namespace VPetLLM.Handlers
 
             if (!string.IsNullOrEmpty(talkText))
             {
-                // 如果启用了TTS，先播放语音，然后显示气泡
+                // 如果启用了TTS，音频开始播放后立即显示气泡
                 if (_plugin.Settings.TTS.IsEnabled)
                 {
-                    Logger.Log($"SmartMessageProcessor: 优先处理TTS: {talkText}");
+                    Logger.Log($"SmartMessageProcessor: TTS和气泡同步播放: {talkText}");
                     
-                    // 先请求TTS音频
-                    bool ttsSuccess = false;
                     try
                     {
-                        await _plugin.TTSService.PlayTextAsync(talkText);
-                        ttsSuccess = true;
-                        Logger.Log($"SmartMessageProcessor: TTS播放完成");
+                        // 启动TTS播放，音频开始播放时立即返回
+                        await _plugin.TTSService.StartPlayTextAsync(talkText);
+                        Logger.Log($"SmartMessageProcessor: TTS已开始播放");
+                        
+                        // TTS开始播放后立即显示气泡
+                        await ExecuteActionAsync(segment.Content);
+                        Logger.Log($"SmartMessageProcessor: TTS和气泡同步完成");
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"SmartMessageProcessor: TTS播放失败: {ex.Message}");
-                        ttsSuccess = false;
+                        Logger.Log($"SmartMessageProcessor: TTS启动失败: {ex.Message}");
+                        // TTS失败时仍然显示气泡
+                        await ExecuteActionAsync(segment.Content);
                     }
-                    
-                    // TTS完成（成功或失败）后才执行Say动作显示气泡
-                    Logger.Log($"SmartMessageProcessor: TTS处理完成，现在显示气泡");
-                    await ExecuteActionAsync(segment.Content);
                 }
                 else
                 {

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Media;
 using System.Text;
 using System.Text.Json;
@@ -21,7 +22,8 @@ namespace VPetLLM.Utils
             _settings = settings;
             _proxySettings = proxySettings;
             _httpClient = CreateHttpClient();
-            _mediaPlayer = new MediaPlayer();
+            // MediaPlayer将在需要时在UI线程上创建
+            _mediaPlayer = null;
         }
 
         private HttpClient CreateHttpClient()
@@ -72,6 +74,67 @@ namespace VPetLLM.Utils
             var client = new HttpClient(handler);
             client.Timeout = TimeSpan.FromSeconds(30);
             return client;
+        }
+
+        /// <summary>
+        /// 开始播放文本转语音（音频开始播放时立即返回）
+        /// </summary>
+        /// <param name="text">要转换的文本</param>
+        /// <returns></returns>
+        public async Task<bool> StartPlayTextAsync(string text)
+        {
+            if (!_settings.IsEnabled || string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            try
+            {
+                Logger.Log($"TTS: 开始转换文本: {text.Substring(0, Math.Min(text.Length, 50))}...");
+                
+                byte[] audioData;
+                string fileExtension;
+
+                // 根据提供商获取音频数据
+                switch (_settings.Provider)
+                {
+                    case "OpenAI":
+                        audioData = await GetOpenAITTSAsync(text);
+                        fileExtension = _settings.OpenAI.Format;
+                        break;
+                    case "URL":
+                    default:
+                        audioData = await GetURLTTSAsync(text);
+                        fileExtension = "mp3";
+                        break;
+                }
+
+                if (audioData == null || audioData.Length == 0)
+                {
+                    Logger.Log("TTS: 未获取到音频数据");
+                    return false;
+                }
+
+                Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
+
+                // 保存到临时文件
+                var tempDir = Path.GetTempPath();
+                var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
+                var tempFile = Path.Combine(tempDir, tempFileName);
+                await File.WriteAllBytesAsync(tempFile, audioData);
+                Logger.Log($"TTS: 音频文件保存到: {tempFile}");
+
+                // 开始播放音频（不等待播放完成）
+                _ = Task.Run(async () => await PlayAudioFileAsync(tempFile));
+                Logger.Log($"TTS: 音频开始播放，立即返回");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"TTS播放错误: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>
@@ -323,79 +386,63 @@ namespace VPetLLM.Utils
         {
             try
             {
-                var playbackCompleted = new TaskCompletionSource<bool>();
+                Logger.Log($"TTS: 开始播放音频文件: {filePath}");
 
-                // 确保在UI线程上执行所有MediaPlayer操作
-                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                var tcs = new TaskCompletionSource<bool>();
+                
+                await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     try
                     {
-                        // 确保MediaPlayer在UI线程上创建
+                        // 确保MediaPlayer已初始化
                         if (_mediaPlayer == null)
                         {
                             _mediaPlayer = new MediaPlayer();
-                            Logger.Log($"TTS: MediaPlayer已在UI线程上创建");
+                            Logger.Log("TTS: MediaPlayer已在UI线程上创建");
                         }
-
-                        // 清除之前的事件处理器
-                        _mediaPlayer.MediaEnded -= OnMediaEnded;
-                        _mediaPlayer.MediaFailed -= OnMediaFailed;
-
+                        
                         // 停止当前播放
                         _mediaPlayer.Stop();
-
-                        // 设置音量和播放速度
-                        _mediaPlayer.Volume = _settings.Volume;
-                        _mediaPlayer.SpeedRatio = _settings.Speed;
-
-                        // 添加事件处理器
-                        void OnMediaEnded(object sender, EventArgs e)
+                        
+                        // 设置音频文件
+                        _mediaPlayer.Open(new Uri(filePath, UriKind.Absolute));
+                        
+                        // 设置播放结束事件
+                        EventHandler mediaEndedHandler = null;
+                        EventHandler<ExceptionEventArgs> mediaFailedHandler = null;
+                        
+                        mediaEndedHandler = (s, e) =>
                         {
+                            _mediaPlayer.MediaEnded -= mediaEndedHandler;
+                            _mediaPlayer.MediaFailed -= mediaFailedHandler;
                             Logger.Log($"TTS: 音频播放完成: {filePath}");
-                            playbackCompleted.TrySetResult(true);
-                        }
-
-                        void OnMediaFailed(object sender, System.Windows.Media.ExceptionEventArgs e)
+                            tcs.TrySetResult(true);
+                        };
+                        
+                        mediaFailedHandler = (s, e) =>
                         {
-                            Logger.Log($"TTS: 音频播放失败: {e.ErrorException?.Message}");
-                            playbackCompleted.TrySetResult(false);
-                        }
-
-                        _mediaPlayer.MediaEnded += OnMediaEnded;
-                        _mediaPlayer.MediaFailed += OnMediaFailed;
-
-                        // 打开并播放文件
-                        _mediaPlayer.Open(new Uri(filePath));
+                            _mediaPlayer.MediaEnded -= mediaEndedHandler;
+                            _mediaPlayer.MediaFailed -= mediaFailedHandler;
+                            Logger.Log($"TTS: 音频播放失败: {filePath}, 错误: {e.ErrorException?.Message}");
+                            tcs.TrySetResult(false);
+                        };
+                        
+                        _mediaPlayer.MediaEnded += mediaEndedHandler;
+                        _mediaPlayer.MediaFailed += mediaFailedHandler;
+                        
+                        // 开始播放
                         _mediaPlayer.Play();
-
-                        Logger.Log($"TTS: 开始播放音频文件: {filePath}");
+                        Logger.Log($"TTS: 开始播放音频: {filePath}");
                     }
                     catch (Exception ex)
                     {
                         Logger.Log($"TTS: UI线程播放设置失败: {ex.Message}");
-                        playbackCompleted.TrySetResult(false);
+                        tcs.TrySetResult(false);
                     }
                 });
 
-                // 等待播放完成或超时（最多30秒）
-                var timeoutTask = Task.Delay(30000);
-                var completedTask = await Task.WhenAny(playbackCompleted.Task, timeoutTask);
-
-                if (completedTask == timeoutTask)
-                {
-                    Logger.Log($"TTS: 播放超时，停止播放: {filePath}");
-                    await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
-                    {
-                        try
-                        {
-                            _mediaPlayer?.Stop();
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Log($"TTS: 停止播放失败: {ex.Message}");
-                        }
-                    });
-                }
+                // 等待播放完成
+                await tcs.Task;
 
                 // 清理临时文件（延迟删除）
                 _ = Task.Run(async () =>
