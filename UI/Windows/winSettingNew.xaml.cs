@@ -1806,14 +1806,21 @@ namespace VPetLLM.UI.Windows
 
         private string GetPluginStoreUrl(string originalUrl)
         {
-            var pluginStoreSettings = _plugin.Settings.PluginStore;
-            if (pluginStoreSettings != null && pluginStoreSettings.UseProxy && !string.IsNullOrEmpty(pluginStoreSettings.ProxyUrl))
+            var (useUrlRewrite, proxy) = GetPluginStoreProxyInfo();
+            
+            // 如果需要使用URL重写（拼接类型代理）
+            if (useUrlRewrite)
             {
+                var pluginStoreSettings = _plugin.Settings.PluginStore;
+                var proxyUrl = pluginStoreSettings.ProxyUrl.Trim();
+                
                 // 移除原URL中的协议部分，然后拼接代理地址
                 var uri = new Uri(originalUrl);
                 var pathAndQuery = originalUrl.Substring(uri.Scheme.Length + 3); // 移除 "https://" 或 "http://"
-                return $"{pluginStoreSettings.ProxyUrl.TrimEnd('/')}/{pathAndQuery}";
+                return $"{proxyUrl.TrimEnd('/')}/{pathAndQuery}";
             }
+            
+            // 对于传统代理或无代理，直接返回原URL
             return originalUrl;
         }
 
@@ -1897,7 +1904,10 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private System.Net.IWebProxy GetPluginStoreProxy()
+        /// <summary>
+        /// 获取插件商店代理配置信息
+        /// </summary>
+        private (bool useUrlRewrite, System.Net.IWebProxy proxy) GetPluginStoreProxyInfo()
         {
             // 优先检查插件商店专用代理设置
             var pluginStoreSettings = _plugin.Settings.PluginStore;
@@ -1905,32 +1915,32 @@ namespace VPetLLM.UI.Windows
             {
                 var proxyUrl = pluginStoreSettings.ProxyUrl.Trim();
 
-                // 如果是URL拼接类型的代理（如ghfast.top），不使用HttpClient代理
+                // 如果是URL拼接类型的代理（如ghfast.top），使用URL重写方式
                 if (proxyUrl.StartsWith("http://") || proxyUrl.StartsWith("https://"))
                 {
                     // 检查是否是GitHub加速服务（URL拼接类型）
                     if (proxyUrl.Contains("ghfast.top") || proxyUrl.Contains("github") || proxyUrl.Contains("raw.githubusercontent"))
                     {
-                        return null; // 使用URL拼接方式
+                        return (true, null); // 使用URL拼接方式，不使用HttpClient代理
                     }
 
                     // 其他HTTP/HTTPS代理，使用传统代理方式
-                    return new System.Net.WebProxy(proxyUrl);
+                    return (false, new System.Net.WebProxy(proxyUrl));
                 }
                 else
                 {
                     // 假设是 IP:Port 格式的代理
-                    return new System.Net.WebProxy($"http://{proxyUrl}");
+                    return (false, new System.Net.WebProxy($"http://{proxyUrl}"));
                 }
             }
 
             // 如果插件商店专用代理未设置，则检查通用代理设置
             var proxySettings = _plugin.Settings.Proxy;
             
-            // 如果通用代理未启用，返回null
+            // 如果通用代理未启用，不使用代理
             if (proxySettings == null || !proxySettings.IsEnabled)
             {
-                return null;
+                return (false, null);
             }
 
             bool useProxy = false;
@@ -1950,7 +1960,7 @@ namespace VPetLLM.UI.Windows
             {
                 if (proxySettings.FollowSystemProxy)
                 {
-                    return System.Net.WebRequest.GetSystemWebProxy();
+                    return (false, System.Net.WebRequest.GetSystemWebProxy());
                 }
                 else if (!string.IsNullOrEmpty(proxySettings.Address))
                 {
@@ -1959,11 +1969,17 @@ namespace VPetLLM.UI.Windows
                         proxySettings.Protocol = "http";
                     }
                     var protocol = proxySettings.Protocol.ToLower() == "socks" ? "socks5" : "http";
-                    return new System.Net.WebProxy(new Uri($"{protocol}://{proxySettings.Address}"));
+                    return (false, new System.Net.WebProxy(new Uri($"{protocol}://{proxySettings.Address}")));
                 }
             }
             
-            return null;
+            return (false, null);
+        }
+
+        private System.Net.IWebProxy GetPluginStoreProxy()
+        {
+            var (useUrlRewrite, proxy) = GetPluginStoreProxyInfo();
+            return proxy;
         }
 
         /// <summary>
