@@ -63,6 +63,17 @@ namespace VPetLLM.Utils
                         {
                             var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
                             plugin.FilePath = file;
+                            
+                            // 检查是否已存在同名插件
+                            var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
+                            if (existingPlugin != null)
+                            {
+                                Logger.Log($"Warning: Plugin with name '{plugin.Name}' already exists. Skipping duplicate from {file}");
+                                Logger.Log($"Existing plugin from: {existingPlugin.FilePath}");
+                                Logger.Log($"Duplicate plugin from: {file}");
+                                continue; // 跳过重复的插件
+                            }
+                            
                             if (plugin is IPluginWithData pluginWithData)
                             {
                                 var pluginDataDir = Path.Combine(pluginDir, "PluginData", plugin.Name);
@@ -100,8 +111,20 @@ namespace VPetLLM.Utils
         public static void SavePluginStates()
         {
             var configFile = Path.Combine(PluginPath, "plugins.json");
-            var pluginStates = Plugins.ToDictionary(p => p.Name, p => p.Enabled);
+            
+            // 使用安全的方式创建字典，避免重复键的问题
+            var pluginStates = new Dictionary<string, bool>();
+            foreach (var plugin in Plugins)
+            {
+                if (!string.IsNullOrEmpty(plugin.Name))
+                {
+                    // 如果存在重复名称，使用最后一个插件的状态
+                    pluginStates[plugin.Name] = plugin.Enabled;
+                }
+            }
+            
             File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
+            Logger.Log($"Saved plugin states for {pluginStates.Count} plugins");
         }
 
         public static async Task<bool> UnloadAndTryDeletePlugin(IVPetLLMPlugin plugin, IChatCore chatCore)

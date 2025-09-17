@@ -1679,30 +1679,108 @@ namespace VPetLLM.UI.Windows
                 {
                     var downloadUrl = GetPluginStoreUrl(plugin.FileUrl);
                     var data = await client.GetByteArrayAsync(downloadUrl);
+                    string downloadedFileHash;
+                    
                     using (var sha256 = SHA256.Create())
                     {
                         var hash = sha256.ComputeHash(data);
-                        var hashString = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                        if (hashString != plugin.SHA256.ToLowerInvariant())
+                        downloadedFileHash = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                        if (downloadedFileHash != plugin.SHA256.ToLowerInvariant())
                         {
                             MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.FileValidationError", _plugin.Settings.Language, "文件校验失败，请稍后重试"),
                                 ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
                             return;
                         }
                     }
+                    
                     var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
                     if (!Directory.Exists(pluginDir))
                     {
                         Directory.CreateDirectory(pluginDir);
                     }
                     var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
+                    
+                    // 如果是更新操作，先卸载旧版本插件
+                    if (plugin.IsLocal && plugin.LocalPlugin != null)
+                    {
+                        try
+                        {
+                            plugin.LocalPlugin.Unload();
+                            _plugin.ChatCore?.RemovePlugin(plugin.LocalPlugin);
+                            Logger.Log($"Unloaded old version of plugin '{plugin.LocalPlugin.Name}' before update.");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Warning: Failed to unload old plugin version: {ex.Message}");
+                        }
+                    }
+                    
+                    // 写入新文件
                     File.WriteAllBytes(filePath, data);
+                    Logger.Log($"Plugin file written to: {filePath}");
 
-                    // Force reload plugins to recognize the new dll
+                    // 确保文件写入完成并释放文件句柄
+                    await Task.Delay(200);
+
+                    // 验证文件确实已更新（在加载插件之前）
+                    string actualFileHash;
+                    try
+                    {
+                        actualFileHash = PluginManager.GetFileSha256(filePath);
+                        Logger.Log($"Plugin update verification - Expected: {downloadedFileHash}, Actual: {actualFileHash}");
+                        
+                        if (actualFileHash != downloadedFileHash)
+                        {
+                            Logger.Log($"Error: File hash mismatch after update. Expected: {downloadedFileHash}, Got: {actualFileHash}");
+                            MessageBox.Show($"插件更新验证失败！\n期望: {downloadedFileHash}\n实际: {actualFileHash}",
+                                "更新验证失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error verifying updated plugin file: {ex.Message}");
+                        MessageBox.Show($"无法验证更新后的插件文件: {ex.Message}", 
+                            "验证失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    // 强制重新加载插件以识别新的dll
                     _plugin.LoadPlugins();
+                    Logger.Log($"Plugins reloaded after update");
 
-                    // Now refresh the UI
+                    // 再次验证加载后的状态
+                    var reloadedHash = PluginManager.GetFileSha256(filePath);
+                    Logger.Log($"Post-reload verification - Expected: {downloadedFileHash}, Actual: {reloadedHash}");
+
+                    // 刷新UI显示 - 让系统重新计算所有版本信息
                     Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+                    
+                    // 等待UI刷新完成后再次检查
+                    await Task.Delay(500);
+                    
+                    // 查找更新后的插件项并验证状态
+                    var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
+                    if (dataGrid?.ItemsSource is IEnumerable<UnifiedPluginItem> currentItems)
+                    {
+                        var updatedItem = currentItems.FirstOrDefault(p => p.Id == plugin.Id || p.OriginalName == plugin.OriginalName);
+                        if (updatedItem != null)
+                        {
+                            Logger.Log($"Updated plugin item found - Version: {updatedItem.Version}, IsUpdatable: {updatedItem.IsUpdatable}");
+                            if (updatedItem.IsUpdatable)
+                            {
+                                Logger.Log($"Warning: Plugin still shows as updatable after update. Local: {updatedItem.Version}, Remote: {updatedItem.SHA256}");
+                            }
+                        }
+                        else
+                        {
+                            Logger.Log($"Warning: Could not find updated plugin item in UI list");
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log($"Warning: Could not access DataGrid ItemsSource for verification");
+                    }
 
                     MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", _plugin.Settings.Language, "插件安装/更新成功！"),
                         ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
