@@ -1382,6 +1382,7 @@ namespace VPetLLM.UI.Windows
 
             if (FindName("TextBlock_GeminiApiEndpointNote") is TextBlock textBlockGeminiApiEndpointNote) textBlockGeminiApiEndpointNote.Text = LanguageHelper.Get("Gemini.ApiEndpointNote", langCode);
             if (FindName("TextBlock_FreeApiEndpointNote") is TextBlock textBlockFreeApiEndpointNote) textBlockFreeApiEndpointNote.Text = LanguageHelper.Get("Free.ApiEndpointNote", langCode);
+            if (FindName("TextBlock_ApiServiceNotice") is TextBlock textBlockApiServiceNotice) textBlockApiServiceNotice.Text = LanguageHelper.Get("Free.ApiServiceNotice", langCode);
             if (FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox checkBoxGeminiEnableAdvanced) checkBoxGeminiEnableAdvanced.Content = LanguageHelper.Get("Gemini.EnableAdvanced", langCode);
             if (FindName("CheckBox_Free_EnableAdvanced") is CheckBox checkBoxFreeEnableAdvanced) checkBoxFreeEnableAdvanced.Content = LanguageHelper.Get("Free.EnableAdvanced", langCode);
             if (FindName("TextBlock_Gemini_Temperature") is TextBlock textBlockGeminiTemperature) textBlockGeminiTemperature.Text = LanguageHelper.Get("Gemini.Temperature", langCode);

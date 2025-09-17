@@ -580,6 +580,7 @@
                                                         VerticalAlignment="Center"
                                                         Style="{StaticResource ModernTextBox}"/>
                                             </StackPanel>
+                                            <TextBlock x:Name="TextBlock_ApiServiceNotice" Foreground="{StaticResource SecondaryTextBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

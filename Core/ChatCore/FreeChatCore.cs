@@ -19,8 +19,8 @@ namespace VPetLLM.Core.ChatCore
         private readonly Setting _setting;
         private readonly HttpClient _httpClient;
         
-        private const string ENCODED_API_KEY = "";
-        private const string ENCODED_API_URL = "";
+        private const string ENCODED_API_KEY = "633273745233704955327875626b46775879314f64584e66513051744e3070714d544e49625855776331424d536b644d6344424254306c575545394a5954557956555a49";
+        private const string ENCODED_API_URL = "6148523063484d364c793932634756304c6e706c59574a31636935686348417663484a7665486b76646e426c644339324d574a6c64474576593268686443396a62323177624756306157397563773d3d";
         private const string ENCODED_UA = "566c426c6445784d54563947636d566c58304a3558304a5a54513d3d";
         
         public FreeChatCore(Setting.FreeSetting freeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)

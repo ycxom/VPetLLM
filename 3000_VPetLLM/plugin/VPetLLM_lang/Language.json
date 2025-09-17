@@ -285,6 +285,12 @@
             "zh-hans": "最大Token:",
             "zh-hant": "最大Token:",
             "jp": "最大トークン:"
+        },
+        "ApiServiceNotice": {
+            "en": "API service provided by QQ: 790132463! We have limited keys available and cannot support large numbers of requests, which may result in unstable service. If you have your own key, please use it. Thank you!",
+            "zh-hans": "感谢API服务由 QQ：790132463 提供！我们可使用的Key有限，我们无法支持大量请求，可能导致服务不一定稳定，若您拥有属于自己的Key，还请您使用自己的Key，谢谢！",
+            "zh-hant": "感謝API服務由 QQ：790132463 提供！我們可使用的Key有限，我們無法支持大量請求，可能導致服務不一定穩定，若您擁有屬於自己的Key，還請您使用自己的Key，謝謝！",
+            "jp": "APIサービスはQQ: 790132463によって提供されています！利用可能なキーが限られており、大量のリクエストをサポートできず、サービスが不安定になる可能性があります。ご自身のキーをお持ちの場合は、そちらをご利用ください。ありがとうございます！"
         }
     },
     "Advanced_Options": {
