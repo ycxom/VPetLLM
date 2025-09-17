@@ -184,8 +184,7 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Voice")).SelectionChanged += Control_SelectionChanged;
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Format")).SelectionChanged += Control_SelectionChanged;
             
-            // DIY TTS 按钮事件绑定
-            ((Button)this.FindName("Button_TTS_DIY_OpenConfig")).Click += Button_TTS_DIY_OpenConfig_Click;
+            // DIY TTS 按钮事件绑定 - 已在 XAML 中绑定，无需重复绑定
 
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
 
@@ -1872,8 +1871,6 @@ namespace VPetLLM.UI.Windows
                 if (System.IO.Directory.Exists(configDir))
                 {
                     System.Diagnostics.Process.Start("explorer.exe", configDir);
-                    MessageBox.Show($"已打开配置文件夹。\n\n配置文件路径：\n{configPath}\n\n请编辑 Config.json 文件来配置您的 DIY TTS 服务。",
-                        "DIY TTS 配置", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
                 {
@@ -1897,6 +1894,10 @@ namespace VPetLLM.UI.Windows
             {
                 // 保存当前设置到TTS服务
                 SaveSettings();
+
+                // 重新创建TTS服务实例以使用最新设置
+                _ttsService?.Dispose();
+                _ttsService = new TTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
 
                 if (_ttsService != null)
                 {

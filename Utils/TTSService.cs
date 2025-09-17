@@ -295,11 +295,17 @@ namespace VPetLLM.Utils
                 string fileExtension;
 
                 // 根据提供商获取音频数据
+                Logger.Log($"TTS: 当前提供商设置: '{_settings.Provider}'");
                 switch (_settings.Provider)
                 {
                     case "OpenAI":
                         audioData = await GetOpenAITTSAsync(text);
                         fileExtension = _settings.OpenAI.Format;
+                        break;
+                    case "DIY":
+                        audioData = await GetDIYTTSAsync(text);
+                        var diyConfig = DIYTTSConfig.LoadConfig();
+                        fileExtension = diyConfig.ResponseFormat;
                         break;
                     case "URL":
                     default:
@@ -356,11 +362,17 @@ namespace VPetLLM.Utils
                 string fileExtension;
 
                 // 根据提供商获取音频数据
+                Logger.Log($"TTS: 当前提供商设置: '{_settings.Provider}'");
                 switch (_settings.Provider)
                 {
                     case "OpenAI":
                         audioData = await GetOpenAITTSAsync(text);
                         fileExtension = _settings.OpenAI.Format;
+                        break;
+                    case "DIY":
+                        audioData = await GetDIYTTSAsync(text);
+                        var diyConfig = DIYTTSConfig.LoadConfig();
+                        fileExtension = diyConfig.ResponseFormat;
                         break;
                     case "URL":
                     default:
@@ -461,7 +473,6 @@ namespace VPetLLM.Utils
                 var url = $"{baseUrl}/?text={encodedText}&voice={voice}";
                 
                 Logger.Log($"TTS: GET请求URL: {url}");
-                Logger.Log($"TTS: 编码后文本: '{encodedText}'");
                 Logger.Log($"TTS: 发送GET请求到: {url}");
                 
                 response = await _httpClient.GetAsync(url);
@@ -878,9 +889,30 @@ namespace VPetLLM.Utils
             }
             else
             {
-                // GET请求
-                var encodedText = Uri.EscapeDataString(text);
-                var url = $"{baseUrl}?text={encodedText}";
+                // GET请求 - 构建查询参数
+                var queryParams = new List<string>();
+                
+                // 处理 requestBody 中的参数，替换 {text} 占位符并添加到查询参数
+                foreach (var param in diyConfig.RequestBody ?? new Dictionary<string, object>())
+                {
+                    var value = param.Value?.ToString() ?? "";
+                    if (value.Contains("{text}"))
+                    {
+                        value = value.Replace("{text}", text);
+                    }
+                    var encodedValue = Uri.EscapeDataString(value);
+                    queryParams.Add($"{param.Key}={encodedValue}");
+                }
+                
+                // 如果 requestBody 为空或没有 text 参数，添加默认的 text 参数
+                if (!diyConfig.RequestBody.ContainsKey("text"))
+                {
+                    var encodedText = Uri.EscapeDataString(text);
+                    queryParams.Add($"text={encodedText}");
+                }
+                
+                var queryString = string.Join("&", queryParams);
+                var url = $"{baseUrl}?{queryString}";
                 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 
@@ -908,7 +940,6 @@ namespace VPetLLM.Utils
                 }
                 
                 Logger.Log($"TTS: GET请求URL: {url}");
-                Logger.Log($"TTS: 编码后文本: '{encodedText}'");
                 Logger.Log($"TTS: 发送GET请求到: {url}");
                 
                 response = await _httpClient.SendAsync(request, cts.Token);
