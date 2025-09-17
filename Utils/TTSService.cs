@@ -916,7 +916,7 @@ namespace VPetLLM.Utils
                 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 
-                // 设置自定义请求头
+                // 设置自定义请求头（GET请求不设置Content-Type）
                 foreach (var header in diyConfig.CustomHeaders)
                 {
                     if (header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase))
@@ -924,6 +924,11 @@ namespace VPetLLM.Utils
                         // 强制限制User-Agent为VPetLLM
                         request.Headers.Add("User-Agent", "VPetLLM");
                         Logger.Log($"TTS: 已设置User-Agent: VPetLLM (强制限制)");
+                    }
+                    else if (header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // GET请求跳过Content-Type设置
+                        Logger.Log($"TTS: 跳过Content-Type设置 (GET请求不需要)");
                     }
                     else
                     {
