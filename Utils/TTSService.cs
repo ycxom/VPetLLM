@@ -647,6 +647,15 @@ namespace VPetLLM.Utils
                         // 设置音频文件
                         _mediaPlayer.Open(new Uri(filePath, UriKind.Absolute));
                         
+                        // 设置音量（基础音量 + 增益转换为线性系数）
+                        // MediaPlayer.Volume 可以设置超过1.0，最大到100
+                        double baseVolume = _settings.Volume;
+                        double gainLinear = Math.Pow(10.0, _settings.VolumeGain / 20.0);
+                        double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
+                        _mediaPlayer.Volume = finalVolume;
+                        
+                        Logger.Log($"TTS: 设置播放器音量 - 基础音量: {baseVolume:F2}, 增益: {_settings.VolumeGain:F1}dB (线性系数: {gainLinear:F3}), 最终音量: {finalVolume:F2}");
+                        
                         // 设置播放结束事件
                         EventHandler mediaEndedHandler = null;
                         EventHandler<ExceptionEventArgs> mediaFailedHandler = null;

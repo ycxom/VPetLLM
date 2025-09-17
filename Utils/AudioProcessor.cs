@@ -37,9 +37,9 @@ namespace VPetLLM.Utils
                 }
                 else
                 {
-                    // 对于MP3等压缩格式，我们无法直接处理
-                    // 返回原数据，让MediaPlayer的Volume属性处理
-                    Logger.Log("AudioProcessor: 检测到压缩音频格式，将使用播放器音量控制");
+                    // 对于MP3等压缩格式，我们无法直接处理音频数据
+                    // 但增益信息会在TTSService中通过MediaPlayer.Volume属性应用
+                    Logger.Log($"AudioProcessor: 检测到压缩音频格式，增益 {gainDb:F1}dB 将通过播放器音量控制应用");
                     return audioData;
                 }
             }
