@@ -183,6 +183,9 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Model")).SelectionChanged += Control_SelectionChanged;
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Voice")).SelectionChanged += Control_SelectionChanged;
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Format")).SelectionChanged += Control_SelectionChanged;
+            
+            // DIY TTS 按钮事件绑定
+            ((Button)this.FindName("Button_TTS_DIY_OpenConfig")).Click += Button_TTS_DIY_OpenConfig_Click;
 
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
 
@@ -486,6 +489,8 @@ namespace VPetLLM.UI.Windows
                 }
             }
 
+            // DIY TTS 配置通过 JSON 文件管理，无需在此加载
+
             // 触发提供商切换事件来显示正确的面板
             ComboBox_TTS_Provider_SelectionChanged(providerComboBox, null);
 
@@ -649,6 +654,8 @@ namespace VPetLLM.UI.Windows
             {
                 _plugin.Settings.TTS.OpenAI.Format = selectedFormatItem.Tag?.ToString() ?? "mp3";
             }
+
+            // DIY TTS 配置通过 JSON 文件管理，无需在此保存
 
             // 更新TTS服务设置
             _ttsService?.UpdateSettings(_plugin.Settings.TTS, _plugin.Settings.Proxy);
@@ -921,7 +928,7 @@ namespace VPetLLM.UI.Windows
             if (sender is CheckBox checkBox && checkBox.DataContext is UnifiedPluginItem item && item.LocalPlugin != null)
             {
                 var langCode = _plugin.Settings.Language;
-                
+
                 try
                 {
                     bool isEnabled = checkBox.IsChecked ?? false;
@@ -942,7 +949,7 @@ namespace VPetLLM.UI.Windows
                             item.IsEnabled = false;
                             item.LocalPlugin.Enabled = false;
                             checkBox.IsChecked = false;
-                            
+
                             var errorMsg = $"{LanguageHelper.Get("Plugin.InitializeFailed", langCode) ?? "插件初始化失败"}: {ex.Message}";
                             MessageBox.Show(errorMsg, LanguageHelper.Get("Error", langCode) ?? "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                             Logger.Log($"Plugin '{item.LocalPlugin.Name}' initialization failed: {ex.Message}");
@@ -1009,7 +1016,7 @@ namespace VPetLLM.UI.Windows
                     var errorMsg = $"{LanguageHelper.Get("Plugin.OperationFailed", langCode) ?? "插件操作失败"}: {ex.Message}";
                     MessageBox.Show(errorMsg, LanguageHelper.Get("Error", langCode) ?? "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                     Logger.Log($"Plugin operation failed for '{item.LocalPlugin?.Name}': {ex}");
-                    
+
                     // 尝试重置复选框状态
                     try
                     {
@@ -1373,7 +1380,7 @@ namespace VPetLLM.UI.Windows
 
                 // 第一步：立即加载并显示本地插件
                 _plugin.LoadPlugins();
-                
+
                 System.Diagnostics.Debug.WriteLine($"[PluginStore] 加载的插件数量: {_plugin.Plugins.Count}");
                 System.Diagnostics.Debug.WriteLine($"[PluginStore] 失败的插件数量: {_plugin.FailedPlugins.Count}");
 
@@ -1403,7 +1410,7 @@ namespace VPetLLM.UI.Windows
                             LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用",
                         UninstallActionText = LanguageHelper.Get("Plugin.Uninstall", langCode) ?? "卸载"
                     };
-                    
+
                     if (localPlugin is IActionPlugin && localPlugin.Parameters.Contains("setting"))
                     {
                         item.HasSettingAction = true;
@@ -1451,7 +1458,7 @@ namespace VPetLLM.UI.Windows
                     try
                     {
                         Dictionary<string, JObject> remotePlugins = new Dictionary<string, JObject>();
-                        
+
                         using (var client = CreatePluginStoreHttpClient())
                         {
                             var pluginListUrl = GetPluginStoreUrl("https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json");
@@ -1535,7 +1542,7 @@ namespace VPetLLM.UI.Windows
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载失败，继续使用离线模式: {ex.Message}");
-                        
+
                         Dispatcher.Invoke(() =>
                         {
                             // 可以在这里显示离线状态提示
@@ -1680,7 +1687,7 @@ namespace VPetLLM.UI.Windows
                     var downloadUrl = GetPluginStoreUrl(plugin.FileUrl);
                     var data = await client.GetByteArrayAsync(downloadUrl);
                     string downloadedFileHash;
-                    
+
                     using (var sha256 = SHA256.Create())
                     {
                         var hash = sha256.ComputeHash(data);
@@ -1692,14 +1699,14 @@ namespace VPetLLM.UI.Windows
                             return;
                         }
                     }
-                    
+
                     var pluginDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
                     if (!Directory.Exists(pluginDir))
                     {
                         Directory.CreateDirectory(pluginDir);
                     }
                     var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
-                    
+
                     // 如果是更新操作，先卸载旧版本插件
                     if (plugin.IsLocal && plugin.LocalPlugin != null)
                     {
@@ -1714,7 +1721,7 @@ namespace VPetLLM.UI.Windows
                             Logger.Log($"Warning: Failed to unload old plugin version: {ex.Message}");
                         }
                     }
-                    
+
                     // 写入新文件
                     File.WriteAllBytes(filePath, data);
                     Logger.Log($"Plugin file written to: {filePath}");
@@ -1728,7 +1735,7 @@ namespace VPetLLM.UI.Windows
                     {
                         actualFileHash = PluginManager.GetFileSha256(filePath);
                         Logger.Log($"Plugin update verification - Expected: {downloadedFileHash}, Actual: {actualFileHash}");
-                        
+
                         if (actualFileHash != downloadedFileHash)
                         {
                             Logger.Log($"Error: File hash mismatch after update. Expected: {downloadedFileHash}, Got: {actualFileHash}");
@@ -1740,7 +1747,7 @@ namespace VPetLLM.UI.Windows
                     catch (Exception ex)
                     {
                         Logger.Log($"Error verifying updated plugin file: {ex.Message}");
-                        MessageBox.Show($"无法验证更新后的插件文件: {ex.Message}", 
+                        MessageBox.Show($"无法验证更新后的插件文件: {ex.Message}",
                             "验证失败", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
@@ -1755,10 +1762,10 @@ namespace VPetLLM.UI.Windows
 
                     // 刷新UI显示 - 让系统重新计算所有版本信息
                     Button_RefreshPlugins_Click(this, new RoutedEventArgs());
-                    
+
                     // 等待UI刷新完成后再次检查
                     await Task.Delay(500);
-                    
+
                     // 查找更新后的插件项并验证状态
                     var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
                     if (dataGrid?.ItemsSource is IEnumerable<UnifiedPluginItem> currentItems)
@@ -1806,11 +1813,11 @@ namespace VPetLLM.UI.Windows
                     catch (Exception ex)
                     {
                         var langCode = _plugin.Settings.Language;
-                        
+
                         // 针对不同类型的错误提供更具体的提示
                         string errorMessage;
                         if (ex.Message.Contains("不具有由 URI") || ex.Message.Contains("识别的资源"))
-{
+                        {
                             errorMessage = $"{LanguageHelper.Get("Plugin.ResourceError", langCode) ?? "插件资源文件缺失或损坏"}\n\n" +
                                          $"插件: {plugin.Name}\n" +
                                          $"建议: 尝试重新安装此插件或联系插件开发者";
@@ -1819,11 +1826,11 @@ namespace VPetLLM.UI.Windows
                         {
                             errorMessage = $"{LanguageHelper.Get("Plugin.SettingError", langCode) ?? "插件设置打开失败"}: {ex.Message}";
                         }
-                        
+
                         var errorTitle = LanguageHelper.Get("Error", langCode) ?? "错误";
-                        
+
                         MessageBox.Show(errorMessage, errorTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
-                        
+
                         // 记录详细错误信息到调试日志
                         System.Diagnostics.Debug.WriteLine($"[PluginSetting] 插件 {plugin.Name} 设置打开失败: {ex}");
                     }
@@ -1843,6 +1850,41 @@ namespace VPetLLM.UI.Windows
 
                 if (FindName("Panel_TTS_OpenAI") is StackPanel openAIPanel)
                     openAIPanel.Visibility = provider == "OpenAI" ? Visibility.Visible : Visibility.Collapsed;
+
+                if (FindName("Panel_TTS_DIY") is StackPanel diyPanel)
+                    diyPanel.Visibility = provider == "DIY" ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            // 调用原有的保存逻辑
+            ScheduleAutoSave();
+        }
+
+        private void Button_TTS_DIY_OpenConfig_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 确保配置文件存在
+                var config = Utils.DIYTTSConfig.LoadConfig();
+                var configPath = Utils.DIYTTSConfig.GetConfigFilePath();
+                var configDir = System.IO.Path.GetDirectoryName(configPath);
+
+                // 打开配置文件夹
+                if (System.IO.Directory.Exists(configDir))
+                {
+                    System.Diagnostics.Process.Start("explorer.exe", configDir);
+                    MessageBox.Show($"已打开配置文件夹。\n\n配置文件路径：\n{configPath}\n\n请编辑 Config.json 文件来配置您的 DIY TTS 服务。",
+                        "DIY TTS 配置", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"配置文件夹不存在：{configDir}",
+                        "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开配置文件夹失败：{ex.Message}",
+                    "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1885,19 +1927,19 @@ namespace VPetLLM.UI.Windows
         private string GetPluginStoreUrl(string originalUrl)
         {
             var (useUrlRewrite, proxy) = GetPluginStoreProxyInfo();
-            
+
             // 如果需要使用URL重写（拼接类型代理）
             if (useUrlRewrite)
             {
                 var pluginStoreSettings = _plugin.Settings.PluginStore;
                 var proxyUrl = pluginStoreSettings.ProxyUrl.Trim();
-                
+
                 // 移除原URL中的协议部分，然后拼接代理地址
                 var uri = new Uri(originalUrl);
                 var pathAndQuery = originalUrl.Substring(uri.Scheme.Length + 3); // 移除 "https://" 或 "http://"
                 return $"{proxyUrl.TrimEnd('/')}/{pathAndQuery}";
             }
-            
+
             // 对于传统代理或无代理，直接返回原URL
             return originalUrl;
         }
@@ -2014,7 +2056,7 @@ namespace VPetLLM.UI.Windows
 
             // 如果插件商店专用代理未设置，则检查通用代理设置
             var proxySettings = _plugin.Settings.Proxy;
-            
+
             // 如果通用代理未启用，不使用代理
             if (proxySettings == null || !proxySettings.IsEnabled)
             {
@@ -2022,7 +2064,7 @@ namespace VPetLLM.UI.Windows
             }
 
             bool useProxy = false;
-            
+
             // 如果ForAllAPI为true，则对所有API使用代理
             if (proxySettings.ForAllAPI)
             {
@@ -2050,7 +2092,7 @@ namespace VPetLLM.UI.Windows
                     return (false, new System.Net.WebProxy(new Uri($"{protocol}://{proxySettings.Address}")));
                 }
             }
-            
+
             return (false, null);
         }
 
@@ -2067,7 +2109,7 @@ namespace VPetLLM.UI.Windows
         {
             var handler = new HttpClientHandler();
             var proxy = GetPluginStoreProxy();
-            
+
             if (proxy != null)
             {
                 handler.Proxy = proxy;
@@ -2079,7 +2121,7 @@ namespace VPetLLM.UI.Windows
                 handler.UseProxy = false;
                 handler.Proxy = null;
             }
-            
+
             return new HttpClient(handler);
         }
     }

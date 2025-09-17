@@ -1,0 +1,22 @@
+{
+  "enabled": false,
+  "baseUrl": "https://api.example.com/tts",
+  "method": "POST",
+  "contentType": "application/json",
+  "requestBody": {
+    "text": "{text}",
+    "voice": "default",
+    "format": "mp3",
+    "speed": 1.0,
+    "pitch": 1.0
+  },
+  "customHeaders": {
+    "User-Agent": "VPetLLM",
+    "Accept": "audio/mpeg",
+    "Authorization": "Bearer your-api-key-here",
+    "X-Custom-Header": "custom-value"
+  },
+  "responseFormat": "mp3",
+  "timeout": 30000,
+  "description": "DIY TTS 配置示例 - 请根据您的 TTS 服务 API 文档修改此配置。requestBody 现在使用键值对格式，与 customHeaders 一致，便于编写和维护。"
+}

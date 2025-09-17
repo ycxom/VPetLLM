@@ -655,6 +655,7 @@
                                             Style="{StaticResource ModernComboBox}">
                                         <ComboBoxItem Content="URL" Tag="URL" IsSelected="True"/>
                                         <ComboBoxItem Content="OpenAI" Tag="OpenAI"/>
+                                        <ComboBoxItem Content="DIY" Tag="DIY"/>
                                         <ComboBox.ItemContainerStyle>
                                             <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
                                                 <Setter Property="Padding" Value="12,8"/>
@@ -875,6 +876,32 @@
 
                                     <TextBlock Text="支持OpenAI TTS API格式的服务，如fish.audio等。需要提供有效的API Key。"
                                             x:Name="TextBlock_TTS_OpenAI_Description"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+                                </StackPanel>
+                                <!-- DIY TTS 配置 -->
+                                <StackPanel x:Name="Panel_TTS_DIY"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="TextBlock_TTS_DIY_Config"
+                                            Text="DIY TTS 配置"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+
+                                    <TextBlock Text="DIY TTS 使用 JSON 配置文件进行配置，支持强大的自定义功能。"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Button x:Name="Button_TTS_DIY_OpenConfig"
+                                            Content="打开配置文件夹"
+                                            Click="Button_TTS_DIY_OpenConfig_Click"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernButton}"/>
+
+                                    <TextBlock Text="配置文件位置: 文档\VPetLLM\DiyTTS\Config.json"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,8"/>
+
+                                    <TextBlock Text="支持自定义请求头、请求体、请求方法等参数。User-Agent 将自动限制为 VPetLLM。"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
                                 </StackPanel>

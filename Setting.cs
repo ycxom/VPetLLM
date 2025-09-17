@@ -140,12 +140,15 @@ namespace VPetLLM
             public bool AutoPlay { get; set; } = true;
             public double Volume { get; set; } = 1.0;
             public double Speed { get; set; } = 1.0;
-            
+
             // URL TTS 设置
             public URLTTSSetting URL { get; set; } = new URLTTSSetting();
-            
+
             // OpenAI TTS 设置 (fish.audio)
             public OpenAITTSSetting OpenAI { get; set; } = new OpenAITTSSetting();
+
+            // DIY TTS 设置
+            public DIYTTSSetting DIY { get; set; } = new DIYTTSSetting();
         }
 
         public class URLTTSSetting
@@ -163,5 +166,27 @@ namespace VPetLLM
             public string Voice { get; set; } = "alloy";
             public string Format { get; set; } = "mp3";
         }
+
+        public class DIYTTSSetting
+        {
+            public string BaseUrl { get; set; } = "https://api.example.com/tts";
+            public string Method { get; set; } = "POST"; // GET 或 POST
+            public string ContentType { get; set; } = "application/json";
+            public string RequestBody { get; set; } = "{\n  \"text\": \"{text}\",\n  \"voice\": \"default\",\n  \"format\": \"mp3\"\n}";
+            public List<CustomHeader> CustomHeaders { get; set; } = new List<CustomHeader>
+    {
+        new CustomHeader { Key = "User-Agent", Value = "VPetLLM", IsEnabled = true },
+        new CustomHeader { Key = "Accept", Value = "audio/mpeg", IsEnabled = true }
+    };
+            public string ResponseFormat { get; set; } = "mp3"; // 响应音频格式
+        }
+
+        public class CustomHeader
+        {
+            public string Key { get; set; } = "";
+            public string Value { get; set; } = "";
+            public bool IsEnabled { get; set; } = true;
+        }
+
     }
 }

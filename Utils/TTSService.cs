@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
@@ -109,11 +110,17 @@ namespace VPetLLM.Utils
                 string fileExtension;
 
                 // 根据提供商获取音频数据
+                Logger.Log($"TTS: 当前提供商设置: '{_settings.Provider}'");
                 switch (_settings.Provider)
                 {
                     case "OpenAI":
                         audioData = await GetOpenAITTSAsync(text);
                         fileExtension = _settings.OpenAI.Format;
+                        break;
+                    case "DIY":
+                        audioData = await GetDIYTTSAsync(text);
+                        var diyConfig = DIYTTSConfig.LoadConfig();
+                        fileExtension = diyConfig.ResponseFormat;
                         break;
                     case "URL":
                     default:
@@ -218,11 +225,17 @@ namespace VPetLLM.Utils
                 string fileExtension;
 
                 // 根据提供商获取音频数据
+                Logger.Log($"TTS: 当前提供商设置: '{_settings.Provider}'");
                 switch (_settings.Provider)
                 {
                     case "OpenAI":
                         audioData = await GetOpenAITTSAsync(text);
                         fileExtension = _settings.OpenAI.Format;
+                        break;
+                    case "DIY":
+                        audioData = await GetDIYTTSAsync(text);
+                        var diyConfigForTask = DIYTTSConfig.LoadConfig();
+                        fileExtension = diyConfigForTask.ResponseFormat;
                         break;
                     case "URL":
                     default:
@@ -757,6 +770,169 @@ namespace VPetLLM.Utils
                    settings1.Address == settings2.Address &&
                    settings1.ForAllAPI == settings2.ForAllAPI &&
                    settings1.ForTTS == settings2.ForTTS;
+        }
+
+        /// <summary>
+        /// 获取DIY TTS音频数据
+        /// </summary>
+        /// <param name="text">文本内容</param>
+        /// <returns>音频数据</returns>
+        private async Task<byte[]> GetDIYTTSAsync(string text)
+        {
+            // 从配置文件加载 DIY TTS 配置
+            var diyConfig = DIYTTSConfig.LoadConfig();
+            
+            if (!diyConfig.Enabled)
+            {
+                Logger.Log("TTS: DIY TTS 未启用");
+                throw new InvalidOperationException("DIY TTS 未启用");
+            }
+
+            if (!DIYTTSConfig.IsValidConfig(diyConfig))
+            {
+                Logger.Log("TTS: DIY TTS 配置无效");
+                throw new InvalidOperationException("DIY TTS 配置无效");
+            }
+
+            var baseUrl = diyConfig.BaseUrl?.TrimEnd('/');
+            var requestMethod = diyConfig.Method?.ToUpper() ?? "POST";
+            var contentType = diyConfig.ContentType ?? "application/json";
+            
+            Logger.Log($"TTS: DIY请求构建信息:");
+            Logger.Log($"TTS: 配置文件路径: {DIYTTSConfig.GetConfigFilePath()}");
+            Logger.Log($"TTS: 目标URL: '{baseUrl}'");
+            Logger.Log($"TTS: 请求方法: '{requestMethod}'");
+            Logger.Log($"TTS: Content-Type: '{contentType}'");
+            Logger.Log($"TTS: 原始文本: '{text}'");
+            
+            // 验证URL格式
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
+            {
+                Logger.Log($"TTS: 错误 - URL格式无效: {baseUrl}");
+                throw new ArgumentException($"无效的URL格式: {baseUrl}");
+            }
+            
+            HttpResponseMessage response;
+            
+            // 设置超时时间
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromMilliseconds(diyConfig.Timeout));
+            
+            if (requestMethod == "POST")
+            {
+                // POST请求
+                var request = new HttpRequestMessage(HttpMethod.Post, baseUrl);
+                
+                // 设置自定义请求头
+                foreach (var header in diyConfig.CustomHeaders)
+                {
+                    if (header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 强制限制User-Agent为VPetLLM
+                        request.Headers.Add("User-Agent", "VPetLLM");
+                        Logger.Log($"TTS: 已设置User-Agent: VPetLLM (强制限制)");
+                    }
+                    else if (header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Content-Type通过StringContent设置，跳过
+                        continue;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            request.Headers.Add(header.Key, header.Value);
+                            Logger.Log($"TTS: 已设置请求头: {header.Key}: {header.Value}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"TTS: 设置请求头失败 {header.Key}: {ex.Message}");
+                        }
+                    }
+                }
+                
+                // 构建请求体，处理键值对格式并替换文本占位符
+                var requestBodyDict = new Dictionary<string, object>(diyConfig.RequestBody ?? new Dictionary<string, object>());
+                
+                // 替换所有值中的 {text} 占位符
+                foreach (var key in requestBodyDict.Keys.ToList())
+                {
+                    if (requestBodyDict[key] is string stringValue)
+                    {
+                        requestBodyDict[key] = stringValue.Replace("{text}", text);
+                    }
+                }
+                
+                var requestBodyJson = JsonSerializer.Serialize(requestBodyDict, new JsonSerializerOptions
+                {
+                    WriteIndented = false,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                });
+            
+                request.Content = new StringContent(requestBodyJson, Encoding.UTF8, contentType);
+                
+                Logger.Log($"TTS: POST请求体:");
+                Logger.Log($"TTS: {requestBodyJson}");
+                Logger.Log($"TTS: 发送POST请求到: {baseUrl}");
+                
+                response = await _httpClient.SendAsync(request, cts.Token);
+            }
+            else
+            {
+                // GET请求
+                var encodedText = Uri.EscapeDataString(text);
+                var url = $"{baseUrl}?text={encodedText}";
+                
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                
+                // 设置自定义请求头
+                foreach (var header in diyConfig.CustomHeaders)
+                {
+                    if (header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 强制限制User-Agent为VPetLLM
+                        request.Headers.Add("User-Agent", "VPetLLM");
+                        Logger.Log($"TTS: 已设置User-Agent: VPetLLM (强制限制)");
+                    }
+                    else
+                    {
+                        try
+                        {
+                            request.Headers.Add(header.Key, header.Value);
+                            Logger.Log($"TTS: 已设置请求头: {header.Key}: {header.Value}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"TTS: 设置请求头失败 {header.Key}: {ex.Message}");
+                        }
+                    }
+                }
+                
+                Logger.Log($"TTS: GET请求URL: {url}");
+                Logger.Log($"TTS: 编码后文本: '{encodedText}'");
+                Logger.Log($"TTS: 发送GET请求到: {url}");
+                
+                response = await _httpClient.SendAsync(request, cts.Token);
+            }
+            
+            Logger.Log($"TTS: DIY响应状态码: {response.StatusCode}");
+            Logger.Log($"TTS: DIY响应头:");
+            foreach (var header in response.Headers)
+            {
+                Logger.Log($"TTS:   {header.Key}: {string.Join(", ", header.Value)}");
+            }
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Logger.Log($"TTS: 错误响应内容: {errorContent}");
+            }
+            
+            response.EnsureSuccessStatusCode();
+            
+            var responseData = await response.Content.ReadAsByteArrayAsync();
+            Logger.Log($"TTS: DIY响应数据大小: {responseData.Length} 字节");
+            
+            return responseData;
         }
 
         /// <summary>
