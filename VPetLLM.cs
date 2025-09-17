@@ -71,6 +71,10 @@ namespace VPetLLM
                     ChatCore = new GeminiChatCore(Settings.Gemini, Settings, mainwin, ActionProcessor);
                     Utils.Logger.Log("Chat core set to Gemini.");
                     break;
+                case global::VPetLLM.Setting.LLMType.Free:
+                    ChatCore = new FreeChatCore(Settings.Free, Settings, mainwin, ActionProcessor);
+                    Utils.Logger.Log("Chat core set to Free.");
+                    break;
             }
             // 加载聊天历史记录
             Utils.Logger.Log("VPetLLM plugin constructor finished.");

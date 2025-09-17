@@ -13,6 +13,7 @@ namespace VPetLLM
         public OllamaSetting Ollama { get; set; } = new OllamaSetting();
         public OpenAISetting OpenAI { get; set; } = new OpenAISetting();
         public GeminiSetting Gemini { get; set; } = new GeminiSetting();
+        public FreeSetting Free { get; set; } = new FreeSetting();
         public string AiName { get; set; } = "虚拟宠物";
         public string UserName { get; set; } = "主人";
         public string Role { get; set; } = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回应我。";
@@ -60,6 +61,10 @@ namespace VPetLLM
             {
                 TTS = new TTSSetting();
             }
+            if (Free == null)
+            {
+                Free = new FreeSetting();
+            }
         }
 
         public void Save()
@@ -97,6 +102,14 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
         }
 
+        public class FreeSetting
+        {
+            public string? Model { get; set; }
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
+        }
+
         public class ToolSetting
         {
             public string Name { get; set; } = "";
@@ -109,7 +122,8 @@ namespace VPetLLM
         {
             Ollama,
             OpenAI,
-            Gemini
+            Gemini,
+            Free
         }
         public class ProxySetting
         {
@@ -121,6 +135,7 @@ namespace VPetLLM
             public bool ForOllama { get; set; } = false;
             public bool ForOpenAI { get; set; } = false;
             public bool ForGemini { get; set; } = false;
+            public bool ForFree { get; set; } = false;
             public bool ForTTS { get; set; } = false;
             public bool ForMcp { get; set; } = false;
             public bool ForPlugin { get; set; } = false;

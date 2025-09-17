@@ -22,23 +22,23 @@ namespace VPetLLM.Core
         protected ActionProcessor? ActionProcessor { get; }
         protected SystemMessageProvider SystemMessageProvider { get; }
         protected Action<string> ResponseHandler;
-    public abstract Task<string> Chat(string prompt);
-    public abstract Task<string> Chat(string prompt, bool isFunctionCall);
-    public abstract Task<string> Summarize(string text);
+        public abstract Task<string> Chat(string prompt);
+        public abstract Task<string> Chat(string prompt, bool isFunctionCall);
+        public abstract Task<string> Summarize(string text);
 
         protected string GetSystemMessage()
         {
             return SystemMessageProvider.GetSystemMessage();
         }
 
-      protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
-      {
-          Settings = settings;
-          MainWindow = mainWindow;
-          ActionProcessor = actionProcessor;
-          HistoryManager = new HistoryManager(settings, Name, this);
-          SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
-      }
+        protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
+        {
+            Settings = settings;
+            MainWindow = mainWindow;
+            ActionProcessor = actionProcessor;
+            HistoryManager = new HistoryManager(settings, Name, this);
+            SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
+        }
 
         public virtual List<string> GetModels()
         {
@@ -48,54 +48,54 @@ namespace VPetLLM.Core
         /// <summary>
         /// 清除聊天历史上下文
         /// </summary>
-       public virtual void ClearContext()
-       {
-           HistoryManager.ClearHistory();
-       }
+        public virtual void ClearContext()
+        {
+            HistoryManager.ClearHistory();
+        }
 
         /// <summary>
         /// 获取聊天历史用于编辑
         /// </summary>
-       public virtual List<Message> GetHistoryForEditing()
-       {
-           return HistoryManager.GetHistory();
-       }
+        public virtual List<Message> GetHistoryForEditing()
+        {
+            return HistoryManager.GetHistory();
+        }
 
-       public List<Message> GetChatHistory()
-       {
-           return HistoryManager.GetHistory();
-       }
+        public List<Message> GetChatHistory()
+        {
+            return HistoryManager.GetHistory();
+        }
 
         /// <summary>
         /// 更新聊天历史（用户编辑后）
         /// </summary>
-       public virtual void UpdateHistory(List<Message> editedHistory)
-       {
-           HistoryManager.GetHistory().Clear();
-           HistoryManager.GetHistory().AddRange(editedHistory);
-           HistoryManager.SaveHistory();
-       }
+        public virtual void UpdateHistory(List<Message> editedHistory)
+        {
+            HistoryManager.GetHistory().Clear();
+            HistoryManager.GetHistory().AddRange(editedHistory);
+            HistoryManager.SaveHistory();
+        }
 
 
         /// <summary>
         /// 设置聊天历史记录（用于切换提供商时恢复）
         /// </summary>
-       public virtual void SetChatHistory(List<Message> history)
-       {
-           HistoryManager.GetHistory().Clear();
-           HistoryManager.GetHistory().AddRange(history);
-       }
+        public virtual void SetChatHistory(List<Message> history)
+        {
+            HistoryManager.GetHistory().Clear();
+            HistoryManager.GetHistory().AddRange(history);
+        }
 
 
-      public void SaveHistory()
-      {
-          HistoryManager.SaveHistory();
-      }
+        public void SaveHistory()
+        {
+            HistoryManager.SaveHistory();
+        }
 
-      public void LoadHistory()
-      {
-          HistoryManager.LoadHistory();
-      }
+        public void LoadHistory()
+        {
+            HistoryManager.LoadHistory();
+        }
         public void SetResponseHandler(Action<string> handler)
         {
             ResponseHandler = handler;
@@ -110,7 +110,7 @@ namespace VPetLLM.Core
         {
             SystemMessageProvider.RemovePlugin(plugin);
         }
-        
+
         public IWebProxy GetProxy(string? requestType = null)
         {
             // 如果Settings或Proxy为null，直接返回null
@@ -129,10 +129,10 @@ namespace VPetLLM.Core
 
             bool useProxy = false;
             string type = requestType ?? Name;
-            
+
             System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Checking proxy for {type}");
             System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForAllAPI: {Settings.Proxy.ForAllAPI}");
-            
+
             // 如果ForAllAPI为true，则对所有API使用代理
             if (Settings.Proxy.ForAllAPI)
             {
@@ -189,7 +189,7 @@ namespace VPetLLM.Core
                     return new WebProxy(new Uri(proxyUri));
                 }
             }
-            
+
             // 如果不应该使用代理，返回null
             System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Not using proxy, returning null");
             return null;
@@ -199,7 +199,7 @@ namespace VPetLLM.Core
         {
             var handler = new HttpClientHandler();
             var proxy = GetProxy();
-            
+
             if (proxy != null)
             {
                 handler.Proxy = proxy;
@@ -211,7 +211,7 @@ namespace VPetLLM.Core
                 handler.UseProxy = false;
                 handler.Proxy = null;
             }
-            
+
             return handler;
         }
 
@@ -220,19 +220,19 @@ namespace VPetLLM.Core
             var handler = CreateHttpClientHandler();
             return new HttpClient(handler);
         }
-  }
+    }
 
     public class Message
     {
         public string? Role { get; set; }
         public string? Content { get; set; }
-        
+
         /// <summary>
         /// 标准化角色名称，确保不同提供商API的角色名称一致
         /// </summary>
-        public string NormalizedRole 
-        { 
-            get 
+        public string NormalizedRole
+        {
+            get
             {
                 return Role?.ToLower() switch
                 {
@@ -273,9 +273,9 @@ namespace VPetLLM.Core
         public static List<Message> NormalizeRoles(List<Message> messages)
         {
             if (messages == null) return new List<Message>();
-            
-            return messages.Select(m => new Message 
-            { 
+
+            return messages.Select(m => new Message
+            {
                 Role = m.Role?.ToLower() switch
                 {
                     "model" => "assistant",  // Gemini使用"model"，标准化为"assistant"
@@ -284,35 +284,35 @@ namespace VPetLLM.Core
                 Content = m.Content
             }).ToList();
         }
-        
+
         /// <summary>
         /// 修复历史文件中的角色名称不一致问题
         /// </summary>
         public static void FixRoleInconsistencies(string historyFile)
         {
             if (!File.Exists(historyFile)) return;
-            
+
             try
             {
                 var json = File.ReadAllText(historyFile);
                 var messages = JsonConvert.DeserializeObject<List<Message>>(json);
-                
+
                 if (messages != null && messages.Count > 0)
                 {
                     var normalizedMessages = NormalizeRoles(messages);
-                    
+
                     // 只有在确实需要修复时才重写文件
                     if (HasRoleInconsistencies(messages))
                     {
                         var normalizedJson = JsonConvert.SerializeObject(normalizedMessages, Formatting.Indented);
-                        
+
                         // 使用临时文件确保写入完整性
                         var tempFile = historyFile + ".fix.tmp";
                         File.WriteAllText(tempFile, normalizedJson);
-                        
+
                         // 原子替换
                         File.Replace(tempFile, historyFile, null);
-                        
+
                         Console.WriteLine($"已修复聊天历史文件中的角色不一致问题: {Path.GetFileName(historyFile)}");
                     }
                 }
@@ -322,7 +322,7 @@ namespace VPetLLM.Core
                 Console.WriteLine($"修复角色不一致失败: {ex.Message}");
             }
         }
-        
+
         /// <summary>
         /// 检查是否存在角色名称不一致
         /// </summary>

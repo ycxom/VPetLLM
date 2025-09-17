@@ -26,7 +26,10 @@ namespace VPetLLM.Windows
         {
             _plugin = plugin;
             _messageProcessor = new SmartMessageProcessor(_plugin);
-            _plugin.ChatCore.SetResponseHandler(HandleResponse);
+            if (_plugin.ChatCore != null)
+            {
+                _plugin.ChatCore.SetResponseHandler(HandleResponse);
+            }
             Logger.Log("TalkBox created.");
         }
 

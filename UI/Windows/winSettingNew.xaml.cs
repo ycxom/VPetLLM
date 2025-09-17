@@ -89,7 +89,7 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private readonly VPetLLM _plugin;
+        private readonly global::VPetLLM.VPetLLM _plugin;
 
         // 自动保存相关字段
         private DispatcherTimer? _autoSaveTimer;
@@ -99,7 +99,7 @@ namespace VPetLLM.UI.Windows
         // TTS服务
         private TTSService? _ttsService;
 
-        public winSettingNew(VPetLLM plugin)
+        public winSettingNew(global::VPetLLM.VPetLLM plugin)
         {
             InitializeComponent();
             _plugin = plugin;
@@ -114,6 +114,7 @@ namespace VPetLLM.UI.Windows
             ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Control_ValueChanged;
+            ((Slider)this.FindName("Slider_Free_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_TTS_Volume")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_TTS_VolumeGain")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_TTS_Speed")).ValueChanged += Control_ValueChanged;
@@ -132,8 +133,11 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_OpenAIModel")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_OpenAIUrl")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_GeminiApiKey")).TextChanged += Control_TextChanged;
+
             ((ComboBox)this.FindName("ComboBox_GeminiModel")).SelectionChanged += Control_SelectionChanged;
+            ((ComboBox)this.FindName("ComboBox_FreeModel")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_GeminiUrl")).TextChanged += Control_TextChanged;
+
             ((CheckBox)this.FindName("CheckBox_KeepContext")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).Click += Control_Click;
@@ -152,7 +156,9 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_Free_MaxTokens")).TextChanged += Control_TextChanged;
 
             // Proxy settings
             ((CheckBox)this.FindName("CheckBox_Proxy_IsEnabled")).Click += Control_Click;
@@ -164,6 +170,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Proxy_ForOllama")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForOpenAI")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForFree")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForTTS")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).Click += Control_Click;
@@ -209,6 +216,10 @@ namespace VPetLLM.UI.Windows
                 else if (slider.Name == "Slider_Gemini_Temperature")
                 {
                     ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = slider.Value.ToString("F2");
+                }
+                else if (slider.Name == "Slider_Free_Temperature")
+                {
+                    ((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = slider.Value.ToString("F2");
                 }
                 else if (slider.Name == "Slider_TTS_Volume")
                 {
@@ -367,6 +378,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_GeminiApiKey")).Text = _plugin.Settings.Gemini.ApiKey;
             ((ComboBox)this.FindName("ComboBox_GeminiModel")).Text = _plugin.Settings.Gemini.Model;
             ((TextBox)this.FindName("TextBox_GeminiUrl")).Text = _plugin.Settings.Gemini.Url;
+            ((ComboBox)this.FindName("ComboBox_FreeModel")).Text = _plugin.Settings.Free.Model;
             ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked = _plugin.Settings.KeepContext;
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked = _plugin.Settings.SeparateChatByProvider;
@@ -393,6 +405,10 @@ namespace VPetLLM.UI.Windows
             ((Slider)this.FindName("Slider_Gemini_Temperature")).Value = _plugin.Settings.Gemini.Temperature;
             ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
             ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).Text = _plugin.Settings.Gemini.MaxTokens.ToString();
+            ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).IsChecked = _plugin.Settings.Free.EnableAdvanced;
+            ((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
+            ((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
+            ((TextBox)this.FindName("TextBox_Free_MaxTokens")).Text = _plugin.Settings.Free.MaxTokens.ToString();
             ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
             ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
 
@@ -416,6 +432,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Proxy_ForOllama")).IsChecked = _plugin.Settings.Proxy.ForOllama;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForOpenAI")).IsChecked = _plugin.Settings.Proxy.ForOpenAI;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked = _plugin.Settings.Proxy.ForGemini;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForFree")).IsChecked = _plugin.Settings.Proxy.ForFree;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForTTS")).IsChecked = _plugin.Settings.Proxy.ForTTS;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked = _plugin.Settings.Proxy.ForMcp;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked = _plugin.Settings.Proxy.ForPlugin;
@@ -521,6 +538,7 @@ namespace VPetLLM.UI.Windows
             var geminiApiKeyTextBox = (TextBox)this.FindName("TextBox_GeminiApiKey");
             var geminiModelComboBox = (ComboBox)this.FindName("ComboBox_GeminiModel");
             var geminiUrlTextBox = (TextBox)this.FindName("TextBox_GeminiUrl");
+            var freeModelComboBox = (ComboBox)this.FindName("ComboBox_FreeModel");
             var keepContextCheckBox = (CheckBox)this.FindName("CheckBox_KeepContext");
             var enableChatHistoryCheckBox = (CheckBox)this.FindName("CheckBox_EnableChatHistory");
             var separateChatByProviderCheckBox = (CheckBox)this.FindName("CheckBox_SeparateChatByProvider");
@@ -541,6 +559,9 @@ namespace VPetLLM.UI.Windows
             var geminiEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced");
             var geminiTemperatureSlider = (Slider)this.FindName("Slider_Gemini_Temperature");
             var geminiMaxTokensTextBox = (TextBox)this.FindName("TextBox_Gemini_MaxTokens");
+            var freeEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Free_EnableAdvanced");
+            var freeTemperatureSlider = (Slider)this.FindName("Slider_Free_Temperature");
+            var freeMaxTokensTextBox = (TextBox)this.FindName("TextBox_Free_MaxTokens");
             var toolsDataGrid = (DataGrid)this.FindName("DataGrid_Tools");
 
             var oldProvider = _plugin.Settings.Provider;
@@ -567,6 +588,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Gemini.ApiKey = geminiApiKeyTextBox.Text;
             _plugin.Settings.Gemini.Model = geminiModelComboBox.Text;
             _plugin.Settings.Gemini.Url = geminiUrlTextBox.Text;
+            _plugin.Settings.Free.Model = freeModelComboBox.Text;
             _plugin.Settings.KeepContext = keepContextCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableChatHistory = enableChatHistoryCheckBox.IsChecked ?? true;
             _plugin.Settings.SeparateChatByProvider = separateChatByProviderCheckBox.IsChecked ?? true;
@@ -612,6 +634,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Proxy.ForOllama = ((CheckBox)this.FindName("CheckBox_Proxy_ForOllama")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForOpenAI = ((CheckBox)this.FindName("CheckBox_Proxy_ForOpenAI")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForGemini = ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked ?? true;
+            _plugin.Settings.Proxy.ForFree = ((CheckBox)this.FindName("CheckBox_Proxy_ForFree")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForTTS = ((CheckBox)this.FindName("CheckBox_Proxy_ForTTS")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForMcp = ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForPlugin = ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked ?? true;
@@ -678,6 +701,7 @@ namespace VPetLLM.UI.Windows
                     Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
                 if (_plugin.Settings.EnableChatHistory && oldHistory != null)
@@ -695,6 +719,7 @@ namespace VPetLLM.UI.Windows
                     Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
                 if (_plugin.Settings.EnableChatHistory && currentHistory != null)
@@ -764,6 +789,30 @@ namespace VPetLLM.UI.Windows
             catch (System.Exception ex)
             {
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshOpenAIModels.Fail", _plugin.Settings.Language, "刷新OpenAI模型失败", ex),
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
+        }
+
+        private void Button_RefreshFreeModels_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
+            try
+            {
+                var freeCore = new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+                var models = freeCore.RefreshModels();
+                ((ComboBox)this.FindName("ComboBox_FreeModel")).ItemsSource = models;
+                if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_FreeModel")).Text))
+                    ((ComboBox)this.FindName("ComboBox_FreeModel")).SelectedIndex = 0;
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshFreeModels.Fail", _plugin.Settings.Language, "刷新免费模型失败", ex),
                     ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -1322,14 +1371,23 @@ namespace VPetLLM.UI.Windows
             if (FindName("TextBlock_OpenAI_MaxTokens") is TextBlock textBlockOpenAIMaxTokens) textBlockOpenAIMaxTokens.Text = LanguageHelper.Get("OpenAI.MaxTokens", langCode);
 
             if (FindName("Tab_Gemini") is TabItem tabGemini) tabGemini.Header = LanguageHelper.Get("Gemini.Header", langCode);
+            if (FindName("Tab_Free") is TabItem tabFree) tabFree.Header = LanguageHelper.Get("Free.Header", langCode);
             if (FindName("Label_GeminiApiKey") is Label labelGeminiApiKey) labelGeminiApiKey.Content = LanguageHelper.Get("Gemini.ApiKey", langCode);
+
             if (FindName("Label_GeminiModel") is Label labelGeminiModel) labelGeminiModel.Content = LanguageHelper.Get("Gemini.Model", langCode);
+            if (FindName("Label_FreeModel") is Label labelFreeModel) labelFreeModel.Content = LanguageHelper.Get("Free.Model", langCode);
             if (FindName("Button_RefreshGeminiModels") is Button buttonRefreshGeminiModels) buttonRefreshGeminiModels.Content = LanguageHelper.Get("Gemini.Refresh", langCode);
+            if (FindName("Button_RefreshFreeModels") is Button buttonRefreshFreeModels) buttonRefreshFreeModels.Content = LanguageHelper.Get("Free.Refresh", langCode);
             if (FindName("Label_GeminiUrl") is Label labelGeminiUrl) labelGeminiUrl.Content = LanguageHelper.Get("Gemini.ApiAddress", langCode);
+
             if (FindName("TextBlock_GeminiApiEndpointNote") is TextBlock textBlockGeminiApiEndpointNote) textBlockGeminiApiEndpointNote.Text = LanguageHelper.Get("Gemini.ApiEndpointNote", langCode);
+            if (FindName("TextBlock_FreeApiEndpointNote") is TextBlock textBlockFreeApiEndpointNote) textBlockFreeApiEndpointNote.Text = LanguageHelper.Get("Free.ApiEndpointNote", langCode);
             if (FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox checkBoxGeminiEnableAdvanced) checkBoxGeminiEnableAdvanced.Content = LanguageHelper.Get("Gemini.EnableAdvanced", langCode);
+            if (FindName("CheckBox_Free_EnableAdvanced") is CheckBox checkBoxFreeEnableAdvanced) checkBoxFreeEnableAdvanced.Content = LanguageHelper.Get("Free.EnableAdvanced", langCode);
             if (FindName("TextBlock_Gemini_Temperature") is TextBlock textBlockGeminiTemperature) textBlockGeminiTemperature.Text = LanguageHelper.Get("Gemini.Temperature", langCode);
+            if (FindName("TextBlock_Free_Temperature") is TextBlock textBlockFreeTemperature) textBlockFreeTemperature.Text = LanguageHelper.Get("Free.Temperature", langCode);
             if (FindName("TextBlock_Gemini_MaxTokens") is TextBlock textBlockGeminiMaxTokens) textBlockGeminiMaxTokens.Text = LanguageHelper.Get("Gemini.MaxTokens", langCode);
+            if (FindName("TextBlock_Free_MaxTokens") is TextBlock textBlockFreeMaxTokens) textBlockFreeMaxTokens.Text = LanguageHelper.Get("Free.MaxTokens", langCode);
 
             // Proxy UI
             if (FindName("CheckBox_Proxy_IsEnabled") is CheckBox checkBoxProxyIsEnabled) checkBoxProxyIsEnabled.Content = LanguageHelper.Get("Proxy.EnableProxy", langCode);
@@ -1343,6 +1401,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("CheckBox_Proxy_ForOllama") is CheckBox checkBoxProxyForOllama) checkBoxProxyForOllama.Content = LanguageHelper.Get("Proxy.ForOllama", langCode);
             if (FindName("CheckBox_Proxy_ForOpenAI") is CheckBox checkBoxProxyForOpenAI) checkBoxProxyForOpenAI.Content = LanguageHelper.Get("Proxy.ForOpenAI", langCode);
             if (FindName("CheckBox_Proxy_ForGemini") is CheckBox checkBoxProxyForGemini) checkBoxProxyForGemini.Content = LanguageHelper.Get("Proxy.ForGemini", langCode);
+            if (FindName("CheckBox_Proxy_ForFree") is CheckBox checkBoxProxyForFree) checkBoxProxyForFree.Content = LanguageHelper.Get("Proxy.ForFree", langCode);
             if (FindName("CheckBox_Proxy_ForTTS") is CheckBox checkBoxProxyForTTS) checkBoxProxyForTTS.Content = LanguageHelper.Get("Proxy.ForTTS", langCode);
             if (FindName("CheckBox_Proxy_ForMcp") is CheckBox checkBoxProxyForMcp) checkBoxProxyForMcp.Content = LanguageHelper.Get("Proxy.ForMcp", langCode);
             if (FindName("CheckBox_Proxy_ForPlugin") is CheckBox checkBoxProxyForPlugin) checkBoxProxyForPlugin.Content = LanguageHelper.Get("Proxy.ForPlugin", langCode);
