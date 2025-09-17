@@ -137,6 +137,12 @@ namespace VPetLLM.Utils
 
                 Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
+                // 应用音量增益
+                if (Math.Abs(_settings.VolumeGain) > 0.01)
+                {
+                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _settings.VolumeGain);
+                }
+
                 // 保存到临时文件
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
@@ -252,6 +258,12 @@ namespace VPetLLM.Utils
 
                 Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
+                // 应用音量增益
+                if (Math.Abs(_settings.VolumeGain) > 0.01)
+                {
+                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _settings.VolumeGain);
+                }
+
                 // 保存到临时文件
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
@@ -322,6 +334,12 @@ namespace VPetLLM.Utils
 
                 Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
+                // 应用音量增益
+                if (Math.Abs(_settings.VolumeGain) > 0.01)
+                {
+                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _settings.VolumeGain);
+                }
+
                 // 保存到临时文件
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
@@ -388,6 +406,12 @@ namespace VPetLLM.Utils
                 }
 
                 Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
+
+                // 应用音量增益
+                if (Math.Abs(_settings.VolumeGain) > 0.01)
+                {
+                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _settings.VolumeGain);
+                }
 
                 // 保存到临时文件
                 var tempDir = Path.GetTempPath();

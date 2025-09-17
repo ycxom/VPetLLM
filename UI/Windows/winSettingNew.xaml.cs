@@ -115,6 +115,7 @@ namespace VPetLLM.UI.Windows
             ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_TTS_Volume")).ValueChanged += Control_ValueChanged;
+            ((Slider)this.FindName("Slider_TTS_VolumeGain")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_TTS_Speed")).ValueChanged += Control_ValueChanged;
 
             // Add event handlers for all other controls
@@ -212,6 +213,10 @@ namespace VPetLLM.UI.Windows
                 else if (slider.Name == "Slider_TTS_Volume")
                 {
                     ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = slider.Value.ToString("F2");
+                }
+                else if (slider.Name == "Slider_TTS_VolumeGain")
+                {
+                    ((TextBlock)this.FindName("TextBlock_TTS_VolumeGainValue")).Text = slider.Value.ToString("F1");
                 }
                 else if (slider.Name == "Slider_TTS_Speed")
                 {
@@ -434,6 +439,8 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked = _plugin.Settings.TTS.OnlyPlayAIResponse;
             ((Slider)this.FindName("Slider_TTS_Volume")).Value = _plugin.Settings.TTS.Volume;
             ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = _plugin.Settings.TTS.Volume.ToString("F2");
+            ((Slider)this.FindName("Slider_TTS_VolumeGain")).Value = _plugin.Settings.TTS.VolumeGain;
+            ((TextBlock)this.FindName("TextBlock_TTS_VolumeGainValue")).Text = _plugin.Settings.TTS.VolumeGain.ToString("F1");
             ((Slider)this.FindName("Slider_TTS_Speed")).Value = _plugin.Settings.TTS.Speed;
             ((TextBlock)this.FindName("TextBlock_TTS_SpeedValue")).Text = _plugin.Settings.TTS.Speed.ToString("F2");
 
@@ -617,6 +624,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.TTS.IsEnabled = ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).IsChecked ?? false;
             _plugin.Settings.TTS.OnlyPlayAIResponse = ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked ?? true;
             _plugin.Settings.TTS.Volume = ((Slider)this.FindName("Slider_TTS_Volume")).Value;
+            _plugin.Settings.TTS.VolumeGain = ((Slider)this.FindName("Slider_TTS_VolumeGain")).Value;
             _plugin.Settings.TTS.Speed = ((Slider)this.FindName("Slider_TTS_Speed")).Value;
 
             // TTS提供商设置
@@ -1269,8 +1277,16 @@ namespace VPetLLM.UI.Windows
             if (FindName("Label_TTS_Voice") is Label labelTTSVoice) labelTTSVoice.Content = LanguageHelper.Get("TTS.Voice", langCode);
             if (FindName("Label_TTS_Speed") is Label labelTTSSpeed) labelTTSSpeed.Content = LanguageHelper.Get("TTS.Speed", langCode);
             if (FindName("Label_TTS_Volume") is Label labelTTSVolume) labelTTSVolume.Content = LanguageHelper.Get("TTS.Volume", langCode);
-            if (FindName("Button_TTS_Test") is Button buttonTTSTest) buttonTTSTest.Content = LanguageHelper.Get("TTS.TestTTS", langCode);
+            if (FindName("TextBlock_TTS_VolumeGain") is TextBlock textBlockTTSVolumeGain) textBlockTTSVolumeGain.Text = (LanguageHelper.Get("TTS.VolumeGain", langCode) ?? "音量增益") + ":";
+            if (FindName("Button_TTS_Test") is Button buttonTTSTest) buttonTTSTest.Content = LanguageHelper.Get("TTS.TestTTS", langCode) ?? "测试TTS";
             if (FindName("TextBlock_TTS_Description") is TextBlock textBlockTTSDescription) textBlockTTSDescription.Text = LanguageHelper.Get("TTS.Description", langCode);
+            
+            // DIY TTS 多语言支持
+            if (FindName("TextBlock_TTS_DIY_Config") is TextBlock textBlockTTSDIYConfig) textBlockTTSDIYConfig.Text = LanguageHelper.Get("TTS.DIYTTSConfig", langCode) ?? "DIY TTS 配置";
+            if (FindName("TextBlock_TTS_DIY_Description") is TextBlock textBlockTTSDIYDescription) textBlockTTSDIYDescription.Text = LanguageHelper.Get("TTS.DIYTTSDescription", langCode) ?? "DIY TTS 使用 JSON 配置文件进行配置，支持强大的自定义功能。";
+            if (FindName("Button_TTS_DIY_OpenConfig") is Button buttonTTSDIYOpenConfig) buttonTTSDIYOpenConfig.Content = LanguageHelper.Get("TTS.OpenConfigFolder", langCode) ?? "打开配置文件夹";
+            if (FindName("TextBlock_TTS_DIY_ConfigLocation") is TextBlock textBlockTTSDIYConfigLocation) textBlockTTSDIYConfigLocation.Text = LanguageHelper.Get("TTS.ConfigFileLocation", langCode) ?? "配置文件位置: 文档\\VPetLLM\\DiyTTS\\Config.json";
+            if (FindName("TextBlock_TTS_DIY_Features") is TextBlock textBlockTTSDIYFeatures) textBlockTTSDIYFeatures.Text = LanguageHelper.Get("TTS.DIYTTSFeatures", langCode) ?? "支持自定义请求头、请求体、请求方法等参数。User-Agent 将自动限制为 VPetLLM。";
             // 更新插件 DataGrid 的列标题
             if (FindName("DataGrid_Plugins") is DataGrid dataGridPlugins)
             {
@@ -1839,19 +1855,59 @@ namespace VPetLLM.UI.Windows
 
         private void ComboBox_TTS_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem selectedItem)
+            try
             {
-                var provider = selectedItem.Tag?.ToString();
+                if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem selectedItem)
+                {
+                    var provider = selectedItem.Tag?.ToString();
+                    System.Diagnostics.Debug.WriteLine($"[TTS Provider] 切换到提供商: {provider}");
 
-                // 显示/隐藏对应的配置面板
-                if (FindName("Panel_TTS_URL") is StackPanel URLPanel)
-                    URLPanel.Visibility = provider == "URL" ? Visibility.Visible : Visibility.Collapsed;
+                    // 先隐藏所有面板
+                    var urlPanel = FindName("Panel_TTS_URL") as StackPanel;
+                    var openAIPanel = FindName("Panel_TTS_OpenAI") as StackPanel;
+                    var diyPanel = FindName("Panel_TTS_DIY") as StackPanel;
 
-                if (FindName("Panel_TTS_OpenAI") is StackPanel openAIPanel)
-                    openAIPanel.Visibility = provider == "OpenAI" ? Visibility.Visible : Visibility.Collapsed;
+                    if (urlPanel != null) urlPanel.Visibility = Visibility.Collapsed;
+                    if (openAIPanel != null) openAIPanel.Visibility = Visibility.Collapsed;
+                    if (diyPanel != null) diyPanel.Visibility = Visibility.Collapsed;
 
-                if (FindName("Panel_TTS_DIY") is StackPanel diyPanel)
-                    diyPanel.Visibility = provider == "DIY" ? Visibility.Visible : Visibility.Collapsed;
+                    // 显示对应的面板
+                    switch (provider)
+                    {
+                        case "URL":
+                            if (urlPanel != null)
+                            {
+                                urlPanel.Visibility = Visibility.Visible;
+                                System.Diagnostics.Debug.WriteLine("[TTS Provider] 显示URL面板");
+                            }
+                            break;
+                        case "OpenAI":
+                            if (openAIPanel != null)
+                            {
+                                openAIPanel.Visibility = Visibility.Visible;
+                                System.Diagnostics.Debug.WriteLine("[TTS Provider] 显示OpenAI面板");
+                            }
+                            break;
+                        case "DIY":
+                            if (diyPanel != null)
+                            {
+                                diyPanel.Visibility = Visibility.Visible;
+                                System.Diagnostics.Debug.WriteLine("[TTS Provider] 显示DIY面板");
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine("[TTS Provider] 错误: 找不到DIY面板!");
+                            }
+                            break;
+                        default:
+                            System.Diagnostics.Debug.WriteLine($"[TTS Provider] 未知提供商: {provider}");
+                            break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TTS Provider] 面板切换异常: {ex.Message}");
             }
 
             // 调用原有的保存逻辑

@@ -726,6 +726,32 @@
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,0,12">
+                                        <TextBlock Width="80"
+                                                VerticalAlignment="Center"
+                                                x:Name="TextBlock_TTS_VolumeGain"
+                                                Foreground="{StaticResource PrimaryTextBrush}"
+                                                FontSize="14"/>
+                                        <Slider x:Name="Slider_TTS_VolumeGain"
+                                                Minimum="-20"
+                                                Maximum="20"
+                                                Value="0"
+                                                Width="125"
+                                                Margin="10,0"
+                                                VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TextBlock_TTS_VolumeGainValue"
+                                                Width="50"
+                                                VerticalAlignment="Center"
+                                                Foreground="{StaticResource SecondaryTextBrush}"
+                                                FontSize="14"/>
+                                        <TextBlock Text="dB"
+                                                VerticalAlignment="Center"
+                                                Foreground="{StaticResource SecondaryTextBrush}"
+                                                FontSize="12"
+                                                Margin="2,0,0,0"/>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal"
                                             Margin="0,0,0,16">
                                         <TextBlock Text="语速:"
                                                 Width="80"
@@ -749,7 +775,6 @@
 
                                     <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
                                         <Button x:Name="Button_TTS_Test"
-                                                Content="测试TTS"
                                                 Click="Button_TTS_Test_Click"
                                                 Style="{StaticResource ModernButton}"/>
                                     </WrapPanel>
@@ -887,7 +912,8 @@
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
 
-                                    <TextBlock Text="DIY TTS 使用 JSON 配置文件进行配置，支持强大的自定义功能。"
+                                    <TextBlock x:Name="TextBlock_TTS_DIY_Description"
+                                            Text="DIY TTS 使用 JSON 配置文件进行配置，支持强大的自定义功能。"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
@@ -897,11 +923,13 @@
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernButton}"/>
 
-                                    <TextBlock Text="配置文件位置: 文档\VPetLLM\DiyTTS\Config.json"
+                                    <TextBlock x:Name="TextBlock_TTS_DIY_ConfigLocation"
+                                            Text="配置文件位置: 文档\VPetLLM\DiyTTS\Config.json"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,8"/>
 
-                                    <TextBlock Text="支持自定义请求头、请求体、请求方法等参数。User-Agent 将自动限制为 VPetLLM。"
+                                    <TextBlock x:Name="TextBlock_TTS_DIY_Features"
+                                            Text="支持自定义请求头、请求体、请求方法等参数。User-Agent 将自动限制为 VPetLLM。"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
                                 </StackPanel>

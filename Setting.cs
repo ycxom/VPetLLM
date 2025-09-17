@@ -140,6 +140,7 @@ namespace VPetLLM
             public bool AutoPlay { get; set; } = true;
             public double Volume { get; set; } = 1.0;
             public double Speed { get; set; } = 1.0;
+            public double VolumeGain { get; set; } = 0.0; // 音量增益，单位dB，范围-20到+20
 
             // URL TTS 设置
             public URLTTSSetting URL { get; set; } = new URLTTSSetting();

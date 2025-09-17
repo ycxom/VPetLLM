@@ -830,6 +830,48 @@
             "zh-hant": "音量",
             "jp": "音量"
         },
+        "VolumeGain": {
+            "en": "Volume Gain",
+            "zh-hans": "音量增益",
+            "zh-hant": "音量增益",
+            "jp": "音量ゲイン"
+        },
+        "VolumeGainTip": {
+            "en": "Adjust audio volume in dB. Positive values increase volume, negative values decrease volume. 0dB means no change.",
+            "zh-hans": "以dB为单位调整音频音量。正值增加音量，负值降低音量。0dB表示不改变。",
+            "zh-hant": "以dB為單位調整音頻音量。正值增加音量，負值降低音量。0dB表示不改變。",
+            "jp": "dB単位でオーディオ音量を調整します。正の値は音量を上げ、負の値は音量を下げます。0dBは変更なしを意味します。"
+        },
+        "DIYTTSConfig": {
+            "en": "DIY TTS Configuration",
+            "zh-hans": "DIY TTS 配置",
+            "zh-hant": "DIY TTS 配置",
+            "jp": "DIY TTS 設定"
+        },
+        "DIYTTSDescription": {
+            "en": "DIY TTS uses JSON configuration files for setup, supporting powerful customization features.",
+            "zh-hans": "DIY TTS 使用 JSON 配置文件进行配置，支持强大的自定义功能。",
+            "zh-hant": "DIY TTS 使用 JSON 配置文件進行配置，支持強大的自定義功能。",
+            "jp": "DIY TTSはJSON設定ファイルを使用してセットアップし、強力なカスタマイズ機能をサポートします。"
+        },
+        "OpenConfigFolder": {
+            "en": "Open Config Folder",
+            "zh-hans": "打开配置文件夹",
+            "zh-hant": "打開配置文件夾",
+            "jp": "設定フォルダを開く"
+        },
+        "ConfigFileLocation": {
+            "en": "Config file location: Documents\\VPetLLM\\DiyTTS\\Config.json",
+            "zh-hans": "配置文件位置: 文档\\VPetLLM\\DiyTTS\\Config.json",
+            "zh-hant": "配置文件位置: 文檔\\VPetLLM\\DiyTTS\\Config.json",
+            "jp": "設定ファイルの場所: ドキュメント\\VPetLLM\\DiyTTS\\Config.json"
+        },
+        "DIYTTSFeatures": {
+            "en": "Supports custom request headers, request body, request methods and other parameters. User-Agent will be automatically restricted to VPetLLM.",
+            "zh-hans": "支持自定义请求头、请求体、请求方法等参数。User-Agent 将自动限制为 VPetLLM。",
+            "zh-hant": "支持自定義請求頭、請求體、請求方法等參數。User-Agent 將自動限制為 VPetLLM。",
+            "jp": "カスタムリクエストヘッダー、リクエストボディ、リクエストメソッドなどのパラメータをサポートします。User-Agentは自動的にVPetLLMに制限されます。"
+        },
         "TestTTS": {
             "en": "Test TTS",
             "zh-hans": "测试TTS",
