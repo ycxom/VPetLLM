@@ -156,6 +156,10 @@ namespace VPetLLM.Core
                         useProxy = Settings.Proxy.ForGemini;
                         System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForGemini: {Settings.Proxy.ForGemini}");
                         break;
+                    case "Free":
+                        useProxy = Settings.Proxy.ForFree;
+                        System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForFree: {Settings.Proxy.ForFree}");
+                        break;
                     case "Plugin":
                         useProxy = Settings.Proxy.ForPlugin;
                         System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForPlugin: {Settings.Proxy.ForPlugin}");

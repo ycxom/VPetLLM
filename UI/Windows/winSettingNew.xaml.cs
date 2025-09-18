@@ -135,7 +135,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_GeminiApiKey")).TextChanged += Control_TextChanged;
 
             ((ComboBox)this.FindName("ComboBox_GeminiModel")).SelectionChanged += Control_SelectionChanged;
-            ((ComboBox)this.FindName("ComboBox_FreeModel")).SelectionChanged += Control_SelectionChanged;
+
             ((TextBox)this.FindName("TextBox_GeminiUrl")).TextChanged += Control_TextChanged;
 
             ((CheckBox)this.FindName("CheckBox_KeepContext")).Click += Control_Click;
@@ -378,7 +378,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_GeminiApiKey")).Text = _plugin.Settings.Gemini.ApiKey;
             ((ComboBox)this.FindName("ComboBox_GeminiModel")).Text = _plugin.Settings.Gemini.Model;
             ((TextBox)this.FindName("TextBox_GeminiUrl")).Text = _plugin.Settings.Gemini.Url;
-            ((ComboBox)this.FindName("ComboBox_FreeModel")).Text = _plugin.Settings.Free.Model;
+
             ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked = _plugin.Settings.KeepContext;
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked = _plugin.Settings.SeparateChatByProvider;
@@ -538,7 +538,7 @@ namespace VPetLLM.UI.Windows
             var geminiApiKeyTextBox = (TextBox)this.FindName("TextBox_GeminiApiKey");
             var geminiModelComboBox = (ComboBox)this.FindName("ComboBox_GeminiModel");
             var geminiUrlTextBox = (TextBox)this.FindName("TextBox_GeminiUrl");
-            var freeModelComboBox = (ComboBox)this.FindName("ComboBox_FreeModel");
+
             var keepContextCheckBox = (CheckBox)this.FindName("CheckBox_KeepContext");
             var enableChatHistoryCheckBox = (CheckBox)this.FindName("CheckBox_EnableChatHistory");
             var separateChatByProviderCheckBox = (CheckBox)this.FindName("CheckBox_SeparateChatByProvider");
@@ -588,7 +588,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Gemini.ApiKey = geminiApiKeyTextBox.Text;
             _plugin.Settings.Gemini.Model = geminiModelComboBox.Text;
             _plugin.Settings.Gemini.Url = geminiUrlTextBox.Text;
-            _plugin.Settings.Free.Model = freeModelComboBox.Text;
+
             _plugin.Settings.KeepContext = keepContextCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableChatHistory = enableChatHistoryCheckBox.IsChecked ?? true;
             _plugin.Settings.SeparateChatByProvider = separateChatByProviderCheckBox.IsChecked ?? true;
@@ -797,29 +797,7 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private void Button_RefreshFreeModels_Click(object sender, RoutedEventArgs e)
-        {
-            var button = sender as Button;
-            StartButtonLoadingAnimation(button);
 
-            try
-            {
-                var freeCore = new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
-                var models = freeCore.RefreshModels();
-                ((ComboBox)this.FindName("ComboBox_FreeModel")).ItemsSource = models;
-                if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_FreeModel")).Text))
-                    ((ComboBox)this.FindName("ComboBox_FreeModel")).SelectedIndex = 0;
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("RefreshFreeModels.Fail", _plugin.Settings.Language, "刷新免费模型失败", ex),
-                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                StopButtonLoadingAnimation(button);
-            }
-        }
 
         private async void Button_RefreshGeminiModels_Click(object sender, RoutedEventArgs e)
         {
@@ -1375,7 +1353,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("Label_GeminiApiKey") is Label labelGeminiApiKey) labelGeminiApiKey.Content = LanguageHelper.Get("Gemini.ApiKey", langCode);
 
             if (FindName("Label_GeminiModel") is Label labelGeminiModel) labelGeminiModel.Content = LanguageHelper.Get("Gemini.Model", langCode);
-            if (FindName("Label_FreeModel") is Label labelFreeModel) labelFreeModel.Content = LanguageHelper.Get("Free.Model", langCode);
+
             if (FindName("Button_RefreshGeminiModels") is Button buttonRefreshGeminiModels) buttonRefreshGeminiModels.Content = LanguageHelper.Get("Gemini.Refresh", langCode);
             if (FindName("Button_RefreshFreeModels") is Button buttonRefreshFreeModels) buttonRefreshFreeModels.Content = LanguageHelper.Get("Free.Refresh", langCode);
             if (FindName("Label_GeminiUrl") is Label labelGeminiUrl) labelGeminiUrl.Content = LanguageHelper.Get("Gemini.ApiAddress", langCode);

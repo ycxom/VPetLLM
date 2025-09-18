@@ -16,55 +16,35 @@ namespace VPetLLM.Core.ChatCore
     {
         public override string Name => "Free";
         private readonly Setting.FreeSetting _freeSetting;
-        private readonly Setting _setting;
         private readonly HttpClient _httpClient;
         
         private const string ENCODED_API_KEY = "633273745233704955327875626b46775879314f64584e66513051744e3070714d544e49625855776331424d536b644d6344424254306c575545394a5954557956555a49";
-        private const string ENCODED_API_URL = "6148523063484d364c793932634756304c6e706c59574a31636935686348417663484a7665486b76646e426c644339324d574a6c6447453d";
+        private const string ENCODED_API_URL = "6148523063484d364c793932634756304c6e706c59574a31636935686348417663484a7665486b76646e426c644639766347567559576b76646a46695a5852684c324e6f59585176593239746347786c64476c76626e4d3d";
         private const string ENCODED_UA = "566c426c6445784d54563947636d566c58304a3558304a5a54513d3d";
+        private const string Model = "bymbymbym";
         
         public FreeChatCore(Setting.FreeSetting freeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
         {
             _freeSetting = freeSetting;
-            _setting = setting;
             
-            // 创建HttpClient并设置内置配置
-            _httpClient = new HttpClient();
-            var apiKey = DecodeString(ENCODED_API_KEY);
+            // 使用基类的代理设置逻辑
+            var handler = CreateHttpClientHandler();
+            _httpClient = new HttpClient(handler);
+            
+            // 设置超时时间为30秒，避免长时间等待
+            _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            
+            // 设置API密钥
+            var decodedApiKey = DecodeString(ENCODED_API_KEY);
             _httpClient.DefaultRequestHeaders.Authorization = 
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", decodedApiKey);
             
             // 设置解码后的User-Agent头部
             var decodedUA = DecodeString(ENCODED_UA);
             if (!string.IsNullOrEmpty(decodedUA))
             {
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(decodedUA);
-            }
-            
-            // 设置代理
-            if (setting.Proxy.ForFree)
-            {
-                var proxy = GetProxy(setting.Proxy.Address);
-                if (proxy != null)
-                {
-                    var handler = new HttpClientHandler()
-                    {
-                        Proxy = proxy,
-                        UseProxy = true
-                    };
-                    _httpClient.Dispose();
-                    _httpClient = new HttpClient(handler);
-                    var decodedApiKey = DecodeString(ENCODED_API_KEY);
-                    _httpClient.DefaultRequestHeaders.Authorization = 
-                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", decodedApiKey);
-                    
-                    // 重新设置User-Agent
-                    if (!string.IsNullOrEmpty(decodedUA))
-                    {
-                        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(decodedUA);
-                    }
-                }
             }
         }
 
@@ -77,28 +57,23 @@ namespace VPetLLM.Core.ChatCore
         {
             try
             {
-                var messages = new List<object>();
-                
-                // 添加系统消息
-                var systemMessage = GetSystemMessage();
-                if (!string.IsNullOrEmpty(systemMessage))
+                if (!Settings.KeepContext)
                 {
-                    messages.Add(new { role = "system", content = systemMessage });
+                    ClearContext();
                 }
                 
-                // 添加历史消息
-                foreach (var msg in HistoryManager.GetHistory())
+                if (!string.IsNullOrEmpty(prompt))
                 {
-                    messages.Add(new { role = msg.Role, content = msg.Content });
+                    // 无论是用户输入还是插件返回，都作为user角色
+                    await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
                 }
                 
-                // 添加当前用户消息
-                messages.Add(new { role = "user", content = prompt });
-                
+                // 构建请求数据，使用和OpenAI相同的逻辑
+                List<Message> history = GetCoreHistory();
                 var requestBody = new
                 {
-                    model = _freeSetting.Model ?? "gpt-3.5-turbo",
-                    messages = messages,
+                    model = Model,
+                    messages = history.Select(m => new { role = m.Role, content = m.Content }),
                     temperature = _freeSetting.Temperature,
                     max_tokens = _freeSetting.MaxTokens
                 };
@@ -110,65 +85,93 @@ namespace VPetLLM.Core.ChatCore
                 var response = await _httpClient.PostAsync(apiUrl, content);
                 var responseContent = await response.Content.ReadAsStringAsync();
                 
+                string message;
                 if (response.IsSuccessStatusCode)
                 {
                     var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
-                    var reply = responseObj?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "无回复";
-                    
-                    // 添加到历史记录
-                    await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = reply });
-                    
-                    return reply;
+                    message = responseObj?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "无回复";
                 }
                 else
                 {
-                    Utils.Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
-                    return $"API调用失败: {response.StatusCode}";
+                    // 检查是否是服务器错误
+                    if (responseContent.Contains("Failed to retrieve proxy group") || 
+                        responseContent.Contains("INTERNAL_SERVER_ERROR") ||
+                        response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        Utils.Logger.Log($"Free API 服务器错误: {response.StatusCode} - {responseContent}");
+                        
+                        // 如果不是重试，尝试重试一次
+                        if (!isRetry)
+                        {
+                            Utils.Logger.Log("尝试重试 Free API 请求...");
+                            await Task.Delay(2000); // 等待2秒后重试
+                            return await Chat(prompt, true);
+                        }
+                        
+                        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                        {
+                            message = "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
+                        }
+                        else
+                        {
+                            message = "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
+                        }
+                    }
+                    else
+                    {
+                        Utils.Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
+                        message = $"API调用失败: {response.StatusCode}";
+                    }
                 }
+                
+                // 根据上下文设置决定是否保留历史（使用基类的统一状态）
+                if (Settings.KeepContext)
+                {
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                }
+                
+                // 只有在保持上下文模式时才保存历史记录
+                if (Settings.KeepContext)
+                {
+                    SaveHistory();
+                }
+                
+                ResponseHandler?.Invoke(message);
+                return "";
+            }
+            catch (HttpRequestException httpEx)
+            {
+                Utils.Logger.Log($"Free Chat 网络异常: {httpEx.Message}");
+                
+                // 如果不是重试，尝试重试一次
+                if (!isRetry)
+                {
+                    Utils.Logger.Log("网络异常，尝试重试 Free API 请求...");
+                    await Task.Delay(2000); // 等待2秒后重试
+                    return await Chat(prompt, true);
+                }
+                
+                var errorMessage = "网络连接异常，请检查网络设置或稍后再试。";
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+            catch (TaskCanceledException tcEx)
+            {
+                Utils.Logger.Log($"Free Chat 请求超时: {tcEx.Message}");
+                var errorMessage = "请求超时，请稍后再试。";
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
             }
             catch (Exception ex)
             {
                 Utils.Logger.Log($"Free Chat 异常: {ex.Message}");
-                return $"聊天异常: {ex.Message}";
+                var errorMessage = $"聊天异常: {ex.Message}";
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
             }
         }
 
-        public override List<string> GetModels()
-        {
-            try
-            {
-                // 使用标准OpenAI API获取模型列表
-                var apiUrl = DecodeString(ENCODED_API_URL);
-                var modelsUrl = apiUrl.Replace("/chat/completions", "/models");
-                var response = _httpClient.GetAsync(modelsUrl).Result;
-                
-                if (response.IsSuccessStatusCode)
-                {
-                    var responseContent = response.Content.ReadAsStringAsync().Result;
-                    var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
-                    var models = responseObj?["data"]?.ToObject<JArray>();
-                    
-                    if (models != null)
-                    {
-                        return models.Select(m => m["id"]?.ToString()).Where(id => !string.IsNullOrEmpty(id)).ToList()!;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Utils.Logger.Log($"获取Free模型列表失败: {ex.Message}");
-            }
-            
-            // 如果API调用失败，返回空列表而不是硬编码列表
-            return new List<string>();
-        }
 
-        public List<string> RefreshModels()
-        {
-            // 直接调用GetModels方法，避免重复代码
-            return GetModels();
-        }
 
         public override async Task<string> Summarize(string text)
         {
@@ -182,7 +185,7 @@ namespace VPetLLM.Core.ChatCore
                 
                 var requestBody = new
                 {
-                    model = _freeSetting.Model ?? "gpt-3.5-turbo",
+                    model = Model,
                     messages = messages,
                     temperature = 0.3,
                     max_tokens = 500
@@ -202,14 +205,84 @@ namespace VPetLLM.Core.ChatCore
                 }
                 else
                 {
+                    // 检查是否是服务器内部错误
+                    if (responseContent.Contains("Failed to retrieve proxy group") || 
+                        responseContent.Contains("INTERNAL_SERVER_ERROR"))
+                    {
+                        Utils.Logger.Log($"Free Summarize 服务器内部错误: {responseContent}");
+                        return "Free API 服务暂时不可用，总结功能无法使用。";
+                    }
+                    
                     Utils.Logger.Log($"Free Summarize 错误: {response.StatusCode} - {responseContent}");
                     return "总结失败";
                 }
+            }
+            catch (HttpRequestException httpEx)
+            {
+                Utils.Logger.Log($"Free Summarize 网络异常: {httpEx.Message}");
+                return "网络连接异常，总结功能暂时不可用。";
+            }
+            catch (TaskCanceledException tcEx)
+            {
+                Utils.Logger.Log($"Free Summarize 请求超时: {tcEx.Message}");
+                return "请求超时，总结功能暂时不可用。";
             }
             catch (Exception ex)
             {
                 Utils.Logger.Log($"Free Summarize 异常: {ex.Message}");
                 return "总结异常";
+            }
+        }
+
+        private List<Message> GetCoreHistory()
+        {
+            var history = new List<Message>
+            {
+                new Message { Role = "system", Content = GetSystemMessage() }
+            };
+            history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - Settings.HistoryCompressionThreshold)));
+            return history;
+        }
+
+        /// <summary>
+        /// 检查API服务状态
+        /// </summary>
+        public async Task<bool> CheckApiHealthAsync()
+        {
+            try
+            {
+                // 使用一个简单的测试请求来检查API状态
+                var messages = new List<object>
+                {
+                    new { role = "user", content = "test" }
+                };
+                
+                var requestBody = new
+                {
+                    model = Model,
+                    messages = messages,
+                    max_tokens = 1
+                };
+                
+                var json = JsonConvert.SerializeObject(requestBody);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                
+                var apiUrl = DecodeString(ENCODED_API_URL);
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                var response = await _httpClient.PostAsync(apiUrl, content, cts.Token);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    return !responseContent.Contains("Failed to retrieve proxy group") && 
+                           !responseContent.Contains("INTERNAL_SERVER_ERROR");
+                }
+                
+                return false;
+            }
+            catch
+            {
+                return false;
             }
         }
 

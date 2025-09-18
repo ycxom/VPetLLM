@@ -520,25 +520,7 @@
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <Border Style="{StaticResource CardContainer}">
                                     <StackPanel Style="{StaticResource SettingGroup}">
-                                        <Label Content="模型"
-                                                x:Name="Label_FreeModel"
-                                                Style="{StaticResource SettingLabel}"/>
-                                        <Grid Margin="0,0,0,16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <ComboBox x:Name="ComboBox_FreeModel"
-                                                    Grid.Column="0"
-                                                    IsEditable="True"
-                                                    Style="{StaticResource ModelComboBox}"/>
-                                            <Button x:Name="Button_RefreshFreeModels"
-                                                    Grid.Column="1"
-                                                    Content="刷新"
-                                                    Click="Button_RefreshFreeModels_Click"
-                                                    Margin="10,0,0,0"
-                                                    Style="{StaticResource SecondaryButton}"/>
-                                        </Grid>
+
                                         <CheckBox x:Name="CheckBox_Free_EnableAdvanced"
                                                 Content="启用高级配置"
                                                 Margin="0,0,0,16"
