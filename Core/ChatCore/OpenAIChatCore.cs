@@ -1,11 +1,8 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
-using VPet_Simulator.Windows.Interface;
 using System.Text;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
+using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
 
 namespace VPetLLM.Core.ChatCore
@@ -89,7 +86,7 @@ namespace VPetLLM.Core.ChatCore
             // 根据上下文设置决定是否保留历史（使用基类的统一状态）
             if (Settings.KeepContext)
             {
-               await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
             }
             // 只有在保持上下文模式时才保存历史记录
             if (Settings.KeepContext)

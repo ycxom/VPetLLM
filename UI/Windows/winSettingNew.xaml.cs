@@ -191,7 +191,7 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Model")).SelectionChanged += Control_SelectionChanged;
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Voice")).SelectionChanged += Control_SelectionChanged;
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Format")).SelectionChanged += Control_SelectionChanged;
-            
+
             // DIY TTS 按钮事件绑定 - 已在 XAML 中绑定，无需重复绑定
 
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
@@ -1307,7 +1307,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("TextBlock_TTS_VolumeGain") is TextBlock textBlockTTSVolumeGain) textBlockTTSVolumeGain.Text = (LanguageHelper.Get("TTS.VolumeGain", langCode) ?? "音量增益") + ":";
             if (FindName("Button_TTS_Test") is Button buttonTTSTest) buttonTTSTest.Content = LanguageHelper.Get("TTS.TestTTS", langCode) ?? "测试TTS";
             if (FindName("TextBlock_TTS_Description") is TextBlock textBlockTTSDescription) textBlockTTSDescription.Text = LanguageHelper.Get("TTS.Description", langCode);
-            
+
             // DIY TTS 多语言支持
             if (FindName("TextBlock_TTS_DIY_Config") is TextBlock textBlockTTSDIYConfig) textBlockTTSDIYConfig.Text = LanguageHelper.Get("TTS.DIYTTSConfig", langCode) ?? "DIY TTS 配置";
             if (FindName("TextBlock_TTS_DIY_Description") is TextBlock textBlockTTSDIYDescription) textBlockTTSDIYDescription.Text = LanguageHelper.Get("TTS.DIYTTSDescription", langCode) ?? "DIY TTS 使用 JSON 配置文件进行配置，支持强大的自定义功能。";

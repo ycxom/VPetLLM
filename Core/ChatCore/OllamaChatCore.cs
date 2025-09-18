@@ -1,13 +1,8 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.IO;
-using VPet_Simulator.Windows.Interface;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
+using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
 
 namespace VPetLLM.Core.ChatCore
@@ -62,7 +57,7 @@ namespace VPetLLM.Core.ChatCore
                 var responseString = await response.Content.ReadAsStringAsync();
                 var responseObject = JObject.Parse(responseString);
                 var message = responseObject["message"]["content"].ToString();
-            // 根据上下文设置决定是否保留历史（使用基类的统一状态）
+                // 根据上下文设置决定是否保留历史（使用基类的统一状态）
                 if (Settings.KeepContext)
                 {
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });

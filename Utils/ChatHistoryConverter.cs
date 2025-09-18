@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using Newtonsoft.Json;
+using System.IO;
 using VPetLLM.Core;
 
 namespace VPetLLM.Utils
@@ -19,7 +16,7 @@ namespace VPetLLM.Utils
         {
             if (!Directory.Exists(dataDirectory))
             {
-               Utils.Logger.Log($"数据目录不存在: {dataDirectory}");
+                Utils.Logger.Log($"数据目录不存在: {dataDirectory}");
                 return;
             }
 
@@ -33,11 +30,11 @@ namespace VPetLLM.Utils
 
                 if (oldFiles.Length == 0)
                 {
-                   Utils.Logger.Log("未找到旧的聊天历史文件");
+                    Utils.Logger.Log("未找到旧的聊天历史文件");
                     return;
                 }
 
-               Utils.Logger.Log($"找到 {oldFiles.Length} 个聊天历史文件，开始转换...");
+                Utils.Logger.Log($"找到 {oldFiles.Length} 个聊天历史文件，开始转换...");
 
                 // 收集所有消息
                 var allMessages = new List<Message>();
@@ -56,7 +53,7 @@ namespace VPetLLM.Utils
                     }
                     catch (Exception ex)
                     {
-                       Utils.Logger.Log($"转换文件 {Path.GetFileName(filePath)} 失败: {ex.Message}");
+                        Utils.Logger.Log($"转换文件 {Path.GetFileName(filePath)} 失败: {ex.Message}");
                     }
                 }
 
@@ -65,21 +62,21 @@ namespace VPetLLM.Utils
                     // 保存合并后的聊天历史
                     var newFilePath = Path.Combine(dataDirectory, "chat_history.json");
                     SaveMergedHistory(newFilePath, allMessages);
-                    
-                   Utils.Logger.Log($"成功转换 {allMessages.Count} 条消息到新格式");
-                   Utils.Logger.Log($"转换的文件: {string.Join(", ", convertedFiles)}");
-                    
+
+                    Utils.Logger.Log($"成功转换 {allMessages.Count} 条消息到新格式");
+                    Utils.Logger.Log($"转换的文件: {string.Join(", ", convertedFiles)}");
+
                     // 可选：备份或删除旧文件
                     BackupOldFiles(oldFiles, dataDirectory);
                 }
                 else
                 {
-                   Utils.Logger.Log("没有找到可转换的消息");
+                    Utils.Logger.Log("没有找到可转换的消息");
                 }
             }
             catch (Exception ex)
             {
-               Utils.Logger.Log($"转换聊天历史失败: {ex.Message}");
+                Utils.Logger.Log($"转换聊天历史失败: {ex.Message}");
             }
         }
 
@@ -110,7 +107,7 @@ namespace VPetLLM.Utils
                             messages.AddRange(providerMessages);
                         }
                     }
-                   Utils.Logger.Log($"从 {fileName} 转换了 {messages.Count} 条消息（旧字典格式）");
+                    Utils.Logger.Log($"从 {fileName} 转换了 {messages.Count} 条消息（旧字典格式）");
                     return messages;
                 }
             }
@@ -126,13 +123,13 @@ namespace VPetLLM.Utils
                 if (newFormat != null)
                 {
                     messages.AddRange(newFormat);
-                   Utils.Logger.Log($"从 {fileName} 读取了 {messages.Count} 条消息（新列表格式）");
+                    Utils.Logger.Log($"从 {fileName} 读取了 {messages.Count} 条消息（新列表格式）");
                     return messages;
                 }
             }
             catch (Exception ex)
             {
-               Utils.Logger.Log($"文件 {fileName} 格式无法识别: {ex.Message}");
+                Utils.Logger.Log($"文件 {fileName} 格式无法识别: {ex.Message}");
             }
 
             return messages;
@@ -146,11 +143,11 @@ namespace VPetLLM.Utils
             try
             {
                 var json = JsonConvert.SerializeObject(messages, Formatting.Indented);
-                
+
                 // 使用临时文件确保写入完整性
                 var tempFile = filePath + ".tmp";
                 File.WriteAllText(tempFile, json);
-                
+
                 // 原子替换
                 if (File.Exists(filePath))
                 {
@@ -160,12 +157,12 @@ namespace VPetLLM.Utils
                 {
                     File.Move(tempFile, filePath);
                 }
-                
-               Utils.Logger.Log($"已保存合并的聊天历史到: {Path.GetFileName(filePath)}");
+
+                Utils.Logger.Log($"已保存合并的聊天历史到: {Path.GetFileName(filePath)}");
             }
             catch (Exception ex)
             {
-               Utils.Logger.Log($"保存合并聊天历史失败: {ex.Message}");
+                Utils.Logger.Log($"保存合并聊天历史失败: {ex.Message}");
             }
         }
 
@@ -190,11 +187,11 @@ namespace VPetLLM.Utils
                 }
                 catch (Exception ex)
                 {
-                   Utils.Logger.Log($"备份文件 {Path.GetFileName(filePath)} 失败: {ex.Message}");
+                    Utils.Logger.Log($"备份文件 {Path.GetFileName(filePath)} 失败: {ex.Message}");
                 }
             }
 
-           Utils.Logger.Log($"旧文件已备份到: {backupDir}");
+            Utils.Logger.Log($"旧文件已备份到: {backupDir}");
         }
 
         /// <summary>
@@ -211,7 +208,7 @@ namespace VPetLLM.Utils
             // 使用与ChatCoreBase相同的逻辑获取数据目录
             var currentAssemblyPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
             var currentDirectory = Path.GetDirectoryName(currentAssemblyPath);
-            
+
             // 向上查找包含data文件夹的Mod目录
             var directory = new DirectoryInfo(currentDirectory);
             while (directory != null)
@@ -221,17 +218,17 @@ namespace VPetLLM.Utils
                 {
                     return dataPath;
                 }
-                
+
                 var pluginPath = Path.Combine(directory.FullName, "plugin");
                 if (Directory.Exists(pluginPath))
                 {
                     dataPath = Path.Combine(directory.FullName, "data");
                     return dataPath;
                 }
-                
+
                 directory = directory.Parent;
             }
-            
+
             return Path.Combine(currentDirectory, "data");
         }
     }

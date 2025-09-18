@@ -1,14 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Newtonsoft.Json;
 using System.Net.Http;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
 using System.Windows;
-using VPet_Simulator.Core;
-using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
 using VPetLLM.Utils;
 
@@ -124,7 +117,7 @@ namespace VPetLLM.Windows
         private HttpClient CreateHttpClientWithProxy()
         {
             var handler = new HttpClientHandler();
-            
+
             // 获取插件代理设置
             var proxy = GetPluginProxy();
             if (proxy != null)
@@ -138,7 +131,7 @@ namespace VPetLLM.Windows
                 handler.UseProxy = false;
                 handler.Proxy = null;
             }
-            
+
             return new HttpClient(handler);
         }
 
@@ -148,7 +141,7 @@ namespace VPetLLM.Windows
         private System.Net.IWebProxy GetPluginProxy()
         {
             var proxySettings = _plugin.Settings.Proxy;
-            
+
             // 如果代理未启用，返回null
             if (proxySettings == null || !proxySettings.IsEnabled)
             {
@@ -156,7 +149,7 @@ namespace VPetLLM.Windows
             }
 
             bool useProxy = false;
-            
+
             // 如果ForAllAPI为true，则对所有API使用代理
             if (proxySettings.ForAllAPI)
             {
@@ -184,7 +177,7 @@ namespace VPetLLM.Windows
                     return new System.Net.WebProxy(new Uri($"{protocol}://{proxySettings.Address}"));
                 }
             }
-            
+
             return null;
         }
     }

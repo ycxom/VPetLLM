@@ -1,22 +1,12 @@
-using LinePutScript.Localization.WPF;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Runtime.Loader;
-using System.Threading.Tasks;
-using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
-using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
 using VPetLLM.Handlers;
-using VPetLLM.Utils;
-using VPetLLM.Windows;
 using VPetLLM.UI.Windows;
+using VPetLLM.Utils;
 
 namespace VPetLLM
 {
@@ -43,7 +33,7 @@ namespace VPetLLM
             var dllPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             var langPath = Path.Combine(dllPath, "VPetLLM_lang", "Language.json");
             LanguageHelper.LoadLanguages(langPath);
-           PromptHelper.LoadPrompts(langPath);
+            PromptHelper.LoadPrompts(langPath);
             if (string.IsNullOrEmpty(Settings.Language))
             {
                 var culture = System.Globalization.CultureInfo.CurrentUICulture.Name.ToLower();
@@ -201,10 +191,10 @@ namespace VPetLLM
             }
             PromptHelper.ReloadPrompts();
             var response = await ChatCore.Chat(prompt);
-            
+
             // 注意：TTS和动作处理现在由SmartMessageProcessor在HandleResponse中统一处理
             // 这里只返回原始回复，不再单独处理TTS
-            
+
             return response;
         }
 
@@ -254,12 +244,12 @@ namespace VPetLLM
         {
             return await PluginManager.DeletePluginFile(pluginFilePath);
         }
-    
+
         public void Log(string message)
         {
             Logger.Log(message);
         }
-        
+
         public void UpdateSystemMessage()
         {
             if (ChatCore != null)
@@ -300,13 +290,13 @@ namespace VPetLLM
         {
             return MW.Main.Core.Graph.GraphsList.Keys;
         }
-       public IEnumerable<string> GetAvailableSayAnimations()
-       {
-           if (MW.Main.Core.Graph.GraphsName.TryGetValue(VPet_Simulator.Core.GraphInfo.GraphType.Say, out var gl))
-           {
-               return gl;
-           }
-           return new List<string>();
-       }
+        public IEnumerable<string> GetAvailableSayAnimations()
+        {
+            if (MW.Main.Core.Graph.GraphsName.TryGetValue(VPet_Simulator.Core.GraphInfo.GraphType.Say, out var gl))
+            {
+                return gl;
+            }
+            return new List<string>();
+        }
     }
 }

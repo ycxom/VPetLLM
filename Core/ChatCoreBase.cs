@@ -1,15 +1,9 @@
-using System;
-using System.Collections.Generic;
+using Newtonsoft.Json;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
-using System.Linq;
-using System.Windows;
-using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
-using System.Net.Http;
-using System.Net;
 
 namespace VPetLLM.Core
 {

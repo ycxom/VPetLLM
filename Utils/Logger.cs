@@ -1,7 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
-using VPetLLM.Core;
-using VPetLLM.Windows;
 using VPetLLM.UI.Windows;
 
 namespace VPetLLM.Utils
@@ -15,7 +13,7 @@ namespace VPetLLM.Utils
             System.Windows.Application.Current.Dispatcher.Invoke(() =>
             {
                 Logs.Add($"[{System.DateTime.Now:G}] {message}");
-                
+
                 // 如果超过最大日志数量，移除最早的日志
                 if (VPetLLM.Instance != null && VPetLLM.Instance.Settings != null && Logs.Count > VPetLLM.Instance.Settings.MaxLogCount)
                 {
@@ -24,7 +22,7 @@ namespace VPetLLM.Utils
                         Logs.RemoveAt(0);
                     }
                 }
-                
+
                 // 如果启用自动滚动，滚动到最新条目
                 if (VPetLLM.Instance != null && VPetLLM.Instance.Settings != null && VPetLLM.Instance.Settings.LogAutoScroll && Logs.Count > 0)
                 {
@@ -35,16 +33,16 @@ namespace VPetLLM.Utils
                         var windows = System.Windows.Application.Current.Windows;
                         foreach (System.Windows.Window window in windows)
                         {
-                           var settingWindow = window as winSettingNew;
-                           if (settingWindow != null)
-                           {
-                               var logBox = (ListBox)settingWindow.FindName("LogBox");
-                               if (logBox != null)
-                               {
-                                   logBox.ScrollIntoView(Logs[Logs.Count - 1]);
-                                   break;
-                               }
-                           }
+                            var settingWindow = window as winSettingNew;
+                            if (settingWindow != null)
+                            {
+                                var logBox = (ListBox)settingWindow.FindName("LogBox");
+                                if (logBox != null)
+                                {
+                                    logBox.ScrollIntoView(Logs[Logs.Count - 1]);
+                                    break;
+                                }
+                            }
                         }
                     }));
                 }

@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.Loader;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
+using System.IO;
+using System.Runtime.Loader;
 using VPetLLM.Core;
 
 namespace VPetLLM.Utils
@@ -25,7 +21,7 @@ namespace VPetLLM.Utils
                 Directory.CreateDirectory(pluginDir);
                 return;
             }
-            
+
             UnloadAllPlugins(chatCore);
 
             var configFile = Path.Combine(pluginDir, "plugins.json");
@@ -40,7 +36,7 @@ namespace VPetLLM.Utils
                 try
                 {
                     var context = new AssemblyLoadContext($"{Path.GetFileNameWithoutExtension(file)}_{Guid.NewGuid()}", isCollectible: true);
-                    
+
                     var shadowCopyDir = Path.Combine(Path.GetTempPath(), "VPetLLM_Plugins", Guid.NewGuid().ToString());
                     Directory.CreateDirectory(shadowCopyDir);
                     var shadowCopiedFile = Path.Combine(shadowCopyDir, Path.GetFileName(file));
@@ -63,7 +59,7 @@ namespace VPetLLM.Utils
                         {
                             var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
                             plugin.FilePath = file;
-                            
+
                             // 检查是否已存在同名插件
                             var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
                             if (existingPlugin != null)
@@ -73,7 +69,7 @@ namespace VPetLLM.Utils
                                 Logger.Log($"Duplicate plugin from: {file}");
                                 continue; // 跳过重复的插件
                             }
-                            
+
                             if (plugin is IPluginWithData pluginWithData)
                             {
                                 var pluginDataDir = Path.Combine(pluginDir, "PluginData", plugin.Name);
@@ -111,7 +107,7 @@ namespace VPetLLM.Utils
         public static void SavePluginStates()
         {
             var configFile = Path.Combine(PluginPath, "plugins.json");
-            
+
             // 使用安全的方式创建字典，避免重复键的问题
             var pluginStates = new Dictionary<string, bool>();
             foreach (var plugin in Plugins)
@@ -122,7 +118,7 @@ namespace VPetLLM.Utils
                     pluginStates[plugin.Name] = plugin.Enabled;
                 }
             }
-            
+
             File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
             Logger.Log($"Saved plugin states for {pluginStates.Count} plugins");
         }
@@ -200,10 +196,10 @@ namespace VPetLLM.Utils
                 }
                 if (!shadowDeleted)
                 {
-                     Logger.Log($"Failed to delete shadow copy directory after multiple attempts: {shadowDir}");
+                    Logger.Log($"Failed to delete shadow copy directory after multiple attempts: {shadowDir}");
                 }
             }
-            
+
             // Retry deleting the original plugin file
             return await DeletePluginFile(filePath);
         }

@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -182,7 +180,7 @@ namespace VPetLLM.Utils
             if (string.IsNullOrWhiteSpace(config.BaseUrl)) return false;
             if (string.IsNullOrWhiteSpace(config.Method)) return false;
             if (!Uri.TryCreate(config.BaseUrl, UriKind.Absolute, out _)) return false;
-            
+
             return true;
         }
     }

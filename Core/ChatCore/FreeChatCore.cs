@@ -1,14 +1,9 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
-using VPet_Simulator.Windows.Interface;
 using System.Text;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
+using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
-using VPetLLM.Core;
-using System;
 
 namespace VPetLLM.Core.ChatCore
 {
@@ -17,29 +12,29 @@ namespace VPetLLM.Core.ChatCore
         public override string Name => "Free";
         private readonly Setting.FreeSetting _freeSetting;
         private readonly HttpClient _httpClient;
-        
+
         private const string ENCODED_API_KEY = "633273745233704955327875626b46775879314f64584e66513051744e3070714d544e49625855776331424d536b644d6344424254306c575545394a5954557956555a49";
         private const string ENCODED_API_URL = "6148523063484d364c793932634756304c6e706c59574a31636935686348417663484a7665486b76646e426c644639766347567559576b76646a46695a5852684c324e6f59585176593239746347786c64476c76626e4d3d";
         private const string ENCODED_UA = "566c426c6445784d54563947636d566c58304a3558304a5a54513d3d";
         private const string Model = "bymbymbym";
-        
+
         public FreeChatCore(Setting.FreeSetting freeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
         {
             _freeSetting = freeSetting;
-            
+
             // 使用基类的代理设置逻辑
             var handler = CreateHttpClientHandler();
             _httpClient = new HttpClient(handler);
-            
+
             // 设置超时时间为30秒，避免长时间等待
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
-            
+
             // 设置API密钥
             var decodedApiKey = DecodeString(ENCODED_API_KEY);
-            _httpClient.DefaultRequestHeaders.Authorization = 
+            _httpClient.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", decodedApiKey);
-            
+
             // 设置解码后的User-Agent头部
             var decodedUA = DecodeString(ENCODED_UA);
             if (!string.IsNullOrEmpty(decodedUA))
@@ -61,13 +56,13 @@ namespace VPetLLM.Core.ChatCore
                 {
                     ClearContext();
                 }
-                
+
                 if (!string.IsNullOrEmpty(prompt))
                 {
                     // 无论是用户输入还是插件返回，都作为user角色
                     await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
                 }
-                
+
                 // 构建请求数据，使用和OpenAI相同的逻辑
                 List<Message> history = GetCoreHistory();
                 var requestBody = new
@@ -77,14 +72,14 @@ namespace VPetLLM.Core.ChatCore
                     temperature = _freeSetting.Temperature,
                     max_tokens = _freeSetting.MaxTokens
                 };
-                
+
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                
+
                 var apiUrl = DecodeString(ENCODED_API_URL);
                 var response = await _httpClient.PostAsync(apiUrl, content);
                 var responseContent = await response.Content.ReadAsStringAsync();
-                
+
                 string message;
                 if (response.IsSuccessStatusCode)
                 {
@@ -94,12 +89,12 @@ namespace VPetLLM.Core.ChatCore
                 else
                 {
                     // 检查是否是服务器错误
-                    if (responseContent.Contains("Failed to retrieve proxy group") || 
+                    if (responseContent.Contains("Failed to retrieve proxy group") ||
                         responseContent.Contains("INTERNAL_SERVER_ERROR") ||
                         response.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
                         Utils.Logger.Log($"Free API 服务器错误: {response.StatusCode} - {responseContent}");
-                        
+
                         // 如果不是重试，尝试重试一次
                         if (!isRetry)
                         {
@@ -107,7 +102,7 @@ namespace VPetLLM.Core.ChatCore
                             await Task.Delay(2000); // 等待2秒后重试
                             return await Chat(prompt, true);
                         }
-                        
+
                         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                         {
                             message = "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
@@ -123,26 +118,26 @@ namespace VPetLLM.Core.ChatCore
                         message = $"API调用失败: {response.StatusCode}";
                     }
                 }
-                
+
                 // 根据上下文设置决定是否保留历史（使用基类的统一状态）
                 if (Settings.KeepContext)
                 {
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
                 }
-                
+
                 // 只有在保持上下文模式时才保存历史记录
                 if (Settings.KeepContext)
                 {
                     SaveHistory();
                 }
-                
+
                 ResponseHandler?.Invoke(message);
                 return "";
             }
             catch (HttpRequestException httpEx)
             {
                 Utils.Logger.Log($"Free Chat 网络异常: {httpEx.Message}");
-                
+
                 // 如果不是重试，尝试重试一次
                 if (!isRetry)
                 {
@@ -150,7 +145,7 @@ namespace VPetLLM.Core.ChatCore
                     await Task.Delay(2000); // 等待2秒后重试
                     return await Chat(prompt, true);
                 }
-                
+
                 var errorMessage = "网络连接异常，请检查网络设置或稍后再试。";
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
@@ -182,7 +177,7 @@ namespace VPetLLM.Core.ChatCore
                     new { role = "system", content = "请简洁地总结以下内容，保持关键信息。" },
                     new { role = "user", content = text }
                 };
-                
+
                 var requestBody = new
                 {
                     model = Model,
@@ -190,14 +185,14 @@ namespace VPetLLM.Core.ChatCore
                     temperature = 0.3,
                     max_tokens = 500
                 };
-                
+
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                
+
                 var apiUrl = DecodeString(ENCODED_API_URL);
                 var response = await _httpClient.PostAsync(apiUrl, content);
                 var responseContent = await response.Content.ReadAsStringAsync();
-                
+
                 if (response.IsSuccessStatusCode)
                 {
                     var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
@@ -206,13 +201,13 @@ namespace VPetLLM.Core.ChatCore
                 else
                 {
                     // 检查是否是服务器内部错误
-                    if (responseContent.Contains("Failed to retrieve proxy group") || 
+                    if (responseContent.Contains("Failed to retrieve proxy group") ||
                         responseContent.Contains("INTERNAL_SERVER_ERROR"))
                     {
                         Utils.Logger.Log($"Free Summarize 服务器内部错误: {responseContent}");
                         return "Free API 服务暂时不可用，总结功能无法使用。";
                     }
-                    
+
                     Utils.Logger.Log($"Free Summarize 错误: {response.StatusCode} - {responseContent}");
                     return "总结失败";
                 }
@@ -256,28 +251,28 @@ namespace VPetLLM.Core.ChatCore
                 {
                     new { role = "user", content = "test" }
                 };
-                
+
                 var requestBody = new
                 {
                     model = Model,
                     messages = messages,
                     max_tokens = 1
                 };
-                
+
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                
+
                 var apiUrl = DecodeString(ENCODED_API_URL);
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
                 var response = await _httpClient.PostAsync(apiUrl, content, cts.Token);
-                
+
                 if (response.IsSuccessStatusCode)
                 {
                     var responseContent = await response.Content.ReadAsStringAsync();
-                    return !responseContent.Contains("Failed to retrieve proxy group") && 
+                    return !responseContent.Contains("Failed to retrieve proxy group") &&
                            !responseContent.Contains("INTERNAL_SERVER_ERROR");
                 }
-                
+
                 return false;
             }
             catch
@@ -298,19 +293,19 @@ namespace VPetLLM.Core.ChatCore
                 {
                     return "";
                 }
-                
+
                 // 第一步：Hex解码
                 var hexBytes = new byte[encodedString.Length / 2];
                 for (int i = 0; i < hexBytes.Length; i++)
                 {
                     hexBytes[i] = Convert.ToByte(encodedString.Substring(i * 2, 2), 16);
                 }
-                
+
                 // 第二步：Base64解码
                 var base64String = Encoding.UTF8.GetString(hexBytes);
                 var finalBytes = Convert.FromBase64String(base64String);
                 var result = Encoding.UTF8.GetString(finalBytes);
-                
+
                 return result;
             }
             catch (Exception)

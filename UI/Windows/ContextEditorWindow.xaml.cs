@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
 using VPetLLM.Core;
 
 namespace VPetLLM.UI.Windows
@@ -38,7 +34,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 var editedHistory = DataGrid_History.ItemsSource as List<Message> ?? new List<Message>();
-                
+
                 // 验证数据
                 foreach (var message in editedHistory)
                 {

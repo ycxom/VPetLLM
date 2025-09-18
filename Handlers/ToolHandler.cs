@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
 
@@ -33,10 +32,10 @@ namespace VPetLLM.Handlers
             }
         }
 
-       public Task Execute(int value, IMainWindow main)
-       {
-           return Task.CompletedTask;
-       }
-       public int GetAnimationDuration(string animationName) => 0;
-   }
+        public Task Execute(int value, IMainWindow main)
+        {
+            return Task.CompletedTask;
+        }
+        public int GetAnimationDuration(string animationName) => 0;
+    }
 }

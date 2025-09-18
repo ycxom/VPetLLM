@@ -1,5 +1,3 @@
-using System;
-
 namespace VPetLLM.Core
 {
     public class FailedPlugin

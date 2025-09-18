@@ -1,13 +1,9 @@
-using System;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Media;
 using System.Text;
 using System.Text.Json;
-using VPetLLM.Utils;
+using System.Windows;
+using System.Windows.Media;
 
 namespace VPetLLM.Utils
 {
@@ -33,20 +29,20 @@ namespace VPetLLM.Utils
         private HttpClient CreateHttpClient()
         {
             HttpClientHandler handler = new HttpClientHandler();
-            
+
             // 检查是否应该使用代理
             bool useProxy = false;
-            
+
             if (_proxySettings != null && _proxySettings.IsEnabled)
             {
                 // TTS只根据ForTTS设置决定，不受ForAllAPI影响
                 useProxy = _proxySettings.ForTTS;
             }
-            
+
             if (useProxy)
             {
                 Logger.Log($"TTS: 配置代理设置 (ForAllAPI: {_proxySettings.ForAllAPI}, ForTTS: {_proxySettings.ForTTS})");
-                
+
                 if (_proxySettings.FollowSystemProxy)
                 {
                     handler.UseProxy = true;
@@ -59,12 +55,12 @@ namespace VPetLLM.Utils
                     {
                         // 确保协议格式正确
                         var protocol = _proxySettings.Protocol?.ToLower() ?? "http";
-                        if (protocol != "http" && protocol != "https" && 
+                        if (protocol != "http" && protocol != "https" &&
                             protocol != "socks4" && protocol != "socks4a" && protocol != "socks5")
                         {
                             protocol = "http"; // 默认使用http
                         }
-                        
+
                         var proxyUri = new Uri($"{protocol}://{_proxySettings.Address}");
                         handler.Proxy = new System.Net.WebProxy(proxyUri);
                         handler.UseProxy = true;
@@ -105,7 +101,7 @@ namespace VPetLLM.Utils
             try
             {
                 Logger.Log($"TTS: 开始下载音频: {text.Substring(0, Math.Min(text.Length, 50))}...");
-                
+
                 byte[] audioData;
                 string fileExtension;
 
@@ -175,13 +171,13 @@ namespace VPetLLM.Utils
             try
             {
                 Logger.Log($"TTS: 直接播放预下载音频: {filePath}");
-                
+
                 // 等待当前播放完成，确保不会被中断
                 await WaitForCurrentPlaybackAsync();
-                
+
                 // 播放音频文件
                 await PlayAudioFileAsync(filePath);
-                
+
                 Logger.Log($"TTS: 预下载音频播放完成: {filePath}");
             }
             catch (Exception ex)
@@ -199,7 +195,7 @@ namespace VPetLLM.Utils
         private async Task WaitForCurrentPlaybackAsync()
         {
             TaskCompletionSource<bool>? currentTask = null;
-            
+
             lock (_playbackLock)
             {
                 if (_isPlaying && _currentPlaybackTask != null)
@@ -207,7 +203,7 @@ namespace VPetLLM.Utils
                     currentTask = _currentPlaybackTask;
                 }
             }
-            
+
             if (currentTask != null)
             {
                 Logger.Log("TTS: 等待当前播放完成...");
@@ -234,7 +230,7 @@ namespace VPetLLM.Utils
             try
             {
                 Logger.Log($"TTS: 开始转换文本: {text.Substring(0, Math.Min(text.Length, 50))}...");
-                
+
                 byte[] audioData;
                 string fileExtension;
 
@@ -310,7 +306,7 @@ namespace VPetLLM.Utils
             try
             {
                 Logger.Log($"TTS: 开始转换文本: {text.Substring(0, Math.Min(text.Length, 50))}...");
-                
+
                 byte[] audioData;
                 string fileExtension;
 
@@ -383,7 +379,7 @@ namespace VPetLLM.Utils
             try
             {
                 Logger.Log($"TTS: 开始转换文本: {text.Substring(0, Math.Min(text.Length, 50))}...");
-                
+
                 byte[] audioData;
                 string fileExtension;
 
@@ -450,52 +446,52 @@ namespace VPetLLM.Utils
             var baseUrl = _settings.URL.BaseUrl?.TrimEnd('/');
             var voice = _settings.URL.Voice;
             var requestMethod = _settings.URL.Method?.ToUpper() ?? "GET";
-            
+
             Logger.Log($"TTS: URL请求构建信息:");
             Logger.Log($"TTS: 原始BaseUrl: '{_settings.URL.BaseUrl}'");
             Logger.Log($"TTS: 处理后BaseUrl: '{baseUrl}'");
             Logger.Log($"TTS: 语音ID: '{voice}'");
             Logger.Log($"TTS: 请求方法: '{requestMethod}'");
             Logger.Log($"TTS: 原始文本: '{text}'");
-            
+
             // 验证URL格式
             if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
             {
                 Logger.Log($"TTS: 错误 - URL格式无效: {baseUrl}");
                 throw new ArgumentException($"无效的URL格式: {baseUrl}");
             }
-            
+
             HttpResponseMessage response;
-            
+
             if (requestMethod == "POST")
             {
                 // POST请求
                 var request = new HttpRequestMessage(HttpMethod.Post, baseUrl);
-                
+
                 // 设置请求头
                 request.Headers.Add("Connection", "keep-alive");
                 request.Headers.Add("Accept", "*/*");
                 request.Headers.Add("Accept-Encoding", "gzip, deflate, br");
-                
+
                 Logger.Log($"TTS: 已设置POST请求头:");
                 Logger.Log($"TTS:   Connection: keep-alive");
                 Logger.Log($"TTS:   Accept: */*");
                 Logger.Log($"TTS:   Accept-Encoding: gzip, deflate, br");
-                
+
                 // 构建请求体参数
                 var requestBody = new
                 {
                     text = text,
                     @void = voice  // 使用voice作为void参数
                 };
-                
+
                 var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions { WriteIndented = true });
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-                
+
                 Logger.Log($"TTS: POST请求体参数:");
                 Logger.Log($"TTS: {json}");
                 Logger.Log($"TTS: 发送POST请求到: {baseUrl}");
-                
+
                 response = await _httpClient.SendAsync(request);
             }
             else
@@ -503,31 +499,31 @@ namespace VPetLLM.Utils
                 // GET请求
                 var encodedText = Uri.EscapeDataString(text);
                 var url = $"{baseUrl}/?text={encodedText}&voice={voice}";
-                
+
                 Logger.Log($"TTS: GET请求URL: {url}");
                 Logger.Log($"TTS: 发送GET请求到: {url}");
-                
+
                 response = await _httpClient.GetAsync(url);
             }
-            
+
             Logger.Log($"TTS: URL响应状态码: {response.StatusCode}");
             Logger.Log($"TTS: URL响应头:");
             foreach (var header in response.Headers)
             {
                 Logger.Log($"TTS:   {header.Key}: {string.Join(", ", header.Value)}");
             }
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 Logger.Log($"TTS: 错误响应内容: {errorContent}");
             }
-            
+
             response.EnsureSuccessStatusCode();
-            
+
             var responseData = await response.Content.ReadAsByteArrayAsync();
             Logger.Log($"TTS: URL响应数据大小: {responseData.Length} 字节");
-            
+
             return responseData;
         }
 
@@ -539,7 +535,7 @@ namespace VPetLLM.Utils
         private async Task<byte[]> GetOpenAITTSAsync(string text)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, _settings.OpenAI.BaseUrl);
-            
+
             Logger.Log($"TTS: 开始构建OpenAI请求");
             Logger.Log($"TTS: 目标URL: {_settings.OpenAI.BaseUrl}");
             Logger.Log($"TTS: API Key长度: {(_settings.OpenAI.ApiKey?.Length ?? 0)} 字符");
@@ -547,7 +543,7 @@ namespace VPetLLM.Utils
             Logger.Log($"TTS: 语音ID: {_settings.OpenAI.Voice}");
             Logger.Log($"TTS: 音频格式: {_settings.OpenAI.Format}");
             Logger.Log($"TTS: 文本长度: {text.Length} 字符");
-            
+
             // 设置请求头
             if (!string.IsNullOrWhiteSpace(_settings.OpenAI.ApiKey))
             {
@@ -558,13 +554,13 @@ namespace VPetLLM.Utils
             {
                 Logger.Log($"TTS: 警告 - API Key为空");
             }
-            
+
             request.Headers.Add("model", _settings.OpenAI.Model);
             request.Headers.Add("User-Agent", "VPetLLM/1.0");
-            
+
             Logger.Log($"TTS: 已添加model头: {_settings.OpenAI.Model}");
             Logger.Log($"TTS: 已添加User-Agent头: VPetLLM/1.0");
-            
+
             // 构建请求体 - 使用fish.audio格式
             var requestBody = new
             {
@@ -572,10 +568,10 @@ namespace VPetLLM.Utils
                 reference_id = _settings.OpenAI.Voice,
                 format = _settings.OpenAI.Format
             };
-            
+
             var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions { WriteIndented = true });
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            
+
             Logger.Log($"TTS: 完整请求信息:");
             Logger.Log($"TTS: Method: {request.Method}");
             Logger.Log($"TTS: URL: {request.RequestUri}");
@@ -593,29 +589,29 @@ namespace VPetLLM.Utils
             }
             Logger.Log($"TTS: Request Body:");
             Logger.Log($"TTS: {json}");
-            
+
             // 发送请求
             Logger.Log($"TTS: 发送请求...");
             var response = await _httpClient.SendAsync(request);
-            
+
             Logger.Log($"TTS: 响应状态码: {response.StatusCode}");
             Logger.Log($"TTS: 响应头:");
             foreach (var header in response.Headers)
             {
                 Logger.Log($"TTS:   {header.Key}: {string.Join(", ", header.Value)}");
             }
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 Logger.Log($"TTS: 错误响应内容: {errorContent}");
             }
-            
+
             response.EnsureSuccessStatusCode();
-            
+
             var responseData = await response.Content.ReadAsByteArrayAsync();
             Logger.Log($"TTS: 成功获取响应数据，大小: {responseData.Length} 字节");
-            
+
             return responseData;
         }
 
@@ -639,7 +635,7 @@ namespace VPetLLM.Utils
                 }
 
                 var tcs = new TaskCompletionSource<bool>();
-                
+
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     try
@@ -650,26 +646,26 @@ namespace VPetLLM.Utils
                             _mediaPlayer = new MediaPlayer();
                             Logger.Log("TTS: MediaPlayer已在UI线程上创建");
                         }
-                        
+
                         // 停止当前播放
                         _mediaPlayer.Stop();
-                        
+
                         // 设置音频文件
                         _mediaPlayer.Open(new Uri(filePath, UriKind.Absolute));
-                        
+
                         // 设置音量（基础音量 + 增益转换为线性系数）
                         // MediaPlayer.Volume 可以设置超过1.0，最大到100
                         double baseVolume = _settings.Volume;
                         double gainLinear = Math.Pow(10.0, _settings.VolumeGain / 20.0);
                         double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
                         _mediaPlayer.Volume = finalVolume;
-                        
+
                         Logger.Log($"TTS: 设置播放器音量 - 基础音量: {baseVolume:F2}, 增益: {_settings.VolumeGain:F1}dB (线性系数: {gainLinear:F3}), 最终音量: {finalVolume:F2}");
-                        
+
                         // 设置播放结束事件
                         EventHandler mediaEndedHandler = null;
                         EventHandler<ExceptionEventArgs> mediaFailedHandler = null;
-                        
+
                         mediaEndedHandler = (s, e) =>
                         {
                             try
@@ -677,13 +673,13 @@ namespace VPetLLM.Utils
                                 _mediaPlayer.MediaEnded -= mediaEndedHandler;
                                 _mediaPlayer.MediaFailed -= mediaFailedHandler;
                                 Logger.Log($"TTS: 音频播放完成: {filePath}");
-                                
+
                                 lock (_playbackLock)
                                 {
                                     _isPlaying = false;
                                     currentTask?.TrySetResult(true);
                                 }
-                                
+
                                 tcs.TrySetResult(true);
                             }
                             catch (Exception ex)
@@ -692,7 +688,7 @@ namespace VPetLLM.Utils
                                 tcs.TrySetResult(true); // 即使异常也标记为完成
                             }
                         };
-                        
+
                         mediaFailedHandler = (s, e) =>
                         {
                             try
@@ -700,13 +696,13 @@ namespace VPetLLM.Utils
                                 _mediaPlayer.MediaEnded -= mediaEndedHandler;
                                 _mediaPlayer.MediaFailed -= mediaFailedHandler;
                                 Logger.Log($"TTS: 音频播放失败: {filePath}, 错误: {e.ErrorException?.Message}");
-                                
+
                                 lock (_playbackLock)
                                 {
                                     _isPlaying = false;
                                     currentTask?.TrySetResult(false);
                                 }
-                                
+
                                 tcs.TrySetResult(false);
                             }
                             catch (Exception ex)
@@ -715,10 +711,10 @@ namespace VPetLLM.Utils
                                 tcs.TrySetResult(false); // 即使异常也标记为失败
                             }
                         };
-                        
+
                         _mediaPlayer.MediaEnded += mediaEndedHandler;
                         _mediaPlayer.MediaFailed += mediaFailedHandler;
-                        
+
                         // 开始播放
                         _mediaPlayer.Play();
                         Logger.Log($"TTS: 开始播放音频: {filePath}");
@@ -727,13 +723,13 @@ namespace VPetLLM.Utils
                     {
                         Logger.Log($"TTS: UI线程播放设置失败: {ex.Message}");
                         Logger.Log($"TTS: UI线程异常堆栈: {ex.StackTrace}");
-                        
+
                         lock (_playbackLock)
                         {
                             _isPlaying = false;
                             currentTask?.TrySetResult(false);
                         }
-                        
+
                         tcs.TrySetResult(false);
                     }
                 });
@@ -765,7 +761,7 @@ namespace VPetLLM.Utils
             {
                 Logger.Log($"TTS播放错误: {ex.Message}");
                 Logger.Log($"TTS播放异常堆栈: {ex.StackTrace}");
-                
+
                 lock (_playbackLock)
                 {
                     _isPlaying = false;
@@ -817,7 +813,7 @@ namespace VPetLLM.Utils
         public void UpdateSettings(Setting.TTSSetting settings, Setting.ProxySetting? proxySettings = null)
         {
             _settings = settings;
-            
+
             // 如果代理设置发生变化，重新创建HttpClient
             if (proxySettings != null && !ProxySettingsEqual(_proxySettings, proxySettings))
             {
@@ -826,7 +822,7 @@ namespace VPetLLM.Utils
                 _httpClient = CreateHttpClient();
                 Logger.Log("TTS: 代理设置已更新，重新创建HttpClient");
             }
-            
+
             Logger.Log("TTS: 设置已更新");
         }
 
@@ -837,7 +833,7 @@ namespace VPetLLM.Utils
         {
             if (settings1 == null && settings2 == null) return true;
             if (settings1 == null || settings2 == null) return false;
-            
+
             return settings1.IsEnabled == settings2.IsEnabled &&
                    settings1.FollowSystemProxy == settings2.FollowSystemProxy &&
                    settings1.Protocol == settings2.Protocol &&
@@ -855,7 +851,7 @@ namespace VPetLLM.Utils
         {
             // 从配置文件加载 DIY TTS 配置
             var diyConfig = DIYTTSConfig.LoadConfig();
-            
+
             if (!diyConfig.Enabled)
             {
                 Logger.Log("TTS: DIY TTS 未启用");
@@ -871,31 +867,31 @@ namespace VPetLLM.Utils
             var baseUrl = diyConfig.BaseUrl?.TrimEnd('/');
             var requestMethod = diyConfig.Method?.ToUpper() ?? "POST";
             var contentType = diyConfig.ContentType ?? "application/json";
-            
+
             Logger.Log($"TTS: DIY请求构建信息:");
             Logger.Log($"TTS: 配置文件路径: {DIYTTSConfig.GetConfigFilePath()}");
             Logger.Log($"TTS: 目标URL: '{baseUrl}'");
             Logger.Log($"TTS: 请求方法: '{requestMethod}'");
             Logger.Log($"TTS: Content-Type: '{contentType}'");
             Logger.Log($"TTS: 原始文本: '{text}'");
-            
+
             // 验证URL格式
             if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
             {
                 Logger.Log($"TTS: 错误 - URL格式无效: {baseUrl}");
                 throw new ArgumentException($"无效的URL格式: {baseUrl}");
             }
-            
+
             HttpResponseMessage response;
-            
+
             // 设置超时时间
             using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromMilliseconds(diyConfig.Timeout));
-            
+
             if (requestMethod == "POST")
             {
                 // POST请求
                 var request = new HttpRequestMessage(HttpMethod.Post, baseUrl);
-                
+
                 // 设置自定义请求头
                 foreach (var header in diyConfig.CustomHeaders)
                 {
@@ -923,10 +919,10 @@ namespace VPetLLM.Utils
                         }
                     }
                 }
-                
+
                 // 构建请求体，处理键值对格式并替换文本占位符
                 var requestBodyDict = new Dictionary<string, object>(diyConfig.RequestBody ?? new Dictionary<string, object>());
-                
+
                 // 替换所有值中的 {text} 占位符
                 foreach (var key in requestBodyDict.Keys.ToList())
                 {
@@ -935,26 +931,26 @@ namespace VPetLLM.Utils
                         requestBodyDict[key] = stringValue.Replace("{text}", text);
                     }
                 }
-                
+
                 var requestBodyJson = JsonSerializer.Serialize(requestBodyDict, new JsonSerializerOptions
                 {
                     WriteIndented = false,
                     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                 });
-            
+
                 request.Content = new StringContent(requestBodyJson, Encoding.UTF8, contentType);
-                
+
                 Logger.Log($"TTS: POST请求体:");
                 Logger.Log($"TTS: {requestBodyJson}");
                 Logger.Log($"TTS: 发送POST请求到: {baseUrl}");
-                
+
                 response = await _httpClient.SendAsync(request, cts.Token);
             }
             else
             {
                 // GET请求 - 构建查询参数
                 var queryParams = new List<string>();
-                
+
                 // 处理 requestBody 中的参数，替换 {text} 占位符并添加到查询参数
                 foreach (var param in diyConfig.RequestBody ?? new Dictionary<string, object>())
                 {
@@ -966,19 +962,19 @@ namespace VPetLLM.Utils
                     var encodedValue = Uri.EscapeDataString(value);
                     queryParams.Add($"{param.Key}={encodedValue}");
                 }
-                
+
                 // 如果 requestBody 为空或没有 text 参数，添加默认的 text 参数
                 if (!diyConfig.RequestBody.ContainsKey("text"))
                 {
                     var encodedText = Uri.EscapeDataString(text);
                     queryParams.Add($"text={encodedText}");
                 }
-                
+
                 var queryString = string.Join("&", queryParams);
                 var url = $"{baseUrl}?{queryString}";
-                
+
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                
+
                 // 设置自定义请求头（GET请求不设置Content-Type）
                 foreach (var header in diyConfig.CustomHeaders)
                 {
@@ -1006,31 +1002,31 @@ namespace VPetLLM.Utils
                         }
                     }
                 }
-                
+
                 Logger.Log($"TTS: GET请求URL: {url}");
                 Logger.Log($"TTS: 发送GET请求到: {url}");
-                
+
                 response = await _httpClient.SendAsync(request, cts.Token);
             }
-            
+
             Logger.Log($"TTS: DIY响应状态码: {response.StatusCode}");
             Logger.Log($"TTS: DIY响应头:");
             foreach (var header in response.Headers)
             {
                 Logger.Log($"TTS:   {header.Key}: {string.Join(", ", header.Value)}");
             }
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 Logger.Log($"TTS: 错误响应内容: {errorContent}");
             }
-            
+
             response.EnsureSuccessStatusCode();
-            
+
             var responseData = await response.Content.ReadAsByteArrayAsync();
             Logger.Log($"TTS: DIY响应数据大小: {responseData.Length} 字节");
-            
+
             return responseData;
         }
 

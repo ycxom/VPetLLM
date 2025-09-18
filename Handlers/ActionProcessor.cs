@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.RegularExpressions;
-using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Utils;
 
@@ -57,15 +53,19 @@ namespace VPetLLM.Handlers
                     {
                         var outerCommand = nestedMatch.Groups[1].Value.ToLower();
                         var innerValue = nestedMatch.Groups[2].Value.Trim(')');
-                        
+
                         handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == outerCommand);
-                        if(handler != null){
+                        if (handler != null)
+                        {
                             value = innerValue;
-                        } else {
-                             var innerParts = innerValue.Split(new[] { '(' }, 2);
+                        }
+                        else
+                        {
+                            var innerParts = innerValue.Split(new[] { '(' }, 2);
                             var innerCommand = innerParts[0].ToLower();
                             handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == innerCommand);
-                            if(handler != null){
+                            if (handler != null)
+                            {
                                 value = innerParts.Length > 1 ? innerParts[1].TrimEnd(')') : "";
                             }
                         }
@@ -74,11 +74,11 @@ namespace VPetLLM.Handlers
 
                 if (handler == null)
                 {
-                     handler = Handlers.FirstOrDefault(h => h.Keyword == "plugin");
-                     if (handler != null)
-                     {
+                    handler = Handlers.FirstOrDefault(h => h.Keyword == "plugin");
+                    if (handler != null)
+                    {
                         value = content;
-                     }
+                    }
                 }
 
                 if (handler == null)
@@ -86,7 +86,7 @@ namespace VPetLLM.Handlers
                     Logger.Log($"ActionProcessor: No handler found for command: {command}");
                     continue;
                 }
-                
+
                 bool isEnabled = handler.ActionType switch
                 {
                     ActionType.State => settings.EnableState,

@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using VPetLLM.Core;
@@ -43,16 +41,16 @@ namespace VPetLLM.UI.Windows
 
         private void Button_Save_Click(object sender, RoutedEventArgs e)
         {
-           var systemMessages = _originalHistory.Where(m => m.Role == "system").ToList();
-           var newHistory = new List<Message>(systemMessages);
+            var systemMessages = _originalHistory.Where(m => m.Role == "system").ToList();
+            var newHistory = new List<Message>(systemMessages);
 
-           foreach (var item in DisplayHistory)
-           {
-               item.OriginalMessage.Content = item.Content;
-               newHistory.Add(item.OriginalMessage);
-           }
+            foreach (var item in DisplayHistory)
+            {
+                item.OriginalMessage.Content = item.Content;
+                newHistory.Add(item.OriginalMessage);
+            }
 
-           _plugin.ChatCore.SetChatHistory(newHistory);
+            _plugin.ChatCore.SetChatHistory(newHistory);
             Close();
         }
 

@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-
 namespace VPetLLM.Utils
 {
     /// <summary>
@@ -27,7 +24,7 @@ namespace VPetLLM.Utils
             {
                 // 将dB转换为线性增益系数
                 double gainLinear = Math.Pow(10.0, gainDb / 20.0);
-                
+
                 Logger.Log($"AudioProcessor: 应用音量增益 {gainDb:F1}dB (线性系数: {gainLinear:F3})");
 
                 // 检查是否为WAV格式
@@ -94,7 +91,7 @@ namespace VPetLLM.Utils
                 // 处理音频样本
                 int dataStart = dataChunkStart + 8; // 跳过"data"标识和长度字段
                 int dataLength = BitConverter.ToInt32(wavData, dataChunkStart + 4);
-                
+
                 if (formatInfo.BitsPerSample == 16)
                 {
                     ProcessInt16Samples(result, dataStart, dataLength, gainLinear);
@@ -127,7 +124,7 @@ namespace VPetLLM.Utils
         {
             for (int i = 12; i < wavData.Length - 8; i++)
             {
-                if (wavData[i] == 0x64 && wavData[i + 1] == 0x61 && 
+                if (wavData[i] == 0x64 && wavData[i + 1] == 0x61 &&
                     wavData[i + 2] == 0x74 && wavData[i + 3] == 0x61) // "data"
                 {
                     return i;
@@ -145,14 +142,14 @@ namespace VPetLLM.Utils
             {
                 // 查找fmt chunk (通常在位置12)
                 int fmtStart = 12;
-                if (wavData[fmtStart] != 0x66 || wavData[fmtStart + 1] != 0x6D || 
+                if (wavData[fmtStart] != 0x66 || wavData[fmtStart + 1] != 0x6D ||
                     wavData[fmtStart + 2] != 0x74 || wavData[fmtStart + 3] != 0x20) // "fmt "
                 {
                     // 如果不在标准位置，搜索fmt chunk
                     fmtStart = -1;
                     for (int i = 12; i < wavData.Length - 16; i++)
                     {
-                        if (wavData[i] == 0x66 && wavData[i + 1] == 0x6D && 
+                        if (wavData[i] == 0x66 && wavData[i + 1] == 0x6D &&
                             wavData[i + 2] == 0x74 && wavData[i + 3] == 0x20)
                         {
                             fmtStart = i;
@@ -186,10 +183,10 @@ namespace VPetLLM.Utils
             {
                 short sample = BitConverter.ToInt16(data, i);
                 int newSample = (int)(sample * gain);
-                
+
                 // 防止溢出
                 newSample = Math.Max(-32768, Math.Min(32767, newSample));
-                
+
                 byte[] newBytes = BitConverter.GetBytes((short)newSample);
                 data[i] = newBytes[0];
                 data[i + 1] = newBytes[1];
@@ -205,10 +202,10 @@ namespace VPetLLM.Utils
             {
                 int sample = data[i] - 128; // 转换为有符号
                 int newSample = (int)(sample * gain);
-                
+
                 // 防止溢出
                 newSample = Math.Max(-128, Math.Min(127, newSample));
-                
+
                 data[i] = (byte)(newSample + 128); // 转换回无符号
             }
         }
