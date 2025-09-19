@@ -268,7 +268,7 @@ namespace VPetLLM
         public void UpdateTTSService()
         {
             TTSService?.UpdateSettings(Settings.TTS, Settings.Proxy);
-            Logger.Log("TTS服务设置已更新");
+            // Logger.Log("TTS服务设置已更新");
         }
 
         public async Task PlayTTSAsync(string text)

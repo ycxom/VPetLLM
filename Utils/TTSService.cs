@@ -660,7 +660,7 @@ namespace VPetLLM.Utils
                         double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
                         _mediaPlayer.Volume = finalVolume;
 
-                        Logger.Log($"TTS: 设置播放器音量 - 基础音量: {baseVolume:F2}, 增益: {_settings.VolumeGain:F1}dB (线性系数: {gainLinear:F3}), 最终音量: {finalVolume:F2}");
+                        // Logger.Log($"TTS: 设置播放器音量 - 基础音量: {baseVolume:F2}, 增益: {_settings.VolumeGain:F1}dB (线性系数: {gainLinear:F3}), 最终音量: {finalVolume:F2}");
 
                         // 设置播放结束事件
                         EventHandler mediaEndedHandler = null;
@@ -812,6 +812,9 @@ namespace VPetLLM.Utils
         /// <param name="proxySettings">代理设置</param>
         public void UpdateSettings(Setting.TTSSetting settings, Setting.ProxySetting? proxySettings = null)
         {
+            var oldVolume = _settings?.Volume ?? 1.0;
+            var oldVolumeGain = _settings?.VolumeGain ?? 0.0;
+            
             _settings = settings;
 
             // 如果代理设置发生变化，重新创建HttpClient
@@ -820,11 +823,63 @@ namespace VPetLLM.Utils
                 _proxySettings = proxySettings;
                 _httpClient?.Dispose();
                 _httpClient = CreateHttpClient();
-                Logger.Log("TTS: 代理设置已更新，重新创建HttpClient");
+                // Logger.Log("TTS: 代理设置已更新，重新创建HttpClient");
             }
 
-            Logger.Log("TTS: 设置已更新");
+            // 如果音量设置发生变化，立即应用到当前播放器
+            if (Math.Abs(oldVolume - settings.Volume) > 0.01 || Math.Abs(oldVolumeGain - settings.VolumeGain) > 0.01)
+            {
+                UpdateCurrentPlayerVolume();
+            }
+
+            // Logger.Log("TTS: 设置已更新");
         }
+
+        /// <summary>
+        /// 立即更新当前播放器的音量
+        /// </summary>
+        private void UpdateCurrentPlayerVolume()
+        {
+            if (_mediaPlayer != null)
+            {
+                try
+                {
+                    // 在UI线程上更新音量
+                    System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                    {
+                        if (_mediaPlayer != null)
+                        {
+                            // 计算最终音量（基础音量 + 增益转换为线性系数）
+                            double baseVolume = _settings.Volume;
+                            double gainLinear = Math.Pow(10.0, _settings.VolumeGain / 20.0);
+                            double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
+                            
+                            _mediaPlayer.Volume = finalVolume;
+                            // Logger.Log($"TTS: 立即更新播放器音量 - 基础音量: {baseVolume:F2}, 增益: {_settings.VolumeGain:F1}dB, 最终音量: {finalVolume:F2}");
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"TTS: 更新播放器音量失败: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 公共方法：立即更新音量设置并应用到当前播放器
+        /// </summary>
+        /// <param name="volume">基础音量 (0-10)</param>
+        /// <param name="volumeGain">音量增益 (dB, -20到+40)</param>
+        public void UpdateVolumeSettings(double volume, double volumeGain)
+        {
+            _settings.Volume = volume;
+            _settings.VolumeGain = volumeGain;
+            UpdateCurrentPlayerVolume();
+            // Logger.Log($"TTS: 音量设置已更新 - 音量: {volume:F2}, 增益: {volumeGain:F1}dB");
+        }
+
+
 
         /// <summary>
         /// 比较两个代理设置是否相等

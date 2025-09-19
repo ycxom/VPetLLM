@@ -224,10 +224,20 @@ namespace VPetLLM.UI.Windows
                 else if (slider.Name == "Slider_TTS_Volume")
                 {
                     ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = slider.Value.ToString("F2");
+                    
+                    // 立即更新所有TTS服务实例的音量设置
+                    var volumeGainSlider = (Slider)this.FindName("Slider_TTS_VolumeGain");
+                    _ttsService?.UpdateVolumeSettings(slider.Value, volumeGainSlider.Value);
+                    _plugin.TTSService?.UpdateVolumeSettings(slider.Value, volumeGainSlider.Value);
                 }
                 else if (slider.Name == "Slider_TTS_VolumeGain")
                 {
                     ((TextBlock)this.FindName("TextBlock_TTS_VolumeGainValue")).Text = slider.Value.ToString("F1");
+                    
+                    // 立即更新所有TTS服务实例的音量设置
+                    var volumeSlider = (Slider)this.FindName("Slider_TTS_Volume");
+                    _ttsService?.UpdateVolumeSettings(volumeSlider.Value, slider.Value);
+                    _plugin.TTSService?.UpdateVolumeSettings(volumeSlider.Value, slider.Value);
                 }
                 else if (slider.Name == "Slider_TTS_Speed")
                 {
