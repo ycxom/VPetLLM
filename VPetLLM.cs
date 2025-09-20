@@ -223,6 +223,11 @@ namespace VPetLLM
             PluginManager.LoadPlugins(this.ChatCore);
         }
 
+        public async Task<bool> UpdatePlugin(string pluginFilePath)
+        {
+            return await PluginManager.UpdatePlugin(pluginFilePath, this.ChatCore);
+        }
+
         public void SavePluginStates()
         {
             PluginManager.SavePluginStates();

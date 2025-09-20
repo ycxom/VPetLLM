@@ -299,6 +299,156 @@ namespace VPetLLM.Utils
             Logger.Log($"Failed to delete plugin after multiple attempts: {Path.GetFileName(filePath)}");
             return false;
         }
+        public static async Task<bool> UpdatePlugin(string pluginFilePath, IChatCore chatCore)
+        {
+            if (string.IsNullOrEmpty(pluginFilePath) || !File.Exists(pluginFilePath))
+            {
+                Logger.Log($"Plugin file path is invalid or does not exist: '{pluginFilePath}'");
+                return false;
+            }
+
+            try
+            {
+                // 查找需要更新的插件
+                var existingPlugin = Plugins.FirstOrDefault(p => p.FilePath == pluginFilePath);
+                if (existingPlugin != null)
+                {
+                    Logger.Log($"Found existing plugin to update: {existingPlugin.Name}");
+                    
+                    // 先卸载旧版本插件
+                    if (chatCore != null)
+                    {
+                        chatCore.RemovePlugin(existingPlugin);
+                    }
+                    existingPlugin.Unload();
+                    Plugins.Remove(existingPlugin);
+
+                    // 卸载旧的 AssemblyLoadContext
+                    if (_pluginContexts.TryGetValue(pluginFilePath, out var context))
+                    {
+                        var weakContext = new WeakReference(context);
+                        context.Unload();
+                        _pluginContexts.Remove(pluginFilePath);
+                        Logger.Log($"Unloaded AssemblyLoadContext for {existingPlugin.Name}");
+
+                        // 等待垃圾回收
+                        for (int i = 0; weakContext.IsAlive && (i < 5); i++)
+                        {
+                            GC.Collect();
+                            GC.WaitForPendingFinalizers();
+                            await Task.Delay(100);
+                        }
+                    }
+
+                    // 清理影子拷贝目录
+                    if (_shadowCopyDirectories.TryGetValue(pluginFilePath, out var shadowDir) && Directory.Exists(shadowDir))
+                    {
+                        try
+                        {
+                            Directory.Delete(shadowDir, true);
+                            _shadowCopyDirectories.Remove(pluginFilePath);
+                            Logger.Log($"Cleaned up shadow copy directory for {existingPlugin.Name}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Failed to clean up shadow copy directory: {ex.Message}");
+                        }
+                    }
+                }
+
+                // 重新加载单个插件
+                await LoadSinglePlugin(pluginFilePath, chatCore);
+                Logger.Log($"Successfully updated plugin: {pluginFilePath}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to update plugin {pluginFilePath}: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static async Task LoadSinglePlugin(string pluginFilePath, IChatCore chatCore)
+        {
+            try
+            {
+                var context = new AssemblyLoadContext($"{Path.GetFileNameWithoutExtension(pluginFilePath)}_{Guid.NewGuid()}", isCollectible: true);
+
+                var shadowCopyDir = Path.Combine(Path.GetTempPath(), "VPetLLM_Plugins", Guid.NewGuid().ToString());
+                Directory.CreateDirectory(shadowCopyDir);
+                var shadowCopiedFile = Path.Combine(shadowCopyDir, Path.GetFileName(pluginFilePath));
+                File.Copy(pluginFilePath, shadowCopiedFile, true);
+                _shadowCopyDirectories[pluginFilePath] = shadowCopyDir;
+
+                var pdbFile = Path.ChangeExtension(pluginFilePath, ".pdb");
+                if (File.Exists(pdbFile))
+                {
+                    var shadowCopiedPdb = Path.ChangeExtension(shadowCopiedFile, ".pdb");
+                    File.Copy(pdbFile, shadowCopiedPdb, true);
+                }
+
+                var assembly = context.LoadFromAssemblyPath(shadowCopiedFile);
+                _pluginContexts[pluginFilePath] = context;
+
+                // 读取插件状态配置
+                var pluginDir = PluginPath;
+                var configFile = Path.Combine(pluginDir, "plugins.json");
+                var pluginStates = new Dictionary<string, bool>();
+                if (File.Exists(configFile))
+                {
+                    pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
+                }
+
+                foreach (var type in assembly.GetTypes())
+                {
+                    if (typeof(IVPetLLMPlugin).IsAssignableFrom(type) && !type.IsInterface)
+                    {
+                        var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
+                        plugin.FilePath = pluginFilePath;
+
+                        // 检查是否已存在同名插件（这种情况下应该跳过，因为我们已经在更新前移除了旧插件）
+                        var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
+                        if (existingPlugin != null)
+                        {
+                            Logger.Log($"Warning: Plugin with name '{plugin.Name}' already exists after update. This should not happen.");
+                            continue;
+                        }
+
+                        if (plugin is IPluginWithData pluginWithData)
+                        {
+                            var pluginDataDir = Path.Combine(pluginDir, "PluginData", plugin.Name);
+                            Directory.CreateDirectory(pluginDataDir);
+                            pluginWithData.PluginDataDir = pluginDataDir;
+                        }
+
+                        plugin.Enabled = pluginStates.TryGetValue(plugin.Name, out var enabled) ? enabled : true;
+                        Plugins.Add(plugin);
+                        
+                        if (plugin.Enabled)
+                        {
+                            plugin.Initialize(VPetLLM.Instance);
+                            if (chatCore != null)
+                            {
+                                chatCore.AddPlugin(plugin);
+                            }
+                        }
+                        Logger.Log($"Loaded updated plugin: {plugin.Name}, Enabled: {plugin.Enabled}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to load single plugin {pluginFilePath}: {ex.Message}");
+                FailedPlugins.Add(new FailedPlugin
+                {
+                    Name = Path.GetFileNameWithoutExtension(pluginFilePath),
+                    FilePath = pluginFilePath,
+                    Error = ex,
+                    Description = ex.Message
+                });
+            }
+        }
+
         public static string GetFileSha256(string filePath)
         {
             if (!File.Exists(filePath))

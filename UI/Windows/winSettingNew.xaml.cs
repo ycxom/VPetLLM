@@ -1770,20 +1770,6 @@ namespace VPetLLM.UI.Windows
                     }
                     var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
 
-                    // 如果是更新操作，先卸载旧版本插件
-                    if (plugin.IsLocal && plugin.LocalPlugin != null)
-                    {
-                        try
-                        {
-                            plugin.LocalPlugin.Unload();
-                            _plugin.ChatCore?.RemovePlugin(plugin.LocalPlugin);
-                            Logger.Log($"Unloaded old version of plugin '{plugin.LocalPlugin.Name}' before update.");
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Log($"Warning: Failed to unload old plugin version: {ex.Message}");
-                        }
-                    }
 
                     // 写入新文件
                     File.WriteAllBytes(filePath, data);
@@ -1815,8 +1801,27 @@ namespace VPetLLM.UI.Windows
                         return;
                     }
 
-                    // 强制重新加载插件以识别新的dll
-                    _plugin.LoadPlugins();
+                    // 如果是更新操作，使用专门的更新方法
+                    if (plugin.IsLocal && plugin.LocalPlugin != null)
+                    {
+                        Logger.Log($"Updating existing plugin: {plugin.LocalPlugin.Name}");
+                        bool updateSuccess = await _plugin.UpdatePlugin(filePath);
+                        if (!updateSuccess)
+                        {
+                            Logger.Log($"Failed to update plugin using UpdatePlugin method, falling back to full reload");
+                            _plugin.LoadPlugins();
+                        }
+                        else
+                        {
+                            Logger.Log($"Plugin updated successfully using UpdatePlugin method");
+                        }
+                    }
+                    else
+                    {
+                        // 新安装的插件，使用常规加载方法
+                        Logger.Log($"Installing new plugin: {plugin.Name}");
+                        _plugin.LoadPlugins();
+                    }
                     Logger.Log($"Plugins reloaded after update");
 
                     // 再次验证加载后的状态
