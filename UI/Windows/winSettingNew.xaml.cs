@@ -224,7 +224,7 @@ namespace VPetLLM.UI.Windows
                 else if (slider.Name == "Slider_TTS_Volume")
                 {
                     ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = slider.Value.ToString("F2");
-                    
+
                     // 立即更新所有TTS服务实例的音量设置
                     var volumeGainSlider = (Slider)this.FindName("Slider_TTS_VolumeGain");
                     _ttsService?.UpdateVolumeSettings(slider.Value, volumeGainSlider.Value);
@@ -233,7 +233,7 @@ namespace VPetLLM.UI.Windows
                 else if (slider.Name == "Slider_TTS_VolumeGain")
                 {
                     ((TextBlock)this.FindName("TextBlock_TTS_VolumeGainValue")).Text = slider.Value.ToString("F1");
-                    
+
                     // 立即更新所有TTS服务实例的音量设置
                     var volumeSlider = (Slider)this.FindName("Slider_TTS_Volume");
                     _ttsService?.UpdateVolumeSettings(volumeSlider.Value, slider.Value);
@@ -1441,10 +1441,9 @@ namespace VPetLLM.UI.Windows
                 var langCode = _plugin.Settings.Language;
                 var pluginItems = new Dictionary<string, UnifiedPluginItem>(StringComparer.OrdinalIgnoreCase);
 
-                // 第一步：立即加载并显示本地插件
-                _plugin.LoadPlugins();
-
-                System.Diagnostics.Debug.WriteLine($"[PluginStore] 加载的插件数量: {_plugin.Plugins.Count}");
+                // 第一步：获取当前已加载的插件信息（不重新加载）
+                Logger.Log($"开始刷新插件列表 - 当前本地插件数量: {_plugin.Plugins.Count}");
+                System.Diagnostics.Debug.WriteLine($"[PluginStore] 当前插件数量: {_plugin.Plugins.Count}");
                 System.Diagnostics.Debug.WriteLine($"[PluginStore] 失败的插件数量: {_plugin.FailedPlugins.Count}");
 
                 // 添加本地成功插件
@@ -1515,6 +1514,8 @@ namespace VPetLLM.UI.Windows
                     System.Diagnostics.Debug.WriteLine($"[PluginStore] 立即显示本地插件数量: {pluginItems.Count}");
                 });
 
+                Logger.Log($"正在连接云端插件商店进行版本对比...");
+
                 // 第二步：异步加载在线插件（不阻塞UI）
                 _ = Task.Run(async () =>
                 {
@@ -1529,6 +1530,7 @@ namespace VPetLLM.UI.Windows
                             remotePlugins = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
                         }
 
+                        Logger.Log($"云端插件商店连接成功，发现 {remotePlugins.Count} 个在线插件");
                         System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载成功，数量: {remotePlugins.Count}");
 
                         // 更新本地插件的远程信息
@@ -1539,10 +1541,34 @@ namespace VPetLLM.UI.Windows
                             var remoteSha256 = remoteInfo["SHA256"]?.ToString() ?? string.Empty;
                             var pluginName = remoteInfo["Name"]?.ToString() ?? string.Empty;
 
-                            // 查找对应的本地插件
-                            var localItem = pluginItems.Values.FirstOrDefault(p => p.OriginalName == pluginName);
+                            // 查找对应的本地插件 - 支持多种匹配方式
+                            var localItem = pluginItems.Values.FirstOrDefault(p =>
+                                p.OriginalName == pluginName ||
+                                p.Name == pluginName ||
+                                p.Id == id ||
+                                (p.LocalPlugin != null && p.LocalPlugin.Name == pluginName));
+
+                            // 如果通过名称没有找到，尝试通过文件路径匹配（处理插件名称变更的情况）
+                            if (localItem == null)
+                            {
+                                var expectedFilePath = Path.Combine(PluginManager.PluginPath, $"{id}.dll");
+                                localItem = pluginItems.Values.FirstOrDefault(p =>
+                                    p.LocalFilePath != null &&
+                                    p.LocalFilePath.Equals(expectedFilePath, StringComparison.OrdinalIgnoreCase));
+
+                                if (localItem != null)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"[PluginStore] 通过文件路径匹配到插件: {localItem.Name} -> {pluginName}");
+                                }
+                            }
+
+                            System.Diagnostics.Debug.WriteLine($"[PluginStore] 匹配远程插件 '{pluginName}' (ID: {id})");
+                            System.Diagnostics.Debug.WriteLine($"[PluginStore] 本地插件列表: {string.Join(", ", pluginItems.Values.Select(p => $"{p.Name}({p.OriginalName})"))}");
+
                             if (localItem != null)
                             {
+                                System.Diagnostics.Debug.WriteLine($"[PluginStore] 找到匹配的本地插件: {localItem.Name}");
+
                                 // 更新本地插件的远程信息
                                 localItem.RemoteVersion = remoteSha256;
                                 localItem.FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty;
@@ -1552,12 +1578,22 @@ namespace VPetLLM.UI.Windows
                                                    !string.IsNullOrEmpty(remoteSha256) &&
                                                    !localItem.Version.Equals(remoteSha256, StringComparison.OrdinalIgnoreCase);
 
+                                System.Diagnostics.Debug.WriteLine($"[PluginStore] 版本比较 - 本地: '{localItem.Version}', 远程: '{remoteSha256}', 可更新: {isUpdatable}");
+
                                 if (isUpdatable)
                                 {
                                     localItem.IsUpdatable = true;
                                     localItem.UpdateAvailableText = LanguageHelper.Get("Plugin.UpdateAvailable", langCode);
                                     localItem.ActionText = LanguageHelper.Get("Plugin.Update", langCode);
                                     localItem.Icon = "\uE948"; // Sync icon
+                                }
+                                else
+                                {
+                                    // 确保已更新的插件显示正确的状态
+                                    localItem.IsUpdatable = false;
+                                    localItem.UpdateAvailableText = null;
+                                    localItem.ActionText = LanguageHelper.Get("Plugin.UnloadPlugin", langCode);
+                                    localItem.Icon = "\uE8A5"; // Folder icon
                                 }
 
                                 // 更新描述
@@ -1601,9 +1637,13 @@ namespace VPetLLM.UI.Windows
                             dataGrid.ItemsSource = pluginItems.Values.ToList();
                             System.Diagnostics.Debug.WriteLine($"[PluginStore] 更新后总插件数量: {pluginItems.Count}");
                         });
+
+                        var updatableCount = pluginItems.Values.Count(p => p.IsUpdatable);
+                        Logger.Log($"插件列表刷新完成 - 总计 {pluginItems.Count} 个插件，其中 {updatableCount} 个可更新");
                     }
                     catch (Exception ex)
                     {
+                        Logger.Log($"无法连接云端插件商店，使用离线模式: {ex.Message}");
                         System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载失败，继续使用离线模式: {ex.Message}");
 
                         Dispatcher.Invoke(() =>
@@ -1748,18 +1788,98 @@ namespace VPetLLM.UI.Windows
                 using (var client = CreatePluginStoreHttpClient())
                 {
                     var downloadUrl = GetPluginStoreUrl(plugin.FileUrl);
-                    var data = await client.GetByteArrayAsync(downloadUrl);
-                    string downloadedFileHash;
+                    byte[] data = null;
+                    string downloadedFileHash = null;
+                    bool downloadSuccess = false;
 
-                    using (var sha256 = SHA256.Create())
+                    // 重试下载机制
+                    for (int attempt = 1; attempt <= 3; attempt++)
                     {
-                        var hash = sha256.ComputeHash(data);
-                        downloadedFileHash = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                        if (downloadedFileHash != plugin.SHA256.ToLowerInvariant())
+                        try
                         {
-                            MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.FileValidationError", _plugin.Settings.Language, "文件校验失败，请稍后重试"),
-                                ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                            Logger.Log($"Downloading plugin (attempt {attempt}/3): {downloadUrl}");
+                            data = await client.GetByteArrayAsync(downloadUrl);
+                            Logger.Log($"Downloaded {data.Length} bytes");
+
+                            using (var sha256 = SHA256.Create())
+                            {
+                                var hash = sha256.ComputeHash(data);
+                                downloadedFileHash = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                            }
+
+                            var expectedHash = plugin.SHA256?.ToLowerInvariant() ?? "";
+                            Logger.Log($"File validation - Expected: {expectedHash}");
+                            Logger.Log($"File validation - Downloaded: {downloadedFileHash}");
+                            Logger.Log($"File validation - Size: {data.Length} bytes");
+
+                            if (downloadedFileHash == expectedHash)
+                            {
+                                Logger.Log("File validation successful");
+                                downloadSuccess = true;
+                                break;
+                            }
+                            else
+                            {
+                                Logger.Log($"File validation failed on attempt {attempt}");
+                                if (attempt < 3)
+                                {
+                                    Logger.Log("Retrying download...");
+                                    await Task.Delay(1000); // 等待1秒后重试
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Download attempt {attempt} failed: {ex.Message}");
+                            if (attempt < 3)
+                            {
+                                await Task.Delay(1000);
+                            }
+                        }
+                    }
+
+                    if (!downloadSuccess)
+                    {
+                        var errorMessage = $"文件校验失败！\n" +
+                                         $"插件: {plugin.Name}\n" +
+                                         $"期望哈希: {plugin.SHA256}\n" +
+                                         $"实际哈希: {downloadedFileHash ?? "下载失败"}\n" +
+                                         $"文件大小: {data?.Length ?? 0} 字节\n\n" +
+                                         $"可能原因:\n" +
+                                         $"1. 网络连接不稳定\n" +
+                                         $"2. 服务器文件已更新但哈希值未同步\n" +
+                                         $"3. 文件在传输过程中损坏\n\n" +
+                                         $"是否要强制安装此插件？\n" +
+                                         $"(仅在确信文件来源安全时选择'是')";
+
+                        var result = MessageBox.Show(errorMessage, "文件校验失败", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+                        if (result == MessageBoxResult.No)
+                        {
                             return;
+                        }
+                        else
+                        {
+                            Logger.Log($"User chose to force install plugin despite validation failure");
+                            // 继续安装，但使用实际下载的文件哈希值作为新的期望值
+                            downloadedFileHash = downloadedFileHash ?? "unknown";
+
+                            // 额外的安全检查：验证文件是否为有效的.NET程序集
+                            try
+                            {
+                                using (var ms = new MemoryStream(data))
+                                {
+                                    var assembly = System.Reflection.Assembly.Load(data);
+                                    Logger.Log($"Assembly validation successful: {assembly.FullName}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"Assembly validation failed: {ex.Message}");
+                                MessageBox.Show($"下载的文件不是有效的.NET程序集！\n错误: {ex.Message}\n\n为了安全起见，安装已取消。",
+                                    "文件格式错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                                return;
+                            }
                         }
                     }
 
@@ -1768,8 +1888,21 @@ namespace VPetLLM.UI.Windows
                     {
                         Directory.CreateDirectory(pluginDir);
                     }
-                    var filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
 
+                    string filePath;
+
+                    // 如果是更新操作，使用现有插件的文件路径，确保替换而不是创建新文件
+                    if (plugin.IsLocal && plugin.LocalPlugin != null && !string.IsNullOrEmpty(plugin.LocalPlugin.FilePath))
+                    {
+                        filePath = plugin.LocalPlugin.FilePath;
+                        Logger.Log($"Updating existing plugin file: {filePath}");
+                    }
+                    else
+                    {
+                        // 新安装的插件，使用 plugin.Id 作为文件名
+                        filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
+                        Logger.Log($"Installing new plugin file: {filePath}");
+                    }
 
                     // 写入新文件
                     File.WriteAllBytes(filePath, data);
@@ -1822,17 +1955,21 @@ namespace VPetLLM.UI.Windows
                         Logger.Log($"Installing new plugin: {plugin.Name}");
                         _plugin.LoadPlugins();
                     }
-                    Logger.Log($"Plugins reloaded after update");
+                    Logger.Log($"Plugins reloaded after install/update");
+
+                    // 等待插件加载完成
+                    await Task.Delay(800);
 
                     // 再次验证加载后的状态
                     var reloadedHash = PluginManager.GetFileSha256(filePath);
                     Logger.Log($"Post-reload verification - Expected: {downloadedFileHash}, Actual: {reloadedHash}");
 
-                    // 刷新UI显示 - 让系统重新计算所有版本信息
+                    // 强制刷新UI显示 - 让系统重新计算所有版本信息
+                    Logger.Log($"Refreshing UI to update plugin status...");
                     Button_RefreshPlugins_Click(this, new RoutedEventArgs());
 
                     // 等待UI刷新完成后再次检查
-                    await Task.Delay(500);
+                    await Task.Delay(1000);
 
                     // 查找更新后的插件项并验证状态
                     var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
@@ -1841,15 +1978,33 @@ namespace VPetLLM.UI.Windows
                         var updatedItem = currentItems.FirstOrDefault(p => p.Id == plugin.Id || p.OriginalName == plugin.OriginalName);
                         if (updatedItem != null)
                         {
-                            Logger.Log($"Updated plugin item found - Version: {updatedItem.Version}, IsUpdatable: {updatedItem.IsUpdatable}");
+                            Logger.Log($"Updated plugin item found - Name: {updatedItem.Name}");
+                            Logger.Log($"  Local Version (SHA256): {updatedItem.Version}");
+                            Logger.Log($"  Remote Version (SHA256): {updatedItem.SHA256}");
+                            Logger.Log($"  IsUpdatable: {updatedItem.IsUpdatable}");
+                            Logger.Log($"  ActionText: {updatedItem.ActionText}");
+
                             if (updatedItem.IsUpdatable)
                             {
-                                Logger.Log($"Warning: Plugin still shows as updatable after update. Local: {updatedItem.Version}, Remote: {updatedItem.SHA256}");
+                                Logger.Log($"Warning: Plugin still shows as updatable after update!");
+                                Logger.Log($"  This suggests the file hash comparison is not working correctly.");
+
+                                // 尝试再次强制刷新
+                                Logger.Log($"Attempting additional UI refresh...");
+                                await Task.Delay(500);
+                                Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+                                await Task.Delay(1000);
+                            }
+                            else
+                            {
+                                Logger.Log($"Success: Plugin no longer shows as updatable. Update completed successfully.");
                             }
                         }
                         else
                         {
                             Logger.Log($"Warning: Could not find updated plugin item in UI list");
+                            Logger.Log($"  Searching for plugin with Id: {plugin.Id} or OriginalName: {plugin.OriginalName}");
+                            Logger.Log($"  Available items: {string.Join(", ", currentItems.Select(p => $"{p.Id}({p.OriginalName})"))}");
                         }
                     }
                     else

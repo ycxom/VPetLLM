@@ -215,30 +215,35 @@ namespace VPetLLM.Utils
             }
             Plugins.Clear();
 
-            foreach (var context in _pluginContexts.Values)
+            // 卸载所有程序集上下文
+            var contextList = _pluginContexts.Values.ToList();
+            foreach (var context in contextList)
             {
                 context.Unload();
             }
             _pluginContexts.Clear();
 
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-
-            foreach (var dir in _shadowCopyDirectories.Values)
+            // 强制垃圾回收，等待程序集卸载完成
+            for (int i = 0; i < 3; i++)
             {
-                try
-                {
-                    if (Directory.Exists(dir))
-                    {
-                        Directory.Delete(dir, true);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Failed to delete shadow copy directory {dir}: {ex.Message}");
-                }
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                System.Threading.Thread.Sleep(100);
             }
+
+            // 异步清理影子拷贝目录，避免阻塞UI
+            var shadowDirs = _shadowCopyDirectories.Values.ToList();
             _shadowCopyDirectories.Clear();
+            
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1000); // 等待1秒确保文件句柄释放
+                
+                foreach (var dir in shadowDirs)
+                {
+                    await CleanupShadowDirectory(dir);
+                }
+            });
             FailedPlugins.Clear();
         }
 
@@ -311,9 +316,12 @@ namespace VPetLLM.Utils
             {
                 // 查找需要更新的插件
                 var existingPlugin = Plugins.FirstOrDefault(p => p.FilePath == pluginFilePath);
+                string pluginName = null;
+                
                 if (existingPlugin != null)
                 {
-                    Logger.Log($"Found existing plugin to update: {existingPlugin.Name}");
+                    pluginName = existingPlugin.Name;
+                    Logger.Log($"Found existing plugin to update: {pluginName}");
                     
                     // 先卸载旧版本插件
                     if (chatCore != null)
@@ -329,14 +337,14 @@ namespace VPetLLM.Utils
                         var weakContext = new WeakReference(context);
                         context.Unload();
                         _pluginContexts.Remove(pluginFilePath);
-                        Logger.Log($"Unloaded AssemblyLoadContext for {existingPlugin.Name}");
+                        Logger.Log($"Unloaded AssemblyLoadContext for {pluginName}");
 
                         // 等待垃圾回收
-                        for (int i = 0; weakContext.IsAlive && (i < 5); i++)
+                        for (int i = 0; weakContext.IsAlive && (i < 10); i++)
                         {
                             GC.Collect();
                             GC.WaitForPendingFinalizers();
-                            await Task.Delay(100);
+                            await Task.Delay(200);
                         }
                     }
 
@@ -347,17 +355,27 @@ namespace VPetLLM.Utils
                         {
                             Directory.Delete(shadowDir, true);
                             _shadowCopyDirectories.Remove(pluginFilePath);
-                            Logger.Log($"Cleaned up shadow copy directory for {existingPlugin.Name}");
+                            Logger.Log($"Cleaned up shadow copy directory for {pluginName}");
                         }
                         catch (Exception ex)
                         {
                             Logger.Log($"Failed to clean up shadow copy directory: {ex.Message}");
                         }
                     }
+
+                    // 查找并清理其他可能包含同名插件的文件
+                    await CleanupDuplicatePluginFiles(pluginName, pluginFilePath, chatCore);
+
+                    // 额外等待确保文件句柄完全释放
+                    await Task.Delay(500);
                 }
 
                 // 重新加载单个插件
                 await LoadSinglePlugin(pluginFilePath, chatCore);
+                
+                // 确保文件系统操作完成后再返回
+                await Task.Delay(300);
+                
                 Logger.Log($"Successfully updated plugin: {pluginFilePath}");
                 return true;
             }
@@ -365,6 +383,64 @@ namespace VPetLLM.Utils
             {
                 Logger.Log($"Failed to update plugin {pluginFilePath}: {ex.Message}");
                 return false;
+            }
+        }
+
+        private static async Task CleanupDuplicatePluginFiles(string pluginName, string currentFilePath, IChatCore chatCore)
+        {
+            if (string.IsNullOrEmpty(pluginName))
+                return;
+
+            try
+            {
+                var pluginDir = PluginPath;
+                var allPluginFiles = Directory.GetFiles(pluginDir, "*.dll");
+                
+                foreach (var file in allPluginFiles)
+                {
+                    if (file.Equals(currentFilePath, StringComparison.OrdinalIgnoreCase))
+                        continue; // 跳过当前文件
+                    
+                    // 查找是否有其他插件实例使用相同的插件名
+                    var duplicatePlugin = Plugins.FirstOrDefault(p => p.Name == pluginName && p.FilePath == file);
+                    if (duplicatePlugin != null)
+                    {
+                        Logger.Log($"Found duplicate plugin file for '{pluginName}': {file}");
+                        Logger.Log($"Removing duplicate plugin instance...");
+                        
+                        // 卸载重复的插件
+                        if (chatCore != null)
+                        {
+                            chatCore.RemovePlugin(duplicatePlugin);
+                        }
+                        duplicatePlugin.Unload();
+                        Plugins.Remove(duplicatePlugin);
+
+                        // 清理相关资源
+                        if (_pluginContexts.TryGetValue(file, out var context))
+                        {
+                            context.Unload();
+                            _pluginContexts.Remove(file);
+                        }
+
+                        if (_shadowCopyDirectories.TryGetValue(file, out var shadowDir) && Directory.Exists(shadowDir))
+                        {
+                            try
+                            {
+                                Directory.Delete(shadowDir, true);
+                                _shadowCopyDirectories.Remove(file);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"Failed to clean up shadow copy directory for duplicate: {ex.Message}");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error during duplicate plugin cleanup: {ex.Message}");
             }
         }
 
@@ -406,12 +482,24 @@ namespace VPetLLM.Utils
                         var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
                         plugin.FilePath = pluginFilePath;
 
-                        // 检查是否已存在同名插件（这种情况下应该跳过，因为我们已经在更新前移除了旧插件）
+                        // 在单个插件加载中，不应该有重复插件，因为我们已经在更新前移除了旧插件
+                        // 如果仍然存在重复，说明有其他同名插件文件，这是一个问题
                         var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
                         if (existingPlugin != null)
                         {
-                            Logger.Log($"Warning: Plugin with name '{plugin.Name}' already exists after update. This should not happen.");
-                            continue;
+                            Logger.Log($"Critical: Plugin with name '{plugin.Name}' already exists during single plugin load!");
+                            Logger.Log($"  Existing plugin from: {existingPlugin.FilePath}");
+                            Logger.Log($"  New plugin from: {pluginFilePath}");
+                            Logger.Log($"  This indicates multiple plugin files contain the same plugin name.");
+                            
+                            // 在更新场景下，我们应该替换现有插件而不是跳过
+                            Logger.Log($"  Removing existing plugin and loading the new one...");
+                            if (chatCore != null)
+                            {
+                                chatCore.RemovePlugin(existingPlugin);
+                            }
+                            existingPlugin.Unload();
+                            Plugins.Remove(existingPlugin);
                         }
 
                         if (plugin is IPluginWithData pluginWithData)
@@ -449,20 +537,104 @@ namespace VPetLLM.Utils
             }
         }
 
+        private static async Task CleanupShadowDirectory(string shadowDir)
+        {
+            if (string.IsNullOrEmpty(shadowDir) || !Directory.Exists(shadowDir))
+                return;
+
+            // 重试删除影子拷贝目录，最多尝试5次
+            for (int attempt = 1; attempt <= 5; attempt++)
+            {
+                try
+                {
+                    Directory.Delete(shadowDir, true);
+                    Logger.Log($"Successfully deleted shadow copy directory: {shadowDir}");
+                    return;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    Logger.Log($"Attempt {attempt}/5: Access denied when deleting {shadowDir}. Waiting...");
+                    await Task.Delay(2000 * attempt); // 递增等待时间
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    // 目录已经不存在，认为清理成功
+                    Logger.Log($"Shadow copy directory already deleted: {shadowDir}");
+                    return;
+                }
+                catch (IOException ex)
+                {
+                    Logger.Log($"Attempt {attempt}/5: IO error when deleting {shadowDir}: {ex.Message}. Waiting...");
+                    await Task.Delay(1000 * attempt);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Attempt {attempt}/5: Unexpected error when deleting {shadowDir}: {ex.Message}");
+                    if (attempt == 5)
+                    {
+                        Logger.Log($"Failed to delete shadow copy directory after 5 attempts: {shadowDir}");
+                        // 记录到失败列表，可以考虑在应用程序启动时清理
+                        RecordFailedCleanup(shadowDir);
+                    }
+                    else
+                    {
+                        await Task.Delay(1000 * attempt);
+                    }
+                }
+            }
+        }
+
+        private static void RecordFailedCleanup(string directory)
+        {
+            try
+            {
+                var failedCleanupFile = Path.Combine(Path.GetTempPath(), "VPetLLM_FailedCleanup.txt");
+                File.AppendAllText(failedCleanupFile, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {directory}\n");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to record failed cleanup: {ex.Message}");
+            }
+        }
+
         public static string GetFileSha256(string filePath)
         {
             if (!File.Exists(filePath))
             {
+                Logger.Log($"GetFileSha256: File does not exist: {filePath}");
                 return null;
             }
-            using (var sha256 = System.Security.Cryptography.SHA256.Create())
+
+            // 重试机制，防止文件被锁定
+            for (int attempt = 0; attempt < 3; attempt++)
             {
-                using (var stream = File.OpenRead(filePath))
+                try
                 {
-                    var hash = sha256.ComputeHash(stream);
-                    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                    using (var sha256 = System.Security.Cryptography.SHA256.Create())
+                    {
+                        using (var stream = File.OpenRead(filePath))
+                        {
+                            var hash = sha256.ComputeHash(stream);
+                            var result = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                            Logger.Log($"GetFileSha256: Successfully calculated hash for {Path.GetFileName(filePath)}: {result}");
+                            return result;
+                        }
+                    }
+                }
+                catch (IOException ex) when (attempt < 2)
+                {
+                    Logger.Log($"GetFileSha256: Attempt {attempt + 1} failed for {filePath}: {ex.Message}. Retrying...");
+                    System.Threading.Thread.Sleep(200);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"GetFileSha256: Error calculating hash for {filePath}: {ex.Message}");
+                    return null;
                 }
             }
+
+            Logger.Log($"GetFileSha256: Failed to calculate hash after 3 attempts for {filePath}");
+            return null;
         }
     }
 }

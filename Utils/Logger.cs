@@ -29,6 +29,9 @@ namespace VPetLLM.Utils
                     // 使用Dispatcher延迟执行滚动，确保UI已更新
                     System.Windows.Application.Current.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
                     {
+                        // 线程安全检查：确保集合仍然有元素
+                        if (Logs.Count == 0) return;
+                        
                         // 查找当前活动的设置窗口并滚动日志框
                         var windows = System.Windows.Application.Current.Windows;
                         foreach (System.Windows.Window window in windows)
@@ -37,9 +40,14 @@ namespace VPetLLM.Utils
                             if (settingWindow != null)
                             {
                                 var logBox = (ListBox)settingWindow.FindName("LogBox");
-                                if (logBox != null)
+                                if (logBox != null && Logs.Count > 0)
                                 {
-                                    logBox.ScrollIntoView(Logs[Logs.Count - 1]);
+                                    // 再次检查集合大小，防止在访问时被其他线程修改
+                                    var lastIndex = Logs.Count - 1;
+                                    if (lastIndex >= 0 && lastIndex < Logs.Count)
+                                    {
+                                        logBox.ScrollIntoView(Logs[lastIndex]);
+                                    }
                                     break;
                                 }
                             }
