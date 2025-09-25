@@ -141,15 +141,33 @@ namespace VPetLLM
                 MW.Event_TakeItem -= OnTakeItem;
             }
             
+            // 清理购买计时器
+            _purchaseTimer?.Stop();
+            _purchaseTimer?.Dispose();
+            
             TTSService?.Dispose();
             TouchInteractionHandler?.Dispose();
             _syncTimer?.Stop();
             _syncTimer?.Dispose();
         }
 
-        // 防抖动相关字段
-        private static readonly Dictionary<string, DateTime> _lastPurchaseTime = new();
-        private static readonly TimeSpan _debounceTime = TimeSpan.FromMilliseconds(500);
+        // 购买批处理相关字段
+        private readonly List<PurchaseItem> _pendingPurchases = new();
+        private readonly object _purchaseLock = new object();
+        private System.Timers.Timer? _purchaseTimer;
+        private static readonly TimeSpan _batchProcessTime = TimeSpan.FromMilliseconds(1000); // 1秒批处理时间
+
+        /// <summary>
+        /// 购买物品信息
+        /// </summary>
+        public class PurchaseItem
+        {
+            public string Name { get; set; } = "";
+            public VPet_Simulator.Windows.Interface.Food.FoodType Type { get; set; }
+            public double Price { get; set; }
+            public DateTime PurchaseTime { get; set; }
+            public int Quantity { get; set; } = 1;
+        }
 
         /// <summary>
         /// 处理购买事件
@@ -163,13 +181,6 @@ namespace VPetLLM
                 if (food == null)
                 {
                     Utils.Logger.Log("Purchase event: food is null, skipping");
-                    return;
-                }
-
-                // 防抖动检查
-                if (IsOnDebounce(food.Name))
-                {
-                    Utils.Logger.Log($"Purchase event: {food.Name} is on debounce, skipping");
                     return;
                 }
 
@@ -191,11 +202,8 @@ namespace VPetLLM
                     return;
                 }
 
-                // 更新防抖动时间
-                UpdateDebounceTime(food.Name);
-
-                // 直接处理购买反馈，不使用BuyHandler
-                await ProcessPurchaseFeedback(food);
+                // 添加到批处理队列
+                AddToPurchaseBatch(food);
             }
             catch (Exception ex)
             {
@@ -205,113 +213,207 @@ namespace VPetLLM
         }
 
         /// <summary>
-        /// 检查是否在防抖动时间内
+        /// 添加购买物品到批处理队列
         /// </summary>
-        private bool IsOnDebounce(string itemName)
+        private void AddToPurchaseBatch(Food food)
         {
-            if (_lastPurchaseTime.TryGetValue(itemName, out var lastTime))
+            lock (_purchaseLock)
             {
-                return DateTime.Now - lastTime < _debounceTime;
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// 更新防抖动时间
-        /// </summary>
-        private void UpdateDebounceTime(string itemName)
-        {
-            _lastPurchaseTime[itemName] = DateTime.Now;
-        }
-
-        /// <summary>
-        /// 处理购买反馈
-        /// </summary>
-        private async Task ProcessPurchaseFeedback(Food food)
-        {
-            try
-            {
-                Utils.Logger.Log($"Processing purchase feedback for: {food.Name}");
-                
-                // 使用Prompt.json中的购买反馈提示词
-                string promptKey = GetBuyFeedbackPromptKey(food);
-                string message = PromptHelper.Get(promptKey, Settings.PromptLanguage);
-                
-                if (string.IsNullOrEmpty(message))
+                // 检查是否已存在相同物品
+                var existingItem = _pendingPurchases.FirstOrDefault(p => p.Name == food.Name);
+                if (existingItem != null)
                 {
-                    // 如果没有找到对应的提示词，使用默认提示词
-                    message = PromptHelper.Get("BuyFeedback_Default", Settings.PromptLanguage);
-                }
-                
-                if (string.IsNullOrEmpty(message))
-                {
-                    // 如果还是没有找到，使用简单的默认消息
-                    message = $"我刚刚收到了{food.Name}！";
+                    // 增加数量
+                    existingItem.Quantity++;
+                    existingItem.PurchaseTime = DateTime.Now; // 更新最后购买时间
+                    Utils.Logger.Log($"Updated purchase quantity for {food.Name}: {existingItem.Quantity}");
                 }
                 else
                 {
-                    // 替换提示词中的占位符
-                    message = message.Replace("{ItemName}", food.Name)
-                                   .Replace("{ItemType}", GetItemType(food))
-                                   .Replace("{ItemPrice}", food.Price.ToString("F2"))
-                                   .Replace("{EmotionState}", GetCurrentEmotionState())
-                                   .Replace("{CurrentHealth}", MW.Core.Save.Health.ToString("F0"))
-                                   .Replace("{CurrentMood}", MW.Core.Save.Feeling.ToString("F0"))
-                                   .Replace("{CurrentMoney}", MW.Core.Save.Money.ToString("F2"))
-                                   .Replace("{CurrentHunger}", MW.Core.Save.StrengthFood.ToString("F0"))
-                                   .Replace("{CurrentThirst}", MW.Core.Save.StrengthDrink.ToString("F0"));
+                    // 添加新物品
+                    _pendingPurchases.Add(new PurchaseItem
+                    {
+                        Name = food.Name,
+                        Type = food.Type,
+                        Price = food.Price,
+                        PurchaseTime = DateTime.Now,
+                        Quantity = 1
+                    });
+                    Utils.Logger.Log($"Added new purchase item: {food.Name}");
                 }
-                
-                Utils.Logger.Log($"Sending message to ChatCore: {message}");
-                await ChatCore.Chat(message);
-                Utils.Logger.Log("Purchase feedback sent successfully");
+
+                // 重置或启动计时器
+                ResetPurchaseTimer();
+            }
+        }
+
+        /// <summary>
+        /// 重置购买处理计时器
+        /// </summary>
+        private void ResetPurchaseTimer()
+        {
+            // 停止现有计时器
+            _purchaseTimer?.Stop();
+            _purchaseTimer?.Dispose();
+
+            // 创建新计时器
+            _purchaseTimer = new System.Timers.Timer(_batchProcessTime.TotalMilliseconds);
+            _purchaseTimer.Elapsed += async (sender, e) => await ProcessPurchaseBatch();
+            _purchaseTimer.AutoReset = false; // 只执行一次
+            _purchaseTimer.Start();
+
+            Utils.Logger.Log($"Purchase timer reset, will process batch in {_batchProcessTime.TotalMilliseconds}ms");
+        }
+
+        /// <summary>
+        /// 处理购买批次
+        /// </summary>
+        private async Task ProcessPurchaseBatch()
+        {
+            List<PurchaseItem> itemsToProcess;
+            
+            lock (_purchaseLock)
+            {
+                if (_pendingPurchases.Count == 0)
+                {
+                    Utils.Logger.Log("No pending purchases to process");
+                    return;
+                }
+
+                // 复制待处理列表并清空原列表
+                itemsToProcess = new List<PurchaseItem>(_pendingPurchases);
+                _pendingPurchases.Clear();
+                Utils.Logger.Log($"Processing batch of {itemsToProcess.Count} purchase items");
+            }
+
+            try
+            {
+                await ProcessBatchPurchaseFeedback(itemsToProcess);
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error in ProcessPurchaseFeedback: {ex.Message}");
+                Utils.Logger.Log($"Error processing purchase batch: {ex.Message}");
                 Utils.Logger.Log($"Stack trace: {ex.StackTrace}");
             }
         }
 
         /// <summary>
-        /// 根据物品类型获取对应的购买反馈提示词键
+        /// 处理批量购买反馈
         /// </summary>
-        private string GetBuyFeedbackPromptKey(Food food)
+        private async Task ProcessBatchPurchaseFeedback(List<PurchaseItem> purchases)
         {
-            // 根据物品类型返回对应的提示词键
-            switch (food.Type)
+            try
             {
-                case VPet_Simulator.Windows.Interface.Food.FoodType.Food:
-                    return "BuyFeedback_Food";
-                case VPet_Simulator.Windows.Interface.Food.FoodType.Drink:
-                    return "BuyFeedback_Drink";
-                case VPet_Simulator.Windows.Interface.Food.FoodType.Drug:
-                    return "BuyFeedback_Drug";
-                case VPet_Simulator.Windows.Interface.Food.FoodType.Gift:
-                    return "BuyFeedback_Gift";
-                default:
-                    return "BuyFeedback_General";
+                Utils.Logger.Log($"Processing batch purchase feedback for {purchases.Count} items");
+                
+                // 构建批量购买消息
+                string message = BuildBatchPurchaseMessage(purchases);
+                
+                Utils.Logger.Log($"Sending batch message to ChatCore: {message}");
+                await ChatCore.Chat(message);
+                Utils.Logger.Log("Batch purchase feedback sent successfully");
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error in ProcessBatchPurchaseFeedback: {ex.Message}");
+                Utils.Logger.Log($"Stack trace: {ex.StackTrace}");
             }
         }
 
         /// <summary>
-        /// 获取物品类型的本地化名称
+        /// 构建批量购买消息
         /// </summary>
-        private string GetItemType(Food food)
+        private string BuildBatchPurchaseMessage(List<PurchaseItem> purchases)
         {
-            switch (food.Type)
+            // 获取批量购买提示词
+            string template = PromptHelper.Get("BuyFeedback_Batch", Settings.PromptLanguage);
+            
+            if (string.IsNullOrEmpty(template) || template.Contains("[Prompt Missing"))
             {
-                case VPet_Simulator.Windows.Interface.Food.FoodType.Food:
-                    return Settings.Language.StartsWith("zh") ? "食物" : "food";
-                case VPet_Simulator.Windows.Interface.Food.FoodType.Drink:
-                    return Settings.Language.StartsWith("zh") ? "饮料" : "drink";
-                case VPet_Simulator.Windows.Interface.Food.FoodType.Drug:
-                    return Settings.Language.StartsWith("zh") ? "药品" : "medicine";
-                case VPet_Simulator.Windows.Interface.Food.FoodType.Gift:
-                    return Settings.Language.StartsWith("zh") ? "礼物" : "gift";
-                default:
-                    return Settings.Language.StartsWith("zh") ? "物品" : "item";
+                // 如果没有找到批量模板，使用默认购买提示词
+                template = PromptHelper.Get("BuyFeedback_Default", Settings.PromptLanguage);
+                if (string.IsNullOrEmpty(template) || template.Contains("[Prompt Missing"))
+                {
+                    // 如果连默认提示词都没有，直接返回空字符串让AI自行判断
+                    return "";
+                }
+                
+                // 使用第一个物品的信息填充默认模板
+                var firstItem = purchases[0];
+                return template
+                    .Replace("{ItemName}", firstItem.Name)
+                    .Replace("{ItemType}", GetItemTypeName(firstItem.Type))
+                    .Replace("{ItemPrice}", firstItem.Price.ToString("F2"))
+                    .Replace("{EmotionState}", GetCurrentEmotionState());
             }
+
+            // 构建所有占位符的替换值
+            var itemList = new List<string>();
+            double totalPrice = 0;
+            var itemsByType = purchases.GroupBy(p => p.Type).ToList();
+
+            foreach (var purchase in purchases)
+            {
+                string itemDesc = purchase.Quantity > 1 
+                    ? $"{purchase.Name} x{purchase.Quantity}" 
+                    : purchase.Name;
+                itemList.Add(itemDesc);
+                totalPrice += purchase.Price * purchase.Quantity;
+            }
+
+            // 构建类型统计
+            var typeStats = new List<string>();
+            foreach (var typeGroup in itemsByType)
+            {
+                int totalQuantity = typeGroup.Sum(p => p.Quantity);
+                string typeName = GetItemTypeName(typeGroup.Key);
+                typeStats.Add($"{typeName}({totalQuantity}个)");
+            }
+
+            // 替换所有占位符
+            string separator = Settings.PromptLanguage.StartsWith("zh") ? "、" : ", ";
+            string message = template
+                .Replace("{ItemCount}", purchases.Count.ToString())
+                .Replace("{ItemList}", string.Join(separator, itemList))
+                .Replace("{TotalPrice}", totalPrice.ToString("F2"))
+                .Replace("{TypeStats}", string.Join(separator, typeStats))
+                .Replace("{EmotionState}", GetCurrentEmotionState())
+                .Replace("{CurrentHealth}", MW.Core.Save.Health.ToString("F0"))
+                .Replace("{CurrentMood}", MW.Core.Save.Feeling.ToString("F0"))
+                .Replace("{CurrentMoney}", MW.Core.Save.Money.ToString("F2"))
+                .Replace("{CurrentHunger}", MW.Core.Save.StrengthFood.ToString("F0"))
+                .Replace("{CurrentThirst}", MW.Core.Save.StrengthDrink.ToString("F0"))
+                .Replace("{PurchaseTime}", DateTime.Now.ToString("HH:mm:ss"));
+
+            return message;
+        }
+
+        /// <summary>
+        /// 构建默认批量消息（已废弃，不应该被调用）
+        /// </summary>
+        private string BuildDefaultBatchMessage(List<PurchaseItem> purchases)
+        {
+            // 这个方法不应该被调用，因为我们已经移除了对它的调用
+            // 如果被调用，返回空字符串让AI自行处理
+            return "";
+        }
+
+        /// <summary>
+        /// 获取物品类型名称
+        /// </summary>
+        private string GetItemTypeName(VPet_Simulator.Windows.Interface.Food.FoodType type)
+        {
+            string key = type switch
+            {
+                VPet_Simulator.Windows.Interface.Food.FoodType.Food => "ItemType.Food",
+                VPet_Simulator.Windows.Interface.Food.FoodType.Drink => "ItemType.Drink", 
+                VPet_Simulator.Windows.Interface.Food.FoodType.Drug => "ItemType.Drug",
+                VPet_Simulator.Windows.Interface.Food.FoodType.Gift => "ItemType.Gift",
+                _ => "ItemType.General"
+            };
+            
+            string result = LanguageHelper.Get(key, Settings.Language);
+            return string.IsNullOrEmpty(result) || result.Contains("[") ? type.ToString().ToLower() : result;
         }
 
         /// <summary>
@@ -322,24 +424,22 @@ namespace VPetLLM
             var feeling = MW.Core.Save.Feeling;
             var health = MW.Core.Save.Health;
             
-            if (Settings.Language.StartsWith("zh"))
-            {
-                if (health < 50) return "不舒服";
-                if (feeling > 80) return "非常开心";
-                if (feeling > 60) return "开心";
-                if (feeling > 40) return "普通";
-                if (feeling > 20) return "有点不开心";
-                return "很不开心";
-            }
+            string key;
+            if (health < 50)
+                key = "EmotionState.Unwell";
+            else if (feeling > 80)
+                key = "EmotionState.VeryHappy";
+            else if (feeling > 60)
+                key = "EmotionState.Happy";
+            else if (feeling > 40)
+                key = "EmotionState.Normal";
+            else if (feeling > 20)
+                key = "EmotionState.Unhappy";
             else
-            {
-                if (health < 50) return "unwell";
-                if (feeling > 80) return "very happy";
-                if (feeling > 60) return "happy";
-                if (feeling > 40) return "normal";
-                if (feeling > 20) return "a bit unhappy";
-                return "very unhappy";
-            }
+                key = "EmotionState.VeryUnhappy";
+            
+            string result = LanguageHelper.Get(key, Settings.Language);
+            return string.IsNullOrEmpty(result) || result.Contains("[") ? "normal" : result;
         }
 
         public void UpdateChatCore(IChatCore newChatCore)

@@ -101,14 +101,18 @@
     },
     "BuyFeedback_Drug": {
         "en": "The user bought you {ItemName} (medicine) for ${ItemPrice}. You are feeling {EmotionState}. Your health is {CurrentHealth}. Show appreciation for the user's care about your wellbeing. Express how this medicine will help you feel better.",
-        "zh": "用户给你买了{ItemName}（药品），花费了${ItemPrice}。你现在感到{EmotionState}。你的健康值是{CurrentHealth}。对用户关心你的健康表示感激。表达这个药品将如何帮助你感觉更好。" 
+        "zh": "用户给你买了{ItemName}（药品），花费了${ItemPrice}。你现在感到{EmotionState}。你的健康值是{CurrentHealth}。对用户关心你的健康表示感激。表达这个药品将如何帮助你感觉更好。"
     },
     "TouchFeedback_General": {
         "en": "The user just touched your {TouchArea}. Respond naturally as a desktop pet. Current mood: {PetMood}, Health: {PetHealth}.",
-        "zh-hans": "用户刚刚触摸了你的{TouchArea}。请作为桌面宠物自然地回应。当前心情：{PetMood}，健康：{PetHealth}。" 
+        "zh-hans": "用户刚刚触摸了你的{TouchArea}。请作为桌面宠物自然地回应。当前心情：{PetMood}，健康：{PetHealth}。"
     },
     "BuyFeedback_Default": {
         "en": "The user just bought {ItemName} ({ItemType}) for ${ItemPrice}. You are feeling {EmotionState}. Respond naturally as a desktop pet, expressing your reaction to receiving this gift. Use appropriate commands to show your emotions and actions.",
-        "zh-hans": "用户刚刚给你买了{ItemName}（{ItemType}），花费了${ItemPrice}。你现在感到{EmotionState}。请作为桌面宠物自然地回应，表达你收到这个礼物的反应。使用合适的指令来展示你的情感和动作。" 
+        "zh-hans": "用户刚刚给你买了{ItemName}（{ItemType}），花费了${ItemPrice}。你现在感到{EmotionState}。请作为桌面宠物自然地回应，表达你收到这个礼物的反应。使用合适的指令来展示你的情感和动作。"
+    },
+    "BuyFeedback_Batch": {
+        "en": "The user bought you {ItemCount} items at {PurchaseTime}: {ItemList}! Total cost: ${TotalPrice}. Item types: {TypeStats}. You are feeling {EmotionState}. Current status: Health({CurrentHealth}), Mood({CurrentMood}), Money(${CurrentMoney}), Hunger({CurrentHunger}), Thirst({CurrentThirst}). Respond naturally as a desktop pet, expressing your excitement about receiving multiple gifts. Use appropriate commands to show your emotions and actions.",
+        "zh-hans": "用户在{PurchaseTime}给你买了{ItemCount}样东西：{ItemList}！总花费：${TotalPrice}。物品类型：{TypeStats}。你现在感到{EmotionState}。当前状态：健康({CurrentHealth})，心情({CurrentMood})，金钱(${CurrentMoney})，饥饿度({CurrentHunger})，口渴度({CurrentThirst})。"
     }
 }

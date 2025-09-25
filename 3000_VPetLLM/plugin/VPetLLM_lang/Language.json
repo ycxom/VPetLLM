@@ -1252,5 +1252,75 @@
             "zh-hant": "身體",
             "jp": "体"
         }
+    },
+    "ItemType": {
+        "Food": {
+            "en": "food",
+            "zh-hans": "食物",
+            "zh-hant": "食物",
+            "jp": "食べ物"
+        },
+        "Drink": {
+            "en": "drink",
+            "zh-hans": "饮料",
+            "zh-hant": "飲料",
+            "jp": "飲み物"
+        },
+        "Drug": {
+            "en": "medicine",
+            "zh-hans": "药品",
+            "zh-hant": "藥品",
+            "jp": "薬"
+        },
+        "Gift": {
+            "en": "gift",
+            "zh-hans": "礼物",
+            "zh-hant": "禮物",
+            "jp": "ギフト"
+        },
+        "General": {
+            "en": "item",
+            "zh-hans": "物品",
+            "zh-hant": "物品",
+            "jp": "アイテム"
+        }
+    },
+    "EmotionState": {
+        "Unwell": {
+            "en": "unwell",
+            "zh-hans": "不舒服",
+            "zh-hant": "不舒服",
+            "jp": "体調不良"
+        },
+        "VeryHappy": {
+            "en": "very happy",
+            "zh-hans": "非常开心",
+            "zh-hant": "非常開心",
+            "jp": "とても幸せ"
+        },
+        "Happy": {
+            "en": "happy",
+            "zh-hans": "开心",
+            "zh-hant": "開心",
+            "jp": "幸せ"
+        },
+        "Normal": {
+            "en": "normal",
+            "zh-hans": "普通",
+            "zh-hant": "普通",
+            "jp": "普通"
+        },
+        "Unhappy": {
+            "en": "a bit unhappy",
+            "zh-hans": "有点不开心",
+            "zh-hant": "有點不開心",
+            "jp": "少し不幸"
+        },
+        "VeryUnhappy": {
+            "en": "very unhappy",
+            "zh-hans": "很不开心",
+            "zh-hant": "很不開心",
+            "jp": "とても不幸"
+        }
     }
 }
