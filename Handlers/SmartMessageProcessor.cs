@@ -28,6 +28,9 @@ namespace VPetLLM.Handlers
                 return;
 
             Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}");
+            
+            // 通知TouchInteractionHandler开始执行VPetLLM动作
+            TouchInteractionHandler.NotifyVPetLLMActionStart();
 
             // 解析消息，提取文本片段和动作指令
             var messageSegments = ParseMessage(response);
@@ -43,16 +46,24 @@ namespace VPetLLM.Handlers
 
             // 按顺序处理每个片段，使用智能等待机制
             int talkIndex = 0;
-            foreach (var segment in messageSegments)
+            try
             {
-                if (segment.Type == SegmentType.Talk && downloadTasks != null)
+                foreach (var segment in messageSegments)
                 {
-                    await ProcessTalkSegmentWithQueueAsync(segment, downloadTasks, talkIndex++);
+                    if (segment.Type == SegmentType.Talk && downloadTasks != null)
+                    {
+                        await ProcessTalkSegmentWithQueueAsync(segment, downloadTasks, talkIndex++);
+                    }
+                    else
+                    {
+                        await ProcessSegmentAsync(segment, null);
+                    }
                 }
-                else
-                {
-                    await ProcessSegmentAsync(segment, null);
-                }
+            }
+            finally
+            {
+                // 通知TouchInteractionHandler完成VPetLLM动作
+                TouchInteractionHandler.NotifyVPetLLMActionEnd();
             }
         }
 

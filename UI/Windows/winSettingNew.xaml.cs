@@ -1273,6 +1273,14 @@ namespace VPetLLM.UI.Windows
             if (FindName("CheckBox_EnableActionExecution") is CheckBox checkBoxEnableActionExecution) checkBoxEnableActionExecution.Content = LanguageHelper.Get("Advanced_Options.EnableActionExecution", langCode);
             if (FindName("CheckBox_EnableMove") is CheckBox checkBoxEnableMove) checkBoxEnableMove.Content = LanguageHelper.Get("Advanced_Options.EnableMove", langCode);
             if (FindName("CheckBox_EnableTime") is CheckBox checkBoxEnableTime) checkBoxEnableTime.Content = LanguageHelper.Get("Advanced_Options.EnableTime", langCode);
+            if (FindName("CheckBox_EnableBuyFeedback") is CheckBox checkBoxEnableBuyFeedback) 
+            {
+                checkBoxEnableBuyFeedback.Content = LanguageHelper.Get("BuyInteraction.Enable", langCode);
+                if (checkBoxEnableBuyFeedback.ToolTip is ToolTip toolTip && toolTip.Content is TextBlock textBlock)
+                {
+                    textBlock.Text = LanguageHelper.Get("BuyInteraction.EnableTooltip", langCode);
+                }
+            }
             if (FindName("CheckBox_EnableHistoryCompression") is CheckBox checkBoxEnableHistoryCompression) checkBoxEnableHistoryCompression.Content = LanguageHelper.Get("Advanced_Options.EnableHistoryCompression", langCode);
             if (FindName("TextBlock_HistoryCompressionThreshold") is TextBlock textBlockHistoryCompressionThreshold) textBlockHistoryCompressionThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionThreshold", langCode);
             if (FindName("TextBlock_CurrentContextLengthLabel") is TextBlock textBlockCurrentContextLengthLabel) textBlockCurrentContextLengthLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentContextLength", langCode);

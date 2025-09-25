@@ -1185,10 +1185,16 @@
             "jp": "購入インタラクション設定"
         },
         "Enable": {
-            "en": "Smart Purchase Feedback",
-            "zh-hans": "智能购买反馈",
-            "zh-hant": "智能購買反饋",
-            "jp": "スマート購入フィードバック"
+            "en": "Enable Purchase Feedback",
+            "zh-hans": "启用购买反馈",
+            "zh-hant": "啟用購買反饋",
+            "jp": "購入フィードバックを有効にする"
+        },
+        "EnableTooltip": {
+            "en": "When users purchase items, the pet will generate personalized feedback responses through AI.",
+            "zh-hans": "当用户购买物品时，宠物会通过AI生成个性化的反馈回应。",
+            "zh-hant": "當用戶購買物品時，寵物會通過AI生成個性化的反饋回應。",
+            "jp": "ユーザーがアイテムを購入すると、ペットはAIを通じてパーソナライズされたフィードバック応答を生成します。"
         },
         "EnableDescription": {
             "en": "When enabled, VPet will provide intelligent feedback when you buy items for it",

@@ -23,12 +23,26 @@ namespace VPetLLM.Handlers
         // 连续交互计数
         private int _consecutiveTouchCount = 0;
         private DateTime _lastTouchTime = DateTime.MinValue;
+        
+        // 智能过滤系统 - 跟踪VPetLLM动作执行状态
+        private static bool _isVPetLLMActionInProgress = false;
+        private static DateTime _lastVPetLLMActionTime = DateTime.MinValue;
+        private static readonly object _actionStateLock = new object();
+        
+        // 动作执行监听
+        private static readonly List<TouchInteractionHandler> _allInstances = new List<TouchInteractionHandler>();
 
         public TouchInteractionHandler(VPetLLM plugin)
         {
             _plugin = plugin;
             _mainWindow = plugin.MW;
             _recentInteractions = new List<TouchInteraction>();
+            
+            // 注册到全局实例列表
+            lock (_actionStateLock)
+            {
+                _allInstances.Add(this);
+            }
             
             // 延迟注册事件，确保Main已经初始化
             if (_plugin?.MW?.Main != null)
@@ -129,6 +143,20 @@ namespace VPetLLM.Handlers
                 // 检查是否启用触摸反馈
                 if (!_plugin.Settings.TouchFeedback.EnableTouchFeedback)
                 {
+                    return;
+                }
+
+                // 检查是否是VPet自身动作触发的事件（避免误识别）
+                if (IsVPetActionInProgress())
+                {
+                    Logger.Log($"VPet action in progress, ignoring {touchType} touch to avoid false interaction.");
+                    return;
+                }
+
+                // 检查是否是VPet自身动作触发的事件（避免误识别）
+                if (IsVPetActionInProgress())
+                {
+                    Logger.Log($"VPet action in progress, ignoring {touchType} touch to avoid false interaction.");
                     return;
                 }
 
@@ -323,12 +351,86 @@ namespace VPetLLM.Handlers
 
 
         /// <summary>
+        /// 智能检查VPet是否正在执行动作（避免误识别为用户交互）
+        /// </summary>
+        private bool IsVPetActionInProgress()
+        {
+            try
+            {
+                lock (_actionStateLock)
+                {
+                    // 检查VPetLLM是否正在执行动作
+                    if (_isVPetLLMActionInProgress)
+                    {
+                        Logger.Log("VPetLLM action in progress, ignoring touch event to avoid false trigger.");
+                        return true;
+                    }
+                    
+                    // 检查距离上次VPetLLM动作的时间
+                    var timeSinceLastAction = DateTime.Now - _lastVPetLLMActionTime;
+                    if (timeSinceLastAction.TotalMilliseconds < 3000) // 3秒内
+                    {
+                        Logger.Log($"Recent VPetLLM action detected ({timeSinceLastAction.TotalMilliseconds}ms ago), ignoring touch event.");
+                        return true;
+                    }
+                }
+
+                // 额外检查：距离上次用户交互的时间
+                var timeSinceLastInteraction = DateTime.Now - _lastInteractionTime;
+                if (timeSinceLastInteraction.TotalMilliseconds < 1000) // 1秒内
+                {
+                    Logger.Log("Recent user interaction detected, applying cooldown.");
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error checking VPet action status: {ex.Message}");
+                return false; // 出错时不阻止交互
+            }
+        }
+        
+        /// <summary>
+        /// 通知VPetLLM开始执行动作（由SmartMessageProcessor调用）
+        /// </summary>
+        public static void NotifyVPetLLMActionStart()
+        {
+            lock (_actionStateLock)
+            {
+                _isVPetLLMActionInProgress = true;
+                _lastVPetLLMActionTime = DateTime.Now;
+                Logger.Log("VPetLLM action started - touch events will be filtered");
+            }
+        }
+        
+        /// <summary>
+        /// 通知VPetLLM完成动作执行（由SmartMessageProcessor调用）
+        /// </summary>
+        public static void NotifyVPetLLMActionEnd()
+        {
+            lock (_actionStateLock)
+            {
+                _isVPetLLMActionInProgress = false;
+                _lastVPetLLMActionTime = DateTime.Now;
+                Logger.Log("VPetLLM action completed - touch events filtering will continue for 3 seconds");
+            }
+        }
+
+        /// <summary>
         /// 清理资源
         /// </summary>
         public void Dispose()
         {
             try
             {
+                // 从全局实例列表中移除
+                lock (_actionStateLock)
+                {
+                    _allInstances.Remove(this);
+                }
+                
                 if (_plugin?.MW?.Main != null)
                 {
                     _plugin.MW.Main.Event_TouchHead -= OnTouchHead;
