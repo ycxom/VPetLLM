@@ -76,15 +76,15 @@
         "zh": "调用一个已安装的工具。格式: [:tool(工具名称(参数))]"
     },
     "TouchFeedback_Head": {
-        "en": "The user is gently touching your head. Please respond naturally and cutely as a desktop pet. You can express happiness, shyness, or other appropriate emotions. Use the say command to respond with appropriate animations.",
-        "zh": "用户正在轻抚你的头部。请作为桌宠自然可爱地回应。你可以表达开心、害羞或其他合适的情绪。使用say指令配合合适的动画来回应。"
+        "en": "The user is gently touching your head.",
+        "zh": "用户正在轻抚你的头部。"
     },
     "TouchFeedback_Body": {
-        "en": "The user is gently touching your body. Please respond naturally and cutely as a desktop pet. You can express comfort, happiness, or playful emotions. Use the say command to respond with appropriate animations.",
-        "zh": "用户正在轻抚你的身体。请作为桌宠自然可爱地回应。你可以表达舒适、开心或顽皮的情绪。使用say指令配合合适的动画来回应。"
+        "en": "The user is gently touching your body.",
+        "zh": "用户正在轻抚你的身体。"
     },
     "TouchFeedback_Multiple": {
-        "en": "The user has touched you {count} times in a row. You can show more excitement or playfulness due to the continuous attention. Respond with increasing enthusiasm while maintaining your cute desktop pet character.",
-        "zh": "用户已经连续触摸了你{count}次。你可以因为持续的关注而表现得更加兴奋或顽皮。在保持可爱桌宠角色的同时，以递增的热情回应。"
+        "en": "The user has touched you {count} times in a row.",
+        "zh": "用户已经连续触摸了你{count}次。"
     }
 }
