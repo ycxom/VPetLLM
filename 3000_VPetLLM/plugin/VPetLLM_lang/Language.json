@@ -1176,5 +1176,75 @@
             "zh-hant": "ms",
             "jp": "ms"
         }
+    },
+    "BuyInteraction": {
+        "Title": {
+            "en": "Purchase Interaction Settings",
+            "zh-hans": "购买互动设置",
+            "zh-hant": "購買互動設置",
+            "jp": "購入インタラクション設定"
+        },
+        "Enable": {
+            "en": "Smart Purchase Feedback",
+            "zh-hans": "智能购买反馈",
+            "zh-hant": "智能購買反饋",
+            "jp": "スマート購入フィードバック"
+        },
+        "EnableDescription": {
+            "en": "When enabled, VPet will provide intelligent feedback when you buy items for it",
+            "zh-hans": "启用后，当你给VPet购买物品时，它会提供智能反馈",
+            "zh-hant": "啟用後，當你給VPet購買物品時，它會提供智能反饋",
+            "jp": "有効にすると、VPetにアイテムを購入したときにインテリジェントなフィードバックを提供します"
+        },
+        "EnableRecommendation": {
+            "en": "Purchase Recommendations",
+            "zh-hans": "购买建议",
+            "zh-hant": "購買建議",
+            "jp": "購入推奨"
+        },
+        "RecommendationDescription": {
+            "en": "VPet will suggest items to buy based on its current needs",
+            "zh-hans": "VPet会根据当前需求建议购买物品",
+            "zh-hant": "VPet會根據當前需求建議購買物品",
+            "jp": "VPetは現在のニーズに基づいてアイテムの購入を提案します"
+        },
+        "EmotionResponse": {
+            "en": "Emotional Response Level",
+            "zh-hans": "情感反应程度",
+            "zh-hant": "情感反應程度",
+            "jp": "感情反応レベル"
+        },
+        "EmotionLow": {
+            "en": "Calm",
+            "zh-hans": "平静",
+            "zh-hant": "平靜",
+            "jp": "穏やか"
+        },
+        "EmotionMedium": {
+            "en": "Normal",
+            "zh-hans": "正常",
+            "zh-hant": "正常",
+            "jp": "普通"
+        },
+        "EmotionHigh": {
+            "en": "Enthusiastic",
+            "zh-hans": "热情",
+            "zh-hant": "熱情",
+            "jp": "熱狂的"
+        }
+    },
+    "TouchArea": {
+        "TouchArea_Head": {
+            "en": "head",
+            "zh-hans": "头部",
+            "zh-hant": "頭部",
+            "jp": "頭"
+        },
+        "TouchArea_Body": {
+            "en": "body",
+            "zh-hans": "身体",
+            "zh-hant": "身體",
+            "jp": "体"
+        }
     }
 }

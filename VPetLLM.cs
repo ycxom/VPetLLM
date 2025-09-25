@@ -117,6 +117,10 @@ namespace VPetLLM
                 // 在LoadPlugin阶段初始化TouchInteractionHandler，确保Main窗口已经完全加载
                 InitializeTouchInteractionHandler();
                 
+                // 监听购买事件
+                MW.Event_TakeItem += OnTakeItem;
+                Utils.Logger.Log("Purchase event listener registered.");
+                
                 Utils.Logger.Log("Dispatcher.Invoke finished.");
             });
             Utils.Logger.Log("LoadPlugin finished.");
@@ -131,10 +135,211 @@ namespace VPetLLM
 
         public void Dispose()
         {
+            // 取消事件监听
+            if (MW != null)
+            {
+                MW.Event_TakeItem -= OnTakeItem;
+            }
+            
             TTSService?.Dispose();
             TouchInteractionHandler?.Dispose();
             _syncTimer?.Stop();
             _syncTimer?.Dispose();
+        }
+
+        // 防抖动相关字段
+        private static readonly Dictionary<string, DateTime> _lastPurchaseTime = new();
+        private static readonly TimeSpan _debounceTime = TimeSpan.FromMilliseconds(500);
+
+        /// <summary>
+        /// 处理购买事件
+        /// </summary>
+        private async void OnTakeItem(Food food)
+        {
+            try
+            {
+                Utils.Logger.Log($"Purchase event detected: {food?.Name ?? "Unknown"}");
+                
+                if (food == null)
+                {
+                    Utils.Logger.Log("Purchase event: food is null, skipping");
+                    return;
+                }
+
+                // 防抖动检查
+                if (IsOnDebounce(food.Name))
+                {
+                    Utils.Logger.Log($"Purchase event: {food.Name} is on debounce, skipping");
+                    return;
+                }
+
+                if (MW == null)
+                {
+                    Utils.Logger.Log("Purchase event: MW is null, skipping");
+                    return;
+                }
+
+                if (!Settings.EnableBuyFeedback)
+                {
+                    Utils.Logger.Log("Purchase event: BuyFeedback is disabled, skipping");
+                    return;
+                }
+
+                if (ChatCore == null)
+                {
+                    Utils.Logger.Log("Purchase event: ChatCore is null, skipping");
+                    return;
+                }
+
+                // 更新防抖动时间
+                UpdateDebounceTime(food.Name);
+
+                // 直接处理购买反馈，不使用BuyHandler
+                await ProcessPurchaseFeedback(food);
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error handling purchase event: {ex.Message}");
+                Utils.Logger.Log($"Stack trace: {ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
+        /// 检查是否在防抖动时间内
+        /// </summary>
+        private bool IsOnDebounce(string itemName)
+        {
+            if (_lastPurchaseTime.TryGetValue(itemName, out var lastTime))
+            {
+                return DateTime.Now - lastTime < _debounceTime;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 更新防抖动时间
+        /// </summary>
+        private void UpdateDebounceTime(string itemName)
+        {
+            _lastPurchaseTime[itemName] = DateTime.Now;
+        }
+
+        /// <summary>
+        /// 处理购买反馈
+        /// </summary>
+        private async Task ProcessPurchaseFeedback(Food food)
+        {
+            try
+            {
+                Utils.Logger.Log($"Processing purchase feedback for: {food.Name}");
+                
+                // 使用Prompt.json中的购买反馈提示词
+                string promptKey = GetBuyFeedbackPromptKey(food);
+                string message = PromptHelper.Get(promptKey, Settings.PromptLanguage);
+                
+                if (string.IsNullOrEmpty(message))
+                {
+                    // 如果没有找到对应的提示词，使用默认提示词
+                    message = PromptHelper.Get("BuyFeedback_Default", Settings.PromptLanguage);
+                }
+                
+                if (string.IsNullOrEmpty(message))
+                {
+                    // 如果还是没有找到，使用简单的默认消息
+                    message = $"我刚刚收到了{food.Name}！";
+                }
+                else
+                {
+                    // 替换提示词中的占位符
+                    message = message.Replace("{ItemName}", food.Name)
+                                   .Replace("{ItemType}", GetItemType(food))
+                                   .Replace("{ItemPrice}", food.Price.ToString("F2"))
+                                   .Replace("{EmotionState}", GetCurrentEmotionState())
+                                   .Replace("{CurrentHealth}", MW.Core.Save.Health.ToString("F0"))
+                                   .Replace("{CurrentMood}", MW.Core.Save.Feeling.ToString("F0"))
+                                   .Replace("{CurrentMoney}", MW.Core.Save.Money.ToString("F2"))
+                                   .Replace("{CurrentHunger}", MW.Core.Save.StrengthFood.ToString("F0"))
+                                   .Replace("{CurrentThirst}", MW.Core.Save.StrengthDrink.ToString("F0"));
+                }
+                
+                Utils.Logger.Log($"Sending message to ChatCore: {message}");
+                await ChatCore.Chat(message);
+                Utils.Logger.Log("Purchase feedback sent successfully");
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error in ProcessPurchaseFeedback: {ex.Message}");
+                Utils.Logger.Log($"Stack trace: {ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
+        /// 根据物品类型获取对应的购买反馈提示词键
+        /// </summary>
+        private string GetBuyFeedbackPromptKey(Food food)
+        {
+            // 根据物品类型返回对应的提示词键
+            switch (food.Type)
+            {
+                case VPet_Simulator.Windows.Interface.Food.FoodType.Food:
+                    return "BuyFeedback_Food";
+                case VPet_Simulator.Windows.Interface.Food.FoodType.Drink:
+                    return "BuyFeedback_Drink";
+                case VPet_Simulator.Windows.Interface.Food.FoodType.Drug:
+                    return "BuyFeedback_Drug";
+                case VPet_Simulator.Windows.Interface.Food.FoodType.Gift:
+                    return "BuyFeedback_Gift";
+                default:
+                    return "BuyFeedback_General";
+            }
+        }
+
+        /// <summary>
+        /// 获取物品类型的本地化名称
+        /// </summary>
+        private string GetItemType(Food food)
+        {
+            switch (food.Type)
+            {
+                case VPet_Simulator.Windows.Interface.Food.FoodType.Food:
+                    return Settings.Language.StartsWith("zh") ? "食物" : "food";
+                case VPet_Simulator.Windows.Interface.Food.FoodType.Drink:
+                    return Settings.Language.StartsWith("zh") ? "饮料" : "drink";
+                case VPet_Simulator.Windows.Interface.Food.FoodType.Drug:
+                    return Settings.Language.StartsWith("zh") ? "药品" : "medicine";
+                case VPet_Simulator.Windows.Interface.Food.FoodType.Gift:
+                    return Settings.Language.StartsWith("zh") ? "礼物" : "gift";
+                default:
+                    return Settings.Language.StartsWith("zh") ? "物品" : "item";
+            }
+        }
+
+        /// <summary>
+        /// 获取当前情绪状态
+        /// </summary>
+        private string GetCurrentEmotionState()
+        {
+            var feeling = MW.Core.Save.Feeling;
+            var health = MW.Core.Save.Health;
+            
+            if (Settings.Language.StartsWith("zh"))
+            {
+                if (health < 50) return "不舒服";
+                if (feeling > 80) return "非常开心";
+                if (feeling > 60) return "开心";
+                if (feeling > 40) return "普通";
+                if (feeling > 20) return "有点不开心";
+                return "很不开心";
+            }
+            else
+            {
+                if (health < 50) return "unwell";
+                if (feeling > 80) return "very happy";
+                if (feeling > 60) return "happy";
+                if (feeling > 40) return "normal";
+                if (feeling > 20) return "a bit unhappy";
+                return "very unhappy";
+            }
         }
 
         public void UpdateChatCore(IChatCore newChatCore)

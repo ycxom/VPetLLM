@@ -423,6 +423,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).IsChecked = _plugin.Settings.EnableActionExecution;
             ((CheckBox)this.FindName("CheckBox_EnableMove")).IsChecked = _plugin.Settings.EnableMove;
             ((CheckBox)this.FindName("CheckBox_EnableTime")).IsChecked = _plugin.Settings.EnableTime;
+            ((CheckBox)this.FindName("CheckBox_EnableBuyFeedback")).IsChecked = _plugin.Settings.EnableBuyFeedback;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked = _plugin.Settings.EnableHistoryCompression;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text = _plugin.Settings.HistoryCompressionThreshold.ToString();
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
@@ -583,6 +584,7 @@ namespace VPetLLM.UI.Windows
             var enableActionExecutionCheckBox = (CheckBox)this.FindName("CheckBox_EnableActionExecution");
             var enableMoveCheckBox = (CheckBox)this.FindName("CheckBox_EnableMove");
             var enableTimeCheckBox = (CheckBox)this.FindName("CheckBox_EnableTime");
+            var enableBuyFeedbackCheckBox = (CheckBox)this.FindName("CheckBox_EnableBuyFeedback");
             var logAutoScrollCheckBox = (CheckBox)this.FindName("CheckBox_LogAutoScroll");
             var maxLogCountTextBox = (TextBox)this.FindName("TextBox_MaxLogCount");
             var ollamaEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced");
@@ -633,6 +635,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableActionExecution = enableActionExecutionCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableMove = enableMoveCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableTime = enableTimeCheckBox.IsChecked ?? true;
+            _plugin.Settings.EnableBuyFeedback = enableBuyFeedbackCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableHistoryCompression = ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked ?? false;
             if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text, out int historyCompressionThreshold))
                 _plugin.Settings.HistoryCompressionThreshold = historyCompressionThreshold;

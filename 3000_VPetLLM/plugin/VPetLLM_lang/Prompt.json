@@ -83,8 +83,32 @@
         "en": "The user is gently touching your body.",
         "zh": "用户正在轻抚你的身体。"
     },
-    "TouchFeedback_Multiple": {
-        "en": "The user has touched you {count} times in a row.",
-        "zh": "用户已经连续触摸了你{count}次。"
+    "BuyFeedback_General": {
+        "en": "The user just bought {ItemName} ({ItemType}) for ${ItemPrice}. You are feeling {EmotionState}. Current status: Health({CurrentHealth}), Mood({CurrentMood}), Money(${CurrentMoney}). ",
+        "zh": "用户刚刚给你买了{ItemName}（{ItemType}），花费了${ItemPrice}。你现在感到{EmotionState}。当前状态：健康({CurrentHealth})，心情({CurrentMood})，金钱(${CurrentMoney})。"
+    },
+    "BuyFeedback_Food": {
+        "en": "The user bought you {ItemName} (food) for ${ItemPrice}! You are feeling {EmotionState}. Your hunger level is {CurrentHunger}. As a desktop pet, express your excitement about this delicious food. Show your gratitude and maybe mention how tasty it looks or smells.",
+        "zh": "用户给你买了{ItemName}（食物），花费了${ItemPrice}！你现在感到{EmotionState}。你的饥饿度是{CurrentHunger}。作为桌面宠物，表达你对这个美味食物的兴奋。表现出你的感激，也许可以提到它看起来或闻起来多么美味。"
+    },
+    "BuyFeedback_Gift": {
+        "en": "Wow! The user gave you {ItemName} as a gift for ${ItemPrice}! You are feeling {EmotionState}. This is such a thoughtful present! Express your overwhelming joy and gratitude. Show how much this gift means to you as a desktop pet.",
+        "zh": "哇！用户给你买了{ItemName}作为礼物，花费了${ItemPrice}！你现在感到{EmotionState}。这真是一个贴心的礼物！表达你满满的喜悦和感激。展示这个礼物对你这只桌面宠物的意义。"
+    },
+    "BuyFeedback_Drink": {
+        "en": "The user bought you {ItemName} (drink) for ${ItemPrice}! You are feeling {EmotionState}. Your thirst level is {CurrentThirst}. Express how refreshing this drink looks and your appreciation for the user's thoughtfulness.",
+        "zh": "用户给你买了{ItemName}（饮料），花费了${ItemPrice}！你现在感到{EmotionState}。你的口渴度是{CurrentThirst}。表达这个饮料看起来多么解渴，以及你对用户贴心的感激。"
+    },
+    "BuyFeedback_Drug": {
+        "en": "The user bought you {ItemName} (medicine) for ${ItemPrice}. You are feeling {EmotionState}. Your health is {CurrentHealth}. Show appreciation for the user's care about your wellbeing. Express how this medicine will help you feel better.",
+        "zh": "用户给你买了{ItemName}（药品），花费了${ItemPrice}。你现在感到{EmotionState}。你的健康值是{CurrentHealth}。对用户关心你的健康表示感激。表达这个药品将如何帮助你感觉更好。" 
+    },
+    "TouchFeedback_General": {
+        "en": "The user just touched your {TouchArea}. Respond naturally as a desktop pet. Current mood: {PetMood}, Health: {PetHealth}.",
+        "zh-hans": "用户刚刚触摸了你的{TouchArea}。请作为桌面宠物自然地回应。当前心情：{PetMood}，健康：{PetHealth}。" 
+    },
+    "BuyFeedback_Default": {
+        "en": "The user just bought {ItemName} ({ItemType}) for ${ItemPrice}. You are feeling {EmotionState}. Respond naturally as a desktop pet, expressing your reaction to receiving this gift. Use appropriate commands to show your emotions and actions.",
+        "zh-hans": "用户刚刚给你买了{ItemName}（{ItemType}），花费了${ItemPrice}。你现在感到{EmotionState}。请作为桌面宠物自然地回应，表达你收到这个礼物的反应。使用合适的指令来展示你的情感和动作。" 
     }
 }

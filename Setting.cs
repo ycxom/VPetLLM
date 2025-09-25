@@ -38,6 +38,7 @@ namespace VPetLLM
         public ProxySetting Proxy { get; set; } = new ProxySetting();
         public PluginStoreSetting PluginStore { get; set; } = new PluginStoreSetting();
         public Handlers.TouchFeedbackSettings TouchFeedback { get; set; } = new Handlers.TouchFeedbackSettings();
+        public bool EnableBuyFeedback { get; set; } = true;
         private readonly string _path;
 
         public Setting(string path)

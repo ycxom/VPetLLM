@@ -1075,8 +1075,20 @@
                                         Content="允许获取当前时间"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
-                                        Margin="0,0,0,16"
+                                        Margin="0,0,0,8"
                                         Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableBuyFeedback"
+                                        Content="启用购买反馈"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
+                                        IsChecked="True"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernCheckBox}">
+                                    <CheckBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="当用户购买物品时，宠物会通过AI生成个性化的反馈回应。"/>
+                                        </ToolTip>
+                                    </CheckBox.ToolTip>
+                                </CheckBox>
                                 <CheckBox x:Name="CheckBox_EnableHistoryCompression"
                                         Content="启用聊天记录压缩"
                                         Margin="0,0,0,12"

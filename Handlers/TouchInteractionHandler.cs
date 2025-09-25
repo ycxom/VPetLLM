@@ -228,9 +228,58 @@ namespace VPetLLM.Handlers
         /// </summary>
         private string BuildTouchPrompt(TouchInteraction interaction)
         {
-            var touchArea = interaction.Type == TouchType.Head ? "头部" : "身体";
-            var prompt = $"用户刚刚轻抚了我的{touchArea}。请用可爱、温馨的语气回应这次互动。";
+            // 从JSON文件读取触摸提示词模板
+            var templateKey = interaction.Type == TouchType.Head ? "TouchFeedback_Head" : "TouchFeedback_Body";
+            var template = PromptHelper.Get(templateKey, _plugin.Settings.PromptLanguage);
+            
+            // 如果没有找到特定模板，使用通用触摸模板
+            if (string.IsNullOrEmpty(template))
+            {
+                template = PromptHelper.Get("TouchFeedback_General", _plugin.Settings.PromptLanguage);
+            }
+            
+            // 如果还是没有找到，返回空字符串
+            if (string.IsNullOrEmpty(template))
+            {
+                Logger.Log("TouchInteractionHandler: No touch prompt template found in JSON");
+                return string.Empty;
+            }
+            
+            // 替换模板中的变量
+            var context = new Dictionary<string, string>
+            {
+                { "TouchArea", GetLocalizedTouchArea(interaction.Type, _plugin.Settings.PromptLanguage) },
+                { "ConsecutiveCount", interaction.ConsecutiveCount.ToString() },
+                { "PetMood", interaction.PetMood.ToString("F0") },
+                { "PetHealth", interaction.PetHealth.ToString("F0") },
+                { "PetName", _plugin.Settings.AiName },
+                { "UserName", _plugin.Settings.UserName }
+            };
+            
+            var prompt = template;
+            foreach (var kvp in context)
+            {
+                prompt = prompt.Replace($"{{{kvp.Key}}}", kvp.Value);
+            }
+            
             return prompt;
+        }
+
+        /// <summary>
+        /// 获取本地化的触摸区域描述
+        /// </summary>
+        private string GetLocalizedTouchArea(TouchType touchType, string language)
+        {
+            var key = touchType == TouchType.Head ? "TouchArea_Head" : "TouchArea_Body";
+            var localizedArea = LanguageHelper.Get(key, language);
+            
+            // 如果没有找到本地化文本，返回英文默认值
+            if (string.IsNullOrEmpty(localizedArea))
+            {
+                return touchType == TouchType.Head ? "head" : "body";
+            }
+            
+            return localizedArea;
         }
 
         /// <summary>
