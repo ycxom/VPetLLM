@@ -11,6 +11,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
+using VPetLLM.UI.Controls;
 using VPetLLM.Utils;
 
 namespace VPetLLM.UI.Windows
@@ -103,6 +104,9 @@ namespace VPetLLM.UI.Windows
         {
             InitializeComponent();
             _plugin = plugin;
+            
+            // 初始化触摸反馈设置控件
+            InitializeTouchFeedbackSettings();
             _plugin.SettingWindow = this;
             LoadSettings();
             Closed += Window_Closed;
@@ -264,6 +268,10 @@ namespace VPetLLM.UI.Windows
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     UpdateUIForLanguage();
+                    
+                    // 重新初始化TouchFeedbackSettingsControl以确保语言更新
+                    InitializeTouchFeedbackSettings();
+                    
                     // 强制刷新插件列表的列标题
                     if (FindName("DataGrid_Plugins") is DataGrid dataGridPluginsAsync)
                     {
@@ -364,6 +372,23 @@ namespace VPetLLM.UI.Windows
         private void Control_PasswordChanged(object sender, RoutedEventArgs e)
         {
             ScheduleAutoSave();
+        }
+
+        /// <summary>
+        /// 初始化触摸反馈设置控件
+        /// </summary>
+        private void InitializeTouchFeedbackSettings()
+        {
+            try
+            {
+                var touchFeedbackControl = new TouchFeedbackSettingsControl(_plugin);
+                TouchFeedbackSettingsContainer.Content = touchFeedbackControl;
+                Logger.Log("TouchFeedbackSettingsControl initialized successfully.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error initializing TouchFeedbackSettingsControl: {ex.Message}");
+            }
         }
 
         private void LoadSettings()
@@ -1424,6 +1449,22 @@ namespace VPetLLM.UI.Windows
             if (FindName("Button_TTS_OpenAI_RefreshModels") is Button buttonTTSOpenAIRefreshModels) buttonTTSOpenAIRefreshModels.Content = LanguageHelper.Get("TTS.OpenAI.RefreshModels", langCode);
             if (FindName("TextBlock_TTS_OpenAI_BaseUrl_Tip") is TextBlock textBlockTTSOpenAIBaseUrlTip) textBlockTTSOpenAIBaseUrlTip.Text = LanguageHelper.Get("TTS.OpenAI.BaseUrlTip", langCode);
             if (FindName("TextBlock_TTS_OpenAI_Description") is TextBlock textBlockTTSOpenAIDescription) textBlockTTSOpenAIDescription.Text = LanguageHelper.Get("TTS.OpenAI.Description", langCode);
+
+            // 更新身体交互设置标题
+            if (FindName("TextBlock_TouchFeedbackTitle") is TextBlock textBlockTouchFeedbackTitle)
+            {
+                textBlockTouchFeedbackTitle.Text = LanguageHelper.Get("TouchFeedback.Title", langCode);
+            }
+
+            // 更新 TouchFeedbackSettingsControl 的多语言
+            if (FindName("TouchFeedbackSettingsContainer") is ContentControl touchFeedbackContainer)
+            {
+                if (touchFeedbackContainer.Content is TouchFeedbackSettingsControl touchFeedbackControl)
+                {
+                    // 立即刷新语言
+                    touchFeedbackControl.RefreshLanguage();
+                }
+            }
         }
 
         private async void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)

@@ -37,6 +37,7 @@ namespace VPetLLM
         public TTSSetting TTS { get; set; } = new TTSSetting();
         public ProxySetting Proxy { get; set; } = new ProxySetting();
         public PluginStoreSetting PluginStore { get; set; } = new PluginStoreSetting();
+        public Handlers.TouchFeedbackSettings TouchFeedback { get; set; } = new Handlers.TouchFeedbackSettings();
         private readonly string _path;
 
         public Setting(string path)
@@ -62,6 +63,10 @@ namespace VPetLLM
             if (Free == null)
             {
                 Free = new FreeSetting();
+            }
+            if (TouchFeedback == null)
+            {
+                TouchFeedback = new Handlers.TouchFeedbackSettings();
             }
         }
 

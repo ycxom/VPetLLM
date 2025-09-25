@@ -17,6 +17,7 @@ namespace VPetLLM
         public IChatCore? ChatCore;
         public Windows.TalkBox? TalkBox;
         public ActionProcessor? ActionProcessor;
+        public TouchInteractionHandler? TouchInteractionHandler;
         private System.Timers.Timer _syncTimer;
         public List<IVPetLLMPlugin> Plugins => PluginManager.Plugins;
         public List<FailedPlugin> FailedPlugins => PluginManager.FailedPlugins;
@@ -112,6 +113,10 @@ namespace VPetLLM
                 };
                 menuItem.Click += (s, e) => Setting();
                 MW.Main.ToolBar.MenuMODConfig.Items.Add(menuItem);
+                
+                // 在LoadPlugin阶段初始化TouchInteractionHandler，确保Main窗口已经完全加载
+                InitializeTouchInteractionHandler();
+                
                 Utils.Logger.Log("Dispatcher.Invoke finished.");
             });
             Utils.Logger.Log("LoadPlugin finished.");
@@ -127,6 +132,7 @@ namespace VPetLLM
         public void Dispose()
         {
             TTSService?.Dispose();
+            TouchInteractionHandler?.Dispose();
             _syncTimer?.Stop();
             _syncTimer?.Dispose();
         }
@@ -274,6 +280,34 @@ namespace VPetLLM
         {
             TTSService?.UpdateSettings(Settings.TTS, Settings.Proxy);
             // Logger.Log("TTS服务设置已更新");
+        }
+
+        /// <summary>
+        /// 初始化触摸交互处理器
+        /// </summary>
+        private void InitializeTouchInteractionHandler()
+        {
+            try
+            {
+                Logger.Log("开始初始化TouchInteractionHandler...");
+                
+                // 检查必要的组件是否已准备好
+                if (MW?.Main == null)
+                {
+                    Logger.Log("错误：MW.Main为null，无法初始化TouchInteractionHandler");
+                    return;
+                }
+                
+                Logger.Log("MW.Main已准备好，创建TouchInteractionHandler...");
+                TouchInteractionHandler = new TouchInteractionHandler(this);
+                Logger.Log("TouchInteractionHandler初始化成功");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"初始化TouchInteractionHandler时发生错误: {ex.Message}");
+                Logger.Log($"错误堆栈: {ex.StackTrace}");
+                TouchInteractionHandler = null;
+            }
         }
 
         public async Task PlayTTSAsync(string text)

@@ -1028,6 +1028,7 @@
                     </Border>
                 </ScrollViewer>
             </TabItem>
+
             <TabItem Header="高级选项"
                     x:Name="Tab_Advanced"
                     Style="{StaticResource ModernTabItem}">
@@ -1104,6 +1105,18 @@
                                             FontSize="14"/>
                                 </StackPanel>
                             </StackPanel>
+                            
+                            <!-- 身体交互设置 -->
+                            <Separator Margin="0,20,0,20" 
+                                     Background="{StaticResource BorderBrush}" 
+                                     Height="1"/>
+                            <TextBlock Name="TextBlock_TouchFeedbackTitle"
+                                     Text="身体交互设置" 
+                                     FontSize="16" 
+                                     FontWeight="SemiBold" 
+                                     Margin="0,0,0,16"
+                                     Foreground="{StaticResource PrimaryTextBrush}"/>
+                            <ContentPresenter x:Name="TouchFeedbackSettingsContainer"/>
                         </StackPanel>
                     </Border>
                 </ScrollViewer>

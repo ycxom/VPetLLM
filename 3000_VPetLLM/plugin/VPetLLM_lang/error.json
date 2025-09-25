@@ -54,5 +54,17 @@
     "TTS.InvalidSettings": {
         "zh-hans": "TTS设置无效",
         "en": "Invalid TTS settings"
+    },
+    "TouchFeedback.InitializeFailed": {
+        "zh-hans": "身体交互功能初始化失败",
+        "en": "Touch feedback initialization failed"
+    },
+    "TouchFeedback.ProcessingError": {
+        "zh-hans": "身体交互处理出错",
+        "en": "Touch feedback processing error"
+    },
+    "TouchFeedback.CooldownActive": {
+        "zh-hans": "触摸冷却中，请稍后再试",
+        "en": "Touch cooldown active, please try again later"
     }
 }

@@ -1132,5 +1132,49 @@
             "zh-hant": "插件商店",
             "jp": "プラグインストア"
         }
+    },
+    "TouchFeedback": {
+        "Title": {
+            "en": "Touch Interaction Settings",
+            "zh-hans": "身体交互设置",
+            "zh-hant": "身體交互設置",
+            "jp": "タッチインタラクション設定"
+        },
+        "Tab": {
+            "en": "Touch Interaction",
+            "zh-hans": "身体交互设置",
+            "zh-hant": "身體交互設置",
+            "jp": "タッチインタラクション"
+        },
+        "Enable": {
+            "en": "Touch Interaction Feedback",
+            "zh-hans": "身体交互反馈",
+            "zh-hant": "身體交互反饋",
+            "jp": "タッチインタラクションフィードバック"
+        },
+        "EnableDescription": {
+            "en": "When enabled, touching VPet's head or body will trigger intelligent feedback",
+            "zh-hans": "启用后，触摸VPet的头部或身体时会触发智能反馈",
+            "zh-hant": "啟用後，觸摸VPet的頭部或身體時會觸發智能反饋",
+            "jp": "有効にすると、VPetの頭や体に触れたときにインテリジェントなフィードバックがトリガーされます"
+        },
+        "TouchCooldown": {
+            "en": "Touch Cooldown Time",
+            "zh-hans": "触摸冷却时间",
+            "zh-hant": "觸摸冷卻時間",
+            "jp": "タッチクールダウン時間"
+        },
+        "CooldownDescription": {
+            "en": "Cooldown time prevents overly frequent interactions, recommended setting is 1-3 seconds.",
+            "zh-hans": "冷却时间可防止过于频繁的交互，建议设置在1-3秒之间。",
+            "zh-hant": "冷卻時間可防止過於頻繁的交互，建議設置在1-3秒之間。",
+            "jp": "クールダウン時間は過度に頻繁なインタラクションを防ぎます。1-3秒の設定を推奨します。"
+        },
+        "CooldownUnit": {
+            "en": "ms",
+            "zh-hans": "ms",
+            "zh-hant": "ms",
+            "jp": "ms"
+        }
     }
 }

@@ -1,0 +1,74 @@
+<UserControl x:Class="VPetLLM.UI.Controls.TouchFeedbackSettingsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            
+            <!-- 定义本地样式 -->
+            <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#F8F9FA"/>
+            <SolidColorBrush x:Key="BorderBrush" Color="#E9ECEF"/>
+            <SolidColorBrush x:Key="PrimaryTextBrush" Color="#212529"/>
+            <SolidColorBrush x:Key="SecondaryTextBrush" Color="#6C757D"/>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    
+    <StackPanel Margin="0,0,0,0">
+        <!-- 主开关 - 统一风格 -->
+        <CheckBox Name="EnableTouchFeedbackCheckBox"
+                  Content="身体交互反馈"
+                  Margin="0,0,0,8"
+                  Checked="EnableTouchFeedbackCheckBox_Checked"
+                  Unchecked="EnableTouchFeedbackCheckBox_Unchecked"/>
+        
+        <TextBlock Name="DescriptionTextBlock"
+                   Text="启用后，触摸VPet的头部或身体时会触发智能反馈"
+                   FontSize="12"
+                   Foreground="{StaticResource SecondaryTextBrush}"
+                   TextWrapping="Wrap"
+                   Margin="24,0,0,16"/>
+
+        <!-- 详细设置 -->
+        <StackPanel Name="DetailSettingsPanel" Margin="24,0,0,0">
+            <TextBlock Name="CooldownLabel"
+                       Text="触摸冷却时间"
+                       FontSize="12"
+                       Foreground="{StaticResource PrimaryTextBrush}"
+                       Margin="0,0,0,8"/>
+            
+            <Grid Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <Slider Name="TouchCooldownSlider"
+                        Grid.Column="0"
+                        Minimum="500"
+                        Maximum="5000"
+                        Value="2000"
+                        TickFrequency="500"
+                        IsSnapToTickEnabled="True"
+                        ValueChanged="TouchCooldownSlider_ValueChanged"/>
+                
+                <TextBlock Name="TouchCooldownValueText" 
+                           Grid.Column="1"
+                           Text="2000ms" 
+                           VerticalAlignment="Center" 
+                           Margin="16,0,0,0"
+                           FontSize="12"
+                           Foreground="{StaticResource SecondaryTextBrush}"/>
+            </Grid>
+
+            <!-- 说明文本 -->
+            <TextBlock Name="CooldownDescription"
+                       Text="冷却时间可防止过于频繁的交互，建议设置在1-3秒之间。"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource SecondaryTextBrush}"
+                       FontSize="11"
+                       LineHeight="16"/>
+        </StackPanel>
+    </StackPanel>
+</UserControl>
