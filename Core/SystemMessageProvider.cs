@@ -40,15 +40,15 @@ namespace VPetLLM.Core
                     var status = PromptHelper.Get("Status_Prefix", lang)
                         .Replace("{Level}", core.Save.Level.ToString())
                         .Replace("{Money:F2}", core.Save.Money.ToString("F2"))
-                        .Replace("{Strength:F0}", core.Save.Strength.ToString("F0"))
-                        .Replace("{StrengthMax:F0}", core.Save.StrengthMax.ToString("F0"))
-                        .Replace("{Health:F0}", core.Save.Health.ToString("F0"))
-                        .Replace("{Feeling:F0}", core.Save.Feeling.ToString("F0"))
-                        .Replace("{FeelingMax:F0}", core.Save.FeelingMax.ToString("F0"))
-                        .Replace("{Likability:F0}", core.Save.Likability.ToString("F0"))
-                        .Replace("{LikabilityMax:F0}", core.Save.LikabilityMax.ToString("F0"))
-                        .Replace("{StrengthFood:F0}", core.Save.StrengthFood.ToString("F0"))
-                        .Replace("{StrengthDrink:F0}", core.Save.StrengthDrink.ToString("F0"));
+                        .Replace("{Strength:F0}", $"{(core.Save.Strength / core.Save.StrengthMax * 100):F0}%")
+                        .Replace("{StrengthMax:F0}", "100%")
+                        .Replace("{Health:F0}", $"{(core.Save.Health / 100.0 * 100):F0}%")
+                        .Replace("{Feeling:F0}", $"{(core.Save.Feeling / core.Save.FeelingMax * 100):F0}%")
+                        .Replace("{FeelingMax:F0}", "100%")
+                        .Replace("{Likability:F0}", $"{(core.Save.Likability / core.Save.LikabilityMax * 100):F0}%")
+                        .Replace("{LikabilityMax:F0}", "100%")
+                        .Replace("{StrengthFood:F0}", $"{(core.Save.StrengthFood / core.Save.StrengthMax * 100):F0}%")
+                        .Replace("{StrengthDrink:F0}", $"{(core.Save.StrengthDrink / core.Save.StrengthMax * 100):F0}%");
 
                     if (_settings.EnableTime)
                     {

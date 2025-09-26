@@ -378,11 +378,11 @@ namespace VPetLLM
                 .Replace("{TotalPrice}", totalPrice.ToString("F2"))
                 .Replace("{TypeStats}", string.Join(separator, typeStats))
                 .Replace("{EmotionState}", GetCurrentEmotionState())
-                .Replace("{CurrentHealth}", MW.Core.Save.Health.ToString("F0"))
-                .Replace("{CurrentMood}", MW.Core.Save.Feeling.ToString("F0"))
+                .Replace("{CurrentHealth}", $"{(MW.Core.Save.Health / 100.0 * 100):F0}%")
+                .Replace("{CurrentMood}", $"{(MW.Core.Save.Feeling / MW.Core.Save.FeelingMax * 100):F0}%")
                 .Replace("{CurrentMoney}", MW.Core.Save.Money.ToString("F2"))
-                .Replace("{CurrentHunger}", MW.Core.Save.StrengthFood.ToString("F0"))
-                .Replace("{CurrentThirst}", MW.Core.Save.StrengthDrink.ToString("F0"))
+                .Replace("{CurrentHunger}", $"{(MW.Core.Save.StrengthFood / MW.Core.Save.StrengthMax * 100):F0}%")
+                .Replace("{CurrentThirst}", $"{(MW.Core.Save.StrengthDrink / MW.Core.Save.StrengthMax * 100):F0}%")
                 .Replace("{PurchaseTime}", DateTime.Now.ToString("HH:mm:ss"));
 
             return message;

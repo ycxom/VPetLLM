@@ -278,8 +278,8 @@ namespace VPetLLM.Handlers
             {
                 { "TouchArea", GetLocalizedTouchArea(interaction.Type, _plugin.Settings.PromptLanguage) },
                 { "ConsecutiveCount", interaction.ConsecutiveCount.ToString() },
-                { "PetMood", interaction.PetMood.ToString("F0") },
-                { "PetHealth", interaction.PetHealth.ToString("F0") },
+                { "PetMood", $"{interaction.PetMood:F0}%" },
+                { "PetHealth", $"{interaction.PetHealth:F0}%" },
                 { "PetName", _plugin.Settings.AiName },
                 { "UserName", _plugin.Settings.UserName }
             };
