@@ -27,68 +27,112 @@ namespace VPetLLM.Core.ChatCore
         }
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
-            if (!Settings.KeepContext)
+            try
             {
-                ClearContext();
-            }
-            if (!string.IsNullOrEmpty(prompt))
-            {
-                //无论是用户输入还是插件返回，都作为user角色
-                await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
-            }
-            List<Message> history = GetCoreHistory();
-            var data = new
-            {
-                model = _ollamaSetting.Model,
-                messages = history.Select(m => new { role = m.Role, content = m.Content }),
-                stream = false,
-                options = _ollamaSetting.EnableAdvanced ? new
+                if (!Settings.KeepContext)
                 {
-                    temperature = _ollamaSetting.Temperature,
-                    num_predict = _ollamaSetting.MaxTokens
-                } : null
-            };
-            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-            using (var client = GetClient())
-            {
-                client.BaseAddress = new System.Uri(_ollamaSetting.Url);
-                var response = await client.PostAsync("/api/chat", content);
-                response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
-                var responseObject = JObject.Parse(responseString);
-                var message = responseObject["message"]["content"].ToString();
-                // 根据上下文设置决定是否保留历史（使用基类的统一状态）
-                if (Settings.KeepContext)
-                {
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                    ClearContext();
                 }
-                // 只有在保持上下文模式时才保存历史记录
-                if (Settings.KeepContext)
+                if (!string.IsNullOrEmpty(prompt))
                 {
-                    SaveHistory();
+                    //无论是用户输入还是插件返回，都作为user角色
+                    await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
                 }
-                ResponseHandler?.Invoke(message);
+                List<Message> history = GetCoreHistory();
+                var data = new
+                {
+                    model = _ollamaSetting.Model,
+                    messages = history.Select(m => new { role = m.Role, content = m.Content }),
+                    stream = false,
+                    options = _ollamaSetting.EnableAdvanced ? new
+                    {
+                        temperature = _ollamaSetting.Temperature,
+                        num_predict = _ollamaSetting.MaxTokens
+                    } : null
+                };
+                var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                using (var client = GetClient())
+                {
+                    client.BaseAddress = new System.Uri(_ollamaSetting.Url);
+                    client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
+                    var response = await client.PostAsync("/api/chat", content);
+                    response.EnsureSuccessStatusCode();
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    var responseObject = JObject.Parse(responseString);
+                    var message = responseObject["message"]["content"].ToString();
+                    // 根据上下文设置决定是否保留历史（使用基类的统一状态）
+                    if (Settings.KeepContext)
+                    {
+                        await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                    }
+                    // 只有在保持上下文模式时才保存历史记录
+                    if (Settings.KeepContext)
+                    {
+                        SaveHistory();
+                    }
+                    ResponseHandler?.Invoke(message);
+                }
+                return "";
             }
-            return "";
+            catch (TaskCanceledException tcEx)
+            {
+                var errorMessage = "Ollama请求超时，请检查：\n1. Ollama服务是否正常运行\n2. 模型是否已下载\n3. 网络连接是否正常\n4. URL配置是否正确";
+                Utils.Logger.Log($"Ollama Chat 请求超时: {tcEx.Message}");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+            catch (HttpRequestException httpEx)
+            {
+                var errorMessage = "Ollama连接失败，请检查：\n1. Ollama服务是否启动\n2. URL配置是否正确\n3. 防火墙设置";
+                Utils.Logger.Log($"Ollama Chat 网络异常: {httpEx.Message}");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Ollama聊天异常: {ex.Message}";
+                Utils.Logger.Log($"Ollama Chat 异常: {ex.Message}");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
         }
 
         public override async Task<string> Summarize(string text)
         {
-            var data = new
+            try
             {
-                model = _ollamaSetting.Model,
-                prompt = text,
-                stream = false
-            };
-            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-            using (var client = GetClient())
+                var data = new
+                {
+                    model = _ollamaSetting.Model,
+                    prompt = text,
+                    stream = false
+                };
+                var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                using (var client = GetClient())
+                {
+                    client.BaseAddress = new System.Uri(_ollamaSetting.Url);
+                    client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
+                    var response = await client.PostAsync("/api/generate", content);
+                    response.EnsureSuccessStatusCode();
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    var responseObject = JObject.Parse(responseString);
+                    return responseObject["response"].ToString();
+                }
+            }
+            catch (TaskCanceledException tcEx)
             {
-                client.BaseAddress = new System.Uri(_ollamaSetting.Url);
-                var response = await client.PostAsync("/api/generate", content);
-                response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
-                var responseObject = JObject.Parse(responseString);
-                return responseObject["response"].ToString();
+                Utils.Logger.Log($"Ollama Summarize 请求超时: {tcEx.Message}");
+                return "总结请求超时，请检查Ollama服务状态";
+            }
+            catch (HttpRequestException httpEx)
+            {
+                Utils.Logger.Log($"Ollama Summarize 网络异常: {httpEx.Message}");
+                return "Ollama连接失败，无法完成总结";
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Ollama Summarize 异常: {ex.Message}");
+                return $"总结异常: {ex.Message}";
             }
         }
 
@@ -109,6 +153,7 @@ namespace VPetLLM.Core.ChatCore
             using (var client = GetClient())
             {
                 client.BaseAddress = new System.Uri(_ollamaSetting.Url);
+                client.Timeout = TimeSpan.FromSeconds(30); // 获取模型列表用较短超时
                 var response = client.GetAsync("/api/tags").Result;
                 response.EnsureSuccessStatusCode();
                 var responseString = response.Content.ReadAsStringAsync().Result;
