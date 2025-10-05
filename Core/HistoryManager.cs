@@ -8,12 +8,16 @@ namespace VPetLLM.Core
         private List<Message> _history = new List<Message>();
         private readonly Setting _settings;
         private readonly string _historyFilePath;
+        public string HistoryFilePath => _historyFilePath;
+        public string LongTermMemoryFilePath { get; }
+
         private readonly ChatCoreBase _chatCore;
 
         public HistoryManager(Setting settings, string name, ChatCoreBase chatCore)
         {
             _settings = settings;
             _historyFilePath = GetHistoryFilePath(name);
+            LongTermMemoryFilePath = Path.ChangeExtension(_historyFilePath, ".memory.txt");
             _chatCore = chatCore;
             LoadHistory();
         }

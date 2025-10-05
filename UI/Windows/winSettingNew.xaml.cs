@@ -153,6 +153,12 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableTime")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_EnableAutoSummarize")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_SummarizeTokenThreshold")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_LongTermMemoryTokenLimit")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_EnableRateLimiter")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_TpmLimit")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_RpmLimit")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
@@ -426,6 +432,19 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableBuyFeedback")).IsChecked = _plugin.Settings.EnableBuyFeedback;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked = _plugin.Settings.EnableHistoryCompression;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text = _plugin.Settings.HistoryCompressionThreshold.ToString();
+            ((CheckBox)this.FindName("CheckBox_EnableAutoSummarize")).IsChecked = _plugin.Settings.EnableAutoSummarize;
+            ((TextBox)this.FindName("TextBox_SummarizeTokenThreshold")).Text = _plugin.Settings.SummarizeTokenThreshold.ToString();
+            ((TextBox)this.FindName("TextBox_LongTermMemoryTokenLimit")).Text = _plugin.Settings.LongTermMemoryTokenLimit.ToString();
+
+            // Rate Limiter settings
+            if (_plugin.Settings.RateLimiter == null)
+            {
+                _plugin.Settings.RateLimiter = new Setting.RateLimiterSettings();
+            }
+            ((CheckBox)this.FindName("CheckBox_EnableRateLimiter")).IsChecked = _plugin.Settings.RateLimiter.IsEnabled;
+            ((TextBox)this.FindName("TextBox_TpmLimit")).Text = _plugin.Settings.RateLimiter.TpmLimitPerKey.ToString();
+            ((TextBox)this.FindName("TextBox_RpmLimit")).Text = _plugin.Settings.RateLimiter.RpmLimitPerKey.ToString();
+
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).Text = _plugin.Settings.MaxLogCount.ToString();
             ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
@@ -639,6 +658,19 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableHistoryCompression = ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked ?? false;
             if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text, out int historyCompressionThreshold))
                 _plugin.Settings.HistoryCompressionThreshold = historyCompressionThreshold;
+            _plugin.Settings.EnableAutoSummarize = ((CheckBox)this.FindName("CheckBox_EnableAutoSummarize")).IsChecked ?? true;
+            if (int.TryParse(((TextBox)this.FindName("TextBox_SummarizeTokenThreshold")).Text, out int summarizeTokenThreshold))
+                _plugin.Settings.SummarizeTokenThreshold = summarizeTokenThreshold;
+            if (int.TryParse(((TextBox)this.FindName("TextBox_LongTermMemoryTokenLimit")).Text, out int longTermMemoryTokenLimit))
+                _plugin.Settings.LongTermMemoryTokenLimit = longTermMemoryTokenLimit;
+
+            // Rate Limiter settings
+            _plugin.Settings.RateLimiter.IsEnabled = ((CheckBox)this.FindName("CheckBox_EnableRateLimiter")).IsChecked ?? true;
+            if (int.TryParse(((TextBox)this.FindName("TextBox_TpmLimit")).Text, out int tpmLimit))
+                _plugin.Settings.RateLimiter.TpmLimitPerKey = tpmLimit;
+            if (int.TryParse(((TextBox)this.FindName("TextBox_RpmLimit")).Text, out int rpmLimit))
+                _plugin.Settings.RateLimiter.RpmLimitPerKey = rpmLimit;
+
             _plugin.Settings.LogAutoScroll = logAutoScrollCheckBox.IsChecked ?? true;
             if (int.TryParse(maxLogCountTextBox.Text, out int maxLogCount))
                 _plugin.Settings.MaxLogCount = maxLogCount;

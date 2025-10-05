@@ -1,3 +1,4 @@
+using System.Linq;
 using Newtonsoft.Json;
 using System.IO;
 using System.Net;
@@ -16,13 +17,64 @@ namespace VPetLLM.Core
         protected ActionProcessor? ActionProcessor { get; }
         protected SystemMessageProvider SystemMessageProvider { get; }
         protected Action<string> ResponseHandler;
+        private string _longTermMemory = "";
         public abstract Task<string> Chat(string prompt);
         public abstract Task<string> Chat(string prompt, bool isFunctionCall);
         public abstract Task<string> Summarize(string text);
 
+        public async Task CheckAndSummarizeHistoryIfNeeded()
+        {
+            if (Settings?.EnableAutoSummarize != true) return;
+
+            var history = HistoryManager.GetHistory();
+            var estimatedTokens = history.Sum(m => m.Content?.Length ?? 0) / 2.0;
+
+            if (estimatedTokens > Settings.SummarizeTokenThreshold)
+            {
+                var historyToArchive = HistoryManager.GetHistory();
+                if (historyToArchive != null && historyToArchive.Any())
+                {
+                    try
+                    {                   
+                        var baseFilePath = HistoryManager.HistoryFilePath;
+                        var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+                        var directory = Path.GetDirectoryName(baseFilePath);
+                        var fileNameWithoutExt = Path.GetFileNameWithoutExtension(baseFilePath);
+                        var archiveFilePath = Path.Combine(directory, $"{fileNameWithoutExt}_archive_{timestamp}.json");
+                        
+                        var json = JsonConvert.SerializeObject(historyToArchive, Formatting.Indented);
+                        File.WriteAllText(archiveFilePath, json);
+                    }
+                    catch (Exception ex)
+                    {                       
+                        Console.WriteLine($"Failed to archive chat history: {ex.Message}");
+                    }
+                }
+
+                var newConversationText = string.Join("\n", history.Select(m => $"{m.Role}: {m.Content}"));
+                var textToSummarize = $"[Previous Summary]:\n{_longTermMemory}\n\n[New Conversation to Integrate]:\n{newConversationText}";
+
+                var summary = await Summarize(textToSummarize).ConfigureAwait(false);
+
+                HistoryManager.ClearHistory();
+
+                if (!string.IsNullOrWhiteSpace(summary))
+                {
+                    _longTermMemory = summary;
+                    File.WriteAllText(HistoryManager.LongTermMemoryFilePath, _longTermMemory);
+                }
+            }
+        }
+
         protected string GetSystemMessage()
         {
-            return SystemMessageProvider.GetSystemMessage();
+            string mainSystemMessage = SystemMessageProvider.GetSystemMessage();
+            if (!string.IsNullOrEmpty(_longTermMemory))
+            {
+                string finalMessage = $"[Background Memory & Personality]:\n{_longTermMemory}\n\n[Current Task & System Prompt]:\n{mainSystemMessage}";
+                return finalMessage;
+            }
+            return mainSystemMessage;
         }
 
         protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
@@ -31,6 +83,10 @@ namespace VPetLLM.Core
             MainWindow = mainWindow;
             ActionProcessor = actionProcessor;
             HistoryManager = new HistoryManager(settings, Name, this);
+            if (File.Exists(HistoryManager.LongTermMemoryFilePath))
+            {
+                _longTermMemory = File.ReadAllText(HistoryManager.LongTermMemoryFilePath);
+            }
             SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
         }
 
@@ -228,6 +284,7 @@ namespace VPetLLM.Core
         /// <summary>
         /// 标准化角色名称，确保不同提供商API的角色名称一致
         /// </summary>
+        [JsonIgnore]
         public string NormalizedRole
         {
             get
@@ -239,13 +296,14 @@ namespace VPetLLM.Core
                 };
             }
         }
+        [JsonIgnore]
         public string DisplayContent
         {
             get
             {
                 if (Role == "assistant")
                 {
-                    var match = System.Text.RegularExpressions.Regex.Match(Content ?? "", @"(?<=say\("")(?:[^""\\]|\\.)*(?=""\))");
+                    var match = System.Text.RegularExpressions.Regex.Match(Content ?? "", @"(?<=say\(""""""))[\s\S]*?(?=""""""\))", System.Text.RegularExpressions.RegexOptions.None);
                     if (match.Success)
                     {
                         return match.Value;

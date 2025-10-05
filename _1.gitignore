@@ -1,0 +1,44 @@
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.codebuddy
+
+# Build results
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio cache files
+.vs/
+
+# NuGet Packages
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+# VS Code files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Rider files
+*.sln.iml
+/.idea
+
+# Log files
+[Ll]og/
+[Ll]ogs/
+*.log
+
+# Temp files
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj

@@ -33,6 +33,10 @@
 	  </None>
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Compile Remove="VPetLLM源代码\**\*.cs" />
+	</ItemGroup>
+
 	<Target Name="CopyResources" AfterTargets="Build">
 		<ItemGroup>
 			<FilesToCopy Include="$(OutDir)**\*" />
