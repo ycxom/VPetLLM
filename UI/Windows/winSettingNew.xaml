@@ -353,7 +353,11 @@
                                                 Style="{StaticResource SettingLabel}"/>
                                         <TextBox x:Name="TextBox_OpenAIApiKey"
                                                 Margin="0,0,0,16"
-                                                Style="{StaticResource ModernTextBox}"/>
+                                                Style="{StaticResource ModernTextBox}"
+                                                Height="100"
+                                                AcceptsReturn="True"
+                                                TextWrapping="Wrap"
+                                                VerticalScrollBarVisibility="Auto"/>
                                         <Label Content="模型"
                                                 x:Name="Label_OpenAIModel"
                                                 Style="{StaticResource SettingLabel}"/>
@@ -436,7 +440,11 @@
                                                 Style="{StaticResource SettingLabel}"/>
                                         <TextBox x:Name="TextBox_GeminiApiKey"
                                                 Margin="0,0,0,16"
-                                                Style="{StaticResource ModernTextBox}"/>
+                                                Style="{StaticResource ModernTextBox}"
+                                                Height="100"
+                                                AcceptsReturn="True"
+                                                TextWrapping="Wrap"
+                                                VerticalScrollBarVisibility="Auto"/>
                                         <Label Content="模型"
                                                 x:Name="Label_GeminiModel"
                                                 Style="{StaticResource SettingLabel}"/>
@@ -1115,8 +1123,88 @@
                                             Foreground="{StaticResource SecondaryTextBrush}"
                                             FontSize="14"/>
                                 </StackPanel>
+
+                                <CheckBox x:Name="CheckBox_EnableAutoSummarize"
+                                          Content="启用自动对话历史摘要 (长期记忆)"
+                                          Margin="0,16,0,12"
+                                          Style="{StaticResource ModernCheckBox}"/>
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="20,0,0,0"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAutoSummarize}">
+                                    <TextBlock Text="摘要触发阈值:"
+                                            VerticalAlignment="Center"
+                                            x:Name="TextBlock_SummarizeTokenThreshold"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="100"/>
+                                    <TextBox x:Name="TextBox_SummarizeTokenThreshold"
+                                            Width="95"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="Tokens"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                            FontSize="14"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="20,8,0,0"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAutoSummarize}">
+                                    <TextBlock Text="长期记忆上限:"
+                                            VerticalAlignment="Center"
+                                            x:Name="TextBlock_LongTermMemoryTokenLimit"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="100"/>
+                                    <TextBox x:Name="TextBox_LongTermMemoryTokenLimit"
+                                            Width="95"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="Tokens"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                            FontSize="14"/>
+                                </StackPanel>
                             </StackPanel>
                             
+                            <!-- API Rate Limiter Settings -->
+                            <Separator Margin="0,20,0,20" 
+                                     Background="{StaticResource BorderBrush}" 
+                                     Height="1"/>
+                            <TextBlock Text="API 速率限制" 
+                                     FontSize="16" 
+                                     FontWeight="SemiBold" 
+                                     Margin="0,0,0,16"
+                                     Foreground="{StaticResource PrimaryTextBrush}"/>
+                            <CheckBox x:Name="CheckBox_EnableRateLimiter"
+                                      Content="启用 API 速率限制"
+                                      Margin="0,0,0,12"
+                                      Style="{StaticResource ModernCheckBox}"/>
+                            <StackPanel Margin="20,0,0,0"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableRateLimiter}">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="TPM (每分钟 Token 数):"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="180"/>
+                                    <TextBox x:Name="TextBox_TpmLimit"
+                                            Width="120"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="RPM (每分钟请求数):"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="180"/>
+                                    <TextBox x:Name="TextBox_RpmLimit"
+                                            Width="120"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+                            </StackPanel>
+
                             <!-- 身体交互设置 -->
                             <Separator Margin="0,20,0,20" 
                                      Background="{StaticResource BorderBrush}" 

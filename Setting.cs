@@ -31,6 +31,9 @@ namespace VPetLLM
         public bool EnableTime { get; set; } = true;
         public bool EnableHistoryCompression { get; set; } = false;
         public int HistoryCompressionThreshold { get; set; } = 20;
+        public bool EnableAutoSummarize { get; set; } = true;
+        public int SummarizeTokenThreshold { get; set; } = 5000;
+        public int LongTermMemoryTokenLimit { get; set; } = 8000;
         public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         public bool ShowUninstallWarning { get; set; } = true;
@@ -39,6 +42,8 @@ namespace VPetLLM
         public PluginStoreSetting PluginStore { get; set; } = new PluginStoreSetting();
         public Handlers.TouchFeedbackSettings TouchFeedback { get; set; } = new Handlers.TouchFeedbackSettings();
         public bool EnableBuyFeedback { get; set; } = true;
+        public RateLimiterSettings RateLimiter { get; set; } = new RateLimiterSettings();
+
         private readonly string _path;
 
         public Setting(string path)
@@ -151,6 +156,14 @@ namespace VPetLLM
             public string ProxyUrl { get; set; } = "https://ghfast.top";
         }
 
+        public class RateLimiterSettings
+        {
+            public bool IsEnabled { get; set; } = true;
+            public int TpmLimitPerKey { get; set; } = 125000;
+            public int RpmLimitPerKey { get; set; } = 2;
+        }
+
+
         public class TTSSetting
         {
             public bool IsEnabled { get; set; } = false;
@@ -192,7 +205,11 @@ namespace VPetLLM
             public string BaseUrl { get; set; } = "https://api.example.com/tts";
             public string Method { get; set; } = "POST"; // GET 或 POST
             public string ContentType { get; set; } = "application/json";
-            public string RequestBody { get; set; } = "{\n  \"text\": \"{text}\",\n  \"voice\": \"default\",\n  \"format\": \"mp3\"\n}";
+            public string RequestBody { get; set; } = @"{
+  ""text"": ""{text}"",
+  ""voice"": ""default"",
+  ""format"": ""mp3""
+}";
             public List<CustomHeader> CustomHeaders { get; set; } = new List<CustomHeader>
     {
         new CustomHeader { Key = "User-Agent", Value = "VPetLLM", IsEnabled = true },

@@ -1,9 +1,14 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
+using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
+using VPetLLM.Utils;
 
 namespace VPetLLM.Core.ChatCore
 {
@@ -12,6 +17,8 @@ namespace VPetLLM.Core.ChatCore
         public override string Name => "OpenAI";
         private readonly Setting.OpenAISetting _openAISetting;
         private readonly Setting _setting;
+        private static int _apiKeyIndex = 0;
+
         public OpenAIChatCore(Setting.OpenAISetting openAISetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
         {
@@ -19,135 +26,251 @@ namespace VPetLLM.Core.ChatCore
             _setting = setting;
         }
 
+        private string GetNextApiKey()
+        {
+            if (string.IsNullOrWhiteSpace(_openAISetting.ApiKey)) return null;
+            var apiKeys = _openAISetting.ApiKey.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                              .Select(key => key.Trim())
+                                              .Where(key => !string.IsNullOrWhiteSpace(key))
+                                              .ToArray();
+            if (apiKeys.Length == 0) return null;
+            _apiKeyIndex = (_apiKeyIndex + 1) % apiKeys.Length;
+            return apiKeys[_apiKeyIndex];
+        }
+
+        private async Task<string> SendRequestWithRetry(string url, HttpContent content, int estimatedTokens, bool isGet = false, int maxRetries = 3)
+        {
+            var availableKeys = _openAISetting.ApiKey?.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Length ?? 1;
+            var attemptLimit = Math.Max(maxRetries, availableKeys) + 1;
+
+            for (int i = 0; i < attemptLimit; i++)
+            { 
+                Logger.Log($"[{Name}] Request attempt {i + 1}/{attemptLimit}.");
+                try
+                {
+                    Logger.Log($"[{Name}] Waiting for rate limiter...");
+                    await RateLimiter.WaitForReady(estimatedTokens, availableKeys, _setting.RateLimiter).ConfigureAwait(false);
+                    Logger.Log($"[{Name}] Rate limiter passed.");
+
+                    using (var client = GetClient())
+                    {
+                        var apiKey = GetNextApiKey();
+                        if (!string.IsNullOrEmpty(apiKey))
+                        {
+                            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                        }
+                        Logger.Log($"[{Name}] Sending HTTP request to {url}");
+                        HttpResponseMessage response;
+                        if (isGet)
+                        {
+                            response = await client.GetAsync(url).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            response = await client.PostAsync(url, content).ConfigureAwait(false);
+                        }
+                        Logger.Log($"[{Name}] Received response with status code: {response.StatusCode}");
+
+                        if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                        {
+                            throw new HttpRequestException($"Rate limit exceeded (429) for key ending with ...{apiKey?.Substring(Math.Max(0, apiKey.Length - 4))}", null, HttpStatusCode.TooManyRequests);
+                        }
+                        response.EnsureSuccessStatusCode();
+                        return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    }
+                }
+                catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
+                {
+                    Logger.Log($"[{Name}] Rate limit error detected. Switching to next API key.");
+                    if (i == attemptLimit - 1)
+                    {
+                        Logger.Log($"[{Name}] All API keys have been tried and failed due to rate limits.");
+                        throw;
+                    }
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[{Name}] Error during request attempt {i + 1}: {ex.GetType().Name} - {ex.Message}");
+                    if (i == attemptLimit - 1)
+                    {
+                        Logger.Log($"[{Name}] All retries failed. Rethrowing final exception.");
+                        throw;
+                    }
+                    // For other errors, just continue to the next attempt immediately.
+                    continue;
+                }
+            }
+            throw new Exception("Request failed after all retries.");
+        }
+
         public override Task<string> Chat(string prompt)
         {
             return Chat(prompt, false);
         }
+
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
-            if (!Settings.KeepContext)
+            var sanitizedPrompt = prompt?.Replace("\r", " ").Replace("\n", " ") ?? "";
+            Logger.Log($"[{Name}] Chat process started. Prompt: '{(sanitizedPrompt.Length > 50 ? sanitizedPrompt.Substring(0, 50) + "..." : sanitizedPrompt)}'");
+            try
             {
-                ClearContext();
-            }
-            if (!string.IsNullOrEmpty(prompt))
-            {
-                //无论是用户输入还是插件返回，都作为user角色
-                await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
-            }
-            // 构建请求数据，根据启用开关决定是否包含高级参数
-            List<Message> history = GetCoreHistory();
-            object data;
-            if (_openAISetting.EnableAdvanced)
-            {
-                data = new
+                if (!Settings.KeepContext)
                 {
-                    model = _openAISetting.Model,
-                    messages = history.Select(m => new { role = m.Role, content = m.Content }),
-                    temperature = _openAISetting.Temperature,
-                    max_tokens = _openAISetting.MaxTokens
-                };
-            }
-            else
-            {
-                data = new
-                {
-                    model = _openAISetting.Model,
-                    messages = history.Select(m => new { role = m.Role, content = m.Content })
-                };
-            }
-            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-
-            // 处理OpenAI URL兼容性：自动补全后缀
-            string apiUrl = _openAISetting.Url;
-            if (!apiUrl.Contains("/chat/completions"))
-            {
-                // 如果URL不包含完整端点，自动补全
-                var baseUrl = apiUrl.TrimEnd('/');
-                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
-                {
-                    baseUrl += "/v1";
+                    Logger.Log($"[{Name}] Context is disabled, clearing history.");
+                    ClearContext();
                 }
-                apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
-            }
-
-            string message;
-            using (var client = GetClient())
-            {
-                if (!string.IsNullOrEmpty(_openAISetting.ApiKey))
+                if (!string.IsNullOrEmpty(prompt))
                 {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openAISetting.ApiKey}");
+                    await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt }).ConfigureAwait(false);
                 }
-                var response = await client.PostAsync(apiUrl, content);
-                response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
+
+                Logger.Log($"[{Name}] Checking for history summarization...");
+                await CheckAndSummarizeHistoryIfNeeded().ConfigureAwait(false);
+                Logger.Log($"[{Name}] History summarization check complete.");
+
+                List<Message> history = GetCoreHistory();
+                object data;
+                if (_openAISetting.EnableAdvanced)
+                {
+                    data = new
+                    {
+                        model = _openAISetting.Model,
+                        messages = history.Select(m => new { role = m.NormalizedRole, content = m.Content }),
+                        temperature = _openAISetting.Temperature,
+                        max_tokens = _openAISetting.MaxTokens
+                    };
+                }
+                else
+                {
+                    data = new
+                    {
+                        model = _openAISetting.Model,
+                        messages = history.Select(m => new { role = m.NormalizedRole, content = m.Content })
+                    };
+                }
+                var requestJson = JsonConvert.SerializeObject(data);
+                var requestContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
+                var estimatedTokens = requestJson.Length / 2;
+
+                string apiUrl = GetApiUrl("/chat/completions");
+                Logger.Log($"[{Name}] Preparing to send request to {apiUrl}. Estimated tokens: {estimatedTokens}");
+
+                var responseString = await SendRequestWithRetry(apiUrl, requestContent, estimatedTokens).ConfigureAwait(false);
+                Logger.Log($"[{Name}] Received successful response string from server.");
+
                 var responseObject = JObject.Parse(responseString);
-                message = responseObject["choices"][0]["message"]["content"].ToString();
+                string message;
+                try
+                {
+                    message = responseObject["choices"]?.FirstOrDefault()?["message"]?["content"]?.ToString();
+
+                    if (string.IsNullOrEmpty(message))
+                    {
+                        string finishReason = responseObject["choices"]?.FirstOrDefault()?["finish_reason"]?.ToString() ?? "Unknown";
+                        Logger.Log($"[{Name}] Response was empty or filtered. Finish Reason: {finishReason}. Full response: {responseString}");
+                        message = $"抱歉，我的回复被内容过滤器拦截了。原因: {finishReason}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[{Name}] Error parsing response JSON: {ex.Message}. Full response: {responseString}");
+                    message = "抱歉，解析服务器响应时发生错误。";
+                }
+                Logger.Log($"[{Name}] Parsed message content successfully.");
+
+                if (Settings.KeepContext)
+                {
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message }).ConfigureAwait(false);
+                    SaveHistory();
+                }
+
+                Logger.Log($"[{Name}] Invoking response handler to display message.");
+                ResponseHandler?.Invoke(message);
+                return "";
             }
-            // 根据上下文设置决定是否保留历史（使用基类的统一状态）
-            if (Settings.KeepContext)
+            catch (Exception ex)
             {
-                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                Logger.Log($"[{Name}] A critical error occurred in the Chat method: {ex.GetType().Name} - {ex.Message}\nStackTrace: {ex.StackTrace}");
+                ResponseHandler?.Invoke($"抱歉，处理您的请求时发生错误: {ex.Message}");
+                return "";
             }
-            // 只有在保持上下文模式时才保存历史记录
-            if (Settings.KeepContext)
-            {
-                SaveHistory();
-            }
-            ResponseHandler?.Invoke(message);
-            return "";
         }
 
         public override async Task<string> Summarize(string text)
         {
-            var messages = new[]
+            Logger.Log($"[{Name}] Starting summarization with new creative prompt...");
+            try
             {
-                new { role = "user", content = text }
-            };
+                var creativePrompt = $@"You are a memory editor for a virtual pet. Your task is to refine and combine a [Previous Summary] with a [New Conversation to Integrate].
+Read both sections carefully.
+Your goal is to create a new, single, coherent summary from the first-person perspective of the virtual pet.
+- Merge new events from the conversation into the summary.
+- If the new conversation corrects or updates information in the previous summary, reflect that change.
+- Remove redundant or less important details to save space.
+- The final summary should be a continuous piece of text, not a list or dialogue.
+- IMPORTANT: The total length of your final summary must not exceed {_setting.LongTermMemoryTokenLimit} tokens (approximately {_setting.LongTermMemoryTokenLimit / 2} characters).
 
-            object data;
-            if (_openAISetting.EnableAdvanced)
-            {
-                data = new
+Here is the data:
+{text}";
+
+                var messages = new[]
                 {
-                    model = _openAISetting.Model,
-                    messages = messages,
-                    temperature = _openAISetting.Temperature,
-                    max_tokens = _openAISetting.MaxTokens
+                    new { role = "user", content = creativePrompt }
                 };
-            }
-            else
-            {
-                data = new
+
+                object data;
+                if (_openAISetting.EnableAdvanced)
                 {
-                    model = _openAISetting.Model,
-                    messages = messages
-                };
+                    data = new
+                    {
+                        model = _openAISetting.Model,
+                        messages = messages,
+                        temperature = _openAISetting.Temperature,
+                        max_tokens = _setting.LongTermMemoryTokenLimit // Limit summary tokens
+                    };
+                }
+                else
+                {
+                    data = new
+                    {
+                        model = _openAISetting.Model,
+                        messages = messages,
+                        max_tokens = _setting.LongTermMemoryTokenLimit // Limit summary tokens
+                    };
+                }
+
+                var requestContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                var estimatedTokens = text.Length / 2;
+                string apiUrl = GetApiUrl("/chat/completions");
+                Logger.Log($"[{Name}] Sending summarization request to {apiUrl}.");
+
+                var responseString = await SendRequestWithRetry(apiUrl, requestContent, estimatedTokens).ConfigureAwait(false);
+                var responseObject = JObject.Parse(responseString);
+                var summary = responseObject["choices"][0]["message"]["content"].ToString();
+                Logger.Log($"[{Name}] Summarization successful.");
+                return summary;
             }
+            catch (Exception ex)
+            {
+                Logger.Log($"[{Name}] A critical error occurred during summarization: {ex.GetType().Name} - {ex.Message}\nStackTrace: {ex.StackTrace}");
+                return ""; // Return empty string on failure
+            }
+        }
 
-            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-
+        private string GetApiUrl(string endpoint)
+        {
             string apiUrl = _openAISetting.Url;
-            if (!apiUrl.Contains("/chat/completions"))
+            if (!apiUrl.Contains(endpoint))
             {
                 var baseUrl = apiUrl.TrimEnd('/');
                 if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
                 {
                     baseUrl += "/v1";
                 }
-                apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
+                return baseUrl.TrimEnd('/') + endpoint;
             }
-            using (var client = GetClient())
-            {
-                if (!string.IsNullOrEmpty(_openAISetting.ApiKey))
-                {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openAISetting.ApiKey}");
-                }
-                var response = await client.PostAsync(apiUrl, content);
-                response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
-                var responseObject = JObject.Parse(responseString);
-                return responseObject["choices"][0]["message"]["content"].ToString();
-            }
+            return apiUrl;
         }
 
         private List<Message> GetCoreHistory()
@@ -159,48 +282,32 @@ namespace VPetLLM.Core.ChatCore
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
             return history;
         }
+
         public List<string> RefreshModels()
         {
-            string apiUrl = _openAISetting.Url;
-            if (apiUrl.Contains("/chat/completions"))
+            Logger.Log($"[{Name}] Starting to refresh models...");
+            try
             {
-                apiUrl = apiUrl.Replace("/chat/completions", "/models");
-            }
-            else
-            {
-                var baseUrl = apiUrl.TrimEnd('/');
-                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
+                // Bridge the sync-over-async call safely to prevent deadlocks
+                return Task.Run(async () =>
                 {
-                    baseUrl += "/v1";
-                }
-                apiUrl = baseUrl.TrimEnd('/') + "/models";
-            }
+                    string apiUrl = GetApiUrl("/models").Replace("/chat/completions", "/models");
+                    var responseString = await SendRequestWithRetry(apiUrl, null, 0, isGet: true).ConfigureAwait(false);
 
-            var url = new System.Uri(new System.Uri(apiUrl), "");
-            using (var client = GetClient())
+                    JObject responseObject = JObject.Parse(responseString);
+                    var models = new List<string>();
+                    foreach (var model in responseObject["data"])
+                    {
+                        models.Add(model["id"].ToString());
+                    }
+                    Logger.Log($"[{Name}] Found {models.Count} models.");
+                    return models;
+                }).Result;
+            }
+            catch (Exception ex)
             {
-                if (!string.IsNullOrEmpty(_openAISetting.ApiKey))
-                {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openAISetting.ApiKey}");
-                }
-                var response = client.GetAsync(url).Result;
-                response.EnsureSuccessStatusCode();
-                var responseString = response.Content.ReadAsStringAsync().Result;
-                JObject responseObject;
-                try
-                {
-                    responseObject = JObject.Parse(responseString);
-                }
-                catch (JsonReaderException)
-                {
-                    throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
-                }
-                var models = new List<string>();
-                foreach (var model in responseObject["data"])
-                {
-                    models.Add(model["id"].ToString());
-                }
-                return models;
+                Logger.Log($"[{Name}] Failed to refresh models: {ex.Message}");
+                return new List<string>();
             }
         }
 
