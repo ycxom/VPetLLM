@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using System;
 using System.Net.Http;
 using System.Text;
 using System.Windows;
@@ -53,6 +54,9 @@ namespace VPetLLM.Windows
         {
             OnSendMessage?.Invoke(text);
             Logger.Log($"Responded called with text: {text}");
+
+
+
             try
             {
                 Logger.Log("Calling ChatCore.Chat...");

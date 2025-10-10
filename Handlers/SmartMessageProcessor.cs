@@ -1,3 +1,4 @@
+using System;
 using System.Text.RegularExpressions;
 using VPetLLM.Utils;
 
@@ -29,6 +30,10 @@ namespace VPetLLM.Handlers
 
             Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}");
             
+            // 标记进入单条 AI 回复的处理会话，期间豁免插件/工具限流
+            var _sessionId = Guid.NewGuid();
+            global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value = _sessionId;
+
             // 通知TouchInteractionHandler开始执行VPetLLM动作
             TouchInteractionHandler.NotifyVPetLLMActionStart();
 
@@ -64,6 +69,13 @@ namespace VPetLLM.Handlers
             {
                 // 通知TouchInteractionHandler完成VPetLLM动作
                 TouchInteractionHandler.NotifyVPetLLMActionEnd();
+
+                // 先统一Flush一次本次会话内所有聚合结果，确保只回灌一次
+                global::VPetLLM.Utils.ResultAggregator.FlushSession(_sessionId);
+
+                // 退出本次会话，恢复上下文
+                if (global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value == _sessionId)
+                    global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value = null;
             }
         }
 
@@ -470,6 +482,21 @@ namespace VPetLLM.Handlers
                 foreach (var action in actionQueue)
                 {
                     Logger.Log($"SmartMessageProcessor: 执行动作: {action.Keyword}, 值: {action.Value}");
+
+                    // 对插件类动作做非用户触发限流（会话内豁免）：2分钟内最多5次
+                    var isPluginAction = action.Type == ActionType.Plugin || string.Equals(action.Keyword, "plugin", StringComparison.OrdinalIgnoreCase);
+                    if (isPluginAction)
+                    {
+                        var inMessageSession = global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value.HasValue;
+                        if (!inMessageSession)
+                        {
+                            if (!Utils.RateLimiter.TryAcquire("ai-plugin", 5, TimeSpan.FromMinutes(2)))
+                            {
+                                Logger.Log("SmartMessageProcessor: 插件动作频率超限（跨消息），终止剩余动作执行以丢弃非用户触发链。");
+                                break;
+                            }
+                        }
+                    }
 
                     if (string.IsNullOrEmpty(action.Value))
                         await action.Handler.Execute(_plugin.MW);

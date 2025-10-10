@@ -309,9 +309,10 @@ namespace VPetLLM
                 // 构建批量购买消息
                 string message = BuildBatchPurchaseMessage(purchases);
                 
-                Utils.Logger.Log($"Sending batch message to ChatCore: {message}");
-                await ChatCore.Chat(message);
-                Utils.Logger.Log("Batch purchase feedback sent successfully");
+                Utils.Logger.Log($"Sending batch message to aggregator: {message}");
+                // 非用户触发的系统反馈：进入2秒聚合，再统一回灌给AI，避免连续唤起
+                ResultAggregator.Enqueue($"[System.BuyFeedback: \"{message}\"]");
+                Utils.Logger.Log("Batch purchase feedback enqueued for aggregation");
             }
             catch (Exception ex)
             {

@@ -1,5 +1,7 @@
+using System;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
+using VPetLLM.Utils;
 
 namespace VPetLLM.Handlers
 {
@@ -16,6 +18,16 @@ namespace VPetLLM.Handlers
 
         public async Task Execute(string value, IMainWindow main)
         {
+            // 若处于单条 AI 回复的执行会话中，则豁免限流（允许该回复内多次插件联合调用）
+            var inMessageSession = global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value.HasValue;
+
+            // 非用户触发的跨消息限流：2分钟内最多5次，超限直接丢弃
+            if (!inMessageSession && !RateLimiter.TryAcquire("ai-plugin", 5, TimeSpan.FromMinutes(2)))
+            {
+                VPetLLM.Instance.Log("PluginHandler: 插件触发频率超限（跨消息），丢弃此次调用。");
+                return;
+            }
+
             VPetLLM.Instance.Log($"PluginHandler: Received value: {value}");
             var firstParen = value.IndexOf('(');
             var lastParen = value.LastIndexOf(')');
@@ -39,7 +51,9 @@ namespace VPetLLM.Handlers
                         var result = await actionPlugin.Function(arguments);
                         var formattedResult = $"[Plugin.{pluginName}: \"{result}\"]";
                         VPetLLM.Instance.Log($"PluginHandler: Plugin function returned: {result}, formatted: {formattedResult}");
-                        _ = VPetLLM.Instance.ChatCore.Chat(formattedResult, true);
+
+                        // 聚合到2秒窗口，统一回灌，避免连续触发LLM
+                        ResultAggregator.Enqueue(formattedResult);
                     }
                 }
                 else
@@ -47,7 +61,9 @@ namespace VPetLLM.Handlers
                     VPetLLM.Instance.Log($"PluginHandler: Plugin not found: {pluginName}");
                     var availablePlugins = string.Join(", ", VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => p.Name));
                     var errorMessage = $"[SYSTEM] Error: Plugin '{pluginName}' not found. Available plugins are: {availablePlugins}";
-                    await VPetLLM.Instance.ChatCore.Chat(errorMessage, true);
+
+                    // 错误信息也进入聚合，避免多次触发LLM
+                    ResultAggregator.Enqueue(errorMessage);
                 }
             }
             else
