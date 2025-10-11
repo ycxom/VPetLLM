@@ -39,7 +39,7 @@ namespace VPetLLM.Core.ChatCore
             var requestData = new
             {
                 contents = history.Where(m => m.Role != "system")
-                                  .Select(m => new { role = m.Role == "assistant" ? "model" : m.Role, parts = new[] { new { text = m.Content } } }),
+                                  .Select(m => new { role = m.Role == "assistant" ? "model" : m.Role, parts = new[] { new { text = m.DisplayContent } } }),
                 generationConfig = new
                 {
                     maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,

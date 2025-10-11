@@ -42,7 +42,7 @@ namespace VPetLLM.Core.ChatCore
                 data = new
                 {
                     model = _openAISetting.Model,
-                    messages = history.Select(m => new { role = m.Role, content = m.Content }),
+                    messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
                     temperature = _openAISetting.Temperature,
                     max_tokens = _openAISetting.MaxTokens
                 };
@@ -52,7 +52,7 @@ namespace VPetLLM.Core.ChatCore
                 data = new
                 {
                     model = _openAISetting.Model,
-                    messages = history.Select(m => new { role = m.Role, content = m.Content })
+                    messages = history.Select(m => new { role = m.Role, content = m.DisplayContent })
                 };
             }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");

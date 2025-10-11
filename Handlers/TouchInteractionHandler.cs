@@ -290,6 +290,8 @@ namespace VPetLLM.Handlers
                 prompt = prompt.Replace($"{{{kvp.Key}}}", kvp.Value);
             }
             
+            // 标记为系统生成，便于与用户消息区分
+            prompt = "[System] " + prompt;
             return prompt;
         }
 

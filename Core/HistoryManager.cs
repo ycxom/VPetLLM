@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using System.IO;
+using VPetLLM.Utils;
 
 namespace VPetLLM.Core
 {
@@ -42,6 +43,13 @@ namespace VPetLLM.Core
             {
                 await CompressHistory();
             }
+
+            // 如果允许获取当前时间，仅写入Unix时间戳，显示时再根据UnixTime动态补全时间前缀
+            if (_settings.EnableTime)
+            {
+                message.UnixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
+            }
+
             _history.Add(message);
         }
 
@@ -74,8 +82,7 @@ namespace VPetLLM.Core
             }
 
             var historyText = string.Join("\n", historyToCompress.Select(m => m.Content));
-            var prompt = $"请将以下多轮对话总结为一段摘要，以便后续机器人能理解上下文。总结时不要模仿任何角色，内容要尽可能简洁，只保留核心信息，避免任何与总结任务无关的词语。要总结的内容如下:\n{historyText}";
-
+            var prompt = PromptHelper.Get("Context_Summary_Prefix", _settings.PromptLanguage).Replace("{historyText}", historyText);
             var summary = await _chatCore.Summarize(prompt);
 
             if (string.IsNullOrWhiteSpace(summary))

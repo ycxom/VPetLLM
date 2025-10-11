@@ -222,12 +222,15 @@ namespace VPetLLM.Core
 
     public class Message
     {
+        [JsonProperty(Order = 1)]
         public string? Role { get; set; }
+        [JsonProperty(Order = 2)]
         public string? Content { get; set; }
 
         /// <summary>
         /// 标准化角色名称，确保不同提供商API的角色名称一致
         /// </summary>
+        [JsonProperty(Order = 3)]
         public string NormalizedRole
         {
             get
@@ -239,19 +242,43 @@ namespace VPetLLM.Core
                 };
             }
         }
+
+        [JsonProperty(Order = 4)]
+        public long? UnixTime { get; set; }
+
+        [JsonIgnore]
         public string DisplayContent
         {
             get
             {
+                // 基础文本：对assistant提取 say("...")，否则直接使用Content
+                string baseText;
                 if (Role == "assistant")
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(Content ?? "", @"(?<=say\("")(?:[^""\\]|\\.)*(?=""\))");
-                    if (match.Success)
+                    baseText = match.Success ? match.Value : (Content ?? "");
+                }
+                else
+                {
+                    baseText = Content ?? "";
+                }
+
+                // 时间前缀：若存在UnixTime则动态渲染为 [yyyy/MM/dd HH:mm:ss]
+                string prefix = "";
+                if (UnixTime.HasValue)
+                {
+                    try
                     {
-                        return match.Value;
+                        var dt = DateTimeOffset.FromUnixTimeSeconds(UnixTime.Value).ToLocalTime().DateTime;
+                        prefix = $"[{dt:yyyy/MM/dd HH:mm:ss}] ";
+                    }
+                    catch
+                    {
+                        // 忽略解析异常，保持无前缀
                     }
                 }
-                return Content ?? "";
+
+                return prefix + baseText;
             }
         }
     }

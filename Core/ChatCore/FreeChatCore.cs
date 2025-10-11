@@ -68,7 +68,7 @@ namespace VPetLLM.Core.ChatCore
                 var requestBody = new
                 {
                     model = Model,
-                    messages = history.Select(m => new { role = m.Role, content = m.Content }),
+                    messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
                     temperature = _freeSetting.Temperature,
                     max_tokens = _freeSetting.MaxTokens
                 };

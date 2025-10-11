@@ -42,7 +42,7 @@ namespace VPetLLM.Core.ChatCore
                 var data = new
                 {
                     model = _ollamaSetting.Model,
-                    messages = history.Select(m => new { role = m.Role, content = m.Content }),
+                    messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
                     stream = false,
                     options = _ollamaSetting.EnableAdvanced ? new
                     {
