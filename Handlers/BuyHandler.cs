@@ -95,7 +95,7 @@ namespace VPetLLM.Handlers
         /// <summary>
         /// 处理智能购买互动
         /// </summary>
-        private async Task ProcessIntelligentPurchase(Food food)
+        private Task ProcessIntelligentPurchase(Food food)
         {
             try
             {
@@ -107,6 +107,7 @@ namespace VPetLLM.Handlers
                 // 静默处理错误，不影响购买流程
                 Logger.Log($"BuyHandler: 智能反馈异常: {ex.Message}");
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>

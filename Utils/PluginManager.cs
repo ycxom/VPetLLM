@@ -386,10 +386,10 @@ namespace VPetLLM.Utils
             }
         }
 
-        private static async Task CleanupDuplicatePluginFiles(string pluginName, string currentFilePath, IChatCore chatCore)
+        private static Task CleanupDuplicatePluginFiles(string pluginName, string currentFilePath, IChatCore chatCore)
         {
             if (string.IsNullOrEmpty(pluginName))
-                return;
+                return Task.CompletedTask;
 
             try
             {
@@ -442,9 +442,11 @@ namespace VPetLLM.Utils
             {
                 Logger.Log($"Error during duplicate plugin cleanup: {ex.Message}");
             }
+            
+            return Task.CompletedTask;
         }
 
-        private static async Task LoadSinglePlugin(string pluginFilePath, IChatCore chatCore)
+        private static Task LoadSinglePlugin(string pluginFilePath, IChatCore chatCore)
         {
             try
             {
@@ -501,39 +503,31 @@ namespace VPetLLM.Utils
                             existingPlugin.Unload();
                             Plugins.Remove(existingPlugin);
                         }
-
-                        if (plugin is IPluginWithData pluginWithData)
-                        {
-                            var pluginDataDir = Path.Combine(pluginDir, "PluginData", plugin.Name);
-                            Directory.CreateDirectory(pluginDataDir);
-                            pluginWithData.PluginDataDir = pluginDataDir;
-                        }
-
-                        plugin.Enabled = pluginStates.TryGetValue(plugin.Name, out var enabled) ? enabled : true;
-                        Plugins.Add(plugin);
                         
-                        if (plugin.Enabled)
+                        Plugins.Add(plugin);
+                        _pluginContexts[pluginFilePath] = context;
+                        
+                        // 应用插件状态配置
+                        if (pluginStates.TryGetValue(plugin.Name, out var isEnabled))
                         {
-                            plugin.Initialize(VPetLLM.Instance);
-                            if (chatCore != null)
-                            {
-                                chatCore.AddPlugin(plugin);
-                            }
+                            plugin.Enabled = isEnabled;
                         }
-                        Logger.Log($"Loaded updated plugin: {plugin.Name}, Enabled: {plugin.Enabled}");
+                        
+                        if (plugin.Enabled && chatCore != null)
+                        {
+                            chatCore.AddPlugin(plugin);
+                        }
+                        
+                        Logger.Log($"Plugin loaded: {plugin.Name} from {pluginFilePath}");
                     }
                 }
+                
+                return Task.CompletedTask;
             }
             catch (Exception ex)
             {
-                Logger.Log($"Failed to load single plugin {pluginFilePath}: {ex.Message}");
-                FailedPlugins.Add(new FailedPlugin
-                {
-                    Name = Path.GetFileNameWithoutExtension(pluginFilePath),
-                    FilePath = pluginFilePath,
-                    Error = ex,
-                    Description = ex.Message
-                });
+                Logger.Log($"Error loading plugin {pluginFilePath}: {ex.Message}");
+                return Task.CompletedTask;
             }
         }
 

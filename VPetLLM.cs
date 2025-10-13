@@ -172,7 +172,7 @@ namespace VPetLLM
         /// <summary>
         /// 处理购买事件
         /// </summary>
-        private async void OnTakeItem(Food food)
+        private void OnTakeItem(Food food)
         {
             try
             {
@@ -300,7 +300,7 @@ namespace VPetLLM
         /// <summary>
         /// 处理批量购买反馈
         /// </summary>
-        private async Task ProcessBatchPurchaseFeedback(List<PurchaseItem> purchases)
+        private Task ProcessBatchPurchaseFeedback(List<PurchaseItem> purchases)
         {
             try
             {
@@ -319,6 +319,7 @@ namespace VPetLLM
                 Utils.Logger.Log($"Error in ProcessBatchPurchaseFeedback: {ex.Message}");
                 Utils.Logger.Log($"Stack trace: {ex.StackTrace}");
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>

@@ -1478,7 +1478,7 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private async void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
+        private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
 
