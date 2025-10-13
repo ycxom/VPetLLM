@@ -31,7 +31,7 @@ namespace VPetLLM.Utils
         private static bool IsSessionKey(string key) => key.StartsWith("session:", StringComparison.Ordinal) && key != "session:global";
 
         /// <summary>
-        /// 入队一条需要回灌给AI的片段（例如 [Plugin.X: "..."] 或 [Tool.X: "..."]）
+        /// 入队一条需要回灌给AI的片段（例如 [Plugin Result: X] ... 或 [Tool.X: "..."]）
         /// 会在窗口内与同Key的其他片段合并后，仅触发一次 ChatCore.Chat(..., true)
         /// </summary>
         public static void Enqueue(string payload)

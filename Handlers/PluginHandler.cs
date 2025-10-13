@@ -49,7 +49,7 @@ namespace VPetLLM.Handlers
                     if (plugin is IActionPlugin actionPlugin)
                     {
                         var result = await actionPlugin.Function(arguments);
-                        var formattedResult = $"[Plugin.{pluginName}: \"{result}\"]";
+                        var formattedResult = $"[Plugin Result: {pluginName}] {result}";
                         VPetLLM.Instance.Log($"PluginHandler: Plugin function returned: {result}, formatted: {formattedResult}");
 
                         // 聚合到2秒窗口，统一回灌，避免连续触发LLM
@@ -77,5 +77,23 @@ namespace VPetLLM.Handlers
             return Task.CompletedTask;
         }
         public int GetAnimationDuration(string animationName) => 0;
+
+        /// <summary>
+        /// 供插件直接调用的方法，确保插件消息经过正确的格式化
+        /// </summary>
+        public static void SendPluginMessage(string pluginName, string message)
+        {
+            if (string.IsNullOrEmpty(pluginName) || string.IsNullOrEmpty(message))
+            {
+                VPetLLM.Instance.Log("Plugin message skipped: plugin name or message is empty");
+                return;
+            }
+
+            var formattedResult = $"[Plugin Result: {pluginName}] {message}";
+            VPetLLM.Instance.Log($"Plugin message formatted: {formattedResult}");
+
+            // 使用聚合器确保消息正确处理
+            ResultAggregator.Enqueue(formattedResult);
+        }
     }
 }

@@ -112,6 +112,7 @@ namespace VPetLLM.Core
             {
                 var pluginDescriptions = VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => $"{p.Name}: {p.Description} {p.Examples}");
                 parts.Add("Available Plugins (all plugins must be called in the format `[:plugin(plugin_name(parameters))]`):\n" + string.Join("\n", pluginDescriptions));
+                parts.Add("Plugin return results will be formatted as `[Plugin Result: {pluginName}] {result}`. When you see this format, it means a plugin has executed successfully and returned a result. You should acknowledge and respond to the plugin result appropriately.");
             }
 
             var systemMessage = string.Join("\n", parts);
