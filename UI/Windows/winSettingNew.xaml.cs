@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.IO;
 using System.Net.Http;
@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -51,10 +52,10 @@ namespace VPetLLM.UI.Windows
             // 获取当前活跃的OpenAI节点设置
             if (_plugin.Settings.OpenAI.OpenAINodes.Count == 0)
             {
-                // 如果没有配置节点，返回默认设置
+                // 如果没有配置节点，返回默认设置（并在渠道内多 key 自动随机）
                 return new Setting.OpenAINodeSetting
                 {
-                    ApiKey = _plugin.Settings.OpenAI.ApiKey,
+                    ApiKey = SelectRandomKey(_plugin.Settings.OpenAI.ApiKey),
                     Model = _plugin.Settings.OpenAI.Model,
                     Url = _plugin.Settings.OpenAI.Url,
                     Temperature = _plugin.Settings.OpenAI.Temperature,
@@ -64,31 +65,84 @@ namespace VPetLLM.UI.Windows
                     Name = _plugin.Settings.OpenAI.Name
                 };
             }
-            
+
             // 使用负载均衡或当前索引获取节点
             if (_plugin.Settings.OpenAI.EnableLoadBalancing)
             {
-                // 负载均衡：轮换使用节点
+                // 负载均衡：随机在已启用节点中选择
                 var enabledNodes = _plugin.Settings.OpenAI.OpenAINodes.Where(n => n.Enabled).ToList();
                 if (enabledNodes.Count == 0)
                 {
-                    // 如果没有启用的节点，返回第一个节点
-                    return _plugin.Settings.OpenAI.OpenAINodes.First();
+                    // 如果没有启用的节点，返回第一个节点（并随机化其 ApiKey）
+                    return CloneOpenAINodeWithRandomKey(_plugin.Settings.OpenAI.OpenAINodes.First());
                 }
-                
-                // 轮换索引
-                _plugin.Settings.OpenAI.CurrentNodeIndex = (_plugin.Settings.OpenAI.CurrentNodeIndex + 1) % enabledNodes.Count;
-                return enabledNodes[_plugin.Settings.OpenAI.CurrentNodeIndex];
+                var idx = _rand.Next(enabledNodes.Count);
+                return CloneOpenAINodeWithRandomKey(enabledNodes[idx]);
             }
             else
             {
                 // 使用固定索引
                 if (_plugin.Settings.OpenAI.CurrentNodeIndex >= 0 && _plugin.Settings.OpenAI.CurrentNodeIndex < _plugin.Settings.OpenAI.OpenAINodes.Count)
                 {
-                    return _plugin.Settings.OpenAI.OpenAINodes[_plugin.Settings.OpenAI.CurrentNodeIndex];
+                    return CloneOpenAINodeWithRandomKey(_plugin.Settings.OpenAI.OpenAINodes[_plugin.Settings.OpenAI.CurrentNodeIndex]);
                 }
-                return _plugin.Settings.OpenAI.OpenAINodes.First();
+                return CloneOpenAINodeWithRandomKey(_plugin.Settings.OpenAI.OpenAINodes.First());
             }
+        }
+
+        private Setting.GeminiSetting GetCurrentGeminiSetting()
+        {
+            var g = _plugin.Settings.Gemini;
+
+            // 未启用负载均衡：仍进行渠道内多 key 自动随机
+            if (!g.EnableLoadBalancing)
+            {
+                return new Setting.GeminiSetting
+                {
+                    EnableLoadBalancing = false,
+                    ApiKey = SelectRandomKey(g.ApiKey),
+                    Model = g.Model,
+                    Url = g.Url,
+                    Temperature = g.Temperature,
+                    MaxTokens = g.MaxTokens,
+                    EnableAdvanced = g.EnableAdvanced,
+                    GeminiNodes = g.GeminiNodes
+                };
+            }
+
+            var nodes = g.GeminiNodes ?? new List<Setting.GeminiNodeSetting>();
+            var enabledNodes = nodes.Where(n => n.Enabled).ToList();
+
+            // 若无启用节点，沿用全局设置，但仍随机化渠道内多 key
+            if (enabledNodes.Count == 0)
+            {
+                return new Setting.GeminiSetting
+                {
+                    EnableLoadBalancing = g.EnableLoadBalancing,
+                    ApiKey = SelectRandomKey(g.ApiKey),
+                    Model = g.Model,
+                    Url = g.Url,
+                    Temperature = g.Temperature,
+                    MaxTokens = g.MaxTokens,
+                    EnableAdvanced = g.EnableAdvanced,
+                    GeminiNodes = g.GeminiNodes
+                };
+            }
+
+            // 在启用节点中随机选一个，并对其 ApiKey 做随机化
+            var picked = enabledNodes[_rand.Next(enabledNodes.Count)];
+
+            return new Setting.GeminiSetting
+            {
+                EnableLoadBalancing = true,
+                ApiKey = SelectRandomKey(picked.ApiKey),
+                Model = picked.Model,
+                Url = picked.Url,
+                Temperature = picked.Temperature,
+                MaxTokens = picked.MaxTokens,
+                EnableAdvanced = picked.EnableAdvanced,
+                GeminiNodes = g.GeminiNodes
+            };
         }
 
         private string GetPluginDescription(IVPetLLMPlugin plugin, string langCode)
@@ -139,6 +193,10 @@ namespace VPetLLM.UI.Windows
 
         // 自动保存相关字段
         private DispatcherTimer? _autoSaveTimer;
+        // 密钥输入专用去抖保存计时器（避免每次按键均保存）
+        private DispatcherTimer? _secretSaveTimer;
+        // Gemini 列表刷新去抖计时器（避免每次键入都刷新列表导致重绘卡顿）
+        private DispatcherTimer? _geminiRefreshTimer;
         private bool _hasUnsavedChanges = false;
         private readonly object _saveLock = new object();
         // 合并异步保存标记，防止重复排队
@@ -149,6 +207,40 @@ namespace VPetLLM.UI.Windows
 
         // TTS服务
         private TTSService? _ttsService;
+        // 随机选择器（负载均衡随机用）
+        private readonly Random _rand = new Random();
+
+        // 在同一渠道内，若 ApiKey 包含多个 key，则自动随机选择一个（不受负载均衡开关影响）
+        private string SelectRandomKey(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return raw;
+            var parts = raw
+                .Split(new[] { ',', ';', '|', '\n', '\r', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(p => p.Trim())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct()
+                .ToList();
+            if (parts.Count <= 1) return raw.Trim();
+            var idx = _rand.Next(parts.Count);
+            return parts[idx];
+        }
+
+        // 克隆一个 OpenAI 节点，并将 ApiKey 随机拆分后取单个 key
+        private Setting.OpenAINodeSetting CloneOpenAINodeWithRandomKey(Setting.OpenAINodeSetting src)
+        {
+            if (src == null) return null;
+            return new Setting.OpenAINodeSetting
+            {
+                Name = src.Name,
+                ApiKey = SelectRandomKey(src.ApiKey),
+                Model = src.Model,
+                Url = src.Url,
+                Temperature = src.Temperature,
+                MaxTokens = src.MaxTokens,
+                EnableAdvanced = src.EnableAdvanced,
+                Enabled = src.Enabled
+            };
+        }
 
         public winSettingNew(global::VPetLLM.VPetLLM plugin)
         {
@@ -273,6 +365,14 @@ namespace VPetLLM.UI.Windows
             EnsureOpenAINodeDetailHandlers();
             // 初始化自动保存定时器
             InitializeAutoSaveTimer();
+            // 初始化密钥输入去抖保存定时器
+            InitializeSecretSaveTimer();
+            // 初始化 Gemini 列表刷新去抖定时器
+            InitializeGeminiRefreshTimer();
+
+            // 负载均衡开关点击即保存
+            if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLBBind) cbGemLBBind.Click += LoadBalancing_CheckBox_Click;
+            if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLBBind) cbOpenLBBind.Click += LoadBalancing_CheckBox_Click;
         }
 
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -481,6 +581,9 @@ namespace VPetLLM.UI.Windows
             // 负载均衡开关
             if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLB)
                 cbGemLB.IsChecked = _plugin.Settings.Gemini.EnableLoadBalancing;
+            // OpenAI 负载均衡开关
+            if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLB)
+                cbOpenLB.IsChecked = _plugin.Settings.OpenAI.EnableLoadBalancing;
 
             // 刷新Gemini多渠道列表
             RefreshGeminiNodesList();
@@ -747,6 +850,9 @@ namespace VPetLLM.UI.Windows
             // 保存 Gemini 负载均衡开关
             if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLB2)
                 _plugin.Settings.Gemini.EnableLoadBalancing = cbGemLB2.IsChecked ?? false;
+            // 保存 OpenAI 负载均衡开关
+            if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLB2)
+                _plugin.Settings.OpenAI.EnableLoadBalancing = cbOpenLB2.IsChecked ?? false;
             _plugin.Settings.Tools = new List<Setting.ToolSetting>((IEnumerable<Setting.ToolSetting>)toolsDataGrid.ItemsSource);
 
             // Proxy settings
@@ -831,7 +937,7 @@ namespace VPetLLM.UI.Windows
                 {
                     Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
-                    Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.Gemini => new GeminiChatCore(GetCurrentGeminiSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
@@ -848,8 +954,8 @@ namespace VPetLLM.UI.Windows
                 IChatCore updatedChatCore = newProvider switch
                 {
                     Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
-                    Setting.LLMType.OpenAI => new OpenAIChatCore(GetCurrentOpenAISetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
-                    Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.Gemini => new GeminiChatCore(GetCurrentGeminiSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
@@ -1241,6 +1347,52 @@ namespace VPetLLM.UI.Windows
                 Interval = TimeSpan.FromMilliseconds(500) // 500ms延迟
             };
             _autoSaveTimer.Tick += AutoSaveTimer_Tick;
+        }
+
+        // 密钥输入去抖保存（避免每次按键均触发保存）
+        private void InitializeSecretSaveTimer()
+        {
+            _secretSaveTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(800)
+            };
+            _secretSaveTimer.Tick += (s, e) =>
+            {
+                _secretSaveTimer?.Stop();
+                if (_isReadyToSave)
+                {
+                    SaveSettings();
+                }
+            };
+        }
+
+        private void ScheduleSecretSave()
+        {
+            if (!_isReadyToSave) return;
+            // 标记有未保存变更，但不立即保存，延迟到用户停止输入片刻
+            _hasUnsavedChanges = true;
+            _secretSaveTimer?.Stop();
+            _secretSaveTimer?.Start();
+        }
+
+        // Gemini 列表刷新去抖，合并短时间内多次刷新请求，降低重绘频率
+        private void InitializeGeminiRefreshTimer()
+        {
+            _geminiRefreshTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(300)
+            };
+            _geminiRefreshTimer.Tick += (s, e) =>
+            {
+                _geminiRefreshTimer?.Stop();
+                RefreshGeminiNodesList();
+            };
+        }
+
+        private void ScheduleGeminiListRefresh()
+        {
+            _geminiRefreshTimer?.Stop();
+            _geminiRefreshTimer?.Start();
         }
 
         /// <summary>
@@ -2752,7 +2904,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         break;
                 }
                 RefreshOpenAINodesList();
-                ScheduleAutoSave();
+                ScheduleSecretSave();
             }
         }
 
@@ -2767,7 +2919,8 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 if (this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbPlain && tbPlain.Text != pb.Password)
                     tbPlain.Text = pb.Password;
                 RefreshOpenAINodesList();
-                ScheduleAutoSave();
+                // 密钥输入采用去抖保存，避免每次按键都保存导致卡顿
+                ScheduleSecretSave();
             }
         }
 
@@ -2780,7 +2933,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 node.Model = cb.Text;
                 RefreshOpenAINodesList();
-                ScheduleAutoSave();
+                SaveSettings();
             }
         }
 
@@ -2793,7 +2946,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 node.EnableAdvanced = cb.IsChecked ?? false;
                 RefreshOpenAINodesList();
-                ScheduleAutoSave();
+                SaveSettings();
             }
         }
 
@@ -2807,7 +2960,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 node.Temperature = sl.Value;
                 if (this.FindName("TextBlock_OpenAI_TemperatureValue") is TextBlock tv) tv.Text = sl.Value.ToString("F2");
                 RefreshOpenAINodesList();
-                ScheduleAutoSave();
+                SaveSettings();
             }
         }
 
@@ -2816,7 +2969,13 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             if (this.FindName("TextBox_OpenAINodeName") is TextBox tbName) tbName.TextChanged += OpenAINodeDetail_TextChanged;
             if (this.FindName("PasswordBox_OpenAIApiKey") is PasswordBox pb) pb.PasswordChanged += OpenAINodeDetail_PasswordChanged;
-            if (this.FindName("ComboBox_OpenAIModel") is ComboBox cbModel) cbModel.SelectionChanged += OpenAINodeDetail_SelectionChanged;
+            if (this.FindName("ComboBox_OpenAIModel") is ComboBox cbModel)
+            {
+                cbModel.SelectionChanged += OpenAINodeDetail_SelectionChanged;
+                cbModel.LostFocus += OpenAIModel_LostFocus;
+                cbModel.DropDownClosed += OpenAIModel_DropDownClosed;
+                cbModel.KeyDown += OpenAIModel_KeyDown;
+            }
             if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl) { tbUrl.TextChanged += OpenAINodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; }
             if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += OpenAINodeDetail_Click;
             if (this.FindName("Slider_OpenAI_Temperature") is Slider slTemp) slTemp.ValueChanged += OpenAINodeDetail_TemperatureChanged;
@@ -2828,6 +2987,32 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         private void Detail_TextBox_LostFocus(object sender, RoutedEventArgs e)
         {
             ScheduleAutoSave();
+        }
+
+        // 负载均衡复选框点击：写回设置并立即保存，使随机/轮询立刻生效
+        private void LoadBalancing_CheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (sender is CheckBox cb)
+                {
+                    if (cb.Name == "CheckBox_Gemini_EnableLoadBalancing")
+                    {
+                        _plugin.Settings.Gemini.EnableLoadBalancing = cb.IsChecked ?? false;
+                    }
+                    else if (cb.Name == "CheckBox_OpenAI_EnableLoadBalancing")
+                    {
+                        _plugin.Settings.OpenAI.EnableLoadBalancing = cb.IsChecked ?? false;
+                        // 重置OpenAI轮换索引，从头开始轮询
+                        _plugin.Settings.OpenAI.CurrentNodeIndex = -1;
+                    }
+                    SaveSettings();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LoadBalancing] 切换失败: {ex.Message}");
+            }
         }
 
         // ========== Gemini 渠道选择与详情回显 ==========
@@ -2858,7 +3043,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 slTemp.Value = node.Temperature;
                 if (this.FindName("TextBlock_GeminiNode_TemperatureValue") is TextBlock tv) tv.Text = node.Temperature.ToString("F2");
             }
-            if (this.FindName("TextBox_GeminiNode_MaxTokens") is TextBox tbMax) tbMax.Text = node.MaxTokens.ToString();
+            if (this.FindName("TextBox_GeminiNode_MaxTokens") is TextBox tbMax) tbMax.Text = (node.MaxTokens > 0 ? node.MaxTokens : _plugin.Settings.Gemini.MaxTokens).ToString();
             _isUpdatingNodeDetails = false;
         }
 
@@ -2887,8 +3072,9 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                             pb2.Password = tb.Text;
                         break;
                 }
-                RefreshGeminiNodesList();
-                ScheduleAutoSave();
+                ScheduleGeminiListRefresh();
+                // Gemini 文本编辑采用去抖保存，避免每次键入都触发重型保存
+                ScheduleSecretSave();
             }
         }
 
@@ -2902,8 +3088,9 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 node.ApiKey = pb.Password;
                 if (this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbPlain && tbPlain.Text != pb.Password)
                     tbPlain.Text = pb.Password;
-                RefreshGeminiNodesList();
-                ScheduleAutoSave();
+                ScheduleGeminiListRefresh();
+                // 密钥输入采用去抖保存，避免每次按键都保存导致卡顿
+                ScheduleSecretSave();
             }
         }
 
@@ -2917,7 +3104,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 cb.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     node.Model = cb.Text;
-                    RefreshGeminiNodesList();
+                    ScheduleGeminiListRefresh();
                     ScheduleAutoSave();
                 }), System.Windows.Threading.DispatcherPriority.Background);
             }
@@ -2931,7 +3118,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (sender is CheckBox cb && cb.Name == "CheckBox_GeminiNode_EnableAdvanced")
             {
                 node.EnableAdvanced = cb.IsChecked ?? false;
-                RefreshGeminiNodesList();
+                ScheduleGeminiListRefresh();
                 ScheduleAutoSave();
             }
         }
@@ -2945,7 +3132,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 node.Temperature = sl.Value;
                 if (this.FindName("TextBlock_GeminiNode_TemperatureValue") is TextBlock tv) tv.Text = sl.Value.ToString("F2");
-                RefreshGeminiNodesList();
+                ScheduleGeminiListRefresh();
                 ScheduleAutoSave();
             }
         }
@@ -2966,41 +3153,74 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         // 小眼睛：OpenAI API Key 显示/隐藏切换（供 XAML Click 使用）
         private void Button_Toggle_OpenAIApiKey_Click(object sender, RoutedEventArgs e)
         {
-            if (this.FindName("PasswordBox_OpenAIApiKey") is PasswordBox pbx && this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbx)
+            // 抑制节点详情事件与自动保存，避免在切换可见性时触发重型保存导致卡顿
+            var prevFlag = _isUpdatingNodeDetails;
+            _isUpdatingNodeDetails = true;
+            try
             {
-                if (pbx.Visibility == Visibility.Visible)
+                if (this.FindName("PasswordBox_OpenAIApiKey") is PasswordBox pbx && this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbx)
                 {
-                    tbx.Text = pbx.Password;
-                    pbx.Visibility = Visibility.Collapsed;
-                    tbx.Visibility = Visibility.Visible;
+                    if (pbx.Visibility == Visibility.Visible)
+                    {
+                        tbx.Text = pbx.Password;
+                        pbx.Visibility = Visibility.Collapsed;
+                        tbx.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        pbx.Password = tbx.Text;
+                        tbx.Visibility = Visibility.Collapsed;
+                        pbx.Visibility = Visibility.Visible;
+                    }
                 }
-                else
-                {
-                    pbx.Password = tbx.Text;
-                    tbx.Visibility = Visibility.Collapsed;
-                    pbx.Visibility = Visibility.Visible;
-                }
+            }
+            finally
+            {
+                _isUpdatingNodeDetails = prevFlag;
             }
         }
 
         // 小眼睛：Gemini API Key 显示/隐藏切换（供 XAML Click 使用）
         private void Button_Toggle_GeminiApiKey_Click(object sender, RoutedEventArgs e)
         {
-            if (this.FindName("PasswordBox_GeminiApiKey") is PasswordBox pbx && this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbx)
+            // 抑制节点详情事件与自动保存，避免在切换可见性时触发重型保存导致卡顿
+            var prevFlag = _isUpdatingNodeDetails;
+            _isUpdatingNodeDetails = true;
+            try
             {
-                if (pbx.Visibility == Visibility.Visible)
+                if (this.FindName("PasswordBox_GeminiApiKey") is PasswordBox pbx && this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbx)
                 {
-                    tbx.Text = pbx.Password;
-                    pbx.Visibility = Visibility.Collapsed;
-                    tbx.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    pbx.Password = tbx.Text;
-                    tbx.Visibility = Visibility.Collapsed;
-                    pbx.Visibility = Visibility.Visible;
+                    if (pbx.Visibility == Visibility.Visible)
+                    {
+                        tbx.Text = pbx.Password;
+                        pbx.Visibility = Visibility.Collapsed;
+                        tbx.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        pbx.Password = tbx.Text;
+                        tbx.Visibility = Visibility.Collapsed;
+                        pbx.Visibility = Visibility.Visible;
+                    }
                 }
             }
+            finally
+            {
+                _isUpdatingNodeDetails = prevFlag;
+            }
+        }
+
+        // 判断事件源是否在 Gemini 渠道列表内，用于在列表级事件中对 Gemini 文本编辑应用去抖保存
+        private bool IsInGeminiList(DependencyObject source)
+        {
+            DependencyObject current = source;
+            while (current != null)
+            {
+                if (current is FrameworkElement fe && fe.Name == "ListView_GeminiNodes")
+                    return true;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return false;
         }
 
         /// <summary>
@@ -3028,11 +3248,46 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
         }
 
-        // 统一转发为立即保存（Loaded 之后 _isReadyToSave 才会为 true）
-        private void ChannelList_TextChanged(object sender, TextChangedEventArgs e) => ScheduleAutoSave(true);
-        private void ChannelList_PasswordChanged(object sender, RoutedEventArgs e) => ScheduleAutoSave(true);
+        // 统一转发为保存：OpenAI/Gemini 列表中的 TextBox 使用去抖，体验一致
+        private void ChannelList_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ScheduleSecretSave();
+        }
+        private void ChannelList_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            // 统一去抖保存：OpenAI/Gemini 列表密码输入，体验一致
+            ScheduleSecretSave();
+        }
         private void ChannelList_SelectionChanged(object sender, SelectionChangedEventArgs e) => ScheduleAutoSave(true);
         private void ChannelList_Click(object sender, RoutedEventArgs e) => ScheduleAutoSave(true);
         private void ChannelList_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => ScheduleAutoSave(true);
+
+        // 处理可编辑 OpenAI 模型下拉框的文本提交（失焦/关闭下拉/回车）
+        private void OpenAIModel_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedOpenAINode();
+            if (node == null) return;
+            if (sender is ComboBox cb)
+            {
+                node.Model = cb.Text;
+                RefreshOpenAINodesList();
+                SaveSettings();
+            }
+        }
+
+        private void OpenAIModel_DropDownClosed(object sender, EventArgs e)
+        {
+            OpenAIModel_LostFocus(sender, null);
+        }
+
+        private void OpenAIModel_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                OpenAIModel_LostFocus(sender, null);
+                e.Handled = true;
+            }
+        }
     }
 }

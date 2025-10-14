@@ -401,7 +401,8 @@
                                                                 <PasswordBox utils:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay}"
                                                                             PasswordChar="*"
                                                                             BorderThickness="0"
-                                                                            Background="Transparent"/>
+                                                                            Background="Transparent"
+                                                                            IsEnabled="False"/>
                                                             </DataTemplate>
                                                         </GridViewColumn.CellTemplate>
                                                     </GridViewColumn>
@@ -600,7 +601,8 @@
                                                                 <PasswordBox utils:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay}"
                                                                              PasswordChar="*"
                                                                              BorderThickness="0"
-                                                                             Background="Transparent"/>
+                                                                             Background="Transparent"
+                                                                             IsEnabled="False"/>
                                                             </DataTemplate>
                                                         </GridViewColumn.CellTemplate>
                                                     </GridViewColumn>

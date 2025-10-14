@@ -17,6 +17,8 @@ namespace VPetLLM.Core.ChatCore
 
         private int _currentApiKeyIndex = 0;
         private readonly Random _random = new Random();
+        // 单次请求上下文缓存：避免同一请求中多次随机选择不同节点
+        private Setting.OpenAINodeSetting? _currentNodeContext;
         
         public OpenAIChatCore(Setting.OpenAINodeSetting openAINodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
@@ -46,31 +48,71 @@ namespace VPetLLM.Core.ChatCore
 
         private Setting.OpenAINodeSetting GetCurrentNode()
         {
-            // 统一复用 Setting.OpenAISetting 的内置选择/轮换逻辑，自动遵循 Enabled 与 EnableLoadBalancing
-            return _openAISetting.GetCurrentOpenAISetting();
+            // 若存在单次请求的缓存节点，则优先返回并清空，确保同一请求的一致性
+            if (_currentNodeContext != null)
+            {
+                var ctx = _currentNodeContext;
+                _currentNodeContext = null;
+                return ctx;
+            }
+            // 每次调用都按当前设置进行“渠道随机”
+            var nodes = _openAISetting.OpenAINodes ?? new List<Setting.OpenAINodeSetting>();
+            if (nodes.Count == 0)
+            {
+                // 兼容无节点：从全局 OpenAISetting 构造一个临时节点
+                return new Setting.OpenAINodeSetting
+                {
+                    ApiKey = _openAISetting.ApiKey,
+                    Model = _openAISetting.Model,
+                    Url = _openAISetting.Url,
+                    Temperature = _openAISetting.Temperature,
+                    MaxTokens = _openAISetting.MaxTokens,
+                    EnableAdvanced = _openAISetting.EnableAdvanced,
+                    Enabled = _openAISetting.Enabled,
+                    Name = _openAISetting.Name
+                };
+            }
+
+            var enabled = nodes.Where(n => n.Enabled).ToList();
+            if (enabled.Count == 0)
+            {
+                // 无启用节点时，回退到第一个
+                return nodes.First();
+            }
+
+            if (_openAISetting.EnableLoadBalancing)
+            {
+                // 负载均衡开启：在启用的节点中随机选择一个
+                return enabled[_random.Next(enabled.Count)];
+            }
+            else
+            {
+                // 未开启负载均衡：固定索引，否则使用第一个
+                if (_openAISetting.CurrentNodeIndex >= 0 && _openAISetting.CurrentNodeIndex < nodes.Count)
+                    return nodes[_openAISetting.CurrentNodeIndex];
+                return nodes.First();
+            }
         }
 
         private string GetCurrentApiKey(Setting.OpenAINodeSetting node)
         {
-            if (string.IsNullOrEmpty(node.ApiKey))
-            {
+            if (string.IsNullOrWhiteSpace(node?.ApiKey))
                 return string.Empty;
-            }
 
-            var apiKeys = node.ApiKey.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-            if (apiKeys.Length == 0)
-            {
+            var apiKeys = node.ApiKey
+                .Split(new[] { ',', ';', '|', '\n', '\r', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(k => k.Trim())
+                .Where(k => !string.IsNullOrWhiteSpace(k))
+                .Distinct()
+                .ToList();
+
+            if (apiKeys.Count == 0)
                 return string.Empty;
-            }
-
-            if (apiKeys.Length == 1)
-            {
+            if (apiKeys.Count == 1)
                 return apiKeys[0];
-            }
 
-            // 轮换选择API Key
-            _currentApiKeyIndex = (_currentApiKeyIndex + 1) % apiKeys.Length;
-            return apiKeys[_currentApiKeyIndex];
+            // 渠道内多 key 自动随机（不受负载均衡开关影响）
+            return apiKeys[_random.Next(apiKeys.Count)];
         }
 
         private (string apiUrl, string apiKey) GetCurrentEndpoint()
@@ -89,6 +131,8 @@ namespace VPetLLM.Core.ChatCore
                 apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
             }
 
+            // 将本次选中的节点写入上下文缓存，供同一请求中后续调用复用
+            _currentNodeContext = currentNode;
             return (apiUrl, currentApiKey);
         }
 
