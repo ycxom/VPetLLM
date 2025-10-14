@@ -218,6 +218,12 @@ namespace VPetLLM.Core
             var handler = CreateHttpClientHandler();
             return new HttpClient(handler);
         }
+
+        // 统一将内部 Message 映射为 OpenAI 风格的 { role, content }，避免额外字段
+        protected IEnumerable<object> ShapeMessages(IEnumerable<Message> messages, bool useDisplayContent = true)
+        {
+            return messages.Select(m => new { role = m.Role, content = useDisplayContent ? m.DisplayContent : m.Content });
+        }
     }
 
     public class Message

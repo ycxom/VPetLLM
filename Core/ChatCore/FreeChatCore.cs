@@ -68,7 +68,7 @@ namespace VPetLLM.Core.ChatCore
                 var requestBody = new
                 {
                     model = Model,
-                    messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
+                    messages = ShapeMessages(history),
                     temperature = _freeSetting.Temperature,
                     max_tokens = _freeSetting.MaxTokens
                 };
@@ -172,9 +172,8 @@ namespace VPetLLM.Core.ChatCore
         {
             try
             {
-                var messages = new List<object>
+                var messages = new[]
                 {
-                    new { role = "system", content = "请简洁地总结以下内容，保持关键信息。" },
                     new { role = "user", content = text }
                 };
 
@@ -182,8 +181,8 @@ namespace VPetLLM.Core.ChatCore
                 {
                     model = Model,
                     messages = messages,
-                    temperature = 0.3,
-                    max_tokens = 500
+                    temperature = _freeSetting.Temperature,
+                    max_tokens = _freeSetting.MaxTokens
                 };
 
                 var json = JsonConvert.SerializeObject(requestBody);
