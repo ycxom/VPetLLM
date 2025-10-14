@@ -28,8 +28,8 @@
         "zh": "仅可用于 [:talk(say(\"文本\", 说话动画, 身体动画))] 第二个参数的说话动画列表: [{SayAnimationList}]"
     },
     "Available_Items_Prefix": {
-        "en": "Available items for purchase: {ItemList}.",
-        "zh": "可购买物品列表:{ItemList}。"
+        "en": "The purchase only applies to itself and cannot affect the user. Available items for purchase: {ItemList}.",
+        "zh": " 该购买仅给予自身 ，无法影响用户。可购买物品列表:{ItemList}。"
     },
     "Available_Plugins_Prefix": {
         "en": "Available Plugins (all plugins must be called in the format `[:plugin(plugin_name(parameters))]`):\n{PluginList}",
@@ -56,19 +56,19 @@
         "zh": "让宠物说话。允许同时指定说话动画和身体动画: `[:talk(say(\"文本\", 说话动画, 身体动画))]`。示例：[:talk(say(\"喜欢\", shy, touchhead))]。两种动画都是可选的。'说话动画'必须是说话动画列表中的一个。'身体动画'来自通用动画列表。使用三参数版本时，不要再使用独立的 `[:body(...)]` 指令。"
     },
     "Handler_Exp_Description": {
-        "en": "Increase or decrease experience points with the 'exp' command. For example: '[:state(exp(10))]'.",
-        "zh": "通过 'exp' 指令增加或减少经验值。例如 '[:state(exp(10))]'。"
+        "en": "Increase or decrease experience points with the 'exp' command. For example: '[:state(exp(10))]'.This command can only affect and act upon itself; it cannot influence the user.",
+        "zh": "通过 'exp' 指令增加或减少经验值。例如 '[:state(exp(10))]'。该命令只能影响并作用与自身，无法影响用户。"
     },
     "Handler_Happy_Description": {
-        "en": "Increase or decrease mood with the 'happy' command. For example: '[:state(happy(10))]', to adjust your affection towards the user.",
-        "zh": "通过 'happy' 指令增加或减少心情值。例如 '[:state(happy(10))]'，调整你对用户的好感度调整。"
+        "en": "Increase or decrease mood with the 'happy' command. For example: '[:state(happy(10))]', to adjust your affection towards the user.This command can only affect and act upon itself; it cannot influence the user.",
+        "zh": "通过 'happy' 指令增加或减少心情值。例如 '[:state(happy(10))]'，调整你对用户的好感度调整。该命令只能影响并作用与自身，无法影响用户。"
     },
     "Handler_Health_Description": {
         "en": "Increase or decrease health points with the 'health' command. For example: '[:state(health(10))]'.",
-        "zh": "通过 'health' 指令增加或减少健康值。例如 '[:state(health(10))]'。"
+        "zh": "通过 'health' 指令增加或减少健康值。例如 '[:state(health(10))]'。该命令只能影响并作用与自身，无法影响用户。"
     },
     "Handler_Plugin_Description": {
-        "en": "Manage or call installed plugins. Format: [:plugin(operation:plugin_name)], supported operations are 'delete', 'disable', 'enable'.",
+        "en": "Manage or call installed plugins. Format: [:plugin(operation:plugin_name)], supported operations are 'delete', 'disable', 'enable'.This command can only affect and act upon itself; it cannot influence the user.",
         "zh": "管理或调用已安装的插件。格式: [:plugin(操作:插件名称)]，支持的操作有 'delete', 'disable', 'enable'。"
     },
     "Handler_Tool_Description": {
