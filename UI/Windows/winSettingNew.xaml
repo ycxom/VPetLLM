@@ -4,11 +4,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VPetLLM"
-        xmlns:utils="clr-namespace:VPetLLM.Utils"
+    
         mc:Ignorable="d"
         Title="VPetLLM"
-        Height="833"
-        Width="991"
+    xmlns:utils="clr-namespace:VPetLLM.Utils"
+        Height="907"
+        Width="1117"
         Background="{DynamicResource BackgroundBrush}">
     <Window.Resources>
         <ResourceDictionary>
@@ -116,7 +117,7 @@
         </Grid.RowDefinitions>
 
         <TabControl Grid.Row="0" Style="{StaticResource ModernTabControl}">
-            <TabItem Header="LLM设置"
+            <TabItem Header="{utils:Localize KeyPath=LLM_Settings.Tab}"
                     x:Name="Tab_LLM"
                     Style="{StaticResource ModernTabItem}">
                 <Grid>
@@ -129,7 +130,7 @@
                             VerticalScrollBarVisibility="Auto">
                         <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
                             <StackPanel Style="{StaticResource SettingGroup}">
-                                <Label Content="LLM 提供商"
+                                <Label Content="{utils:Localize KeyPath=LLM_Settings.Provider}"
                                         x:Name="Label_Provider"
                                         Style="{StaticResource SettingLabel}"/>
                                 <ComboBox x:Name="ComboBox_Provider"
@@ -159,7 +160,7 @@
                                                                         HorizontalAlignment="Center"
                                                                         VerticalAlignment="Center"/>
                                                             </Border>
-                                                            
+
                                                             <!-- 提供商名称 -->
                                                             <TextBlock Text="{Binding}"
                                                                     VerticalAlignment="Center"/>
@@ -190,7 +191,7 @@
                                     </ComboBox.ItemContainerStyle>
                                 </ComboBox>
 
-                                <Label Content="AI名称"
+                                <Label Content="{utils:Localize KeyPath=LLM_Settings.AiName}"
                                         VerticalAlignment="Top"
                                         Margin="0,0,0,0"
                                         x:Name="Label_AiName"
@@ -200,7 +201,7 @@
                                          Margin="0,0,0,16"
                                          Style="{StaticResource ModernTextBox}"
                                          IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
-                                <Label Content="用户名称"
+                                <Label Content="{utils:Localize KeyPath=LLM_Settings.UserName}"
                                          VerticalAlignment="Top"
                                          Margin="0,0,0,0"
                                          x:Name="Label_UserName"
@@ -211,10 +212,10 @@
                                          Style="{StaticResource ModernTextBox}"
                                          IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
                                 <CheckBox x:Name="CheckBox_FollowVPetName"
-                                        Content="名字与主人名字设置跟着桌面宠物设置"
+                                        Content="{utils:Localize KeyPath=LLM_Settings.FollowVPetName}"
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernCheckBox}"/>
-                                <Label Content="角色设定"
+                                <Label Content="{utils:Localize KeyPath=LLM_Settings.Role}"
                                         VerticalAlignment="Top"
                                         Margin="0,0,0,0"
                                         x:Name="Label_Role"
@@ -229,34 +230,34 @@
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernTextBox}"/>
 
-                                <Label Content="上下文控制"
+                                <Label Content="{utils:Localize KeyPath=LLM_Settings.ContextControl}"
                                         Margin="0,0,0,0"
                                         x:Name="Label_ContextControl"
                                         Style="{StaticResource SettingLabel}"/>
                                 <CheckBox x:Name="CheckBox_KeepContext"
-                                        Content="保持聊天上下文"
+                                        Content="{utils:Localize KeyPath=LLM_Settings.KeepContext}"
                                         Margin="0,0,0,8"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableChatHistory"
-                                        Content="保存聊天历史"
+                                        Content="{utils:Localize KeyPath=LLM_Settings.EnableChatHistory}"
                                         Margin="0,0,0,8"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_SeparateChatByProvider"
-                                        Content="按提供商分离聊天记录"
+                                        Content="{utils:Localize KeyPath=LLM_Settings.SeparateChatByProvider}"
                                         Margin="0,0,0,16"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <WrapPanel HorizontalAlignment="Right"
                                         Margin="0,0,0,0">
                                     <Button x:Name="Button_ClearContext"
-                                            Content="清除上下文"
+                                            Content="{utils:Localize KeyPath=LLM_Settings.ClearContext}"
                                             Click="Button_ClearContext_Click"
                                             Margin="0,0,10,0"
                                             Style="{StaticResource SecondaryButton}"/>
                                     <Button x:Name="Button_EditContext"
-                                            Content="编辑上下文"
+                                            Content="{utils:Localize KeyPath=LLM_Settings.EditContext}"
                                             Click="Button_EditContext_Click"
                                             Style="{StaticResource ModernButton}"/>
                                 </WrapPanel>
@@ -265,19 +266,19 @@
                     </ScrollViewer>
 
                     <TabControl Grid.Column="1">
-                        <TabItem Header="Ollama"
+                        <TabItem Header="{utils:Localize KeyPath=Ollama.Header}"
                                 x:Name="Tab_Ollama"
                                 Style="{StaticResource ModernTabItem}">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <Border Style="{StaticResource CardContainer}">
                                     <StackPanel Style="{StaticResource SettingGroup}">
-                                        <Label Content="URL"
+                                        <Label Content="{utils:Localize KeyPath=Ollama.URL}"
                                                 x:Name="Label_OllamaUrl"
                                                 Style="{StaticResource SettingLabel}"/>
                                         <TextBox x:Name="TextBox_OllamaUrl"
                                                 Margin="0,0,0,16"
                                                 Style="{StaticResource ModernTextBox}"/>
-                                        <Label Content="模型"
+                                        <Label Content="{utils:Localize KeyPath=Ollama.Model}"
                                                 x:Name="Label_OllamaModel"
                                                 Style="{StaticResource SettingLabel}"/>
                                         <Grid Margin="0,0,0,16">
@@ -291,13 +292,13 @@
                                                     Style="{StaticResource ModelComboBox}"/>
                                             <Button x:Name="Button_RefreshOllamaModels"
                                                     Grid.Column="1"
-                                                    Content="刷新"
+                                                    Content="{utils:Localize KeyPath=Ollama.Refresh}"
                                                     Click="Button_RefreshOllamaModels_Click"
                                                     Margin="10,0,0,0"
                                                     Style="{StaticResource SecondaryButton}"/>
                                         </Grid>
                                         <CheckBox x:Name="CheckBox_Ollama_EnableAdvanced"
-                                                Content="启用高级配置"
+                                                Content="{utils:Localize KeyPath=Ollama.EnableAdvanced}"
                                                 Margin="0,0,0,16"
                                                 Style="{StaticResource ModernCheckBox}"/>
                                         <StackPanel x:Name="StackPanel_Ollama_Advanced"
@@ -305,7 +306,7 @@
                                                 IsEnabled="{Binding ElementName=CheckBox_Ollama_EnableAdvanced, Path=IsChecked}">
                                             <StackPanel Orientation="Horizontal"
                                                     Margin="0,0,0,12">
-                                                <TextBlock Text="温度:"
+                                                <TextBlock Text="{utils:Localize KeyPath=Ollama.Temperature, Suffix=:}"
                                                         Width="80"
                                                         VerticalAlignment="Center"
                                                         x:Name="TextBlock_Ollama_Temperature"
@@ -325,7 +326,7 @@
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal"
                                                     Margin="0,0,0,0">
-                                                <TextBlock Text="最大Token:"
+                                                <TextBlock Text="{utils:Localize KeyPath=Ollama.MaxTokens, Suffix=:}"
                                                         Width="80"
                                                         VerticalAlignment="Center"
                                                         x:Name="TextBlock_Ollama_MaxTokens"
@@ -342,179 +343,400 @@
                                 </Border>
                             </ScrollViewer>
                         </TabItem>
-                        <TabItem Header="OpenAI"
+                        <TabItem Header="{utils:Localize KeyPath=OpenAI.Header}"
                                 x:Name="Tab_OpenAI"
                                 Style="{StaticResource ModernTabItem}">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <Border Style="{StaticResource CardContainer}">
                                     <StackPanel Style="{StaticResource SettingGroup}">
-                                        <Label Content="API 密钥"
-                                                x:Name="Label_OpenAIApiKey"
-                                                Style="{StaticResource SettingLabel}"/>
-                                        <TextBox x:Name="TextBox_OpenAIApiKey"
+                                        <Label Content="{utils:Localize KeyPath=OpenAI.ChannelManagement}"
+                                                x:Name="Label_OpenAINodeManagement"
+                                                Style="{StaticResource SettingLabel}"
+                                                FontSize="16"
+                                                FontWeight="Bold"/>
+                                        <TextBlock Text="{utils:Localize KeyPath=OpenAI.ChannelManagementDesc}"
+                                                TextWrapping="Wrap"
+                                                Foreground="{StaticResource SecondaryTextBrush}"
                                                 Margin="0,0,0,16"
-                                                Style="{StaticResource ModernTextBox}"/>
-                                        <Label Content="模型"
-                                                x:Name="Label_OpenAIModel"
-                                                Style="{StaticResource SettingLabel}"/>
-                                        <Grid Margin="0,0,0,16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <ComboBox x:Name="ComboBox_OpenAIModel"
-                                                    Grid.Column="0"
-                                                    IsEditable="True"
-                                                    Style="{StaticResource ModelComboBox}"/>
-                                            <Button x:Name="Button_RefreshOpenAIModels"
-                                                    Grid.Column="1"
-                                                    Content="刷新"
-                                                    Click="Button_RefreshOpenAIModels_Click"
+                                                FontSize="12"/>
+
+                                        <CheckBox x:Name="CheckBox_OpenAI_EnableLoadBalancing"
+                                                Content="{utils:Localize KeyPath=OpenAI.EnableLoadBalancing}"
+                                                Margin="0,0,0,16"
+                                                IsChecked="True"
+                                                Style="{StaticResource ModernCheckBox}"/>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                            <Button x:Name="Button_AddOpenAINode"
+                                                    Content="{utils:Localize KeyPath=OpenAI.AddChannel}"
+                                                    Click="Button_AddOpenAINode_Click"
+                                                    Style="{StaticResource ModernButton}"/>
+                                            <Button x:Name="Button_RemoveOpenAINode"
+                                                    Content="{utils:Localize KeyPath=OpenAI.RemoveSelectedChannel}"
+                                                    Click="Button_RemoveOpenAINode_Click"
                                                     Margin="10,0,0,0"
                                                     Style="{StaticResource SecondaryButton}"/>
-                                        </Grid>
-                                        <Label Content="API 地址"
-                                                x:Name="Label_OpenAIUrl"
-                                                Style="{StaticResource SettingLabel}"/>
-                                        <TextBox x:Name="TextBox_OpenAIUrl"
-                                                Margin="0,0,0,16"
-                                                Style="{StaticResource ModernTextBox}"/>
-                                        <CheckBox x:Name="CheckBox_OpenAI_EnableAdvanced"
-                                                Content="启用高级配置"
-                                                Margin="0,0,0,16"
-                                                Style="{StaticResource ModernCheckBox}"/>
-                                        <StackPanel x:Name="StackPanel_OpenAI_Advanced"
-                                                Margin="20,0,0,0"
-                                                IsEnabled="{Binding ElementName=CheckBox_OpenAI_EnableAdvanced, Path=IsChecked}">
-                                            <StackPanel Orientation="Horizontal"
-                                                    Margin="0,0,0,12">
-                                                <TextBlock Text="温度:"
-                                                        Width="80"
-                                                        VerticalAlignment="Center"
-                                                        x:Name="TextBlock_OpenAI_Temperature"
-                                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                                        FontSize="14"/>
-                                                <Slider x:Name="Slider_OpenAI_Temperature"
-                                                        Minimum="0"
-                                                        Maximum="2"
-                                                        Width="125"
-                                                        Margin="10,0"
-                                                        VerticalAlignment="Center"/>
-                                                <TextBlock x:Name="TextBlock_OpenAI_TemperatureValue"
-                                                        Width="40"
-                                                        VerticalAlignment="Center"
-                                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                                        FontSize="14"/>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal"
-                                                    Margin="0,0,0,0">
-                                                <TextBlock Text="最大Token:"
-                                                        Width="80"
-                                                        VerticalAlignment="Center"
-                                                        x:Name="TextBlock_OpenAI_MaxTokens"
-                                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                                        FontSize="14"/>
-                                                <TextBox x:Name="TextBox_OpenAI_MaxTokens"
-                                                        Width="125"
-                                                        Margin="10,0"
-                                                        VerticalAlignment="Center"
+                                        </StackPanel>
+
+                                        <ListView x:Name="ListView_OpenAINodes"
+                                                  Height="200"
+                                                  Margin="0,0,0,16"
+                                                  SelectionMode="Single"
+                                                  SelectionChanged="ListView_OpenAINodes_SelectionChanged">
+                                            <ListView.View>
+                                                <GridView>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=OpenAI.Enabled}" Width="50">
+                                                        <GridViewColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox IsChecked="{Binding Enabled}" 
+                                                                          HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                            </DataTemplate>
+                                                        </GridViewColumn.CellTemplate>
+                                                    </GridViewColumn>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=OpenAI.ChannelName}" Width="120" DisplayMemberBinding="{Binding Name}"/>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=OpenAI.ApiKey}" Width="200">
+                                                        <GridViewColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <PasswordBox utils:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay}"
+                                                                            PasswordChar="*"
+                                                                            BorderThickness="0"
+                                                                            Background="Transparent"/>
+                                                            </DataTemplate>
+                                                        </GridViewColumn.CellTemplate>
+                                                    </GridViewColumn>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=OpenAI.Model}" Width="120" DisplayMemberBinding="{Binding Model}"/>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=OpenAI.ApiAddress}" Width="150" DisplayMemberBinding="{Binding Url}"/>
+                                                </GridView>
+                                            </ListView.View>
+                                        </ListView>
+
+                                        <StackPanel x:Name="StackPanel_OpenAINodeDetails"
+                                                Margin="20,0,0,16"
+                                                IsEnabled="{Binding ElementName=ListView_OpenAINodes, Path=SelectedItem}">
+                                            <Label Content="{utils:Localize KeyPath=OpenAI.ChannelConfig}"
+                                                    Style="{StaticResource SettingLabel}"
+                                                    FontSize="14"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+
+                                                <Label Content="{utils:Localize KeyPath=OpenAI.ChannelName, Suffix=:}"
+                                                        Grid.Row="0" Grid.Column="0"
+                                                        Style="{StaticResource SettingLabel}"/>
+                                                <TextBox x:Name="TextBox_OpenAINodeName"
+                                                        Grid.Row="0" Grid.Column="1"
+                                                        Margin="10,0,0,8"
                                                         Style="{StaticResource ModernTextBox}"/>
+
+                                                <Label Content="{utils:Localize KeyPath=OpenAI.ApiKey, Suffix=:}"
+                                                        Grid.Row="1" Grid.Column="0"
+                                                        Style="{StaticResource SettingLabel}"/>
+                                                <Grid Grid.Row="1" Grid.Column="1" Margin="10,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <PasswordBox x:Name="PasswordBox_OpenAIApiKey"
+                                                                 Grid.Column="0"
+                                                                 PasswordChar="*"/>
+                                                    <TextBox x:Name="TextBox_OpenAIApiKey_Plain"
+                                                             Grid.Column="0"
+                                                             Visibility="Collapsed"
+                                                             AcceptsReturn="True"
+                                                             TextWrapping="Wrap"
+                                                             VerticalScrollBarVisibility="Auto"
+                                                             Height="80"
+                                                             ToolTip="{utils:Localize KeyPath=OpenAI.ApiKeyTooltip}"
+                                                             FontFamily="Consolas"
+                                                             Style="{StaticResource ModernTextBox}"/>
+                                                    <Button x:Name="Button_Toggle_OpenAIApiKey"
+                                                            Grid.Column="1"
+                                                            Content="👁"
+                                                            ToolTip="{utils:Localize KeyPath=OpenAI.ToggleApiKeyVisibility}"
+                                                            Click="Button_Toggle_OpenAIApiKey_Click"
+                                                            Margin="8,0,0,0"
+                                                            Style="{StaticResource SecondaryButton}"/>
+                                                </Grid>
+
+                                                <Label Content="{utils:Localize KeyPath=OpenAI.Model, Suffix=:}"
+                                                        Grid.Row="2" Grid.Column="0"
+                                                        Style="{StaticResource SettingLabel}"/>
+                                                <Grid Grid.Row="2" Grid.Column="1" Margin="10,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <ComboBox x:Name="ComboBox_OpenAIModel"
+                                                            Grid.Column="0"
+                                                            IsEditable="True"
+                                                            Style="{StaticResource ModelComboBox}"/>
+                                                    <Button x:Name="Button_RefreshOpenAIModels"
+                                                            Grid.Column="1"
+                                                            Content="{utils:Localize KeyPath=OpenAI.Refresh}"
+                                                            Click="Button_RefreshOpenAIModels_Click"
+                                                            Margin="10,0,0,0"
+                                                            Style="{StaticResource SecondaryButton}"/>
+                                                </Grid>
+
+                                                <Label Content="{utils:Localize KeyPath=OpenAI.ApiAddress, Suffix=:}"
+                                                        Grid.Row="3" Grid.Column="0"
+                                                        Style="{StaticResource SettingLabel}"/>
+                                                <TextBox x:Name="TextBox_OpenAIUrl"
+                                                        Grid.Row="3" Grid.Column="1"
+                                                        Margin="10,0,0,8"
+                                                        Style="{StaticResource ModernTextBox}"/>
+                                            </Grid>
+
+                                            <CheckBox x:Name="CheckBox_OpenAI_EnableAdvanced"
+                                                    Content="{utils:Localize KeyPath=OpenAI.EnableAdvanced}"
+                                                    Margin="0,16,0,16"
+                                                    Style="{StaticResource ModernCheckBox}"/>
+                                            <StackPanel x:Name="StackPanel_OpenAI_Advanced"
+                                                    Margin="20,0,0,0"
+                                                    IsEnabled="{Binding ElementName=CheckBox_OpenAI_EnableAdvanced, Path=IsChecked}">
+                                                <StackPanel Orientation="Horizontal"
+                                                        Margin="0,0,0,12">
+                                                    <TextBlock Text="{utils:Localize KeyPath=OpenAI.Temperature}"
+                                                            Width="80"
+                                                            VerticalAlignment="Center"
+                                                            x:Name="TextBlock_OpenAI_Temperature"
+                                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                                            FontSize="14"/>
+                                                    <Slider x:Name="Slider_OpenAI_Temperature"
+                                                            Minimum="0"
+                                                            Maximum="2"
+                                                            Width="125"
+                                                            Margin="10,0"
+                                                            VerticalAlignment="Center"/>
+                                                    <TextBlock x:Name="TextBlock_OpenAI_TemperatureValue"
+                                                            Width="40"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                                            FontSize="14"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal"
+                                                        Margin="0,0,0,0">
+                                                    <TextBlock Text="{utils:Localize KeyPath=OpenAI.MaxTokens}"
+                                                            Width="80"
+                                                            VerticalAlignment="Center"
+                                                            x:Name="TextBlock_OpenAI_MaxTokens"
+                                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                                            FontSize="14"/>
+                                                    <TextBox x:Name="TextBox_OpenAI_MaxTokens"
+                                                            Width="125"
+                                                            Margin="10,0"
+                                                            VerticalAlignment="Center"
+                                                            Style="{StaticResource ModernTextBox}"/>
+                                                </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </ScrollViewer>
                         </TabItem>
-                        <TabItem Header="Gemini"
+                        <TabItem Header="{utils:Localize KeyPath=Gemini.Header}"
                                 x:Name="Tab_Gemini"
                                 Style="{StaticResource ModernTabItem}">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <Border Style="{StaticResource CardContainer}">
                                     <StackPanel Style="{StaticResource SettingGroup}">
-                                        <Label Content="API 密钥"
-                                                x:Name="Label_GeminiApiKey"
-                                                Style="{StaticResource SettingLabel}"/>
-                                        <TextBox x:Name="TextBox_GeminiApiKey"
-                                                Margin="0,0,0,16"
-                                                Style="{StaticResource ModernTextBox}"/>
-                                        <Label Content="模型"
-                                                x:Name="Label_GeminiModel"
-                                                Style="{StaticResource SettingLabel}"/>
-                                        <Grid Margin="0,0,0,16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <ComboBox x:Name="ComboBox_GeminiModel"
-                                                    Grid.Column="0"
-                                                    IsEditable="True"
-                                                    Style="{StaticResource ModelComboBox}"/>
-                                            <Button x:Name="Button_RefreshGeminiModels"
-                                                    Grid.Column="1"
-                                                    Content="刷新"
-                                                    Click="Button_RefreshGeminiModels_Click"
+                                        <!-- Gemini 节点管理（新增） -->
+                                        <Label Content="{utils:Localize KeyPath=Gemini.ChannelManagement}"
+                                               x:Name="Label_GeminiNodeManagement"
+                                               Style="{StaticResource SettingLabel}"
+                                               FontSize="16"
+                                               FontWeight="Bold"/>
+                                        <TextBlock Text="{utils:Localize KeyPath=Gemini.ChannelManagementDesc}"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                                   Margin="0,0,0,16"
+                                                   FontSize="12"/>
+                                        <CheckBox x:Name="CheckBox_Gemini_EnableLoadBalancing"
+                                                  Content="{utils:Localize KeyPath=Gemini.EnableLoadBalancing}"
+                                                  Margin="0,0,0,16"
+                                                  IsChecked="True"
+                                                  Style="{StaticResource ModernCheckBox}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                            <Button x:Name="Button_AddGeminiNode"
+                                                    Content="{utils:Localize KeyPath=Gemini.AddChannel}"
+                                                    Click="Button_AddGeminiNode_Click"
+                                                    Style="{StaticResource ModernButton}"/>
+                                            <Button x:Name="Button_RemoveGeminiNode"
+                                                    Content="{utils:Localize KeyPath=Gemini.RemoveSelectedChannel}"
+                                                    Click="Button_RemoveGeminiNode_Click"
                                                     Margin="10,0,0,0"
-                                                    Style="{StaticResource SecondaryButton}"/>
-                                        </Grid>
-                                        <Label Content="API 地址"
-                                                x:Name="Label_GeminiUrl"
-                                                Style="{StaticResource SettingLabel}"/>
-                                        <TextBox x:Name="TextBox_GeminiUrl"
-                                                Margin="0,0,0,8"
-                                                Style="{StaticResource ModernTextBox}"/>
-                                        <TextBlock Text="注意：请提供正确的 API 端点 URL。"
-                                                TextWrapping="Wrap"
-                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                                x:Name="TextBlock_GeminiApiEndpointNote"
-                                                FontSize="12"
-                                                Margin="0,0,0,16"/>
-                                        <CheckBox x:Name="CheckBox_Gemini_EnableAdvanced"
-                                                Content="启用高级配置"
-                                                Margin="0,0,0,16"
-                                                Style="{StaticResource ModernCheckBox}"/>
-                                        <StackPanel x:Name="StackPanel_Gemini_Advanced"
-                                                Margin="20,0,0,0"
-                                                IsEnabled="{Binding ElementName=CheckBox_Gemini_EnableAdvanced, Path=IsChecked}">
-                                            <StackPanel Orientation="Horizontal"
-                                                    Margin="0,0,0,12">
-                                                <TextBlock Text="温度:"
-                                                        Width="80"
-                                                        VerticalAlignment="Center"
-                                                        x:Name="TextBlock_Gemini_Temperature"
-                                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                                        FontSize="14"/>
-                                                <Slider x:Name="Slider_Gemini_Temperature"
-                                                        Minimum="0"
-                                                        Maximum="2"
-                                                        Width="125"
-                                                        Margin="10,0"
-                                                        VerticalAlignment="Center"/>
-                                                <TextBlock x:Name="TextBlock_Gemini_TemperatureValue"
-                                                        Width="40"
-                                                        VerticalAlignment="Center"
-                                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                                        FontSize="14"/>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal"
-                                                    Margin="0,0,0,0">
-                                                <TextBlock Text="最大Token:"
-                                                        Width="80"
-                                                        VerticalAlignment="Center"
-                                                        x:Name="TextBlock_Gemini_MaxTokens"
-                                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                                        FontSize="14"/>
-                                                <TextBox x:Name="TextBox_Gemini_MaxTokens"
-                                                        Width="125"
-                                                        Margin="10,0"
-                                                        VerticalAlignment="Center"
-                                                        Style="{StaticResource ModernTextBox}"/>
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    />
+                                        </StackPanel>
+                                        <ListView x:Name="ListView_GeminiNodes"
+                                                  Height="200"
+                                                  Margin="0,0,0,16"
+                                                  SelectionMode="Single"
+                                                  SelectionChanged="ListView_GeminiNodes_SelectionChanged">
+                                            <ListView.View>
+                                                <GridView>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=Gemini.Enabled}" Width="50">
+                                                        <GridViewColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox IsChecked="{Binding Enabled}"
+                                                                          HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                            </DataTemplate>
+                                                        </GridViewColumn.CellTemplate>
+                                                    </GridViewColumn>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=Gemini.ChannelName}" Width="120" DisplayMemberBinding="{Binding Name}"/>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=Gemini.ApiKey}" Width="200">
+                                                        <GridViewColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <PasswordBox utils:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay}"
+                                                                             PasswordChar="*"
+                                                                             BorderThickness="0"
+                                                                             Background="Transparent"/>
+                                                            </DataTemplate>
+                                                        </GridViewColumn.CellTemplate>
+                                                    </GridViewColumn>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=Gemini.Model}" Width="120" DisplayMemberBinding="{Binding Model}"/>
+                                                    <GridViewColumn Header="{utils:Localize KeyPath=Gemini.ApiAddress}" Width="150" DisplayMemberBinding="{Binding Url}"/>
+                                                </GridView>
+                                            </ListView.View>
+                                        </ListView>
+                                        <StackPanel x:Name="StackPanel_GeminiNodeDetails"
+                                                    Margin="20,0,0,16"
+                                                    IsEnabled="{Binding ElementName=ListView_GeminiNodes, Path=SelectedItem}">
+                                            <Label Content="{utils:Localize KeyPath=Gemini.ChannelConfig}"
+                                                   Style="{StaticResource SettingLabel}"
+                                                   FontSize="14"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <Label Content="{utils:Localize KeyPath=Gemini.ChannelName, Suffix=:}"
+                                                       Grid.Row="0" Grid.Column="0"
+                                                       Style="{StaticResource SettingLabel}"/>
+                                                <TextBox x:Name="TextBox_GeminiNodeName"
+                                                         Grid.Row="0" Grid.Column="1"
+                                                         Margin="10,0,0,8"
+                                                         Style="{StaticResource ModernTextBox}"/>
+                                                <Label Content="{utils:Localize KeyPath=Gemini.ApiKey, Suffix=:}"
+                                                       Grid.Row="1" Grid.Column="0"
+                                                       Style="{StaticResource SettingLabel}"/>
+                                                <Grid Grid.Row="1" Grid.Column="1" Margin="10,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <PasswordBox x:Name="PasswordBox_GeminiApiKey"
+                                                                 Grid.Column="0"
+                                                                 PasswordChar="*"/>
+                                                    <TextBox x:Name="TextBox_GeminiApiKey_Plain"
+                                                             Grid.Column="0"
+                                                             Visibility="Collapsed"
+                                                             AcceptsReturn="True"
+                                                             TextWrapping="Wrap"
+                                                             VerticalScrollBarVisibility="Auto"
+                                                             Height="80"
+                                                             ToolTip="{utils:Localize KeyPath=Gemini.ApiKeyTooltip}"
+                                                             FontFamily="Consolas"
+                                                             Style="{StaticResource ModernTextBox}"/>
+                                                    <Button x:Name="Button_Toggle_GeminiApiKey"
+                                                            Grid.Column="1"
+                                                            Content="👁"
+                                                            ToolTip="{utils:Localize KeyPath=Gemini.ToggleApiKeyVisibility}"
+                                                            Click="Button_Toggle_GeminiApiKey_Click"
+                                                            Margin="8,0,0,0"
+                                                            Style="{StaticResource SecondaryButton}"/>
+                                                </Grid>
+                                                <Label Content="{utils:Localize KeyPath=Gemini.Model, Suffix=:}"
+                                                       Grid.Row="2" Grid.Column="0"
+                                                       Style="{StaticResource SettingLabel}"/>
+                                                <Grid Grid.Row="2" Grid.Column="1" Margin="10,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <ComboBox x:Name="ComboBox_GeminiNodeModel"
+                                                              Grid.Column="0"
+                                                              IsEditable="True"
+                                                              Style="{StaticResource ModelComboBox}"/>
+                                                    <Button x:Name="Button_RefreshGeminiModels_Nodes"
+                                                            Grid.Column="1"
+                                                            Content="{utils:Localize KeyPath=Gemini.Refresh}"
+                                                            Click="Button_RefreshGeminiModels_Click"
+                                                            Margin="10,0,0,0"
+                                                            Style="{StaticResource SecondaryButton}"/>
+                                                </Grid>
+                                                <Label Content="{utils:Localize KeyPath=Gemini.ApiAddress, Suffix=:}"
+                                                       Grid.Row="3" Grid.Column="0"
+                                                       Style="{StaticResource SettingLabel}"/>
+                                                <TextBox x:Name="TextBox_GeminiNodeUrl"
+                                                         Grid.Row="3" Grid.Column="1"
+                                                         Margin="10,0,0,8"
+                                                         Style="{StaticResource ModernTextBox}"/>
+                                            </Grid>
+                                            <CheckBox x:Name="CheckBox_GeminiNode_EnableAdvanced"
+                                                      Content="{utils:Localize KeyPath=Gemini.EnableAdvanced}"
+                                                      Margin="0,16,0,16"
+                                                      Style="{StaticResource ModernCheckBox}"/>
+                                            <StackPanel x:Name="StackPanel_GeminiNode_Advanced"
+                                                        Margin="20,0,0,0"
+                                                        IsEnabled="{Binding ElementName=CheckBox_GeminiNode_EnableAdvanced, Path=IsChecked}">
+                                                <StackPanel Orientation="Horizontal"
+                                                            Margin="0,0,0,12">
+                                                    <TextBlock Text="{utils:Localize KeyPath=Gemini.Temperature}"
+                                                               Width="80"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{StaticResource PrimaryTextBrush}"
+                                                               FontSize="14"/>
+                                                    <Slider x:Name="Slider_GeminiNode_Temperature"
+                                                            Minimum="0"
+                                                            Maximum="2"
+                                                            Width="125"
+                                                            Margin="10,0"
+                                                            VerticalAlignment="Center"/>
+                                                    <TextBlock x:Name="TextBlock_GeminiNode_TemperatureValue"
+                                                               Width="40"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                                               FontSize="14"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal"
+                                                            Margin="0,0,0,0">
+                                                    <TextBlock Text="{utils:Localize KeyPath=Gemini.MaxTokens}"
+                                                               Width="80"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{StaticResource PrimaryTextBrush}"
+                                                               FontSize="14"/>
+                                                    <TextBox x:Name="TextBox_GeminiNode_MaxTokens"
+                                                             Width="125"
+                                                             Margin="10,0"
+                                                             VerticalAlignment="Center"
+                                                             Style="{StaticResource ModernTextBox}"/>
+                                                </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
+
+
                                     </StackPanel>
                                 </Border>
                             </ScrollViewer>
                         </TabItem>
-                        <TabItem Header="免费接口"
+                        <TabItem Header="{utils:Localize KeyPath=Free.Header}"
                                 x:Name="Tab_Free"
                                 Style="{StaticResource ModernTabItem}">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -522,7 +744,7 @@
                                     <StackPanel Style="{StaticResource SettingGroup}">
 
                                         <CheckBox x:Name="CheckBox_Free_EnableAdvanced"
-                                                Content="启用高级配置"
+                                                Content="{utils:Localize KeyPath=Free.EnableAdvanced}"
                                                 Margin="0,0,0,16"
                                                 Style="{StaticResource ModernCheckBox}"/>
                                         <StackPanel x:Name="StackPanel_Free_Advanced"
@@ -530,7 +752,7 @@
                                                 IsEnabled="{Binding ElementName=CheckBox_Free_EnableAdvanced, Path=IsChecked}">
                                             <StackPanel Orientation="Horizontal"
                                                     Margin="0,0,0,12">
-                                                <TextBlock Text="温度:"
+                                                <TextBlock Text="{utils:Localize KeyPath=Free.Temperature, Suffix=:}"
                                                         Width="80"
                                                         VerticalAlignment="Center"
                                                         x:Name="TextBlock_Free_Temperature"
@@ -550,7 +772,7 @@
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal"
                                                     Margin="0,0,0,0">
-                                                <TextBlock Text="最大Token:"
+                                                <TextBlock Text="{utils:Localize KeyPath=Free.MaxTokens, Suffix=:}"
                                                         Width="80"
                                                         VerticalAlignment="Center"
                                                         x:Name="TextBlock_Free_MaxTokens"
@@ -571,114 +793,114 @@
                     </TabControl>
                 </Grid>
             </TabItem>
-            <TabItem Header="代理"
+            <TabItem Header="{utils:Localize KeyPath=Proxy.Tab}"
                     x:Name="Tab_Proxy"
                     Style="{StaticResource ModernTabItem}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <Border Style="{StaticResource CardContainer}">
                         <StackPanel Style="{StaticResource SettingGroup}">
                             <CheckBox x:Name="CheckBox_Proxy_IsEnabled"
-                                    Content="启用代理"
+                                    Content="{utils:Localize KeyPath=Proxy.EnableProxy}"
                                     Margin="0,0,0,16"
                                     Style="{StaticResource ModernCheckBox}"/>
                             <StackPanel Margin="20,0,0,0"
                                     IsEnabled="{Binding ElementName=CheckBox_Proxy_IsEnabled, Path=IsChecked}">
                                 <CheckBox x:Name="CheckBox_Proxy_FollowSystemProxy"
-                                        Content="跟随系统代理"
+                                        Content="{utils:Localize KeyPath=Proxy.FollowSystemProxy}"
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <StackPanel IsEnabled="{Binding ElementName=CheckBox_Proxy_FollowSystemProxy, Path=IsChecked, Converter={StaticResource BoolInverter}}">
-                                    <Label Content="协议"
+                                    <Label Content="{utils:Localize KeyPath=Proxy.Protocol}"
                                             x:Name="Label_Proxy_Protocol"
                                             Style="{StaticResource SettingLabel}"/>
                                     <StackPanel Orientation="Horizontal"
                                             Margin="0,0,0,16">
                                         <RadioButton x:Name="RadioButton_Proxy_Http"
-                                                Content="HTTP"
+                                                Content="{utils:Localize KeyPath=Proxy.Http}"
                                                 GroupName="ProxyProtocol"
                                                 IsChecked="True"
                                                 Style="{StaticResource ModernRadioButton}"/>
                                         <RadioButton x:Name="RadioButton_Proxy_Socks"
-                                                Content="SOCKS5"
+                                                Content="{utils:Localize KeyPath=Proxy.Socks5}"
                                                 GroupName="ProxyProtocol"
                                                 Margin="20,0,0,0"
                                                 Style="{StaticResource ModernRadioButton}"/>
                                     </StackPanel>
-                                    <Label Content="代理地址"
+                                    <Label Content="{utils:Localize KeyPath=Proxy.ProxyAddress}"
                                             x:Name="Label_Proxy_Address"
                                             Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_Proxy_Address"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
-                                <Label Content="代理范围"
+                                <Label Content="{utils:Localize KeyPath=Proxy.ProxyScope}"
                                         Margin="0,8,0,0"
                                         x:Name="Label_Proxy_Scope"
                                         Style="{StaticResource SettingLabel}"/>
                                 <CheckBox x:Name="CheckBox_Proxy_ForAllAPI"
-                                        Content="全部API代理"
+                                        Content="{utils:Localize KeyPath=Proxy.ForAllAPI}"
                                         Margin="0,0,0,12"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <StackPanel Margin="20,0,0,0"
                                         IsEnabled="{Binding ElementName=CheckBox_Proxy_ForAllAPI, Path=IsChecked, Converter={StaticResource BoolInverter}}">
                                     <CheckBox x:Name="CheckBox_Proxy_ForOllama"
-                                            Content="Ollama"
+                                            Content="{utils:Localize KeyPath=Proxy.ForOllama}"
                                             Margin="0,0,0,8"
                                             IsChecked="True"
                                             Style="{StaticResource ModernCheckBox}"/>
                                     <CheckBox x:Name="CheckBox_Proxy_ForOpenAI"
-                                            Content="OpenAI"
+                                            Content="{utils:Localize KeyPath=Proxy.ForOpenAI}"
                                             Margin="0,0,0,8"
                                             IsChecked="True"
                                             Style="{StaticResource ModernCheckBox}"/>
                                     <CheckBox x:Name="CheckBox_Proxy_ForGemini"
-                                            Content="Gemini"
+                                            Content="{utils:Localize KeyPath=Proxy.ForGemini}"
                                             Margin="0,0,0,8"
                                             IsChecked="True"
                                             Style="{StaticResource ModernCheckBox}"/>
                                     <CheckBox x:Name="CheckBox_Proxy_ForFree"
-                                            Content="免费接口"
+                                            Content="{utils:Localize KeyPath=Proxy.ForFree}"
                                             Margin="0,0,0,8"
                                             IsChecked="True"
                                             Style="{StaticResource ModernCheckBox}"/>
                                 </StackPanel>
                                 <CheckBox x:Name="CheckBox_Proxy_ForTTS"
-                                        Content="TTS"
+                                        Content="{utils:Localize KeyPath=Proxy.ForTTS}"
                                         Margin="0,0,0,12"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_Proxy_ForMcp"
-                                        Content="MCP"
+                                        Content="{utils:Localize KeyPath=Proxy.ForMcp}"
                                         Margin="0,0,0,8"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_Proxy_ForPlugin"
-                                        Content="插件商店"
+                                        Content="{utils:Localize KeyPath=Proxy.ForPlugin}"
                                         Margin="0,0,0,16"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
-                                
+
                                 <!-- 插件商店代理设置 - 独立区域 -->
-                                <Label Content="插件商店代理设置"
+                                <Label Content="{utils:Localize KeyPath=PluginStore.ProxySettings}"
                                         Margin="0,16,0,0"
                                         x:Name="Label_PluginStore_Proxy"
                                         Style="{StaticResource SettingLabel}"/>
                                 <CheckBox x:Name="CheckBox_PluginStore_UseProxy"
-                                        Content="启用插件商店代理"
+                                        Content="{utils:Localize KeyPath=PluginStore.EnableProxy}"
                                         Margin="0,0,0,12"
                                         IsChecked="True"
                                         IsEnabled="{Binding ElementName=CheckBox_Proxy_IsEnabled, Path=IsChecked}"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <StackPanel Margin="20,0,0,0"
                                         IsEnabled="{Binding ElementName=CheckBox_PluginStore_UseProxy, Path=IsChecked}">
-                                    <Label Content="代理地址"
+                                    <Label Content="{utils:Localize KeyPath=PluginStore.ProxyUrl}"
                                             x:Name="Label_PluginStore_ProxyUrl"
                                             Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_PluginStore_ProxyUrl"
                                             Margin="0,0,0,8"
                                             Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="示例: https://ghfast.top (用于加速GitHub访问)"
+                                    <TextBlock Text="{utils:Localize KeyPath=PluginStore.ProxyUrlNote}"
                                             TextWrapping="Wrap"
                                             Foreground="{StaticResource SecondaryTextBrush}"
                                             x:Name="TextBlock_PluginStore_ProxyUrlNote"
@@ -690,7 +912,7 @@
                     </Border>
                 </ScrollViewer>
             </TabItem>
-            <TabItem Header="TTS语音"
+            <TabItem Header="{utils:Localize KeyPath=TTS.Tab}"
                     x:Name="Tab_TTS"
                     Style="{StaticResource ModernTabItem}">
                 <Grid>
@@ -704,12 +926,12 @@
                         <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
                             <StackPanel Style="{StaticResource SettingGroup}">
                                 <CheckBox x:Name="CheckBox_TTS_IsEnabled"
-                                        Content="启用TTS语音合成"
+                                        Content="{utils:Localize KeyPath=TTS.Enable}"
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernCheckBox}"/>
 
                                 <StackPanel IsEnabled="{Binding ElementName=CheckBox_TTS_IsEnabled, Path=IsChecked}">
-                                    <Label Content="TTS 提供商"
+                                    <Label Content="{utils:Localize KeyPath=TTS.Provider}"
                                             x:Name="Label_TTS_Provider"
                                             Style="{StaticResource SettingLabel}"/>
                                     <ComboBox x:Name="ComboBox_TTS_Provider"
@@ -761,14 +983,14 @@
                                     </ComboBox>
 
                                     <CheckBox x:Name="CheckBox_TTS_OnlyPlayAIResponse"
-                                            Content="仅播放AI回复"
+                                            Content="{utils:Localize KeyPath=TTS.OnlyPlayAIResponse}"
                                             Margin="0,0,0,16"
                                             IsChecked="True"
                                             Style="{StaticResource ModernCheckBox}"/>
 
                                     <StackPanel Orientation="Horizontal"
                                             Margin="0,0,0,12">
-                                        <TextBlock Text="音量:"
+                                        <TextBlock Text="{utils:Localize KeyPath=TTS.Volume, Suffix=:}"
                                                 Width="80"
                                                 VerticalAlignment="Center"
                                                 x:Name="TextBlock_TTS_Volume"
@@ -816,7 +1038,7 @@
 
                                     <StackPanel Orientation="Horizontal"
                                             Margin="0,0,0,16">
-                                        <TextBlock Text="语速:"
+                                        <TextBlock Text="{utils:Localize KeyPath=TTS.Speed, Suffix=:}"
                                                 Width="80"
                                                 VerticalAlignment="Center"
                                                 x:Name="TextBlock_TTS_Speed"
@@ -1001,19 +1223,19 @@
                     </ScrollViewer>
                 </Grid>
             </TabItem>
-            <TabItem Header="语言"
+            <TabItem Header="{utils:Localize KeyPath=Language.Tab}"
                     x:Name="Tab_Language"
                     Style="{StaticResource ModernTabItem}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <Border Style="{StaticResource CardContainer}">
                         <StackPanel Style="{StaticResource SettingGroup}">
-                            <Label Content="界面语言"
+                            <Label Content="{utils:Localize KeyPath=Language.Tab}"
                                     x:Name="Label_Language"
                                     Style="{StaticResource SettingLabel}"/>
                             <ComboBox x:Name="ComboBox_Language"
                                     Margin="0,0,0,16"
                                     Style="{StaticResource LanguageComboBox}"/>
-                            <Label Content="AI提示词语言"
+                            <Label Content="{utils:Localize KeyPath=Language.PromptLanguage}"
                                     x:Name="Label_PromptLanguage"
                                     Style="{StaticResource SettingLabel}"/>
                             <ComboBox x:Name="ComboBox_PromptLanguage"
@@ -1029,50 +1251,50 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="高级选项"
+            <TabItem Header="{utils:Localize KeyPath=Advanced_Options.Tab}"
                     x:Name="Tab_Advanced"
                     Style="{StaticResource ModernTabItem}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <Border Style="{StaticResource CardContainer}">
                         <StackPanel Style="{StaticResource SettingGroup}">
                             <CheckBox x:Name="CheckBox_EnableAction"
-                                    Content="启动智能桌面宠物"
+                                    Content="{utils:Localize KeyPath=Advanced_Options.EnableAction}"
                                     Margin="0,0,0,16"
                                     IsChecked="True"
                                     Style="{StaticResource ModernCheckBox}">
                                 <CheckBox.ToolTip>
                                     <ToolTip>
-                                        <TextBlock Text="启用此功能会增加 Token 消耗，因为它会向 AI 发送额外的数据。"/>
+                                        <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableActionToolTip}"/>
                                     </ToolTip>
                                 </CheckBox.ToolTip>
                             </CheckBox>
                             <StackPanel Margin="20,0,0,0">
                                 <CheckBox x:Name="CheckBox_EnableBuy"
-                                        Content="允许宠物购买东西"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableBuy}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
                                         Margin="0,0,0,8"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableState"
-                                        Content="允许获取宠物状态"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableState}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
                                         Margin="0,0,0,8"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableActionExecution"
-                                        Content="允许宠物执行动作"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableActionExecution}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
                                         Margin="0,0,0,8"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableMove"
-                                        Content="允许宠物移动"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableMove}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
                                         Margin="0,0,0,8"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableTime"
-                                        Content="允许获取当前时间"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableTime}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
                                         Margin="0,0,0,8"
@@ -1084,17 +1306,17 @@
                                         Style="{StaticResource ModernCheckBox}">
                                     <CheckBox.ToolTip>
                                         <ToolTip>
-                                            <TextBlock x:Name="ToolTip_EnableBuyFeedback" Text="当用户购买物品时，宠物会通过AI生成个性化的反馈回应。"/>
+                                            <TextBlock x:Name="ToolTip_EnableBuyFeedback" Text="{utils:Localize KeyPath=BuyInteraction.EnableTooltip}"/>
                                         </ToolTip>
                                     </CheckBox.ToolTip>
                                 </CheckBox>
                                 <CheckBox x:Name="CheckBox_EnableHistoryCompression"
-                                        Content="启用聊天记录压缩"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableHistoryCompression}"
                                         Margin="0,0,0,12"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <StackPanel Orientation="Horizontal"
                                         Margin="20,0,0,0">
-                                    <TextBlock Text="压缩阈值:"
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.HistoryCompressionThreshold}"
                                             VerticalAlignment="Center"
                                             x:Name="TextBlock_HistoryCompressionThreshold"
                                             Foreground="{StaticResource PrimaryTextBrush}"
@@ -1104,7 +1326,7 @@
                                             Width="110"
                                             Margin="10,0"
                                             Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="当前上下文长度:"
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.CurrentContextLength}"
                                             VerticalAlignment="Center"
                                             Margin="20,0,5,0"
                                             x:Name="TextBlock_CurrentContextLengthLabel"
@@ -1116,15 +1338,15 @@
                                             FontSize="14"/>
                                 </StackPanel>
                             </StackPanel>
-                            
+
                             <!-- 身体交互设置 -->
-                            <Separator Margin="0,20,0,20" 
-                                     Background="{StaticResource BorderBrush}" 
+                            <Separator Margin="0,20,0,20"
+                                     Background="{StaticResource BorderBrush}"
                                      Height="1"/>
                             <TextBlock Name="TextBlock_TouchFeedbackTitle"
-                                     Text="身体交互设置" 
-                                     FontSize="16" 
-                                     FontWeight="SemiBold" 
+                                     Text="{utils:Localize KeyPath=TouchFeedback.Title}"
+                                     FontSize="16"
+                                     FontWeight="SemiBold"
                                      Margin="0,0,0,16"
                                      Foreground="{StaticResource PrimaryTextBrush}"/>
                             <ContentPresenter x:Name="TouchFeedbackSettingsContainer"/>
@@ -1132,7 +1354,7 @@
                     </Border>
                 </ScrollViewer>
             </TabItem>
-            <TabItem Header="工具列表"
+            <TabItem Header="{utils:Localize KeyPath=Tools.Tab}"
                     x:Name="Tab_Tools"
                     Style="{StaticResource ModernTabItem}">
                 <Border Style="{StaticResource CardContainer}">
@@ -1152,13 +1374,13 @@
                                 Margin="0,0,0,20">
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock x:Name="TextBlock_ToolsManagement"
-                                        Text="工具管理"
+                                        Text="{utils:Localize KeyPath=Tools.Management}"
                                         FontSize="18"
                                         FontWeight="SemiBold"
                                         Foreground="{StaticResource PrimaryTextBrush}"
                                         Margin="0,0,0,4"/>
                                 <TextBlock x:Name="TextBlock_ToolsManagementDescription"
-                                        Text="配置和管理您的AI工具。添加自定义API端点和工具配置。"
+                                        Text="{utils:Localize KeyPath=Tools.ManagementDescription}"
                                         Foreground="{StaticResource SecondaryTextBrush}"
                                         FontSize="13"/>
                             </StackPanel>
@@ -1182,7 +1404,7 @@
                                     Style="{StaticResource ModernDataGrid}"
                                     ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header=""
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.Name}"
                                     Binding="{Binding Name}"
                                     Width="120"
                                     MinWidth="100">
@@ -1196,7 +1418,7 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header=""
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.URL}"
                                     Binding="{Binding Url}"
                                     Width="200"
                                     MinWidth="150">
@@ -1210,7 +1432,7 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header=""
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.ApiKey}"
                                     Binding="{Binding ApiKey}"
                                     Width="150"
                                     MinWidth="120">
@@ -1225,7 +1447,7 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header=""
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.Description}"
                                     Binding="{Binding Description}"
                                     Width="*"
                                     MinWidth="200">
@@ -1240,7 +1462,7 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTemplateColumn Header="启用"
+                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Tools.Enabled}"
                                     Width="80">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
@@ -1280,12 +1502,12 @@
 
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock x:Name="TextBlock_MCPToolsConfig"
-                                            Text="MCP 工具配置"
+                                            Text="{utils:Localize KeyPath=Tools.MCPConfig}"
                                             FontWeight="Medium"
                                             Foreground="{StaticResource PrimaryTextBrush}"
                                             FontSize="14"
                                             Margin="0,0,0,2"/>
-                                    <TextBlock Text="此列表用于配置 MCP (Model-Controlled Plugin) 工具"
+                                    <TextBlock Text="{utils:Localize KeyPath=Tools.ToolsDescription}"
                                             x:Name="TextBlock_ToolsDescription"
                                             Foreground="{StaticResource SecondaryTextBrush}"
                                             FontSize="12"/>
@@ -1294,13 +1516,13 @@
                                 <StackPanel Grid.Column="1" 
                                            Orientation="Horizontal" 
                                            VerticalAlignment="Center">
-                                    <Button Content="➕ 添加"
+                                    <Button Content="{utils:Localize KeyPath=Tools.Add, Prefix=➕ }"
                                             Click="Button_AddTool_Click"
                                             Margin="0,0,12,0"
                                             Padding="16,8"
                                             x:Name="Button_AddTool"
                                             Style="{StaticResource PrimaryButton}"/>
-                                    <Button Content="🗑️ 删除"
+                                    <Button Content="{utils:Localize KeyPath=Tools.Delete, Prefix=🗑️ }"
                                             Click="Button_DeleteTool_Click"
                                             Padding="16,8"
                                             x:Name="Button_DeleteTool"
@@ -1311,7 +1533,7 @@
                     </Grid>
                 </Border>
             </TabItem>
-            <TabItem Header="日志"
+            <TabItem Header="{utils:Localize KeyPath=Log.Tab}"
                     x:Name="Tab_Log"
                     Style="{StaticResource ModernTabItem}">
                 <Border Style="{StaticResource CardContainer}">
@@ -1321,10 +1543,10 @@
                                 HorizontalAlignment="Left"
                                 Margin="0,0,0,16">
                             <CheckBox x:Name="CheckBox_LogAutoScroll"
-                                    Content="自动滚动"
+                                    Content="{utils:Localize KeyPath=Log.AutoScroll}"
                                     Margin="0,0,20,0"
                                     Style="{StaticResource ModernCheckBox}"/>
-                            <TextBlock Text="最大日志数量:"
+                            <TextBlock Text="{utils:Localize KeyPath=Log.MaxLogCount}"
                                     VerticalAlignment="Center"
                                     Margin="0,0,8,0"
                                     x:Name="TextBlock_MaxLogCount"
@@ -1340,12 +1562,12 @@
                                 HorizontalAlignment="Right"
                                 Margin="0,16,0,0">
                             <Button x:Name="Button_CopyLog"
-                                    Content="复制"
+                                    Content="{utils:Localize KeyPath=Log.Copy}"
                                     Click="Button_CopyLog_Click"
                                     Margin="0,0,8,0"
                                     Style="{StaticResource SecondaryButton}"/>
                             <Button x:Name="Button_ClearLog"
-                                    Content="清空"
+                                    Content="{utils:Localize KeyPath=Log.Clear}"
                                     Click="Button_ClearLog_Click"
                                     Style="{StaticResource SecondaryButton}"/>
                         </StackPanel>
@@ -1357,7 +1579,7 @@
                     </DockPanel>
                 </Border>
             </TabItem>
-            <TabItem Header="插件商店"
+            <TabItem Header="{utils:Localize KeyPath=Plugin.Tab}"
                     x:Name="Tab_Plugin"
                     Style="{StaticResource ModernTabItem}">
                 <Border Style="{StaticResource CardContainer}">
@@ -1366,7 +1588,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        
+
                         <!-- 简化的插件管理头部 -->
                         <Border Background="{StaticResource ControlBackgroundBrush}"
                                 BorderBrush="{StaticResource BorderBrush}"
@@ -1383,7 +1605,7 @@
                                 <!-- 标题区域 -->
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock x:Name="TextBlock_PluginManagementCenter"
-                                            Text="插件管理"
+                                            Text="{utils:Localize KeyPath=Plugin.ManagementCenter}"
                                             FontSize="16"
                                             FontWeight="SemiBold"
                                             Foreground="{StaticResource PrimaryTextBrush}"
@@ -1398,13 +1620,13 @@
                                            Orientation="Horizontal" 
                                            VerticalAlignment="Center">
                                     <Button x:Name="Button_RefreshPlugins"
-                                            Content="刷新"
+                                            Content="{utils:Localize KeyPath=Plugin.Refresh}"
                                             Margin="0,0,8,0"
                                             Padding="12,6"
                                             Click="Button_RefreshPlugins_Click"
                                             Style="{StaticResource SecondaryButton}"/>
                                     <Button x:Name="Button_ImportPlugin"
-                                            Content="导入插件"
+                                            Content="{utils:Localize KeyPath=Plugin.ImportPlugin}"
                                             Padding="12,6"
                                             Click="Button_ImportPlugin_Click"
                                             Style="{StaticResource PrimaryButton}"/>
@@ -1434,7 +1656,7 @@
                                     SelectionUnit="FullRow">
                                 <DataGrid.Columns>
                                     <!-- 简化的启用状态列 -->
-                                    <DataGridTemplateColumn Header="" Width="60">
+                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Plugin.Enabled}" Width="60">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
@@ -1451,9 +1673,9 @@
                                             </Style>
                                         </DataGridTemplateColumn.HeaderStyle>
                                     </DataGridTemplateColumn>
-                                    
+
                                     <!-- 优化的插件状态列 -->
-                                    <DataGridTemplateColumn Header="" Width="80">
+                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Plugin.Status}" Width="80">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" 
@@ -1466,7 +1688,7 @@
                                                             Fill="#38B2AC"
                                                             Margin="0,0,6,0"
                                                             VerticalAlignment="Center"/>
-                                                    
+
                                                     <!-- 状态文字 -->
                                                     <TextBlock x:Name="StatusTextDisplay"
                                                               Text="{Binding StatusText}"
@@ -1475,20 +1697,20 @@
                                                               FontWeight="Medium"
                                                               VerticalAlignment="Center"/>
                                                 </StackPanel>
-                                                
+
                                                 <DataTemplate.Triggers>
                                                     <!-- 错误状态 -->
                                                     <DataTrigger Binding="{Binding IsFailed}" Value="True">
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#E53E3E"/>
                                                         <Setter TargetName="StatusTextDisplay" Property="Foreground" Value="#E53E3E"/>
                                                     </DataTrigger>
-                                                    
+
                                                     <!-- 禁用状态 -->
                                                     <DataTrigger Binding="{Binding IsEnabled}" Value="False">
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#A0AEC0"/>
                                                         <Setter TargetName="StatusTextDisplay" Property="Foreground" Value="#A0AEC0"/>
                                                     </DataTrigger>
-                                                    
+
                                                     <!-- 待启动状态 -->
                                                     <MultiDataTrigger>
                                                         <MultiDataTrigger.Conditions>
@@ -1498,7 +1720,7 @@
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#F6AD55"/>
                                                         <Setter TargetName="StatusTextDisplay" Property="Foreground" Value="#F6AD55"/>
                                                     </MultiDataTrigger>
-                                                    
+
                                                     <!-- 正常运行状态 -->
                                                     <MultiDataTrigger>
                                                         <MultiDataTrigger.Conditions>
@@ -1508,7 +1730,7 @@
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#38B2AC"/>
                                                         <Setter TargetName="StatusTextDisplay" Property="Foreground" Value="#38B2AC"/>
                                                     </MultiDataTrigger>
-                                                    
+
                                                     <!-- 未下载状态 (最后处理，确保优先级最高) -->
                                                     <DataTrigger Binding="{Binding IsLocal}" Value="False">
                                                         <Setter TargetName="StatusIndicator" Property="Fill" Value="#718096"/>
@@ -1524,7 +1746,7 @@
                                         </DataGridTemplateColumn.HeaderStyle>
                                     </DataGridTemplateColumn>
                                     <!-- 简化的插件信息列 -->
-                                    <DataGridTemplateColumn Header="" Width="200" MinWidth="180">
+                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Plugin.Name}" Width="200" MinWidth="180">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Margin="8,6" VerticalAlignment="Center">
@@ -1536,7 +1758,7 @@
                                                               TextTrimming="CharacterEllipsis"
                                                               ToolTip="{Binding Name}"
                                                               Margin="0,0,0,2"/>
-                                                    
+
                                                     <!-- 作者信息 -->
                                                     <TextBlock Text="{Binding Author}"
                                                               FontSize="12"
@@ -1547,9 +1769,9 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    
+
                                     <!-- 插件描述列 -->
-                                    <DataGridTemplateColumn Header="" Width="*" MinWidth="250">
+                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Plugin.Description}" Width="*" MinWidth="250">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding Description}"
@@ -1566,7 +1788,7 @@
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
                                     <!-- 简化的操作列 -->
-                                    <DataGridTemplateColumn Header="" Width="160" MinWidth="140">
+                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Plugin.Action}" Width="160" MinWidth="140">
                                         <DataGridTemplateColumn.HeaderStyle>
                                             <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource ModernDataGridColumnHeader}">
                                                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -1578,7 +1800,7 @@
                                                            Margin="8,6"
                                                            HorizontalAlignment="Center"
                                                            VerticalAlignment="Center">
-                                                    
+
                                                     <!-- 主要操作按钮 -->
                                                     <Button Click="Button_PluginAction_Click" 
                                                            Content="{Binding ActionText}"
@@ -1620,7 +1842,7 @@
                                                             </Style>
                                                         </Button.Style>
                                                     </Button>
-                                                    
+
                                                     <!-- 卸载按钮 -->
                                                     <Button Click="Button_UninstallPlugin_Click"
                                                            Content="{Binding UninstallActionText}"

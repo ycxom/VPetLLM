@@ -141,6 +141,42 @@
             "zh-hans": "最大Token:",
             "zh-hant": "最大Token:",
             "jp": "最大トークン:"
+        },
+        "ChannelManagement": {
+            "en": "OpenAI Channel Management",
+            "zh-hans": "OpenAI渠道管理",
+            "zh-hant": "OpenAI渠道管理",
+            "jp": "OpenAIチャネル管理"
+        },
+        "ChannelManagementDesc": {
+            "en": "Support adding multiple OpenAI channels. The program will automatically rotate API Keys to distribute request frequency.",
+            "zh-hans": "支持添加多个OpenAI渠道，程序会自动轮换使用API Key分散请求频率",
+            "zh-hant": "支持添加多個OpenAI渠道，程序會自動輪換使用API Key分散請求頻率",
+            "jp": "複数のOpenAIチャネルの追加をサポートします。プログラムはAPIキーを自動的にローテーションしてリクエスト頻度を分散します。"
+        },
+        "AddChannel": {
+            "en": "Add Channel",
+            "zh-hans": "添加渠道",
+            "zh-hant": "添加渠道",
+            "jp": "チャネルを追加"
+        },
+        "RemoveSelectedChannel": {
+            "en": "Remove Selected Channel",
+            "zh-hans": "删除选中渠道",
+            "zh-hant": "刪除選中渠道",
+            "jp": "選択したチャネルを削除"
+        },
+        "ChannelName": {
+            "en": "Channel Name",
+            "zh-hans": "渠道名称",
+            "zh-hant": "渠道名稱",
+            "jp": "チャネル名"
+        },
+        "ChannelConfig": {
+            "en": "Channel Configuration",
+            "zh-hans": "渠道配置",
+            "zh-hant": "渠道配置",
+            "jp": "チャネル設定"
         }
     },
     "OpenAI": {
@@ -191,6 +227,66 @@
             "zh-hans": "最大Token:",
             "zh-hant": "最大Token:",
             "jp": "最大トークン:"
+        },
+        "ChannelManagement": {
+            "en": "OpenAI Channel Management",
+            "zh-hans": "OpenAI渠道管理",
+            "zh-hant": "OpenAI渠道管理",
+            "jp": "OpenAIチャネル管理"
+        },
+        "ChannelManagementDesc": {
+            "en": "Support adding multiple OpenAI channels. You can enter multiple API Keys (one per line) within a channel, and the program will automatically rotate them to distribute request frequency.",
+            "zh-hans": "支持添加多个OpenAI渠道，渠道内可输入多行API Key，程序会自动轮换分散请求频率",
+            "zh-hant": "支持添加多個OpenAI渠道，渠道內可輸入多行API Key，程序會自動輪換分散請求頻率",
+            "jp": "複数のOpenAIチャネルの追加をサポートします。チャネル内に複数のAPIキー（1行に1つ）を入力でき、プログラムはリクエスト頻度を分散するために自動的にローテーションします。"
+        },
+        "AddChannel": {
+            "en": "Add Channel",
+            "zh-hans": "添加渠道",
+            "zh-hant": "添加渠道",
+            "jp": "チャネルを追加"
+        },
+        "RemoveSelectedChannel": {
+            "en": "Remove Selected Channel",
+            "zh-hans": "删除选中渠道",
+            "zh-hant": "刪除選中渠道",
+            "jp": "選択したチャネルを削除"
+        },
+        "ChannelName": {
+            "en": "Channel Name",
+            "zh-hans": "渠道名称",
+            "zh-hant": "渠道名稱",
+            "jp": "チャネル名"
+        },
+        "ChannelConfig": {
+            "en": "Channel Configuration",
+            "zh-hans": "渠道配置",
+            "zh-hant": "渠道配置",
+            "jp": "チャネル設定"
+        },
+        "EnableLoadBalancing": {
+            "en": "Enable Load Balancing (Auto-rotate API Keys)",
+            "zh-hans": "启用负载均衡（自动轮换API Key）",
+            "zh-hant": "啟用負載均衡（自動輪換API Key）",
+            "jp": "負荷分散を有効にする（APIキーを自動ローテーション）"
+        },
+        "ApiKeyTooltip": {
+            "en": "One API Key per line",
+            "zh-hans": "每行一个 API Key",
+            "zh-hant": "每行一個 API Key",
+            "jp": "1行に1つのAPIキー"
+        },
+        "ToggleApiKeyVisibility": {
+            "en": "Show/Hide",
+            "zh-hans": "显示/隐藏",
+            "zh-hant": "顯示/隱藏",
+            "jp": "表示/非表示"
+        },
+        "Enabled": {
+            "en": "Enabled",
+            "zh-hans": "启用",
+            "zh-hant": "啟用",
+            "jp": "有効"
         }
     },
     "Gemini": {
@@ -247,6 +343,66 @@
             "zh-hans": "最大Token:",
             "zh-hant": "最大Token:",
             "jp": "最大トークン:"
+        },
+        "ChannelManagement": {
+            "en": "Gemini Channel Management",
+            "zh-hans": "Gemini渠道管理",
+            "zh-hant": "Gemini渠道管理",
+            "jp": "Geminiチャネル管理"
+        },
+        "ChannelManagementDesc": {
+            "en": "Support adding multiple Gemini channels. You can enter multiple API Keys (one per line) within a channel, and the program will automatically rotate them to distribute request frequency.",
+            "zh-hans": "支持添加多个Gemini渠道，渠道内可输入多行API Key，程序会自动轮换分散请求频率",
+            "zh-hant": "支持添加多個Gemini渠道，渠道內可輸入多行API Key，程序會自動輪換分散請求頻率",
+            "jp": "複数のGeminiチャネルの追加をサポートします。チャネル内に複数のAPIキー（1行に1つ）を入力でき、プログラムはリクエスト頻度を分散するために自動的にローテーションします。"
+        },
+        "EnableLoadBalancing": {
+            "en": "Enable Load Balancing (Auto-rotate API Keys)",
+            "zh-hans": "启用负载均衡（自动轮换API Key）",
+            "zh-hant": "啟用負載均衡（自動輪換API Key）",
+            "jp": "負荷分散を有効にする（APIキーを自動ローテーション）"
+        },
+        "AddChannel": {
+            "en": "Add Channel",
+            "zh-hans": "添加渠道",
+            "zh-hant": "添加渠道",
+            "jp": "チャネルを追加"
+        },
+        "RemoveSelectedChannel": {
+            "en": "Remove Selected Channel",
+            "zh-hans": "删除选中渠道",
+            "zh-hant": "刪除選中渠道",
+            "jp": "選択したチャネルを削除"
+        },
+        "Enabled": {
+            "en": "Enabled",
+            "zh-hans": "启用",
+            "zh-hant": "啟用",
+            "jp": "有効"
+        },
+        "ChannelName": {
+            "en": "Channel Name",
+            "zh-hans": "渠道名称",
+            "zh-hant": "渠道名稱",
+            "jp": "チャネル名"
+        },
+        "ChannelConfig": {
+            "en": "Channel Configuration",
+            "zh-hans": "渠道配置",
+            "zh-hant": "渠道配置",
+            "jp": "チャネル設定"
+        },
+        "ApiKeyTooltip": {
+            "en": "One API Key per line",
+            "zh-hans": "每行一个 API Key",
+            "zh-hant": "每行一個 API Key",
+            "jp": "1行に1つのAPIキー"
+        },
+        "ToggleApiKeyVisibility": {
+            "en": "Show/Hide",
+            "zh-hans": "显示/隐藏",
+            "zh-hant": "顯示/隱藏",
+            "jp": "表示/非表示"
         }
     },
     "Free": {

@@ -2,6 +2,8 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Linq;
+using System.Collections.Generic;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
 
@@ -12,11 +14,82 @@ namespace VPetLLM.Core.ChatCore
         public override string Name => "OpenAI";
         private readonly Setting.OpenAISetting _openAISetting;
         private readonly Setting _setting;
+
+        private int _currentApiKeyIndex = 0;
+        private readonly Random _random = new Random();
+        
+        public OpenAIChatCore(Setting.OpenAINodeSetting openAINodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
+            : base(setting, mainWindow, actionProcessor)
+        {
+            // 将OpenAINodeSetting转换为OpenAISetting
+            _openAISetting = new Setting.OpenAISetting
+            {
+                ApiKey = openAINodeSetting.ApiKey,
+                Model = openAINodeSetting.Model,
+                Url = openAINodeSetting.Url,
+                Temperature = openAINodeSetting.Temperature,
+                MaxTokens = openAINodeSetting.MaxTokens,
+                EnableAdvanced = openAINodeSetting.EnableAdvanced,
+                Enabled = openAINodeSetting.Enabled,
+                Name = openAINodeSetting.Name,
+                OpenAINodes = new List<Setting.OpenAINodeSetting> { openAINodeSetting }
+            };
+            _setting = setting;
+        }
+
         public OpenAIChatCore(Setting.OpenAISetting openAISetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
         {
             _openAISetting = openAISetting;
             _setting = setting;
+        }
+
+        private Setting.OpenAINodeSetting GetCurrentNode()
+        {
+            // 统一复用 Setting.OpenAISetting 的内置选择/轮换逻辑，自动遵循 Enabled 与 EnableLoadBalancing
+            return _openAISetting.GetCurrentOpenAISetting();
+        }
+
+        private string GetCurrentApiKey(Setting.OpenAINodeSetting node)
+        {
+            if (string.IsNullOrEmpty(node.ApiKey))
+            {
+                return string.Empty;
+            }
+
+            var apiKeys = node.ApiKey.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            if (apiKeys.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            if (apiKeys.Length == 1)
+            {
+                return apiKeys[0];
+            }
+
+            // 轮换选择API Key
+            _currentApiKeyIndex = (_currentApiKeyIndex + 1) % apiKeys.Length;
+            return apiKeys[_currentApiKeyIndex];
+        }
+
+        private (string apiUrl, string apiKey) GetCurrentEndpoint()
+        {
+            var currentNode = GetCurrentNode();
+            var currentApiKey = GetCurrentApiKey(currentNode);
+            
+            string apiUrl = currentNode.Url;
+            if (!apiUrl.Contains("/chat/completions"))
+            {
+                var baseUrl = apiUrl.TrimEnd('/');
+                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
+                {
+                    baseUrl += "/v1";
+                }
+                apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
+            }
+
+            return (apiUrl, currentApiKey);
         }
 
         public override Task<string> Chat(string prompt)
@@ -34,6 +107,11 @@ namespace VPetLLM.Core.ChatCore
                 //无论是用户输入还是插件返回，都作为user角色
                 await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
             }
+            
+            // 获取当前节点和API Key
+            var (apiUrl, apiKey) = GetCurrentEndpoint();
+            var currentNode = GetCurrentNode();
+            
             // 构建请求数据，根据启用开关决定是否包含高级参数
             List<Message> history = GetCoreHistory();
             object data;
@@ -41,7 +119,7 @@ namespace VPetLLM.Core.ChatCore
             {
                 data = new
                 {
-                    model = _openAISetting.Model,
+                    model = currentNode.Model,
                     messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
                     temperature = _openAISetting.Temperature,
                     max_tokens = _openAISetting.MaxTokens
@@ -51,31 +129,18 @@ namespace VPetLLM.Core.ChatCore
             {
                 data = new
                 {
-                    model = _openAISetting.Model,
+                    model = currentNode.Model,
                     messages = history.Select(m => new { role = m.Role, content = m.DisplayContent })
                 };
             }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
-            // 处理OpenAI URL兼容性：自动补全后缀
-            string apiUrl = _openAISetting.Url;
-            if (!apiUrl.Contains("/chat/completions"))
-            {
-                // 如果URL不包含完整端点，自动补全
-                var baseUrl = apiUrl.TrimEnd('/');
-                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
-                {
-                    baseUrl += "/v1";
-                }
-                apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
-            }
-
             string message;
             using (var client = GetClient())
             {
-                if (!string.IsNullOrEmpty(_openAISetting.ApiKey))
+                if (!string.IsNullOrEmpty(apiKey))
                 {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openAISetting.ApiKey}");
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                 }
                 var response = await client.PostAsync(apiUrl, content);
                 response.EnsureSuccessStatusCode();
@@ -104,12 +169,16 @@ namespace VPetLLM.Core.ChatCore
                 new { role = "user", content = text }
             };
 
+            // 获取当前节点和API Key
+            var (apiUrl, apiKey) = GetCurrentEndpoint();
+            var currentNode = GetCurrentNode();
+
             object data;
             if (_openAISetting.EnableAdvanced)
             {
                 data = new
                 {
-                    model = _openAISetting.Model,
+                    model = currentNode.Model,
                     messages = messages,
                     temperature = _openAISetting.Temperature,
                     max_tokens = _openAISetting.MaxTokens
@@ -119,28 +188,18 @@ namespace VPetLLM.Core.ChatCore
             {
                 data = new
                 {
-                    model = _openAISetting.Model,
+                    model = currentNode.Model,
                     messages = messages
                 };
             }
 
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
-            string apiUrl = _openAISetting.Url;
-            if (!apiUrl.Contains("/chat/completions"))
-            {
-                var baseUrl = apiUrl.TrimEnd('/');
-                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
-                {
-                    baseUrl += "/v1";
-                }
-                apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
-            }
             using (var client = GetClient())
             {
-                if (!string.IsNullOrEmpty(_openAISetting.ApiKey))
+                if (!string.IsNullOrEmpty(apiKey))
                 {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openAISetting.ApiKey}");
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                 }
                 var response = await client.PostAsync(apiUrl, content);
                 response.EnsureSuccessStatusCode();
@@ -161,27 +220,31 @@ namespace VPetLLM.Core.ChatCore
         }
         public List<string> RefreshModels()
         {
-            string apiUrl = _openAISetting.Url;
-            if (apiUrl.Contains("/chat/completions"))
+            // 获取当前节点和API Key
+            var (apiUrl, apiKey) = GetCurrentEndpoint();
+            var currentNode = GetCurrentNode();
+            
+            string modelsUrl = apiUrl;
+            if (modelsUrl.Contains("/chat/completions"))
             {
-                apiUrl = apiUrl.Replace("/chat/completions", "/models");
+                modelsUrl = modelsUrl.Replace("/chat/completions", "/models");
             }
             else
             {
-                var baseUrl = apiUrl.TrimEnd('/');
+                var baseUrl = modelsUrl.TrimEnd('/');
                 if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
                 {
                     baseUrl += "/v1";
                 }
-                apiUrl = baseUrl.TrimEnd('/') + "/models";
+                modelsUrl = baseUrl.TrimEnd('/') + "/models";
             }
 
-            var url = new System.Uri(new System.Uri(apiUrl), "");
+            var url = new System.Uri(new System.Uri(modelsUrl), "");
             using (var client = GetClient())
             {
-                if (!string.IsNullOrEmpty(_openAISetting.ApiKey))
+                if (!string.IsNullOrEmpty(apiKey))
                 {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_openAISetting.ApiKey}");
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                 }
                 var response = client.GetAsync(url).Result;
                 response.EnsureSuccessStatusCode();

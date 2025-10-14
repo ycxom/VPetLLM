@@ -9,9 +9,37 @@ namespace VPetLLM.Core.ChatCore
 {
     public class GeminiChatCore : ChatCoreBase
     {
+        private int _currentApiKeyIndex = 0;
         public override string Name => "Gemini";
         private readonly Setting.GeminiSetting _geminiSetting;
+        
+        private string GetCurrentApiKey()
+        {
+            var apiKey = _geminiSetting.ApiKey ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(apiKey))
+                return string.Empty;
+            var keys = apiKey.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            if (keys.Length == 0)
+                return string.Empty;
+            if (keys.Length == 1)
+                return keys[0];
+            _currentApiKeyIndex = (_currentApiKeyIndex + 1) % keys.Length;
+            return keys[_currentApiKeyIndex];
+        }
         private readonly Setting _setting;
+        private string GetCurrentApiKeyFromNode(string? apiKey)
+        {
+            var keyText = apiKey ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(keyText))
+                return string.Empty;
+            var keys = keyText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            if (keys.Length == 0)
+                return string.Empty;
+            if (keys.Length == 1)
+                return keys[0];
+            _currentApiKeyIndex = (_currentApiKeyIndex + 1) % keys.Length;
+            return keys[_currentApiKeyIndex];
+        }
         public GeminiChatCore(Setting.GeminiSetting geminiSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
         {
@@ -36,14 +64,15 @@ namespace VPetLLM.Core.ChatCore
             }
 
             List<Message> history = GetCoreHistory();
+            var node = _geminiSetting.GetCurrentGeminiSetting();
             var requestData = new
             {
                 contents = history.Where(m => m.Role != "system")
                                   .Select(m => new { role = m.Role == "assistant" ? "model" : m.Role, parts = new[] { new { text = m.DisplayContent } } }),
                 generationConfig = new
                 {
-                    maxOutputTokens = _geminiSetting.EnableAdvanced ? _geminiSetting.MaxTokens : 4096,
-                    temperature = _geminiSetting.EnableAdvanced ? _geminiSetting.Temperature : 0.8
+                    maxOutputTokens = node.EnableAdvanced ? node.MaxTokens : 4096,
+                    temperature = node.EnableAdvanced ? node.Temperature : 0.8
                 },
                 systemInstruction = new
                 {
@@ -53,12 +82,12 @@ namespace VPetLLM.Core.ChatCore
 
             var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
 
-            var baseUrl = _geminiSetting.Url.TrimEnd('/');
+            var baseUrl = node.Url.TrimEnd('/');
             if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
             {
                 baseUrl += "/v1beta";
             }
-            var modelName = _geminiSetting.Model;
+            var modelName = node.Model;
             var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
 
             string message;
@@ -69,9 +98,10 @@ namespace VPetLLM.Core.ChatCore
                     client.DefaultRequestHeaders.Remove("User-Agent");
                 }
                 client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
+                var rotatedKey = GetCurrentApiKeyFromNode(node.ApiKey);
+                if (!string.IsNullOrEmpty(rotatedKey))
                 {
-                    client.DefaultRequestHeaders.Add("x-goog-api-key", _geminiSetting.ApiKey);
+                    client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey);
                 }
                 var response = await client.PostAsync(apiEndpoint, content);
                 response.EnsureSuccessStatusCode();
@@ -105,12 +135,13 @@ namespace VPetLLM.Core.ChatCore
 
             var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
 
-            var baseUrl = _geminiSetting.Url.TrimEnd('/');
+            var node = _geminiSetting.GetCurrentGeminiSetting();
+            var baseUrl = node.Url.TrimEnd('/');
             if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
             {
                 baseUrl += "/v1beta";
             }
-            var modelName = _geminiSetting.Model;
+            var modelName = node.Model;
             var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
             using (var client = GetClient())
             {
@@ -119,9 +150,10 @@ namespace VPetLLM.Core.ChatCore
                     client.DefaultRequestHeaders.Remove("User-Agent");
                 }
                 client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
+                var rotatedKey2 = GetCurrentApiKeyFromNode(node.ApiKey);
+                if (!string.IsNullOrEmpty(rotatedKey2))
                 {
-                    client.DefaultRequestHeaders.Add("x-goog-api-key", _geminiSetting.ApiKey);
+                    client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey2);
                 }
                 var response = await client.PostAsync(apiEndpoint, content);
                 response.EnsureSuccessStatusCode();
@@ -142,13 +174,14 @@ namespace VPetLLM.Core.ChatCore
         public List<string> RefreshModels()
         {
             string requestUrl;
-            if (_geminiSetting.Url.Contains("/models"))
+            var node = _geminiSetting.GetCurrentGeminiSetting();
+            if (node.Url.Contains("/models"))
             {
-                requestUrl = _geminiSetting.Url;
+                requestUrl = node.Url;
             }
             else
             {
-                var baseUrl = _geminiSetting.Url.TrimEnd('/');
+                var baseUrl = node.Url.TrimEnd('/');
 
                 if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
                 {
@@ -159,7 +192,7 @@ namespace VPetLLM.Core.ChatCore
             }
 
             System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Request URL: {requestUrl}");
-            System.Diagnostics.Debug.WriteLine($"[GeminiDebug] API Key present: {!string.IsNullOrEmpty(_geminiSetting.ApiKey)}");
+            System.Diagnostics.Debug.WriteLine($"[GeminiDebug] API Key present: {!string.IsNullOrEmpty(node.ApiKey)}");
 
             using (var client = GetClient())
             {
@@ -168,9 +201,10 @@ namespace VPetLLM.Core.ChatCore
                     client.DefaultRequestHeaders.Remove("User-Agent");
                 }
                 client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                if (!string.IsNullOrEmpty(_geminiSetting.ApiKey))
+                var rotatedKey3 = GetCurrentApiKeyFromNode(node.ApiKey);
+                if (!string.IsNullOrEmpty(rotatedKey3))
                 {
-                    client.DefaultRequestHeaders.Add("x-goog-api-key", _geminiSetting.ApiKey);
+                    client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey3);
                 }
 
                 var response = client.GetAsync(requestUrl).Result;

@@ -49,6 +49,24 @@ namespace VPetLLM
                 var json = File.ReadAllText(_path);
                 JsonConvert.PopulateObject(json, this);
             }
+            
+            // 确保所有属性都有默认值
+            if (Ollama == null)
+            {
+                Ollama = new OllamaSetting();
+            }
+            if (OpenAI == null)
+            {
+                OpenAI = new OpenAISetting();
+            }
+            if (Gemini == null)
+            {
+                Gemini = new GeminiSetting();
+            }
+            if (Free == null)
+            {
+                Free = new FreeSetting();
+            }
             if (Proxy == null)
             {
                 Proxy = new ProxySetting();
@@ -61,13 +79,99 @@ namespace VPetLLM
             {
                 TTS = new TTSSetting();
             }
-            if (Free == null)
-            {
-                Free = new FreeSetting();
-            }
             if (TouchFeedback == null)
             {
                 TouchFeedback = new Handlers.TouchFeedbackSettings();
+            }
+            if (Tools == null)
+            {
+                Tools = new List<ToolSetting>();
+            }
+
+            // 旧版OpenAI单节点配置迁移到多节点结构，避免用户配置丢失
+            if (OpenAI == null)
+            {
+                OpenAI = new OpenAISetting();
+            }
+            if (OpenAI.OpenAINodes == null)
+            {
+                OpenAI.OpenAINodes = new List<OpenAINodeSetting>();
+            }
+            // 若无多节点但旧字段存在，则创建默认节点承载旧配置
+            bool hasLegacyOpenAI =
+                !string.IsNullOrWhiteSpace(OpenAI.ApiKey) ||
+                !string.IsNullOrWhiteSpace(OpenAI.Model) ||
+                !string.IsNullOrWhiteSpace(OpenAI.Url) ||
+                OpenAI.Temperature != 0.7 ||
+                OpenAI.MaxTokens != 2048 ||
+                OpenAI.EnableAdvanced ||
+                !OpenAI.Enabled ||
+                (OpenAI.Name != null && OpenAI.Name != "OpenAI节点");
+
+            if (OpenAI.OpenAINodes.Count == 0 && hasLegacyOpenAI)
+            {
+                OpenAI.OpenAINodes.Add(new OpenAINodeSetting
+                {
+                    ApiKey = OpenAI.ApiKey,
+                    Model = OpenAI.Model,
+                    Url = OpenAI.Url,
+                    Temperature = OpenAI.Temperature,
+                    MaxTokens = OpenAI.MaxTokens,
+                    EnableAdvanced = OpenAI.EnableAdvanced,
+                    Enabled = OpenAI.Enabled,
+                    Name = string.IsNullOrWhiteSpace(OpenAI.Name) ? "OpenAI节点" : OpenAI.Name
+                });
+            }
+
+            // 修复索引越界
+            if (OpenAI.OpenAINodes.Count == 0)
+            {
+                OpenAI.CurrentNodeIndex = 0;
+            }
+            else if (OpenAI.CurrentNodeIndex < 0 || OpenAI.CurrentNodeIndex >= OpenAI.OpenAINodes.Count)
+            {
+                OpenAI.CurrentNodeIndex = 0;
+            }
+
+            // 旧版Gemini单节点配置迁移到多节点结构，避免用户配置丢失
+            if (Gemini == null)
+            {
+                Gemini = new GeminiSetting();
+            }
+            if (Gemini.GeminiNodes == null)
+            {
+                Gemini.GeminiNodes = new List<GeminiNodeSetting>();
+            }
+            bool hasLegacyGemini =
+                !string.IsNullOrWhiteSpace(Gemini.ApiKey) ||
+                !string.IsNullOrWhiteSpace(Gemini.Model) ||
+                !string.IsNullOrWhiteSpace(Gemini.Url) ||
+                Gemini.Temperature != 0.7 ||
+                Gemini.MaxTokens != 2048 ||
+                Gemini.EnableAdvanced;
+
+            if (Gemini.GeminiNodes.Count == 0 && hasLegacyGemini)
+            {
+                Gemini.GeminiNodes.Add(new GeminiNodeSetting
+                {
+                    ApiKey = Gemini.ApiKey,
+                    Model = Gemini.Model,
+                    Url = Gemini.Url,
+                    Temperature = Gemini.Temperature,
+                    MaxTokens = Gemini.MaxTokens,
+                    EnableAdvanced = Gemini.EnableAdvanced,
+                    Enabled = true,
+                    Name = "Gemini节点"
+                });
+            }
+
+            if (Gemini.GeminiNodes.Count == 0)
+            {
+                Gemini.CurrentNodeIndex = 0;
+            }
+            else if (Gemini.CurrentNodeIndex < 0 || Gemini.CurrentNodeIndex >= Gemini.GeminiNodes.Count)
+            {
+                Gemini.CurrentNodeIndex = 0;
             }
         }
 
@@ -86,7 +190,7 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
         }
 
-        public class OpenAISetting
+        public class OpenAINodeSetting
         {
             public string? ApiKey { get; set; }
             public string? Model { get; set; }
@@ -94,9 +198,84 @@ namespace VPetLLM
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
+            public bool Enabled { get; set; } = true;
+            public string Name { get; set; } = "OpenAI节点";
+            
+            public OpenAISetting GetCurrentOpenAISetting()
+            {
+                return new OpenAISetting
+                {
+                    ApiKey = this.ApiKey,
+                    Model = this.Model,
+                    Url = this.Url,
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    EnableAdvanced = this.EnableAdvanced,
+                    Enabled = this.Enabled,
+                    Name = this.Name
+                };
+            }
         }
 
-        public class GeminiSetting
+        public class OpenAISetting
+        {
+            public List<OpenAINodeSetting> OpenAINodes { get; set; } = new List<OpenAINodeSetting>();
+            public int CurrentNodeIndex { get; set; } = 0;
+            public bool EnableLoadBalancing { get; set; } = true;
+            
+            // 向后兼容的属性
+            public string? ApiKey { get; set; }
+            public string? Model { get; set; }
+            public string Url { get; set; } = "https://api.openai.com/v1";
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
+            public bool Enabled { get; set; } = true;
+            public string Name { get; set; } = "OpenAI节点";
+
+            public OpenAINodeSetting GetCurrentOpenAISetting()
+            {
+                // 无节点时回退到兼容配置生成的默认节点
+                if (OpenAINodes.Count == 0)
+                {
+                    return new OpenAINodeSetting
+                    {
+                        ApiKey = ApiKey,
+                        Model = Model,
+                        Url = Url,
+                        Temperature = Temperature,
+                        MaxTokens = MaxTokens,
+                        EnableAdvanced = EnableAdvanced,
+                        Enabled = Enabled,
+                        Name = Name
+                    };
+                }
+
+                // 仅在启用的节点间进行选择/轮换
+                var enabledNodes = OpenAINodes.Where(n => n.Enabled).ToList();
+                if (enabledNodes.Count == 0)
+                {
+                    // 若没有启用的节点，回退到第一个节点（保持兼容）
+                    if (CurrentNodeIndex < 0 || CurrentNodeIndex >= OpenAINodes.Count)
+                        CurrentNodeIndex = 0;
+                    return OpenAINodes[CurrentNodeIndex];
+                }
+
+                if (EnableLoadBalancing)
+                {
+                    // 轮换到下一个启用的节点
+                    CurrentNodeIndex = (CurrentNodeIndex + 1) % enabledNodes.Count;
+                    return enabledNodes[CurrentNodeIndex];
+                }
+
+                // 非负载均衡：如果索引越界或指向未启用节点，则回退到第一个启用的节点
+                if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
+                    CurrentNodeIndex = 0;
+                return enabledNodes[CurrentNodeIndex];
+            }
+        }
+
+        public class GeminiNodeSetting
         {
             public string? ApiKey { get; set; }
             public string Model { get; set; } = "gemini-pro";
@@ -104,6 +283,64 @@ namespace VPetLLM
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
+            public bool Enabled { get; set; } = true;
+            public string Name { get; set; } = "Gemini节点";
+        }
+
+        public class GeminiSetting
+        {
+            public List<GeminiNodeSetting> GeminiNodes { get; set; } = new List<GeminiNodeSetting>();
+            public int CurrentNodeIndex { get; set; } = 0;
+            public bool EnableLoadBalancing { get; set; } = true;
+
+            // 向后兼容的属性（用于旧版自动迁移/回退）
+            public string? ApiKey { get; set; }
+            public string Model { get; set; } = "gemini-pro";
+            public string Url { get; set; } = "https://generativelanguage.googleapis.com/v1beta";
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
+
+            public GeminiNodeSetting GetCurrentGeminiSetting()
+            {
+                // 无节点时回退到兼容配置生成的默认节点
+                if (GeminiNodes.Count == 0)
+                {
+                    return new GeminiNodeSetting
+                    {
+                        ApiKey = ApiKey,
+                        Model = Model,
+                        Url = Url,
+                        Temperature = Temperature,
+                        MaxTokens = MaxTokens,
+                        EnableAdvanced = EnableAdvanced,
+                        Enabled = true,
+                        Name = "Gemini节点"
+                    };
+                }
+
+                // 仅在启用的节点间进行选择/轮换
+                var enabledNodes = GeminiNodes.Where(n => n.Enabled).ToList();
+                if (enabledNodes.Count == 0)
+                {
+                    // 若没有启用的节点，回退到第一个节点
+                    if (CurrentNodeIndex < 0 || CurrentNodeIndex >= GeminiNodes.Count)
+                        CurrentNodeIndex = 0;
+                    return GeminiNodes[CurrentNodeIndex];
+                }
+
+                if (EnableLoadBalancing)
+                {
+                    // 轮换到下一个启用的节点
+                    CurrentNodeIndex = (CurrentNodeIndex + 1) % enabledNodes.Count;
+                    return enabledNodes[CurrentNodeIndex];
+                }
+
+                // 非负载均衡：如果索引越界或指向未启用节点，则回退到第一个启用的节点
+                if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
+                    CurrentNodeIndex = 0;
+                return enabledNodes[CurrentNodeIndex];
+            }
         }
 
         public class FreeSetting

@@ -46,6 +46,51 @@ namespace VPetLLM.UI.Windows
 
     public partial class winSettingNew : Window
     {
+        private Setting.OpenAINodeSetting GetCurrentOpenAISetting()
+        {
+            // 获取当前活跃的OpenAI节点设置
+            if (_plugin.Settings.OpenAI.OpenAINodes.Count == 0)
+            {
+                // 如果没有配置节点，返回默认设置
+                return new Setting.OpenAINodeSetting
+                {
+                    ApiKey = _plugin.Settings.OpenAI.ApiKey,
+                    Model = _plugin.Settings.OpenAI.Model,
+                    Url = _plugin.Settings.OpenAI.Url,
+                    Temperature = _plugin.Settings.OpenAI.Temperature,
+                    MaxTokens = _plugin.Settings.OpenAI.MaxTokens,
+                    EnableAdvanced = _plugin.Settings.OpenAI.EnableAdvanced,
+                    Enabled = _plugin.Settings.OpenAI.Enabled,
+                    Name = _plugin.Settings.OpenAI.Name
+                };
+            }
+            
+            // 使用负载均衡或当前索引获取节点
+            if (_plugin.Settings.OpenAI.EnableLoadBalancing)
+            {
+                // 负载均衡：轮换使用节点
+                var enabledNodes = _plugin.Settings.OpenAI.OpenAINodes.Where(n => n.Enabled).ToList();
+                if (enabledNodes.Count == 0)
+                {
+                    // 如果没有启用的节点，返回第一个节点
+                    return _plugin.Settings.OpenAI.OpenAINodes.First();
+                }
+                
+                // 轮换索引
+                _plugin.Settings.OpenAI.CurrentNodeIndex = (_plugin.Settings.OpenAI.CurrentNodeIndex + 1) % enabledNodes.Count;
+                return enabledNodes[_plugin.Settings.OpenAI.CurrentNodeIndex];
+            }
+            else
+            {
+                // 使用固定索引
+                if (_plugin.Settings.OpenAI.CurrentNodeIndex >= 0 && _plugin.Settings.OpenAI.CurrentNodeIndex < _plugin.Settings.OpenAI.OpenAINodes.Count)
+                {
+                    return _plugin.Settings.OpenAI.OpenAINodes[_plugin.Settings.OpenAI.CurrentNodeIndex];
+                }
+                return _plugin.Settings.OpenAI.OpenAINodes.First();
+            }
+        }
+
         private string GetPluginDescription(IVPetLLMPlugin plugin, string langCode)
         {
             try
@@ -96,6 +141,11 @@ namespace VPetLLM.UI.Windows
         private DispatcherTimer? _autoSaveTimer;
         private bool _hasUnsavedChanges = false;
         private readonly object _saveLock = new object();
+        // 合并异步保存标记，防止重复排队
+        private bool _isSaveScheduled = false;
+        // UI 就绪标记：Loaded 后才允许保存，避免初始化阶段触发立即保存导致 NRE
+        private bool _isReadyToSave = false;
+        private bool _isUpdatingNodeDetails = false;
 
         // TTS服务
         private TTSService? _ttsService;
@@ -113,11 +163,29 @@ namespace VPetLLM.UI.Windows
             Loaded += (s, e) =>
             {
                 UpdateUIForLanguage();
+                // 同步本地化服务的语言，确保 XAML 中 {utils:Localize} 初次加载和后续切换都正确刷新
+                LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
+                // 监听全局本地化变更，自动刷新手动赋值的 UI（如列头）
+                LocalizationService.Instance.PropertyChanged += (sender2, e2) =>
+                {
+                    if (e2.PropertyName == "Item[]")
+                    {
+                        Dispatcher.BeginInvoke(new Action(UpdateUIForLanguage), System.Windows.Threading.DispatcherPriority.Background);
+                    }
+                };
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+                // 标记界面已就绪，允许后续的立即保存
+                _isReadyToSave = true;
+                // 视觉树稳定后再挂载列表冒泡监听，避免初始化/布局阶段触发保存
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    AttachImmediateSaveForChannelLists();
+                }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             };
             ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
-            ((Slider)this.FindName("Slider_OpenAI_Temperature")).ValueChanged += Control_ValueChanged;
-            ((Slider)this.FindName("Slider_Gemini_Temperature")).ValueChanged += Control_ValueChanged;
+            // OpenAI多节点配置 - 温度设置事件处理已移至多节点管理界面
+            if (this.FindName("Slider_Gemini_Temperature") is Slider sliderGemTemp)
+                sliderGemTemp.ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_Free_Temperature")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_TTS_Volume")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_TTS_VolumeGain")).ValueChanged += Control_ValueChanged;
@@ -133,14 +201,14 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_Role")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_OllamaUrl")).TextChanged += Control_TextChanged;
             ((ComboBox)this.FindName("ComboBox_OllamaModel")).SelectionChanged += Control_SelectionChanged;
-            ((TextBox)this.FindName("TextBox_OpenAIApiKey")).TextChanged += Control_TextChanged;
-            ((ComboBox)this.FindName("ComboBox_OpenAIModel")).SelectionChanged += Control_SelectionChanged;
-            ((TextBox)this.FindName("TextBox_OpenAIUrl")).TextChanged += Control_TextChanged;
-            ((TextBox)this.FindName("TextBox_GeminiApiKey")).TextChanged += Control_TextChanged;
+            // OpenAI多节点配置 - 事件处理已移至多节点管理界面
+            if (this.FindName("TextBox_GeminiApiKey") is TextBox tbGeminiApiKey)
+                tbGeminiApiKey.TextChanged += Control_TextChanged;
 
-            ((ComboBox)this.FindName("ComboBox_GeminiModel")).SelectionChanged += Control_SelectionChanged;
+            if (this.FindName("ComboBox_GeminiModel") is ComboBox comboGemModel)
+                comboGemModel.SelectionChanged += Control_SelectionChanged;
 
-            ((TextBox)this.FindName("TextBox_GeminiUrl")).TextChanged += Control_TextChanged;
+
 
             ((CheckBox)this.FindName("CheckBox_KeepContext")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).Click += Control_Click;
@@ -157,11 +225,12 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).TextChanged += Control_TextChanged;
-            ((CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced")).Click += Control_Click;
-            ((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).TextChanged += Control_TextChanged;
-            ((CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced")).Click += Control_Click;
+            // OpenAI多节点配置 - 高级设置事件处理已移至多节点管理界面
+            if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdvBind)
+                cbGemAdvBind.Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).Click += Control_Click;
-            ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).TextChanged += Control_TextChanged;
+            if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMaxBind)
+                tbGemMaxBind.TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_Free_MaxTokens")).TextChanged += Control_TextChanged;
 
             // Proxy settings
@@ -200,6 +269,8 @@ namespace VPetLLM.UI.Windows
 
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
 
+            // 绑定 OpenAI 节点详情控件事件，确保编辑即时回写
+            EnsureOpenAINodeDetailHandlers();
             // 初始化自动保存定时器
             InitializeAutoSaveTimer();
         }
@@ -219,7 +290,8 @@ namespace VPetLLM.UI.Windows
                 }
                 else if (slider.Name == "Slider_Gemini_Temperature")
                 {
-                    ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = slider.Value.ToString("F2");
+                    if (this.FindName("TextBlock_Gemini_TemperatureValue") is TextBlock tvGem)
+                        tvGem.Text = slider.Value.ToString("F2");
                 }
                 else if (slider.Name == "Slider_Free_Temperature")
                 {
@@ -258,49 +330,27 @@ namespace VPetLLM.UI.Windows
             // 先处理特殊逻辑
             if (sender == FindName("ComboBox_Language"))
             {
-                // 立即保存语言设置
+                // 保存到设置（更新 _plugin.Settings.Language）
                 SaveSettings();
                 // 重新加载语言资源
                 LanguageHelper.ReloadLanguages();
-                // 立即更新UI（同步调用）
+
+                // 立刻广播一次，XAML 中 {utils:Localize} 立即更新
+                LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
+                // 同时刷新代码后台赋值的控件
                 UpdateUIForLanguage();
-                // 使用Dispatcher确保在下一个UI周期再次更新界面，以防有遗漏
+
+                // 在下一帧（空闲时）再强制刷新一次，确保语言资源完全就位后所有文本都更新
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    LocalizationService.Instance.Refresh();
                     UpdateUIForLanguage();
-                    
-                    // 重新初始化TouchFeedbackSettingsControl以确保语言更新
-                    InitializeTouchFeedbackSettings();
-                    
-                    // 强制刷新插件列表的列标题
-                    if (FindName("DataGrid_Plugins") is DataGrid dataGridPluginsAsync)
-                    {
-                        var langCodeAsync = _plugin.Settings.Language;
-                        if (dataGridPluginsAsync.Columns.Count > 0)
-                            dataGridPluginsAsync.Columns[0].Header = LanguageHelper.Get("Plugin.Enabled", langCodeAsync) ?? "启用";
-                        if (dataGridPluginsAsync.Columns.Count > 1)
-                            dataGridPluginsAsync.Columns[1].Header = LanguageHelper.Get("Plugin.Status", langCodeAsync);
-                        if (dataGridPluginsAsync.Columns.Count > 2)
-                            dataGridPluginsAsync.Columns[2].Header = LanguageHelper.Get("Plugin.Name", langCodeAsync) ?? "插件信息";
-                        if (dataGridPluginsAsync.Columns.Count > 3)
-                            dataGridPluginsAsync.Columns[3].Header = LanguageHelper.Get("Plugin.Description", langCodeAsync) ?? "描述";
-                        if (dataGridPluginsAsync.Columns.Count > 4)
-                            dataGridPluginsAsync.Columns[4].Header = LanguageHelper.Get("Plugin.Action", langCodeAsync) ?? "操作";
+                }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
-                        // 重新刷新插件列表以更新多语言文本
-                        Button_RefreshPlugins_Click(this, new RoutedEventArgs());
-                    }
-
-                    // 强制更新Tab标题
-                    if (FindName("Tab_Plugin") is TabItem tabPlugin)
-                    {
-                        var langCodeForTab = _plugin.Settings.Language;
-                        tabPlugin.Header = LanguageHelper.Get("Settings.Plugin", langCodeForTab) ?? "插件";
-                    }
-
-                    // 强制刷新整个窗口
-                    this.UpdateLayout();
-                }), System.Windows.Threading.DispatcherPriority.Background);
+                // 重新初始化部分非绑定或复杂逻辑的控件
+                InitializeTouchFeedbackSettings();
+                // 刷新插件列表以更新动态生成的描述等文本
+                Button_RefreshPlugins_Click(this, new RoutedEventArgs());
             }
             if (sender == FindName("ComboBox_PromptLanguage"))
             {
@@ -341,7 +391,7 @@ namespace VPetLLM.UI.Windows
             {
                 string[] criticalFields = {
                     "TextBox_OpenAIApiKey", "TextBox_GeminiApiKey",
-                    "TextBox_OllamaUrl", "TextBox_OpenAIUrl", "TextBox_GeminiUrl"
+                    "TextBox_OllamaUrl", "TextBox_OpenAIUrl"
                 };
 
                 if (criticalFields.Contains(textBox.Name))
@@ -405,14 +455,42 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
             ((TextBox)this.FindName("TextBox_Role")).Text = _plugin.Settings.Role;
+            if (_plugin.Settings.OpenAI == null)
+            {
+                _plugin.Settings.OpenAI = new Setting.OpenAISetting();
+            }
+            if (_plugin.Settings.Free == null)
+            {
+                _plugin.Settings.Free = new Setting.FreeSetting();
+            }
+            if (_plugin.Settings.Ollama == null)
+            {
+                _plugin.Settings.Ollama = new Setting.OllamaSetting();
+            }
             ((TextBox)this.FindName("TextBox_OllamaUrl")).Text = _plugin.Settings.Ollama.Url;
             ((ComboBox)this.FindName("ComboBox_OllamaModel")).Text = _plugin.Settings.Ollama.Model;
-            ((TextBox)this.FindName("TextBox_OpenAIApiKey")).Text = _plugin.Settings.OpenAI.ApiKey;
-            ((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text = _plugin.Settings.OpenAI.Model;
-            ((TextBox)this.FindName("TextBox_OpenAIUrl")).Text = _plugin.Settings.OpenAI.Url;
-            ((TextBox)this.FindName("TextBox_GeminiApiKey")).Text = _plugin.Settings.Gemini.ApiKey;
-            ((ComboBox)this.FindName("ComboBox_GeminiModel")).Text = _plugin.Settings.Gemini.Model;
-            ((TextBox)this.FindName("TextBox_GeminiUrl")).Text = _plugin.Settings.Gemini.Url;
+            // OpenAI多节点配置 - 不再使用单一配置
+            // 这些控件现在用于多节点管理界面
+            //((TextBox)this.FindName("TextBox_OpenAIApiKey")).Text = "";
+            //((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text = "";
+            //((TextBox)this.FindName("TextBox_OpenAIUrl")).Text = "";
+            if (_plugin.Settings.Gemini == null)
+            {
+                _plugin.Settings.Gemini = new Setting.GeminiSetting();
+            }
+            // 负载均衡开关
+            if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLB)
+                cbGemLB.IsChecked = _plugin.Settings.Gemini.EnableLoadBalancing;
+
+            // 刷新Gemini多渠道列表
+            RefreshGeminiNodesList();
+
+            // 兼容旧表单（保留显示）
+            if (this.FindName("TextBox_GeminiApiKey") is TextBox tbGeminiApiKey2)
+                tbGeminiApiKey2.Text = _plugin.Settings.Gemini.ApiKey;
+            if (this.FindName("ComboBox_GeminiModel") is ComboBox cbGeminiModel)
+                cbGeminiModel.Text = _plugin.Settings.Gemini.Model;
+
 
             ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked = _plugin.Settings.KeepContext;
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
@@ -437,10 +515,18 @@ namespace VPetLLM.UI.Windows
             ((Slider)this.FindName("Slider_OpenAI_Temperature")).Value = _plugin.Settings.OpenAI.Temperature;
             ((TextBlock)this.FindName("TextBlock_OpenAI_TemperatureValue")).Text = _plugin.Settings.OpenAI.Temperature.ToString("F2");
             ((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).Text = _plugin.Settings.OpenAI.MaxTokens.ToString();
-            ((CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced")).IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
-            ((Slider)this.FindName("Slider_Gemini_Temperature")).Value = _plugin.Settings.Gemini.Temperature;
-            ((TextBlock)this.FindName("TextBlock_Gemini_TemperatureValue")).Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
-            ((TextBox)this.FindName("TextBox_Gemini_MaxTokens")).Text = _plugin.Settings.Gemini.MaxTokens.ToString();
+            // 刷新OpenAI多节点列表，确保迁移后的节点显示且避免空引用
+            RefreshOpenAINodesList();
+            if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdv)
+                cbGemAdv.IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
+            if (this.FindName("Slider_Gemini_Temperature") is Slider slGemTemp)
+            {
+                slGemTemp.Value = _plugin.Settings.Gemini.Temperature;
+                if (this.FindName("TextBlock_Gemini_TemperatureValue") is TextBlock tvGemTemp)
+                    tvGemTemp.Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
+            }
+            if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMax)
+                tbGemMax.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
             ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).IsChecked = _plugin.Settings.Free.EnableAdvanced;
             ((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
             ((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
@@ -559,6 +645,7 @@ namespace VPetLLM.UI.Windows
 
         private void SaveSettings()
         {
+            if (!_isReadyToSave) return;
             var providerComboBox = (ComboBox)this.FindName("ComboBox_Provider");
             var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
             var promptlanguageComboBox = (ComboBox)this.FindName("ComboBox_PromptLanguage");
@@ -573,7 +660,7 @@ namespace VPetLLM.UI.Windows
             var openAIUrlTextBox = (TextBox)this.FindName("TextBox_OpenAIUrl");
             var geminiApiKeyTextBox = (TextBox)this.FindName("TextBox_GeminiApiKey");
             var geminiModelComboBox = (ComboBox)this.FindName("ComboBox_GeminiModel");
-            var geminiUrlTextBox = (TextBox)this.FindName("TextBox_GeminiUrl");
+
 
             var keepContextCheckBox = (CheckBox)this.FindName("CheckBox_KeepContext");
             var enableChatHistoryCheckBox = (CheckBox)this.FindName("CheckBox_EnableChatHistory");
@@ -619,12 +706,14 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Role = roleTextBox.Text;
             _plugin.Settings.Ollama.Url = ollamaUrlTextBox.Text;
             _plugin.Settings.Ollama.Model = ollamaModelComboBox.Text;
-            _plugin.Settings.OpenAI.ApiKey = openAIApiKeyTextBox.Text;
-            _plugin.Settings.OpenAI.Model = openAIModelComboBox.Text;
-            _plugin.Settings.OpenAI.Url = openAIUrlTextBox.Text;
-            _plugin.Settings.Gemini.ApiKey = geminiApiKeyTextBox.Text;
-            _plugin.Settings.Gemini.Model = geminiModelComboBox.Text;
-            _plugin.Settings.Gemini.Url = geminiUrlTextBox.Text;
+            // OpenAI多节点配置 - 不再使用单一配置
+            // 这些控件现在用于多节点管理界面
+            // OpenAI配置通过多节点列表管理
+            if (geminiApiKeyTextBox != null)
+                _plugin.Settings.Gemini.ApiKey = geminiApiKeyTextBox.Text;
+            if (geminiModelComboBox != null)
+                _plugin.Settings.Gemini.Model = geminiModelComboBox.Text;
+
 
             _plugin.Settings.KeepContext = keepContextCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableChatHistory = enableChatHistoryCheckBox.IsChecked ?? true;
@@ -646,14 +735,18 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Ollama.Temperature = ollamaTemperatureSlider.Value;
             if (int.TryParse(ollamaMaxTokensTextBox.Text, out int ollamaMaxTokens))
                 _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
-            _plugin.Settings.OpenAI.EnableAdvanced = openAIEnableAdvancedCheckBox.IsChecked ?? false;
-            _plugin.Settings.OpenAI.Temperature = openAITemperatureSlider.Value;
-            if (int.TryParse(openAIMaxTokensTextBox.Text, out int openAIMaxTokens))
-                _plugin.Settings.OpenAI.MaxTokens = openAIMaxTokens;
-            _plugin.Settings.Gemini.EnableAdvanced = geminiEnableAdvancedCheckBox.IsChecked ?? false;
-            _plugin.Settings.Gemini.Temperature = geminiTemperatureSlider.Value;
-            if (int.TryParse(geminiMaxTokensTextBox.Text, out int geminiMaxTokens))
+            // OpenAI多节点配置 - 高级设置通过多节点管理界面处理
+            // 温度和最大令牌数现在由各个节点独立配置
+            if (geminiEnableAdvancedCheckBox != null)
+                _plugin.Settings.Gemini.EnableAdvanced = geminiEnableAdvancedCheckBox.IsChecked ?? false;
+            if (geminiTemperatureSlider != null)
+                _plugin.Settings.Gemini.Temperature = geminiTemperatureSlider.Value;
+            if (geminiMaxTokensTextBox != null && int.TryParse(geminiMaxTokensTextBox.Text, out int geminiMaxTokens))
                 _plugin.Settings.Gemini.MaxTokens = geminiMaxTokens;
+
+            // 保存 Gemini 负载均衡开关
+            if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLB2)
+                _plugin.Settings.Gemini.EnableLoadBalancing = cbGemLB2.IsChecked ?? false;
             _plugin.Settings.Tools = new List<Setting.ToolSetting>((IEnumerable<Setting.ToolSetting>)toolsDataGrid.ItemsSource);
 
             // Proxy settings
@@ -755,7 +848,7 @@ namespace VPetLLM.UI.Windows
                 IChatCore updatedChatCore = newProvider switch
                 {
                     Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
-                    Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.OpenAI => new OpenAIChatCore(GetCurrentOpenAISetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Gemini => new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
@@ -796,18 +889,17 @@ namespace VPetLLM.UI.Windows
             }
             finally
             {
-                // 确保在UI线程上停止动画和重置按钮状态
-                Dispatcher.Invoke(() =>
+                // 确保在UI线程上停止动画和重置按钮状态（使用异步避免潜在阻塞）
+                await Dispatcher.InvokeAsync(() =>
                 {
                     StopButtonLoadingAnimation(button);
 
-                    // 额外的按钮状态重置
                     if (button != null)
                     {
                         button.IsEnabled = true;
                         button.UpdateLayout();
                     }
-                });
+                }, System.Windows.Threading.DispatcherPriority.Background);
             }
         }
 
@@ -818,7 +910,7 @@ namespace VPetLLM.UI.Windows
 
             try
             {
-                var openAICore = new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+                var openAICore = new OpenAIChatCore(GetCurrentOpenAISetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = await Task.Run(() => openAICore.RefreshModels());
                 ((ComboBox)this.FindName("ComboBox_OpenAIModel")).ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text))
@@ -846,9 +938,31 @@ namespace VPetLLM.UI.Windows
             {
                 var geminiCore = new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = await Task.Run(() => geminiCore.RefreshModels());
-                ((ComboBox)this.FindName("ComboBox_GeminiModel")).ItemsSource = models;
-                if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_GeminiModel")).Text))
-                    ((ComboBox)this.FindName("ComboBox_GeminiModel")).SelectedIndex = 0;
+
+                // 记录刷新前两个下拉框的文本，避免刷新后丢失用户输入
+                string oldMainText = (this.FindName("ComboBox_GeminiModel") as ComboBox)?.Text ?? string.Empty;
+                string oldNodeText = (this.FindName("ComboBox_GeminiNodeModel") as ComboBox)?.Text ?? string.Empty;
+
+                // 刷新旧表单下拉框
+                if (this.FindName("ComboBox_GeminiModel") is ComboBox cbMain)
+                {
+                    cbMain.ItemsSource = models;
+                    // 若原文本为空，默认选第一项
+                    if (models.Count > 0 && string.IsNullOrEmpty(oldMainText))
+                        cbMain.SelectedIndex = 0;
+                    else
+                        cbMain.Text = oldMainText;
+                }
+
+                // 刷新节点详情下拉框
+                if (this.FindName("ComboBox_GeminiNodeModel") is ComboBox cbNode)
+                {
+                    cbNode.ItemsSource = models;
+                    if (models.Count > 0 && string.IsNullOrEmpty(oldNodeText))
+                        cbNode.SelectedIndex = 0;
+                    else
+                        cbNode.Text = oldNodeText;
+                }
             }
             catch (System.Exception ex)
             {
@@ -1130,28 +1244,39 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 调度自动保存
+        /// 调度自动保存（异步合并，避免UI线程阻塞/重入）
         /// </summary>
-        /// <param name="immediate">是否立即保存</param>
+        /// <param name="immediate">保留参数，维持兼容</param>
         private void ScheduleAutoSave(bool immediate = false)
         {
+            // 初始化阶段不保存，避免未构造完成的控件/服务导致 NRE
+            if (!_isReadyToSave) return;
+
             lock (_saveLock)
             {
                 _hasUnsavedChanges = true;
+                if (_isSaveScheduled) return;
+                _isSaveScheduled = true;
+            }
 
-                if (immediate)
+            // 异步合并到一次保存，使用后台优先级，不阻塞事件回调/布局周期
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                bool doSave = false;
+                lock (_saveLock)
                 {
-                    // 立即保存
-                    _autoSaveTimer?.Stop();
+                    if (_hasUnsavedChanges)
+                    {
+                        _hasUnsavedChanges = false;
+                        doSave = true;
+                    }
+                    _isSaveScheduled = false;
+                }
+                if (doSave)
+                {
                     SaveSettings();
                 }
-                else
-                {
-                    // 重启定时器，实现防抖动
-                    _autoSaveTimer?.Stop();
-                    _autoSaveTimer?.Start();
-                }
-            }
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         /// <summary>
@@ -1373,6 +1498,27 @@ namespace VPetLLM.UI.Windows
                     dataGridPlugins.Columns[3].Header = LanguageHelper.Get("Plugin.Description", langCode) ?? "描述";
                 if (dataGridPlugins.Columns.Count > 4)
                     dataGridPlugins.Columns[4].Header = LanguageHelper.Get("Plugin.Action", langCode) ?? "操作";
+                dataGridPlugins.Items.Refresh();
+            }
+
+            // OpenAI 多节点 ListView 列头（GridViewColumn.Header 非依赖属性，需手动刷新）
+            if (FindName("ListView_OpenAINodes") is ListView lvOpenAI && lvOpenAI.View is GridView gvOpenAI)
+            {
+                if (gvOpenAI.Columns.Count > 0) gvOpenAI.Columns[0].Header = LanguageHelper.Get("OpenAI.Enabled", langCode) ?? "启用";
+                if (gvOpenAI.Columns.Count > 1) gvOpenAI.Columns[1].Header = LanguageHelper.Get("OpenAI.ChannelName", langCode) ?? "渠道名称";
+                if (gvOpenAI.Columns.Count > 2) gvOpenAI.Columns[2].Header = LanguageHelper.Get("OpenAI.ApiKey", langCode) ?? "API 密钥";
+                if (gvOpenAI.Columns.Count > 3) gvOpenAI.Columns[3].Header = LanguageHelper.Get("OpenAI.Model", langCode) ?? "模型";
+                if (gvOpenAI.Columns.Count > 4) gvOpenAI.Columns[4].Header = LanguageHelper.Get("OpenAI.ApiAddress", langCode) ?? "API 地址";
+            }
+
+            // Gemini 多节点 ListView 列头
+            if (FindName("ListView_GeminiNodes") is ListView lvGem && lvGem.View is GridView gvGem)
+            {
+                if (gvGem.Columns.Count > 0) gvGem.Columns[0].Header = LanguageHelper.Get("Gemini.Enabled", langCode) ?? "启用";
+                if (gvGem.Columns.Count > 1) gvGem.Columns[1].Header = LanguageHelper.Get("Gemini.ChannelName", langCode) ?? "渠道名称";
+                if (gvGem.Columns.Count > 2) gvGem.Columns[2].Header = LanguageHelper.Get("Gemini.ApiKey", langCode) ?? "API 密钥";
+                if (gvGem.Columns.Count > 3) gvGem.Columns[3].Header = LanguageHelper.Get("Gemini.Model", langCode) ?? "模型";
+                if (gvGem.Columns.Count > 4) gvGem.Columns[4].Header = LanguageHelper.Get("Gemini.ApiAddress", langCode) ?? "API 地址";
             }
 
 
@@ -1478,7 +1624,8 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CS4014", Justification = "异步刷新云端插件列表为有意的 fire-and-forget，不应阻塞UI")]
+private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
 
@@ -1569,6 +1716,7 @@ namespace VPetLLM.UI.Windows
                 Logger.Log($"正在连接云端插件商店进行版本对比...");
 
                 // 第二步：异步加载在线插件（不阻塞UI）
+#pragma warning disable CS4014
                 _ = Task.Run(async () =>
                 {
                     try
@@ -1689,6 +1837,7 @@ namespace VPetLLM.UI.Windows
                             dataGrid.ItemsSource = pluginItems.Values.ToList();
                             System.Diagnostics.Debug.WriteLine($"[PluginStore] 更新后总插件数量: {pluginItems.Count}");
                         });
+#pragma warning restore CS4014
 
                         var updatableCount = pluginItems.Values.Count(p => p.IsUpdatable);
                         Logger.Log($"插件列表刷新完成 - 总计 {pluginItems.Count} 个插件，其中 {updatableCount} 个可更新");
@@ -2441,5 +2590,449 @@ namespace VPetLLM.UI.Windows
 
             return new HttpClient(handler);
         }
+
+        private void Button_AddOpenAINode_Click(object sender, RoutedEventArgs e)
+        {
+            var newNode = new Setting.OpenAINodeSetting
+            {
+                Name = $"OpenAI渠道{_plugin.Settings.OpenAI.OpenAINodes.Count + 1}",
+                ApiKey = "",
+                Model = "gpt-3.5-turbo",
+                Url = "https://api.openai.com/v1",
+                Enabled = true,
+                EnableAdvanced = false,
+                Temperature = 0.7,
+                MaxTokens = 2048
+            };
+            
+            _plugin.Settings.OpenAI.OpenAINodes.Add(newNode);
+            RefreshOpenAINodesList();
+            MarkUnsavedChanges();
+        }
+
+        private void Button_RemoveOpenAINode_Click(object sender, RoutedEventArgs e)
+        {
+            var list = this.FindName("ListView_OpenAINodes") as ListView;
+            if (list?.SelectedItem is Setting.OpenAINodeSetting node)
+            {
+                _plugin.Settings.OpenAI.OpenAINodes.Remove(node);
+                RefreshOpenAINodesList();
+                MarkUnsavedChanges();
+            }
+        }
+
+        private void RefreshOpenAINodesList()
+        {
+            var list = this.FindName("ListView_OpenAINodes") as ListView;
+            if (list != null)
+            {
+                var selectedItem = list.SelectedItem;
+                var selectedIndex = list.SelectedIndex;
+
+                list.ItemsSource = null;
+                list.ItemsSource = _plugin.Settings.OpenAI.OpenAINodes;
+
+                if (selectedItem != null && _plugin.Settings.OpenAI.OpenAINodes.Contains(selectedItem))
+                    list.SelectedItem = selectedItem;
+                else if (selectedIndex >= 0 && selectedIndex < list.Items.Count)
+                    list.SelectedIndex = selectedIndex;
+
+                list.UpdateLayout();
+            }
+        }
+
+        private void MarkUnsavedChanges()
+        {
+            // 标记变更后立即保存
+            ScheduleAutoSave(true);
+        }
+
+        // ========== Gemini 多渠道管理 ==========
+        private void RefreshGeminiNodesList()
+        {
+            var list = this.FindName("ListView_GeminiNodes") as ListView;
+            if (list != null)
+            {
+                var selectedItem = list.SelectedItem;
+                var selectedIndex = list.SelectedIndex;
+
+                list.ItemsSource = null;
+                list.ItemsSource = _plugin.Settings.Gemini.GeminiNodes;
+
+                if (selectedItem != null && _plugin.Settings.Gemini.GeminiNodes.Contains(selectedItem))
+                    list.SelectedItem = selectedItem;
+                else if (selectedIndex >= 0 && selectedIndex < list.Items.Count)
+                    list.SelectedIndex = selectedIndex;
+
+                list.UpdateLayout();
+            }
+        }
+
+        private void Button_AddGeminiNode_Click(object sender, RoutedEventArgs e)
+        {
+            var newNode = new Setting.GeminiNodeSetting
+            {
+                Name = $"Gemini渠道{_plugin.Settings.Gemini.GeminiNodes.Count + 1}",
+                ApiKey = "",
+                Model = "gemini-1.5-flash",
+                Url = "https://generativelanguage.googleapis.com/v1beta",
+                Enabled = true,
+                EnableAdvanced = false,
+                Temperature = 0.7,
+                MaxTokens = 2048
+            };
+            _plugin.Settings.Gemini.GeminiNodes.Add(newNode);
+            RefreshGeminiNodesList();
+            MarkUnsavedChanges();
+        }
+
+        private void Button_RemoveGeminiNode_Click(object sender, RoutedEventArgs e)
+        {
+            var list = this.FindName("ListView_GeminiNodes") as ListView;
+            if (list?.SelectedItem is Setting.GeminiNodeSetting node)
+            {
+                _plugin.Settings.Gemini.GeminiNodes.Remove(node);
+                RefreshGeminiNodesList();
+                MarkUnsavedChanges();
+            }
+        }
+
+        // ========== OpenAI 节点选择与详情回显 ==========
+        private Setting.OpenAINodeSetting GetSelectedOpenAINode()
+        {
+            if (this.FindName("ListView_OpenAINodes") is ListView list && list.SelectedItem is Setting.OpenAINodeSetting node)
+                return node;
+            return null;
+        }
+
+        private void ListView_OpenAINodes_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _isUpdatingNodeDetails = true;
+            var node = GetSelectedOpenAINode();
+            if (node == null) { _isUpdatingNodeDetails = false; return; }
+
+            if (this.FindName("TextBox_OpenAINodeName") is TextBox tbName) tbName.Text = node.Name ?? string.Empty;
+            if (this.FindName("PasswordBox_OpenAIApiKey") is PasswordBox pb) pb.Password = node.ApiKey ?? string.Empty;
+            if (this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbPlain) tbPlain.Text = node.ApiKey ?? string.Empty;
+            if (this.FindName("ComboBox_OpenAIModel") is ComboBox cbModel) cbModel.Text = node.Model ?? string.Empty;
+            if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl) tbUrl.Text = node.Url ?? string.Empty;
+            if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.IsChecked = node.EnableAdvanced;
+            if (this.FindName("Slider_OpenAI_Temperature") is Slider slTemp)
+            {
+                slTemp.Value = node.Temperature;
+                if (this.FindName("TextBlock_OpenAI_TemperatureValue") is TextBlock tv) tv.Text = node.Temperature.ToString("F2");
+            }
+            if (this.FindName("TextBox_OpenAI_MaxTokens") is TextBox tbMax) tbMax.Text = node.MaxTokens.ToString();
+            _isUpdatingNodeDetails = false;
+        }
+
+        private void OpenAINodeDetail_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedOpenAINode();
+            if (node == null) return;
+
+            if (sender is TextBox tb)
+            {
+                switch (tb.Name)
+                {
+                    case "TextBox_OpenAINodeName":
+                        node.Name = tb.Text;
+                        break;
+                    case "TextBox_OpenAIUrl":
+                        node.Url = tb.Text;
+                        break;
+                    case "TextBox_OpenAI_MaxTokens":
+                        if (int.TryParse(tb.Text, out var mt)) node.MaxTokens = mt;
+                        break;
+                    case "TextBox_OpenAIApiKey_Plain":
+                        node.ApiKey = tb.Text;
+                        if (this.FindName("PasswordBox_OpenAIApiKey") is PasswordBox pb2 && pb2.Password != tb.Text)
+                            pb2.Password = tb.Text;
+                        break;
+                }
+                RefreshOpenAINodesList();
+                ScheduleAutoSave();
+            }
+        }
+
+        private void OpenAINodeDetail_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedOpenAINode();
+            if (node == null) return;
+            if (sender is PasswordBox pb)
+            {
+                node.ApiKey = pb.Password;
+                if (this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbPlain && tbPlain.Text != pb.Password)
+                    tbPlain.Text = pb.Password;
+                RefreshOpenAINodesList();
+                ScheduleAutoSave();
+            }
+        }
+
+        private void OpenAINodeDetail_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedOpenAINode();
+            if (node == null) return;
+            if (sender is ComboBox cb && cb.Name == "ComboBox_OpenAIModel")
+            {
+                node.Model = cb.Text;
+                RefreshOpenAINodesList();
+                ScheduleAutoSave();
+            }
+        }
+
+        private void OpenAINodeDetail_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedOpenAINode();
+            if (node == null) return;
+            if (sender is CheckBox cb && cb.Name == "CheckBox_OpenAI_EnableAdvanced")
+            {
+                node.EnableAdvanced = cb.IsChecked ?? false;
+                RefreshOpenAINodesList();
+                ScheduleAutoSave();
+            }
+        }
+
+        private void OpenAINodeDetail_TemperatureChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedOpenAINode();
+            if (node == null) return;
+            if (sender is Slider sl && sl.Name == "Slider_OpenAI_Temperature")
+            {
+                node.Temperature = sl.Value;
+                if (this.FindName("TextBlock_OpenAI_TemperatureValue") is TextBlock tv) tv.Text = sl.Value.ToString("F2");
+                RefreshOpenAINodesList();
+                ScheduleAutoSave();
+            }
+        }
+
+        // 绑定 OpenAI 节点详情控件事件（在窗口构造后调用一次也可，当前通过 XAML 绑定列表选择事件触发）
+        private void EnsureOpenAINodeDetailHandlers()
+        {
+            if (this.FindName("TextBox_OpenAINodeName") is TextBox tbName) tbName.TextChanged += OpenAINodeDetail_TextChanged;
+            if (this.FindName("PasswordBox_OpenAIApiKey") is PasswordBox pb) pb.PasswordChanged += OpenAINodeDetail_PasswordChanged;
+            if (this.FindName("ComboBox_OpenAIModel") is ComboBox cbModel) cbModel.SelectionChanged += OpenAINodeDetail_SelectionChanged;
+            if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl) { tbUrl.TextChanged += OpenAINodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; }
+            if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += OpenAINodeDetail_Click;
+            if (this.FindName("Slider_OpenAI_Temperature") is Slider slTemp) slTemp.ValueChanged += OpenAINodeDetail_TemperatureChanged;
+            if (this.FindName("TextBox_OpenAI_MaxTokens") is TextBox tbMax) tbMax.TextChanged += OpenAINodeDetail_TextChanged;
+            if (this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbPlain) tbPlain.TextChanged += OpenAINodeDetail_TextChanged;
+
+        }
+
+        private void Detail_TextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            ScheduleAutoSave();
+        }
+
+        // ========== Gemini 渠道选择与详情回显 ==========
+        private Setting.GeminiNodeSetting GetSelectedGeminiNode()
+        {
+            if (this.FindName("ListView_GeminiNodes") is ListView list && list.SelectedItem is Setting.GeminiNodeSetting node)
+                return node;
+            return null;
+        }
+
+        private void ListView_GeminiNodes_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // 确保详情控件事件已绑定（避免重复绑定造成多次触发，简单容错）
+            EnsureGeminiNodeDetailHandlers();
+
+            _isUpdatingNodeDetails = true;
+            var node = GetSelectedGeminiNode();
+            if (node == null) { _isUpdatingNodeDetails = false; return; }
+
+            if (this.FindName("TextBox_GeminiNodeName") is TextBox tbName) tbName.Text = node.Name ?? string.Empty;
+            if (this.FindName("PasswordBox_GeminiApiKey") is PasswordBox pb) pb.Password = node.ApiKey ?? string.Empty;
+            if (this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbPlain) tbPlain.Text = node.ApiKey ?? string.Empty;
+            if (this.FindName("ComboBox_GeminiNodeModel") is ComboBox cbModel) cbModel.Text = node.Model ?? string.Empty;
+            if (this.FindName("TextBox_GeminiNodeUrl") is TextBox tbUrl) tbUrl.Text = node.Url ?? string.Empty;
+            if (this.FindName("CheckBox_GeminiNode_EnableAdvanced") is CheckBox cbAdv) cbAdv.IsChecked = node.EnableAdvanced;
+            if (this.FindName("Slider_GeminiNode_Temperature") is Slider slTemp)
+            {
+                slTemp.Value = node.Temperature;
+                if (this.FindName("TextBlock_GeminiNode_TemperatureValue") is TextBlock tv) tv.Text = node.Temperature.ToString("F2");
+            }
+            if (this.FindName("TextBox_GeminiNode_MaxTokens") is TextBox tbMax) tbMax.Text = node.MaxTokens.ToString();
+            _isUpdatingNodeDetails = false;
+        }
+
+        private void GeminiNodeDetail_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedGeminiNode();
+            if (node == null) return;
+
+            if (sender is TextBox tb)
+            {
+                switch (tb.Name)
+                {
+                    case "TextBox_GeminiNodeName":
+                        node.Name = tb.Text;
+                        break;
+                    case "TextBox_GeminiNodeUrl":
+                        node.Url = tb.Text;
+                        break;
+                    case "TextBox_GeminiNode_MaxTokens":
+                        if (int.TryParse(tb.Text, out var mt)) node.MaxTokens = mt;
+                        break;
+                    case "TextBox_GeminiApiKey_Plain":
+                        node.ApiKey = tb.Text;
+                        if (this.FindName("PasswordBox_GeminiApiKey") is PasswordBox pb2 && pb2.Password != tb.Text)
+                            pb2.Password = tb.Text;
+                        break;
+                }
+                RefreshGeminiNodesList();
+                ScheduleAutoSave();
+            }
+        }
+
+        private void GeminiNodeDetail_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedGeminiNode();
+            if (node == null) return;
+            if (sender is PasswordBox pb)
+            {
+                node.ApiKey = pb.Password;
+                if (this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbPlain && tbPlain.Text != pb.Password)
+                    tbPlain.Text = pb.Password;
+                RefreshGeminiNodesList();
+                ScheduleAutoSave();
+            }
+        }
+
+        private void GeminiNodeDetail_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedGeminiNode();
+            if (node == null) return;
+            if (sender is ComboBox cb && cb.Name == "ComboBox_GeminiNodeModel")
+            {
+                cb.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    node.Model = cb.Text;
+                    RefreshGeminiNodesList();
+                    ScheduleAutoSave();
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
+        }
+
+        private void GeminiNodeDetail_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedGeminiNode();
+            if (node == null) return;
+            if (sender is CheckBox cb && cb.Name == "CheckBox_GeminiNode_EnableAdvanced")
+            {
+                node.EnableAdvanced = cb.IsChecked ?? false;
+                RefreshGeminiNodesList();
+                ScheduleAutoSave();
+            }
+        }
+
+        private void GeminiNodeDetail_TemperatureChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedGeminiNode();
+            if (node == null) return;
+            if (sender is Slider sl && sl.Name == "Slider_GeminiNode_Temperature")
+            {
+                node.Temperature = sl.Value;
+                if (this.FindName("TextBlock_GeminiNode_TemperatureValue") is TextBlock tv) tv.Text = sl.Value.ToString("F2");
+                RefreshGeminiNodesList();
+                ScheduleAutoSave();
+            }
+        }
+
+        private void EnsureGeminiNodeDetailHandlers()
+        {
+            if (this.FindName("TextBox_GeminiNodeName") is TextBox tbName) tbName.TextChanged += GeminiNodeDetail_TextChanged;
+            if (this.FindName("PasswordBox_GeminiApiKey") is PasswordBox pb) pb.PasswordChanged += GeminiNodeDetail_PasswordChanged;
+            if (this.FindName("ComboBox_GeminiNodeModel") is ComboBox cbModel) cbModel.SelectionChanged += GeminiNodeDetail_SelectionChanged;
+            if (this.FindName("TextBox_GeminiNodeUrl") is TextBox tbUrl) { tbUrl.TextChanged += GeminiNodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; }
+            if (this.FindName("CheckBox_GeminiNode_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += GeminiNodeDetail_Click;
+            if (this.FindName("Slider_GeminiNode_Temperature") is Slider slTemp) slTemp.ValueChanged += GeminiNodeDetail_TemperatureChanged;
+            if (this.FindName("TextBox_GeminiNode_MaxTokens") is TextBox tbMax) tbMax.TextChanged += GeminiNodeDetail_TextChanged;
+            if (this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbPlain) tbPlain.TextChanged += GeminiNodeDetail_TextChanged;
+
+        }
+
+        // 小眼睛：OpenAI API Key 显示/隐藏切换（供 XAML Click 使用）
+        private void Button_Toggle_OpenAIApiKey_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.FindName("PasswordBox_OpenAIApiKey") is PasswordBox pbx && this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbx)
+            {
+                if (pbx.Visibility == Visibility.Visible)
+                {
+                    tbx.Text = pbx.Password;
+                    pbx.Visibility = Visibility.Collapsed;
+                    tbx.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    pbx.Password = tbx.Text;
+                    tbx.Visibility = Visibility.Collapsed;
+                    pbx.Visibility = Visibility.Visible;
+                }
+            }
+        }
+
+        // 小眼睛：Gemini API Key 显示/隐藏切换（供 XAML Click 使用）
+        private void Button_Toggle_GeminiApiKey_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.FindName("PasswordBox_GeminiApiKey") is PasswordBox pbx && this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbx)
+            {
+                if (pbx.Visibility == Visibility.Visible)
+                {
+                    tbx.Text = pbx.Password;
+                    pbx.Visibility = Visibility.Collapsed;
+                    tbx.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    pbx.Password = tbx.Text;
+                    tbx.Visibility = Visibility.Collapsed;
+                    pbx.Visibility = Visibility.Visible;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 让渠道列表内的控件（复选框/文本框/下拉/滑条）任何变更都触发立即保存
+        /// </summary>
+        private void AttachImmediateSaveForChannelLists()
+        {
+            // OpenAI 渠道列表
+            if (this.FindName("ListView_OpenAINodes") is ListView lvOpenAI)
+            {
+                lvOpenAI.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(ChannelList_TextChanged), true);
+                lvOpenAI.AddHandler(PasswordBox.PasswordChangedEvent, new RoutedEventHandler(ChannelList_PasswordChanged), true);
+                lvOpenAI.AddHandler(ComboBox.SelectionChangedEvent, new SelectionChangedEventHandler(ChannelList_SelectionChanged), true);
+                lvOpenAI.AddHandler(CheckBox.ClickEvent, new RoutedEventHandler(ChannelList_Click), true);
+                lvOpenAI.AddHandler(Slider.ValueChangedEvent, new RoutedPropertyChangedEventHandler<double>(ChannelList_ValueChanged), true);
+            }
+            // Gemini 渠道列表
+            if (this.FindName("ListView_GeminiNodes") is ListView lvGemini)
+            {
+                lvGemini.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(ChannelList_TextChanged), true);
+                lvGemini.AddHandler(PasswordBox.PasswordChangedEvent, new RoutedEventHandler(ChannelList_PasswordChanged), true);
+                lvGemini.AddHandler(ComboBox.SelectionChangedEvent, new SelectionChangedEventHandler(ChannelList_SelectionChanged), true);
+                lvGemini.AddHandler(CheckBox.ClickEvent, new RoutedEventHandler(ChannelList_Click), true);
+                lvGemini.AddHandler(Slider.ValueChangedEvent, new RoutedPropertyChangedEventHandler<double>(ChannelList_ValueChanged), true);
+            }
+        }
+
+        // 统一转发为立即保存（Loaded 之后 _isReadyToSave 才会为 true）
+        private void ChannelList_TextChanged(object sender, TextChangedEventArgs e) => ScheduleAutoSave(true);
+        private void ChannelList_PasswordChanged(object sender, RoutedEventArgs e) => ScheduleAutoSave(true);
+        private void ChannelList_SelectionChanged(object sender, SelectionChangedEventArgs e) => ScheduleAutoSave(true);
+        private void ChannelList_Click(object sender, RoutedEventArgs e) => ScheduleAutoSave(true);
+        private void ChannelList_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => ScheduleAutoSave(true);
     }
 }
