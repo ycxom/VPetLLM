@@ -43,7 +43,7 @@ namespace VPetLLM.Core.ChatCore
                 {
                     model = _ollamaSetting.Model,
                     messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
-                    stream = false,
+                    stream = _ollamaSetting.EnableStreaming,
                     options = _ollamaSetting.EnableAdvanced ? new
                     {
                         temperature = _ollamaSetting.Temperature,
@@ -51,26 +51,92 @@ namespace VPetLLM.Core.ChatCore
                     } : null
                 };
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                
+                string message;
                 using (var client = GetClient())
                 {
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
                     client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
-                    var response = await client.PostAsync("/api/chat", content);
-                    response.EnsureSuccessStatusCode();
-                    var responseString = await response.Content.ReadAsStringAsync();
-                    var responseObject = JObject.Parse(responseString);
-                    var message = responseObject["message"]["content"].ToString();
-                    // 根据上下文设置决定是否保留历史（使用基类的统一状态）
-                    if (Settings.KeepContext)
+                    
+                    if (_ollamaSetting.EnableStreaming)
                     {
-                        await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                        // 流式传输模式
+                        Utils.Logger.Log("Ollama: 使用流式传输模式");
+                        var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
+                        {
+                            Content = content
+                        };
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        response.EnsureSuccessStatusCode();
+                        
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        {
+                            // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
+                            Utils.Logger.Log($"Ollama流式: 检测到完整命令: {cmd}");
+                            ResponseHandler?.Invoke(cmd);
+                        });
+                        
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) != null)
+                            {
+                                if (string.IsNullOrWhiteSpace(line))
+                                    continue;
+                                
+                                try
+                                {
+                                    var chunk = JObject.Parse(line);
+                                    var delta = chunk["message"]?["content"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        // 将新片段传递给流式处理器，检测完整命令
+                                        streamProcessor.AddChunk(delta);
+                                        // 通知流式文本更新（用于显示）
+                                        StreamingChunkHandler?.Invoke(delta);
+                                    }
+                                    
+                                    // 检查是否完成
+                                    if (chunk["done"]?.Value<bool>() == true)
+                                        break;
+                                }
+                                catch
+                                {
+                                    // 忽略解析错误，继续处理下一行
+                                }
+                            }
+                        }
+                        message = fullMessage.ToString();
+                        Utils.Logger.Log($"Ollama流式: 流式传输完成，总消息长度: {message.Length}");
+                        // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
-                    // 只有在保持上下文模式时才保存历史记录
-                    if (Settings.KeepContext)
+                    else
                     {
-                        SaveHistory();
+                        // 非流式传输模式
+                        Utils.Logger.Log("Ollama: 使用非流式传输模式");
+                        var response = await client.PostAsync("/api/chat", content);
+                        response.EnsureSuccessStatusCode();
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var responseObject = JObject.Parse(responseString);
+                        message = responseObject["message"]["content"].ToString();
+                        Utils.Logger.Log($"Ollama非流式: 收到完整消息，长度: {message.Length}");
+                        // 非流式模式下，一次性处理完整消息
+                        ResponseHandler?.Invoke(message);
                     }
-                    ResponseHandler?.Invoke(message);
+                }
+                
+                // 根据上下文设置决定是否保留历史（使用基类的统一状态）
+                if (Settings.KeepContext)
+                {
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                }
+                // 只有在保持上下文模式时才保存历史记录
+                if (Settings.KeepContext)
+                {
+                    SaveHistory();
                 }
                 return "";
             }

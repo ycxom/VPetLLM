@@ -130,6 +130,12 @@
             "zh-hant": "啟用高級配置",
             "jp": "詳細設定を有効にする"
         },
+        "EnableStreaming": {
+            "en": "Enable Streaming",
+            "zh-hans": "启用流式传输",
+            "zh-hant": "啟用流式傳輸",
+            "jp": "ストリーミングを有効にする"
+        },
         "Temperature": {
             "en": "Temperature:",
             "zh-hans": "温度:",
@@ -215,6 +221,12 @@
             "zh-hans": "启用高级配置",
             "zh-hant": "啟用高級配置",
             "jp": "詳細設定を有効にする"
+        },
+        "EnableStreaming": {
+            "en": "Enable Streaming",
+            "zh-hans": "启用流式传输",
+            "zh-hant": "啟用流式傳輸",
+            "jp": "ストリーミングを有効にする"
         },
         "Temperature": {
             "en": "Temperature:",
@@ -332,6 +344,12 @@
             "zh-hant": "啟用高級配置",
             "jp": "詳細設定を有効にする"
         },
+        "EnableStreaming": {
+            "en": "Enable Streaming",
+            "zh-hans": "启用流式传输",
+            "zh-hant": "啟用流式傳輸",
+            "jp": "ストリーミングを有効にする"
+        },
         "Temperature": {
             "en": "Temperature:",
             "zh-hans": "温度:",
@@ -429,6 +447,12 @@
             "zh-hans": "启用高级配置",
             "zh-hant": "啟用高級配置",
             "jp": "詳細設定を有効にする"
+        },
+        "EnableStreaming": {
+            "en": "Enable Streaming",
+            "zh-hans": "启用流式传输",
+            "zh-hant": "啟用流式傳輸",
+            "jp": "ストリーミングを有効にする"
         },
         "Temperature": {
             "en": "Temperature:",

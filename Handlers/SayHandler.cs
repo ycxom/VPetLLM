@@ -39,28 +39,54 @@ namespace VPetLLM.Handlers
                     Utils.Logger.Log($"SayHandler performing body animation: {action} while talking.");
 
                     // 1. Start the body animation. It will manage its own lifecycle.
+                    bool actionTriggered = false;
                     switch (action)
                     {
                         case "touch_head":
                         case "touchhead":
                             mainWindow.Main.DisplayTouchHead();
+                            actionTriggered = true;
                             break;
                         case "touch_body":
                         case "touchbody":
                             mainWindow.Main.DisplayTouchBody();
+                            actionTriggered = true;
                             break;
                         case "move":
-                            mainWindow.Main.DisplayMove();
+                            actionTriggered = mainWindow.Main.DisplayMove();
                             break;
                         case "sleep":
                             mainWindow.Main.DisplaySleep();
+                            actionTriggered = true;
                             break;
                         case "idel":
-                            mainWindow.Main.DisplayIdel();
+                            actionTriggered = mainWindow.Main.DisplayIdel();
+                            break;
+                        case "sideleft":
+                            // TODO: 贴墙状态（左边）- 需要 VPet >= 11057 (提交 8acf02c0)
+                            // 当前版本暂不支持，等待 VPet 更新后取消注释以下代码：
+                            // mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.SideLeft, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            // actionTriggered = true;
+                            Logger.Log("SayHandler: 'sideleft' action requires VPet >= 11057, falling back to idel");
+                            actionTriggered = mainWindow.Main.DisplayIdel();
+                            break;
+                        case "sideright":
+                            // TODO: 贴墙状态（右边）- 需要 VPet >= 11057 (提交 8acf02c0)
+                            // 当前版本暂不支持，等待 VPet 更新后取消注释以下代码：
+                            // mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.SideRight, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            // actionTriggered = true;
+                            Logger.Log("SayHandler: 'sideright' action requires VPet >= 11057, falling back to idel");
+                            actionTriggered = mainWindow.Main.DisplayIdel();
                             break;
                         default:
                             mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            actionTriggered = true;
                             break;
+                    }
+                    
+                    if (!actionTriggered)
+                    {
+                        Logger.Log($"SayHandler: Body animation '{action}' failed to trigger, falling back to default");
                     }
 
                     // 2. Show the speech bubble ONLY by passing a null animation name.

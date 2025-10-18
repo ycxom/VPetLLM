@@ -70,52 +70,158 @@ namespace VPetLLM.Core.ChatCore
                     model = Model,
                     messages = ShapeMessages(history),
                     temperature = _freeSetting.Temperature,
-                    max_tokens = _freeSetting.MaxTokens
+                    max_tokens = _freeSetting.MaxTokens,
+                    stream = _freeSetting.EnableStreaming
                 };
 
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var apiUrl = DecodeString(ENCODED_API_URL);
-                var response = await _httpClient.PostAsync(apiUrl, content);
-                var responseContent = await response.Content.ReadAsStringAsync();
-
+                
                 string message;
-                if (response.IsSuccessStatusCode)
+                if (_freeSetting.EnableStreaming)
                 {
-                    var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
-                    message = responseObj?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "无回复";
-                }
-                else
-                {
-                    // 检查是否是服务器错误
-                    if (responseContent.Contains("Failed to retrieve proxy group") ||
-                        responseContent.Contains("INTERNAL_SERVER_ERROR") ||
-                        response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    // 流式传输模式
+                    Utils.Logger.Log("Free: 使用流式传输模式");
+                    var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
                     {
-                        Utils.Logger.Log($"Free API 服务器错误: {response.StatusCode} - {responseContent}");
-
-                        // 如果不是重试，尝试重试一次
-                        if (!isRetry)
+                        Content = content
+                    };
+                    var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
                         {
-                            Utils.Logger.Log("尝试重试 Free API 请求...");
-                            await Task.Delay(2000); // 等待2秒后重试
-                            return await Chat(prompt, true);
+                            // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
+                            Utils.Logger.Log($"Free流式: 检测到完整命令: {cmd}");
+                            ResponseHandler?.Invoke(cmd);
+                        });
+                        
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) != null)
+                            {
+                                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                                    continue;
+                                
+                                var jsonData = line.Substring(6).Trim();
+                                if (jsonData == "[DONE]")
+                                    break;
+                                
+                                try
+                                {
+                                    var chunk = JObject.Parse(jsonData);
+                                    var delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        // 将新片段传递给流式处理器，检测完整命令
+                                        streamProcessor.AddChunk(delta);
+                                        // 通知流式文本更新（用于显示）
+                                        StreamingChunkHandler?.Invoke(delta);
+                                    }
+                                }
+                                catch
+                                {
+                                    // 忽略解析错误，继续处理下一行
+                                }
+                            }
                         }
-
-                        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                        message = fullMessage.ToString();
+                        Utils.Logger.Log($"Free流式: 流式传输完成，总消息长度: {message.Length}");
+                        // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
+                        if (string.IsNullOrEmpty(message))
                         {
-                            message = "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
-                        }
-                        else
-                        {
-                            message = "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
+                            message = "无回复";
                         }
                     }
                     else
                     {
-                        Utils.Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
-                        message = $"API调用失败: {response.StatusCode}";
+                        // 读取错误响应内容
+                        var responseContent = await response.Content.ReadAsStringAsync();
+                        
+                        // 检查是否是服务器错误
+                        if (responseContent.Contains("Failed to retrieve proxy group") ||
+                            responseContent.Contains("INTERNAL_SERVER_ERROR") ||
+                            response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                        {
+                            Utils.Logger.Log($"Free API 服务器错误: {response.StatusCode} - {responseContent}");
+
+                            // 如果不是重试，尝试重试一次
+                            if (!isRetry)
+                            {
+                                Utils.Logger.Log("尝试重试 Free API 请求...");
+                                await Task.Delay(2000); // 等待2秒后重试
+                                return await Chat(prompt, true);
+                            }
+
+                            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                            {
+                                message = "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
+                            }
+                            else
+                            {
+                                message = "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
+                            }
+                        }
+                        else
+                        {
+                            Utils.Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
+                            message = $"API调用失败: {response.StatusCode}";
+                        }
+                    }
+                }
+                else
+                {
+                    // 非流式传输模式
+                    Utils.Logger.Log("Free: 使用非流式传输模式");
+                    var response = await _httpClient.PostAsync(apiUrl, content);
+                    var responseContent = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
+                        message = responseObj?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "无回复";
+                        Utils.Logger.Log($"Free非流式: 收到完整消息，长度: {message.Length}");
+                        // 非流式模式下，一次性处理完整消息
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else
+                    {
+                        // 检查是否是服务器错误
+                        if (responseContent.Contains("Failed to retrieve proxy group") ||
+                            responseContent.Contains("INTERNAL_SERVER_ERROR") ||
+                            response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                        {
+                            Utils.Logger.Log($"Free API 服务器错误: {response.StatusCode} - {responseContent}");
+
+                            // 如果不是重试，尝试重试一次
+                            if (!isRetry)
+                            {
+                                Utils.Logger.Log("尝试重试 Free API 请求...");
+                                await Task.Delay(2000); // 等待2秒后重试
+                                return await Chat(prompt, true);
+                            }
+
+                            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                            {
+                                message = "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
+                            }
+                            else
+                            {
+                                message = "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
+                            }
+                        }
+                        else
+                        {
+                            Utils.Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
+                            message = $"API调用失败: {response.StatusCode}";
+                        }
                     }
                 }
 
@@ -131,7 +237,7 @@ namespace VPetLLM.Core.ChatCore
                     SaveHistory();
                 }
 
-                ResponseHandler?.Invoke(message);
+                // 注意：ResponseHandler 已经在流式/非流式模式的各自分支中调用过了，这里不需要再次调用
                 return "";
             }
             catch (HttpRequestException httpEx)

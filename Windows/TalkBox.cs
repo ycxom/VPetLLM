@@ -15,6 +15,10 @@ namespace VPetLLM.Windows
         private readonly SmartMessageProcessor _messageProcessor;
         public event Action<string> OnSendMessage;
 
+        /// <summary>
+        /// 获取消息处理器（用于流式处理等待）
+        /// </summary>
+        public SmartMessageProcessor MessageProcessor => _messageProcessor;
 
         public TalkBox(VPetLLM plugin) : base(plugin)
         {

@@ -297,6 +297,10 @@
                                                     Margin="10,0,0,0"
                                                     Style="{StaticResource SecondaryButton}"/>
                                         </Grid>
+                                        <CheckBox x:Name="CheckBox_Ollama_EnableStreaming"
+                                                Content="{utils:Localize KeyPath=Ollama.EnableStreaming}"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernCheckBox}"/>
                                         <CheckBox x:Name="CheckBox_Ollama_EnableAdvanced"
                                                 Content="{utils:Localize KeyPath=Ollama.EnableAdvanced}"
                                                 Margin="0,0,0,16"
@@ -497,9 +501,13 @@
                                                         Style="{StaticResource ModernTextBox}"/>
                                             </Grid>
 
+                                            <CheckBox x:Name="CheckBox_OpenAI_EnableStreaming"
+                                                    Content="{utils:Localize KeyPath=OpenAI.EnableStreaming}"
+                                                    Margin="0,16,0,16"
+                                                    Style="{StaticResource ModernCheckBox}"/>
                                             <CheckBox x:Name="CheckBox_OpenAI_EnableAdvanced"
                                                     Content="{utils:Localize KeyPath=OpenAI.EnableAdvanced}"
-                                                    Margin="0,16,0,16"
+                                                    Margin="0,0,0,16"
                                                     Style="{StaticResource ModernCheckBox}"/>
                                             <StackPanel x:Name="StackPanel_OpenAI_Advanced"
                                                     Margin="20,0,0,0"
@@ -691,9 +699,13 @@
                                                          Margin="10,0,0,8"
                                                          Style="{StaticResource ModernTextBox}"/>
                                             </Grid>
+                                            <CheckBox x:Name="CheckBox_GeminiNode_EnableStreaming"
+                                                      Content="{utils:Localize KeyPath=Gemini.EnableStreaming}"
+                                                      Margin="0,16,0,16"
+                                                      Style="{StaticResource ModernCheckBox}"/>
                                             <CheckBox x:Name="CheckBox_GeminiNode_EnableAdvanced"
                                                       Content="{utils:Localize KeyPath=Gemini.EnableAdvanced}"
-                                                      Margin="0,16,0,16"
+                                                      Margin="0,0,0,16"
                                                       Style="{StaticResource ModernCheckBox}"/>
                                             <StackPanel x:Name="StackPanel_GeminiNode_Advanced"
                                                         Margin="20,0,0,0"
@@ -745,6 +757,10 @@
                                 <Border Style="{StaticResource CardContainer}">
                                     <StackPanel Style="{StaticResource SettingGroup}">
 
+                                        <CheckBox x:Name="CheckBox_Free_EnableStreaming"
+                                                Content="{utils:Localize KeyPath=Free.EnableStreaming}"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernCheckBox}"/>
                                         <CheckBox x:Name="CheckBox_Free_EnableAdvanced"
                                                 Content="{utils:Localize KeyPath=Free.EnableAdvanced}"
                                                 Margin="0,0,0,16"

@@ -88,7 +88,9 @@ namespace VPetLLM.Core.ChatCore
                 baseUrl += "/v1beta";
             }
             var modelName = node.Model;
-            var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
+            var apiEndpoint = node.EnableStreaming 
+                ? $"{baseUrl}/models/{modelName}:streamGenerateContent?alt=sse"
+                : $"{baseUrl}/models/{modelName}:generateContent";
 
             string message;
             using (var client = GetClient())
@@ -103,11 +105,73 @@ namespace VPetLLM.Core.ChatCore
                 {
                     client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey);
                 }
-                var response = await client.PostAsync(apiEndpoint, content);
-                response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
-                var responseObject = JObject.Parse(responseString);
-                message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
+                
+                if (node.EnableStreaming)
+                {
+                    // 流式传输模式
+                    Utils.Logger.Log("Gemini: 使用流式传输模式");
+                    var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint)
+                    {
+                        Content = content
+                    };
+                    var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                    response.EnsureSuccessStatusCode();
+                    
+                    var fullMessage = new StringBuilder();
+                    var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                    {
+                        // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
+                        Utils.Logger.Log($"Gemini流式: 检测到完整命令: {cmd}");
+                        ResponseHandler?.Invoke(cmd);
+                    });
+                    
+                    using (var stream = await response.Content.ReadAsStreamAsync())
+                    using (var reader = new System.IO.StreamReader(stream))
+                    {
+                        string line;
+                        while ((line = await reader.ReadLineAsync()) != null)
+                        {
+                            if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                                continue;
+                            
+                            var jsonData = line.Substring(6).Trim();
+                            
+                            try
+                            {
+                                var chunk = JObject.Parse(jsonData);
+                                var delta = chunk["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
+                                if (!string.IsNullOrEmpty(delta))
+                                {
+                                    fullMessage.Append(delta);
+                                    // 将新片段传递给流式处理器，检测完整命令
+                                    streamProcessor.AddChunk(delta);
+                                    // 通知流式文本更新（用于显示）
+                                    StreamingChunkHandler?.Invoke(delta);
+                                }
+                            }
+                            catch
+                            {
+                                // 忽略解析错误，继续处理下一行
+                            }
+                        }
+                    }
+                    message = fullMessage.ToString();
+                    Utils.Logger.Log($"Gemini流式: 流式传输完成，总消息长度: {message.Length}");
+                    // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
+                }
+                else
+                {
+                    // 非流式传输模式
+                    Utils.Logger.Log("Gemini: 使用非流式传输模式");
+                    var response = await client.PostAsync(apiEndpoint, content);
+                    response.EnsureSuccessStatusCode();
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    var responseObject = JObject.Parse(responseString);
+                    message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
+                    Utils.Logger.Log($"Gemini非流式: 收到完整消息，长度: {message.Length}");
+                    // 非流式模式下，一次性处理完整消息
+                    ResponseHandler?.Invoke(message);
+                }
             }
 
             if (Settings.KeepContext)
@@ -118,7 +182,6 @@ namespace VPetLLM.Core.ChatCore
             {
                 SaveHistory();
             }
-            ResponseHandler?.Invoke(message);
             return "";
         }
 

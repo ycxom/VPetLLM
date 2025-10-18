@@ -316,10 +316,12 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).TextChanged += Control_TextChanged;
             // OpenAI多节点配置 - 高级设置事件处理已移至多节点管理界面
             if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdvBind)
                 cbGemAdvBind.Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).Click += Control_Click;
             if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMaxBind)
                 tbGemMaxBind.TextChanged += Control_TextChanged;
@@ -611,6 +613,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_MaxLogCount")).Text = _plugin.Settings.MaxLogCount.ToString();
             ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
+            ((CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming")).IsChecked = _plugin.Settings.Ollama.EnableStreaming;
             ((Slider)this.FindName("Slider_Ollama_Temperature")).Value = _plugin.Settings.Ollama.Temperature;
             ((TextBlock)this.FindName("TextBlock_Ollama_TemperatureValue")).Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
             ((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).Text = _plugin.Settings.Ollama.MaxTokens.ToString();
@@ -630,6 +633,7 @@ namespace VPetLLM.UI.Windows
             }
             if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMax)
                 tbGemMax.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
+            ((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).IsChecked = _plugin.Settings.Free.EnableStreaming;
             ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).IsChecked = _plugin.Settings.Free.EnableAdvanced;
             ((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
             ((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
@@ -778,6 +782,7 @@ namespace VPetLLM.UI.Windows
             var logAutoScrollCheckBox = (CheckBox)this.FindName("CheckBox_LogAutoScroll");
             var maxLogCountTextBox = (TextBox)this.FindName("TextBox_MaxLogCount");
             var ollamaEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced");
+            var ollamaEnableStreamingCheckBox = (CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming");
             var ollamaTemperatureSlider = (Slider)this.FindName("Slider_Ollama_Temperature");
             var ollamaMaxTokensTextBox = (TextBox)this.FindName("TextBox_Ollama_MaxTokens");
             var openAIEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced");
@@ -786,6 +791,7 @@ namespace VPetLLM.UI.Windows
             var geminiEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced");
             var geminiTemperatureSlider = (Slider)this.FindName("Slider_Gemini_Temperature");
             var geminiMaxTokensTextBox = (TextBox)this.FindName("TextBox_Gemini_MaxTokens");
+            var freeEnableStreamingCheckBox = (CheckBox)this.FindName("CheckBox_Free_EnableStreaming");
             var freeEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Free_EnableAdvanced");
             var freeTemperatureSlider = (Slider)this.FindName("Slider_Free_Temperature");
             var freeMaxTokensTextBox = (TextBox)this.FindName("TextBox_Free_MaxTokens");
@@ -835,6 +841,7 @@ namespace VPetLLM.UI.Windows
             if (int.TryParse(maxLogCountTextBox.Text, out int maxLogCount))
                 _plugin.Settings.MaxLogCount = maxLogCount;
             _plugin.Settings.Ollama.EnableAdvanced = ollamaEnableAdvancedCheckBox.IsChecked ?? false;
+            _plugin.Settings.Ollama.EnableStreaming = ollamaEnableStreamingCheckBox.IsChecked ?? true;
             _plugin.Settings.Ollama.Temperature = ollamaTemperatureSlider.Value;
             if (int.TryParse(ollamaMaxTokensTextBox.Text, out int ollamaMaxTokens))
                 _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
@@ -853,6 +860,17 @@ namespace VPetLLM.UI.Windows
             // 保存 OpenAI 负载均衡开关
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLB2)
                 _plugin.Settings.OpenAI.EnableLoadBalancing = cbOpenLB2.IsChecked ?? false;
+            
+            // 保存 Free 设置
+            if (freeEnableStreamingCheckBox != null)
+                _plugin.Settings.Free.EnableStreaming = freeEnableStreamingCheckBox.IsChecked ?? false;
+            if (freeEnableAdvancedCheckBox != null)
+                _plugin.Settings.Free.EnableAdvanced = freeEnableAdvancedCheckBox.IsChecked ?? false;
+            if (freeTemperatureSlider != null)
+                _plugin.Settings.Free.Temperature = freeTemperatureSlider.Value;
+            if (freeMaxTokensTextBox != null && int.TryParse(freeMaxTokensTextBox.Text, out int freeMaxTokens))
+                _plugin.Settings.Free.MaxTokens = freeMaxTokens;
+            
             _plugin.Settings.Tools = new List<Setting.ToolSetting>((IEnumerable<Setting.ToolSetting>)toolsDataGrid.ItemsSource);
 
             // Proxy settings
@@ -2869,6 +2887,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (this.FindName("ComboBox_OpenAIModel") is ComboBox cbModel) cbModel.Text = node.Model ?? string.Empty;
             if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl) tbUrl.Text = node.Url ?? string.Empty;
             if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.IsChecked = node.EnableAdvanced;
+            if (this.FindName("CheckBox_OpenAI_EnableStreaming") is CheckBox cbStream) cbStream.IsChecked = node.EnableStreaming;
             if (this.FindName("Slider_OpenAI_Temperature") is Slider slTemp)
             {
                 slTemp.Value = node.Temperature;
@@ -2942,11 +2961,20 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedOpenAINode();
             if (node == null) return;
-            if (sender is CheckBox cb && cb.Name == "CheckBox_OpenAI_EnableAdvanced")
+            if (sender is CheckBox cb)
             {
-                node.EnableAdvanced = cb.IsChecked ?? false;
-                RefreshOpenAINodesList();
-                SaveSettings();
+                if (cb.Name == "CheckBox_OpenAI_EnableAdvanced")
+                {
+                    node.EnableAdvanced = cb.IsChecked ?? false;
+                    RefreshOpenAINodesList();
+                    SaveSettings();
+                }
+                else if (cb.Name == "CheckBox_OpenAI_EnableStreaming")
+                {
+                    node.EnableStreaming = cb.IsChecked ?? false;
+                    RefreshOpenAINodesList();
+                    SaveSettings();
+                }
             }
         }
 
@@ -2978,6 +3006,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
             if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl) { tbUrl.TextChanged += OpenAINodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; }
             if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += OpenAINodeDetail_Click;
+            if (this.FindName("CheckBox_OpenAI_EnableStreaming") is CheckBox cbStream) cbStream.Click += OpenAINodeDetail_Click;
             if (this.FindName("Slider_OpenAI_Temperature") is Slider slTemp) slTemp.ValueChanged += OpenAINodeDetail_TemperatureChanged;
             if (this.FindName("TextBox_OpenAI_MaxTokens") is TextBox tbMax) tbMax.TextChanged += OpenAINodeDetail_TextChanged;
             if (this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbPlain) tbPlain.TextChanged += OpenAINodeDetail_TextChanged;
@@ -3038,6 +3067,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (this.FindName("ComboBox_GeminiNodeModel") is ComboBox cbModel) cbModel.Text = node.Model ?? string.Empty;
             if (this.FindName("TextBox_GeminiNodeUrl") is TextBox tbUrl) tbUrl.Text = node.Url ?? string.Empty;
             if (this.FindName("CheckBox_GeminiNode_EnableAdvanced") is CheckBox cbAdv) cbAdv.IsChecked = node.EnableAdvanced;
+            if (this.FindName("CheckBox_GeminiNode_EnableStreaming") is CheckBox cbStream) cbStream.IsChecked = node.EnableStreaming;
             if (this.FindName("Slider_GeminiNode_Temperature") is Slider slTemp)
             {
                 slTemp.Value = node.Temperature;
@@ -3115,11 +3145,20 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedGeminiNode();
             if (node == null) return;
-            if (sender is CheckBox cb && cb.Name == "CheckBox_GeminiNode_EnableAdvanced")
+            if (sender is CheckBox cb)
             {
-                node.EnableAdvanced = cb.IsChecked ?? false;
-                ScheduleGeminiListRefresh();
-                ScheduleAutoSave();
+                if (cb.Name == "CheckBox_GeminiNode_EnableAdvanced")
+                {
+                    node.EnableAdvanced = cb.IsChecked ?? false;
+                    ScheduleGeminiListRefresh();
+                    ScheduleAutoSave();
+                }
+                else if (cb.Name == "CheckBox_GeminiNode_EnableStreaming")
+                {
+                    node.EnableStreaming = cb.IsChecked ?? false;
+                    ScheduleGeminiListRefresh();
+                    ScheduleAutoSave();
+                }
             }
         }
 
@@ -3144,6 +3183,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (this.FindName("ComboBox_GeminiNodeModel") is ComboBox cbModel) cbModel.SelectionChanged += GeminiNodeDetail_SelectionChanged;
             if (this.FindName("TextBox_GeminiNodeUrl") is TextBox tbUrl) { tbUrl.TextChanged += GeminiNodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; }
             if (this.FindName("CheckBox_GeminiNode_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += GeminiNodeDetail_Click;
+            if (this.FindName("CheckBox_GeminiNode_EnableStreaming") is CheckBox cbStream) cbStream.Click += GeminiNodeDetail_Click;
             if (this.FindName("Slider_GeminiNode_Temperature") is Slider slTemp) slTemp.ValueChanged += GeminiNodeDetail_TemperatureChanged;
             if (this.FindName("TextBox_GeminiNode_MaxTokens") is TextBox tbMax) tbMax.TextChanged += GeminiNodeDetail_TextChanged;
             if (this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbPlain) tbPlain.TextChanged += GeminiNodeDetail_TextChanged;

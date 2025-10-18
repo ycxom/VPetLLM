@@ -15,7 +15,11 @@ namespace VPetLLM.Handlers
             Utils.Logger.Log($"MoveHandler executed with value: {value}");
             if (string.IsNullOrWhiteSpace(value))
             {
-                mainWindow.Main.DisplayMove();
+                bool moved = mainWindow.Main.DisplayMove();
+                if (!moved)
+                {
+                    Logger.Log("MoveHandler: Failed to trigger move animation");
+                }
                 return Task.CompletedTask;
             }
 
@@ -36,8 +40,16 @@ namespace VPetLLM.Handlers
                 }
                 else
                 {
-                    mainWindow.Main.DisplayMove();
-                    mainWindow.Core.Controller.MoveWindows(x, y);
+                    bool moved = mainWindow.Main.DisplayMove();
+                    if (moved)
+                    {
+                        mainWindow.Core.Controller.MoveWindows(x, y);
+                    }
+                    else
+                    {
+                        Logger.Log("MoveHandler: Failed to trigger move animation, moving directly");
+                        mainWindow.Core.Controller.MoveWindows(x, y);
+                    }
                 }
             }
             else if (double.TryParse(parts[0], out double x) && double.TryParse(parts[1], out double y))
@@ -48,13 +60,25 @@ namespace VPetLLM.Handlers
                 }
                 else
                 {
-                    mainWindow.Main.DisplayMove();
-                    mainWindow.Core.Controller.MoveWindows(x, y);
+                    bool moved = mainWindow.Main.DisplayMove();
+                    if (moved)
+                    {
+                        mainWindow.Core.Controller.MoveWindows(x, y);
+                    }
+                    else
+                    {
+                        Logger.Log("MoveHandler: Failed to trigger move animation, moving directly");
+                        mainWindow.Core.Controller.MoveWindows(x, y);
+                    }
                 }
             }
             else
             {
-                mainWindow.Main.DisplayMove();
+                bool moved = mainWindow.Main.DisplayMove();
+                if (!moved)
+                {
+                    Logger.Log("MoveHandler: Failed to trigger move animation");
+                }
             }
             return Task.CompletedTask;
         }
@@ -66,7 +90,11 @@ namespace VPetLLM.Handlers
         }
         public Task Execute(IMainWindow mainWindow)
         {
-            mainWindow.Main.DisplayMove();
+            bool moved = mainWindow.Main.DisplayMove();
+            if (!moved)
+            {
+                Logger.Log("MoveHandler: Failed to trigger move animation");
+            }
             return Task.CompletedTask;
         }
         public int GetAnimationDuration(string animationName) => 0;

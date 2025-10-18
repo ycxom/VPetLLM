@@ -16,6 +16,7 @@ namespace VPetLLM.Core
         protected ActionProcessor? ActionProcessor { get; }
         protected SystemMessageProvider SystemMessageProvider { get; }
         protected Action<string> ResponseHandler;
+        protected Action<string> StreamingChunkHandler;
         public abstract Task<string> Chat(string prompt);
         public abstract Task<string> Chat(string prompt, bool isFunctionCall);
         public abstract Task<string> Summarize(string text);
@@ -93,6 +94,11 @@ namespace VPetLLM.Core
         public void SetResponseHandler(Action<string> handler)
         {
             ResponseHandler = handler;
+        }
+
+        public void SetStreamingChunkHandler(Action<string> handler)
+        {
+            StreamingChunkHandler = handler;
         }
 
         public virtual void AddPlugin(IVPetLLMPlugin plugin)

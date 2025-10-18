@@ -12,11 +12,27 @@ namespace VPetLLM.Handlers
     {
         private readonly VPetLLM _plugin;
         private readonly ActionProcessor _actionProcessor;
+        private bool _isProcessing = false;
+        private readonly object _processingLock = new object();
 
         public SmartMessageProcessor(VPetLLM plugin)
         {
             _plugin = plugin;
             _actionProcessor = plugin.ActionProcessor;
+        }
+
+        /// <summary>
+        /// 获取当前是否正在处理消息
+        /// </summary>
+        public bool IsProcessing
+        {
+            get
+            {
+                lock (_processingLock)
+                {
+                    return _isProcessing;
+                }
+            }
         }
 
         /// <summary>
@@ -28,54 +44,71 @@ namespace VPetLLM.Handlers
             if (string.IsNullOrWhiteSpace(response))
                 return;
 
-            Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}");
-            
-            // 标记进入单条 AI 回复的处理会话，期间豁免插件/工具限流
-            var _sessionId = Guid.NewGuid();
-            global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value = _sessionId;
-
-            // 通知TouchInteractionHandler开始执行VPetLLM动作
-            TouchInteractionHandler.NotifyVPetLLMActionStart();
-
-            // 解析消息，提取文本片段和动作指令
-            var messageSegments = ParseMessage(response);
-
-            Logger.Log($"SmartMessageProcessor: 解析出 {messageSegments.Count} 个消息片段");
-
-            // 启动并行下载所有TTS音频（不等待完成）
-            List<TTSDownloadTask> downloadTasks = null;
-            if (_plugin.Settings.TTS.IsEnabled)
+            // 设置处理状态
+            lock (_processingLock)
             {
-                downloadTasks = StartParallelTTSDownload(messageSegments);
+                _isProcessing = true;
             }
 
-            // 按顺序处理每个片段，使用智能等待机制
-            int talkIndex = 0;
             try
             {
-                foreach (var segment in messageSegments)
+                Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}");
+                
+                // 标记进入单条 AI 回复的处理会话，期间豁免插件/工具限流
+                var _sessionId = Guid.NewGuid();
+                global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value = _sessionId;
+
+                // 通知TouchInteractionHandler开始执行VPetLLM动作
+                TouchInteractionHandler.NotifyVPetLLMActionStart();
+
+                // 解析消息，提取文本片段和动作指令
+                var messageSegments = ParseMessage(response);
+
+                Logger.Log($"SmartMessageProcessor: 解析出 {messageSegments.Count} 个消息片段");
+
+                // 启动并行下载所有TTS音频（不等待完成）
+                List<TTSDownloadTask> downloadTasks = null;
+                if (_plugin.Settings.TTS.IsEnabled)
                 {
-                    if (segment.Type == SegmentType.Talk && downloadTasks != null)
+                    downloadTasks = StartParallelTTSDownload(messageSegments);
+                }
+
+                // 按顺序处理每个片段，使用智能等待机制
+                int talkIndex = 0;
+                try
+                {
+                    foreach (var segment in messageSegments)
                     {
-                        await ProcessTalkSegmentWithQueueAsync(segment, downloadTasks, talkIndex++);
+                        if (segment.Type == SegmentType.Talk && downloadTasks != null)
+                        {
+                            await ProcessTalkSegmentWithQueueAsync(segment, downloadTasks, talkIndex++);
+                        }
+                        else
+                        {
+                            await ProcessSegmentAsync(segment, null);
+                        }
                     }
-                    else
-                    {
-                        await ProcessSegmentAsync(segment, null);
-                    }
+                }
+                finally
+                {
+                    // 通知TouchInteractionHandler完成VPetLLM动作
+                    TouchInteractionHandler.NotifyVPetLLMActionEnd();
+
+                    // 先统一Flush一次本次会话内所有聚合结果，确保只回灌一次
+                    global::VPetLLM.Utils.ResultAggregator.FlushSession(_sessionId);
+
+                    // 退出本次会话，恢复上下文
+                    if (global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value == _sessionId)
+                        global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value = null;
                 }
             }
             finally
             {
-                // 通知TouchInteractionHandler完成VPetLLM动作
-                TouchInteractionHandler.NotifyVPetLLMActionEnd();
-
-                // 先统一Flush一次本次会话内所有聚合结果，确保只回灌一次
-                global::VPetLLM.Utils.ResultAggregator.FlushSession(_sessionId);
-
-                // 退出本次会话，恢复上下文
-                if (global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value == _sessionId)
-                    global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value = null;
+                // 清除处理状态
+                lock (_processingLock)
+                {
+                    _isProcessing = false;
+                }
             }
         }
 
@@ -269,6 +302,9 @@ namespace VPetLLM.Handlers
                         // 等待气泡显示完成
                         await bubbleTask;
                         Logger.Log($"SmartMessageProcessor: 音频和气泡 #{talkIndex} 处理完成");
+                        
+                        // 等待 EdgeTTS 或其他 TTS 插件播放完成
+                        await WaitForVPetVoiceCompleteAsync();
                     }
                     else
                     {
@@ -289,6 +325,53 @@ namespace VPetLLM.Handlers
             {
                 // 如果没有文本内容，直接执行动作
                 await ExecuteActionAsync(segment.Content);
+            }
+        }
+
+        /// <summary>
+        /// 等待 VPet 主程序的语音播放完成（EdgeTTS 或其他 TTS 插件）
+        /// </summary>
+        private async Task WaitForVPetVoiceCompleteAsync()
+        {
+            try
+            {
+                // 检查是否启用了 VPetLLM 的 TTS
+                if (_plugin.Settings.TTS.IsEnabled)
+                {
+                    Logger.Log("SmartMessageProcessor: VPetLLM TTS 已启用，跳过 VPet 语音等待");
+                    return;
+                }
+
+                // 检查 VPet 主程序是否正在播放语音
+                if (_plugin.MW?.Main == null)
+                {
+                    Logger.Log("SmartMessageProcessor: MW.Main 为 null，无法检查语音状态");
+                    return;
+                }
+
+                // 等待 VPet 主程序的语音播放完成
+                int maxWaitTime = 30000; // 最多等待 30 秒
+                int checkInterval = 100; // 每 100ms 检查一次
+                int elapsedTime = 0;
+
+                while (_plugin.MW.Main.PlayingVoice && elapsedTime < maxWaitTime)
+                {
+                    await Task.Delay(checkInterval);
+                    elapsedTime += checkInterval;
+                }
+
+                if (elapsedTime >= maxWaitTime)
+                {
+                    Logger.Log("SmartMessageProcessor: 等待 VPet 语音超时");
+                }
+                else if (elapsedTime > 0)
+                {
+                    Logger.Log($"SmartMessageProcessor: VPet 语音播放完成，等待时间: {elapsedTime}ms");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 等待 VPet 语音失败: {ex.Message}");
             }
         }
 
@@ -338,12 +421,16 @@ namespace VPetLLM.Handlers
                 if (_plugin.Settings.TTS.IsEnabled)
                 {
                     await PlayTTSAndShowBubbleAsync(actualText);
+                    // 等待 EdgeTTS 或其他 TTS 插件播放完成
+                    await WaitForVPetVoiceCompleteAsync();
                 }
                 else
                 {
                     // 直接显示气泡
                     _plugin.MW.Main.Say(actualText);
                     await Task.Delay(CalculateDisplayTime(actualText));
+                    // 等待 EdgeTTS 或其他 TTS 插件播放完成
+                    await WaitForVPetVoiceCompleteAsync();
                 }
             }
         }
@@ -404,6 +491,9 @@ namespace VPetLLM.Handlers
                         // 等待气泡显示完成
                         await bubbleTask;
                         Logger.Log($"SmartMessageProcessor: TTS和气泡同步处理完成");
+                        
+                        // 等待 EdgeTTS 或其他 TTS 插件播放完成
+                        await WaitForVPetVoiceCompleteAsync();
                     }
                     catch (Exception ex)
                     {
@@ -415,8 +505,9 @@ namespace VPetLLM.Handlers
                 }
                 else
                 {
-                    // 如果TTS未启用，直接执行动作
+                    // 如果TTS未启用，直接执行动作并等待 VPet 语音完成
                     await ExecuteActionAsync(segment.Content);
+                    await WaitForVPetVoiceCompleteAsync();
                 }
             }
             else

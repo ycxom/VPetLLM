@@ -17,29 +17,56 @@ namespace VPetLLM.Handlers
 
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
             {
+                bool actionTriggered = false;
                 switch (action.ToLower())
                 {
                     case "touch_head":
                     case "touchhead":
                         mainWindow.Main.DisplayTouchHead();
+                        actionTriggered = true;
                         break;
                     case "touch_body":
                     case "touchbody":
                         mainWindow.Main.DisplayTouchBody();
+                        actionTriggered = true;
                         break;
                     case "move":
-                        mainWindow.Main.DisplayMove();
+                        actionTriggered = mainWindow.Main.DisplayMove();
                         break;
                     case "sleep":
                         mainWindow.Main.DisplaySleep();
+                        actionTriggered = true;
                         break;
                     case "idel":
-                        mainWindow.Main.DisplayIdel();
+                        actionTriggered = mainWindow.Main.DisplayIdel();
+                        break;
+                    case "sideleft":
+                        // TODO: 贴墙状态（左边）- 需要 VPet >= 11057 (提交 8acf02c0)
+                        // 当前版本暂不支持，等待 VPet 更新后取消注释以下代码：
+                        // mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.SideLeft, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                        // actionTriggered = true;
+                        Logger.Log("ActionHandler: 'sideleft' action requires VPet >= 11057, falling back to idel");
+                        actionTriggered = mainWindow.Main.DisplayIdel();
+                        break;
+                    case "sideright":
+                        // TODO: 贴墙状态（右边）- 需要 VPet >= 11057 (提交 8acf02c0)
+                        // 当前版本暂不支持，等待 VPet 更新后取消注释以下代码：
+                        // mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.SideRight, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                        // actionTriggered = true;
+                        Logger.Log("ActionHandler: 'sideright' action requires VPet >= 11057, falling back to idel");
+                        actionTriggered = mainWindow.Main.DisplayIdel();
                         break;
                     default:
                         mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                        actionTriggered = true;
                         break;
                 }
+                
+                if (!actionTriggered)
+                {
+                    Logger.Log($"ActionHandler: Action '{action}' failed to trigger");
+                }
+                
                 await Task.Delay(1000);
             });
         }

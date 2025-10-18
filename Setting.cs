@@ -160,6 +160,7 @@ namespace VPetLLM
                     Temperature = Gemini.Temperature,
                     MaxTokens = Gemini.MaxTokens,
                     EnableAdvanced = Gemini.EnableAdvanced,
+                    EnableStreaming = Gemini.EnableStreaming,
                     Enabled = true,
                     Name = "Gemini节点"
                 });
@@ -188,6 +189,7 @@ namespace VPetLLM
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
         }
 
         public class OpenAINodeSetting
@@ -198,6 +200,7 @@ namespace VPetLLM
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
             
@@ -211,6 +214,7 @@ namespace VPetLLM
                     Temperature = this.Temperature,
                     MaxTokens = this.MaxTokens,
                     EnableAdvanced = this.EnableAdvanced,
+                    EnableStreaming = this.EnableStreaming,
                     Enabled = this.Enabled,
                     Name = this.Name
                 };
@@ -230,6 +234,7 @@ namespace VPetLLM
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
 
@@ -246,6 +251,7 @@ namespace VPetLLM
                         Temperature = Temperature,
                         MaxTokens = MaxTokens,
                         EnableAdvanced = EnableAdvanced,
+                        EnableStreaming = EnableStreaming,
                         Enabled = Enabled,
                         Name = Name
                     };
@@ -283,6 +289,7 @@ namespace VPetLLM
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "Gemini节点";
         }
@@ -300,6 +307,7 @@ namespace VPetLLM
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
 
             public GeminiNodeSetting GetCurrentGeminiSetting()
             {
@@ -314,6 +322,7 @@ namespace VPetLLM
                         Temperature = Temperature,
                         MaxTokens = MaxTokens,
                         EnableAdvanced = EnableAdvanced,
+                        EnableStreaming = EnableStreaming,
                         Enabled = true,
                         Name = "Gemini节点"
                     };
@@ -349,6 +358,7 @@ namespace VPetLLM
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
         }
 
         public class ToolSetting
