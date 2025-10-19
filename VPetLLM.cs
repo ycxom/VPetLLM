@@ -196,13 +196,24 @@ namespace VPetLLM
                     return;
                 }
 
+                // 检测购买来源：区分用户购买和VPet自动购物
+                bool isAutoBuy = Utils.PurchaseSourceDetector.IsAutoBuy(MW);
+                string source = Utils.PurchaseSourceDetector.GetPurchaseSourceDescription(isAutoBuy);
+                Utils.Logger.Log($"Purchase source: {source}");
+
+                if (isAutoBuy)
+                {
+                    Utils.Logger.Log("Purchase event: 检测到VPet自动购物，跳过AI反馈");
+                    return;
+                }
+
                 if (ChatCore == null)
                 {
                     Utils.Logger.Log("Purchase event: ChatCore is null, skipping");
                     return;
                 }
 
-                // 添加到批处理队列
+                // 添加到批处理队列（仅用户购买）
                 AddToPurchaseBatch(food);
             }
             catch (Exception ex)

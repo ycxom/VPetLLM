@@ -14,6 +14,10 @@ namespace VPetLLM.Handlers
         public async Task Execute(string value, IMainWindow mainWindow)
         {
             Utils.Logger.Log($"SayHandler executed with value: {value}");
+            
+            // Say动作只是显示气泡，不影响动画，所以在所有情况下都允许执行
+            // 不需要检查动画状态
+            
             try
             {
                 string text;
@@ -119,44 +123,84 @@ namespace VPetLLM.Handlers
                 {
                     // No body animation, so just perform the talk animation.
                     var sayAnimation = animation;
-                    var availableSayAnimations = VPetLLM.Instance.GetAvailableSayAnimations().Select(a => a.ToLower());
-                    if (string.IsNullOrEmpty(sayAnimation) || !availableSayAnimations.Contains(sayAnimation.ToLower()))
+                    
+                    // 检查VPet是否正在执行重要动画
+                    // 如果是，则屏蔽Say动画，只显示气泡
+                    bool shouldBlockAnimation = AnimationStateChecker.IsPlayingImportantAnimation(mainWindow);
+                    
+                    if (shouldBlockAnimation)
                     {
-                        if (!string.IsNullOrEmpty(animation))
+                        Logger.Log($"SayHandler: VPet正在执行重要动画，屏蔽Say动画，仅显示气泡");
+                        
+                        // 创建一个TaskCompletionSource来等待气泡关闭
+                        var bubbleCompletionSource = new TaskCompletionSource<bool>();
+                        
+                        // 订阅气泡关闭事件
+                        Action onBubbleEnd = null;
+                        onBubbleEnd = () =>
                         {
-                            Logger.Log($"Say animation '{animation}' not found. Using default say animation.");
+                            mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
+                            bubbleCompletionSource.TrySetResult(true);
+                            Logger.Log($"SayHandler: 气泡显示完成（无动画模式）");
+                        };
+                        mainWindow.Main.MsgBar.EndAction += onBubbleEnd;
+                        
+                        // 只显示气泡，不执行Say动画
+                        mainWindow.Main.Say(text, null, false);
+                        Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: none (blocked)");
+                        
+                        // 等待气泡显示完成（带超时保护）
+                        var timeoutTask = Task.Delay(Math.Max(text.Length * VPetLLM.Instance.Settings.SayTimeMultiplier * 2, VPetLLM.Instance.Settings.SayTimeMin * 2));
+                        var completedTask = await Task.WhenAny(bubbleCompletionSource.Task, timeoutTask);
+                        
+                        if (completedTask == timeoutTask)
+                        {
+                            Logger.Log($"SayHandler: 等待气泡超时（无动画模式），使用备用延迟");
+                            mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
                         }
-                        sayAnimation = "say";
                     }
-
-                    // 创建一个TaskCompletionSource来等待气泡关闭
-                    var bubbleCompletionSource = new TaskCompletionSource<bool>();
-                    
-                    // 订阅气泡关闭事件
-                    Action onBubbleEnd = null;
-                    onBubbleEnd = () =>
+                    else
                     {
-                        mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
-                        bubbleCompletionSource.TrySetResult(true);
-                        Logger.Log($"SayHandler: 气泡显示完成");
-                    };
-                    mainWindow.Main.MsgBar.EndAction += onBubbleEnd;
+                        // VPet不在重要状态，正常执行Say动画
+                        var availableSayAnimations = VPetLLM.Instance.GetAvailableSayAnimations().Select(a => a.ToLower());
+                        if (string.IsNullOrEmpty(sayAnimation) || !availableSayAnimations.Contains(sayAnimation.ToLower()))
+                        {
+                            if (!string.IsNullOrEmpty(animation))
+                            {
+                                Logger.Log($"Say animation '{animation}' not found. Using default say animation.");
+                            }
+                            sayAnimation = "say";
+                        }
 
-                    // Force the talk animation to loop.
-                    mainWindow.Main.Say(text, sayAnimation, true);
-                    Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: {sayAnimation}");
+                        // 创建一个TaskCompletionSource来等待气泡关闭
+                        var bubbleCompletionSource = new TaskCompletionSource<bool>();
+                        
+                        // 订阅气泡关闭事件
+                        Action onBubbleEnd = null;
+                        onBubbleEnd = () =>
+                        {
+                            mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
+                            bubbleCompletionSource.TrySetResult(true);
+                            Logger.Log($"SayHandler: 气泡显示完成");
+                        };
+                        mainWindow.Main.MsgBar.EndAction += onBubbleEnd;
 
-                    // 等待气泡显示完成（带超时保护）
-                    var timeoutTask = Task.Delay(Math.Max(text.Length * VPetLLM.Instance.Settings.SayTimeMultiplier * 2, VPetLLM.Instance.Settings.SayTimeMin * 2));
-                    var completedTask = await Task.WhenAny(bubbleCompletionSource.Task, timeoutTask);
-                    
-                    if (completedTask == timeoutTask)
-                    {
-                        Logger.Log($"SayHandler: 等待气泡超时，使用备用延迟");
-                        mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
+                        // Force the talk animation to loop.
+                        mainWindow.Main.Say(text, sayAnimation, true);
+                        Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: {sayAnimation}");
+
+                        // 等待气泡显示完成（带超时保护）
+                        var timeoutTask = Task.Delay(Math.Max(text.Length * VPetLLM.Instance.Settings.SayTimeMultiplier * 2, VPetLLM.Instance.Settings.SayTimeMin * 2));
+                        var completedTask = await Task.WhenAny(bubbleCompletionSource.Task, timeoutTask);
+                        
+                        if (completedTask == timeoutTask)
+                        {
+                            Logger.Log($"SayHandler: 等待气泡超时，使用备用延迟");
+                            mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
+                        }
+                        
+                        mainWindow.Main.DisplayToNomal();
                     }
-                    
-                    mainWindow.Main.DisplayToNomal();
                 }
             }
             catch (Exception e)

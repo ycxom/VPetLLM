@@ -13,6 +13,14 @@ namespace VPetLLM.Handlers
         public async Task Execute(string actionName, IMainWindow mainWindow)
         {
             Utils.Logger.Log($"ActionHandler executed with value: {actionName}");
+            
+            // 检查VPet是否正在执行重要动画
+            if (AnimationStateChecker.IsPlayingImportantAnimation(mainWindow))
+            {
+                Logger.Log($"ActionHandler: 当前VPet状态 ({AnimationStateChecker.GetCurrentAnimationDescription(mainWindow)}) 不允许执行动作，已跳过");
+                return;
+            }
+            
             var action = string.IsNullOrEmpty(actionName) ? "idel" : actionName;
 
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
