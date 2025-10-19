@@ -100,13 +100,13 @@ namespace VPetLLM.Utils
 
             try
             {
-                Logger.Log($"TTS: 开始下载音频: {text.Substring(0, Math.Min(text.Length, 50))}...");
+                // Logger.Log($"TTS: 开始下载音频: {text.Substring(0, Math.Min(text.Length, 50))}...");
 
                 byte[] audioData;
                 string fileExtension;
 
                 // 根据提供商获取音频数据
-                Logger.Log($"TTS: 当前提供商设置: '{_settings.Provider}'");
+                // Logger.Log($"TTS: 当前提供商设置: '{_settings.Provider}'");
                 switch (_settings.Provider)
                 {
                     case "OpenAI":
@@ -131,7 +131,7 @@ namespace VPetLLM.Utils
                     return null;
                 }
 
-                Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
+                // Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
                 // 应用音量增益
                 if (Math.Abs(_settings.VolumeGain) > 0.01)
@@ -144,7 +144,7 @@ namespace VPetLLM.Utils
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
                 await File.WriteAllBytesAsync(tempFile, audioData);
-                Logger.Log($"TTS: 音频文件已下载到: {tempFile}");
+                // Logger.Log($"TTS: 音频文件已下载到: {tempFile}");
 
                 return tempFile;
             }
@@ -170,7 +170,7 @@ namespace VPetLLM.Utils
 
             try
             {
-                Logger.Log($"TTS: 直接播放预下载音频: {filePath}");
+                // Logger.Log($"TTS: 直接播放预下载音频: {filePath}");
 
                 // 等待当前播放完成，确保不会被中断
                 await WaitForCurrentPlaybackAsync();
@@ -178,7 +178,7 @@ namespace VPetLLM.Utils
                 // 播放音频文件
                 await PlayAudioFileAsync(filePath);
 
-                Logger.Log($"TTS: 预下载音频播放完成: {filePath}");
+                // Logger.Log($"TTS: 预下载音频播放完成: {filePath}");
             }
             catch (Exception ex)
             {
@@ -447,12 +447,12 @@ namespace VPetLLM.Utils
             var voice = _settings.URL.Voice;
             var requestMethod = _settings.URL.Method?.ToUpper() ?? "GET";
 
-            Logger.Log($"TTS: URL请求构建信息:");
-            Logger.Log($"TTS: 原始BaseUrl: '{_settings.URL.BaseUrl}'");
-            Logger.Log($"TTS: 处理后BaseUrl: '{baseUrl}'");
-            Logger.Log($"TTS: 语音ID: '{voice}'");
-            Logger.Log($"TTS: 请求方法: '{requestMethod}'");
-            Logger.Log($"TTS: 原始文本: '{text}'");
+            // Logger.Log($"TTS: URL请求构建信息:");
+            // Logger.Log($"TTS: 原始BaseUrl: '{_settings.URL.BaseUrl}'");
+            // Logger.Log($"TTS: 处理后BaseUrl: '{baseUrl}'");
+            // Logger.Log($"TTS: 语音ID: '{voice}'");
+            // Logger.Log($"TTS: 请求方法: '{requestMethod}'");
+            // Logger.Log($"TTS: 原始文本: '{text}'");
 
             // 验证URL格式
             if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
@@ -473,10 +473,10 @@ namespace VPetLLM.Utils
                 request.Headers.Add("Accept", "*/*");
                 request.Headers.Add("Accept-Encoding", "gzip, deflate, br");
 
-                Logger.Log($"TTS: 已设置POST请求头:");
-                Logger.Log($"TTS:   Connection: keep-alive");
-                Logger.Log($"TTS:   Accept: */*");
-                Logger.Log($"TTS:   Accept-Encoding: gzip, deflate, br");
+                // Logger.Log($"TTS: 已设置POST请求头:");
+                // Logger.Log($"TTS:   Connection: keep-alive");
+                // Logger.Log($"TTS:   Accept: */*");
+                // Logger.Log($"TTS:   Accept-Encoding: gzip, deflate, br");
 
                 // 构建请求体参数
                 var requestBody = new
@@ -488,9 +488,9 @@ namespace VPetLLM.Utils
                 var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions { WriteIndented = true });
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                Logger.Log($"TTS: POST请求体参数:");
-                Logger.Log($"TTS: {json}");
-                Logger.Log($"TTS: 发送POST请求到: {baseUrl}");
+                // Logger.Log($"TTS: POST请求体参数:");
+                // Logger.Log($"TTS: {json}");
+                // Logger.Log($"TTS: 发送POST请求到: {baseUrl}");
 
                 response = await _httpClient.SendAsync(request);
             }
@@ -500,18 +500,18 @@ namespace VPetLLM.Utils
                 var encodedText = Uri.EscapeDataString(text);
                 var url = $"{baseUrl}/?text={encodedText}&voice={voice}";
 
-                Logger.Log($"TTS: GET请求URL: {url}");
-                Logger.Log($"TTS: 发送GET请求到: {url}");
+                // Logger.Log($"TTS: GET请求URL: {url}");
+                // Logger.Log($"TTS: 发送GET请求到: {url}");
 
                 response = await _httpClient.GetAsync(url);
             }
 
-            Logger.Log($"TTS: URL响应状态码: {response.StatusCode}");
-            Logger.Log($"TTS: URL响应头:");
-            foreach (var header in response.Headers)
-            {
-                Logger.Log($"TTS:   {header.Key}: {string.Join(", ", header.Value)}");
-            }
+            // Logger.Log($"TTS: URL响应状态码: {response.StatusCode}");
+            // Logger.Log($"TTS: URL响应头:");
+            // foreach (var header in response.Headers)
+            // {
+            //     Logger.Log($"TTS:   {header.Key}: {string.Join(", ", header.Value)}");
+            // }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -624,7 +624,7 @@ namespace VPetLLM.Utils
         {
             try
             {
-                Logger.Log($"TTS: 开始播放音频文件: {filePath}");
+                // Logger.Log($"TTS: 开始播放音频文件: {filePath}");
 
                 TaskCompletionSource<bool> currentTask;
                 lock (_playbackLock)
@@ -644,7 +644,7 @@ namespace VPetLLM.Utils
                         if (_mediaPlayer == null)
                         {
                             _mediaPlayer = new MediaPlayer();
-                            Logger.Log("TTS: MediaPlayer已在UI线程上创建");
+                            // Logger.Log("TTS: MediaPlayer已在UI线程上创建");
                         }
 
                         // 停止当前播放
@@ -672,7 +672,7 @@ namespace VPetLLM.Utils
                             {
                                 _mediaPlayer.MediaEnded -= mediaEndedHandler;
                                 _mediaPlayer.MediaFailed -= mediaFailedHandler;
-                                Logger.Log($"TTS: 音频播放完成: {filePath}");
+                                // Logger.Log($"TTS: 音频播放完成: {filePath}");
 
                                 lock (_playbackLock)
                                 {

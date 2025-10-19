@@ -110,10 +110,14 @@ namespace VPetLLM.Handlers
                     }
 
                     // 执行命令（同步调用，等待完成）
+                    Utils.Logger.Log($"StreamingCommandProcessor: 开始处理命令: {command}");
                     _onCompleteCommand?.Invoke(command);
                     
                     // 智能等待命令执行完成
+                    Utils.Logger.Log($"StreamingCommandProcessor: 开始等待命令完成: {command}");
                     await WaitForCommandCompleteAsync(command);
+                    Utils.Logger.Log($"StreamingCommandProcessor: 命令处理完成: {command}");
+
                 }
             }
             catch
@@ -130,20 +134,27 @@ namespace VPetLLM.Handlers
         /// </summary>
         private async Task WaitForCommandCompleteAsync(string command)
         {
+            Utils.Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: 进入方法，命令: {command}");
+            
             if (string.IsNullOrEmpty(command))
             {
+                Utils.Logger.Log("StreamingCommandProcessor.WaitForCommandCompleteAsync: 命令为空，跳过");
                 await Task.Delay(100);
                 return;
             }
 
+            // 尝试通过静态实例访问 MessageProcessor
+            var plugin = _plugin ?? VPetLLM.Instance;
+            Utils.Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: plugin = {(plugin != null ? "有效" : "null")}, TalkBox = {(plugin?.TalkBox != null ? "有效" : "null")}, MessageProcessor = {(plugin?.TalkBox?.MessageProcessor != null ? "有效" : "null")}");
+            
             // 等待 SmartMessageProcessor 完成当前命令的处理
-            if (_plugin?.TalkBox?.MessageProcessor != null)
+            if (plugin?.TalkBox?.MessageProcessor != null)
             {
                 int maxWaitTime = 60000; // 最多等待 60 秒
                 int checkInterval = 100; // 每 100ms 检查一次
                 int elapsedTime = 0;
 
-                while (_plugin.TalkBox.MessageProcessor.IsProcessing && elapsedTime < maxWaitTime)
+                while (plugin.TalkBox.MessageProcessor.IsProcessing && elapsedTime < maxWaitTime)
                 {
                     await Task.Delay(checkInterval);
                     elapsedTime += checkInterval;
@@ -157,6 +168,7 @@ namespace VPetLLM.Handlers
             else
             {
                 // 如果无法访问 MessageProcessor，使用传统的等待策略
+                Utils.Logger.Log("StreamingCommandProcessor: 无法访问 MessageProcessor，使用传统等待策略");
                 var match = Regex.Match(command, @"\[:(\w+)");
                 if (!match.Success)
                 {
