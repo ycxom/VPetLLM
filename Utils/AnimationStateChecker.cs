@@ -19,51 +19,80 @@ namespace VPetLLM.Utils
             if (mainWindow?.Main == null)
                 return false;
 
-            var displayType = mainWindow.Main.DisplayType;
-            if (displayType == null)
-                return false;
-
-            // 检查是否正在执行重要动画
-            switch (displayType.Type)
+            // 方法1：检查WorkingState（最准确的方式）
+            var workingState = mainWindow.Main.State;
+            switch (workingState)
             {
-                case GraphType.Work:
-                    // 工作动画 - 不应该被打断
-                    Logger.Log($"AnimationStateChecker: VPet正在工作 (Work)，阻止VPetLLM动作执行");
+                case VPet_Simulator.Core.Main.WorkingState.Work:
+                    // 工作状态 - 包括工作、学习、玩耍
+                    // 进一步识别具体类型
+                    var nowWork = mainWindow.Main.NowWork;
+                    if (nowWork != null)
+                    {
+                        switch (nowWork.Type)
+                        {
+                            case VPet_Simulator.Core.GraphHelper.Work.WorkType.Work:
+                                Logger.Log($"AnimationStateChecker: VPet正在工作 (Work)，阻止VPetLLM动作执行");
+                                break;
+                            case VPet_Simulator.Core.GraphHelper.Work.WorkType.Study:
+                                Logger.Log($"AnimationStateChecker: VPet正在学习 (Study)，阻止VPetLLM动作执行");
+                                break;
+                            case VPet_Simulator.Core.GraphHelper.Work.WorkType.Play:
+                                Logger.Log($"AnimationStateChecker: VPet正在玩耍 (Play)，阻止VPetLLM动作执行");
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log($"AnimationStateChecker: VPet正在工作 (WorkingState.Work)，阻止VPetLLM动作执行");
+                    }
                     return true;
 
-                case GraphType.Sleep:
-                    // 睡觉动画 - 不应该被打断
+                case VPet_Simulator.Core.Main.WorkingState.Sleep:
+                    // 睡觉状态 - 不应该被打断
                     Logger.Log($"AnimationStateChecker: VPet正在睡觉 (Sleep)，阻止VPetLLM动作执行");
                     return true;
 
-                case GraphType.StartUP:
-                    // 开机动画 - 不应该被打断
-                    Logger.Log($"AnimationStateChecker: VPet正在开机 (StartUP)，阻止VPetLLM动作执行");
+                case VPet_Simulator.Core.Main.WorkingState.Travel:
+                    // 旅游状态 - 不应该被打断
+                    Logger.Log($"AnimationStateChecker: VPet正在旅游 (Travel)，阻止VPetLLM动作执行");
                     return true;
-
-                case GraphType.Shutdown:
-                    // 关机动画 - 不应该被打断
-                    Logger.Log($"AnimationStateChecker: VPet正在关机 (Shutdown)，阻止VPetLLM动作执行");
-                    return true;
-
-                case GraphType.Raised_Dynamic:
-                case GraphType.Raised_Static:
-                    // 被提起动画 - 不应该被打断
-                    Logger.Log($"AnimationStateChecker: VPet正在被提起 ({displayType.Type})，阻止VPetLLM动作执行");
-                    return true;
-
-                case GraphType.Switch_Up:
-                case GraphType.Switch_Down:
-                case GraphType.Switch_Thirsty:
-                case GraphType.Switch_Hunger:
-                    // 状态切换动画 - 不应该被打断
-                    Logger.Log($"AnimationStateChecker: VPet正在切换状态 ({displayType.Type})，阻止VPetLLM动作执行");
-                    return true;
-
-                default:
-                    // 其他动画可以被打断
-                    return false;
             }
+
+            // 方法2：检查DisplayType（辅助检查特殊动画）
+            var displayType = mainWindow.Main.DisplayType;
+            if (displayType != null)
+            {
+                switch (displayType.Type)
+                {
+                    case GraphType.StartUP:
+                        // 开机动画 - 不应该被打断
+                        Logger.Log($"AnimationStateChecker: VPet正在开机 (StartUP)，阻止VPetLLM动作执行");
+                        return true;
+
+                    case GraphType.Shutdown:
+                        // 关机动画 - 不应该被打断
+                        Logger.Log($"AnimationStateChecker: VPet正在关机 (Shutdown)，阻止VPetLLM动作执行");
+                        return true;
+
+                    case GraphType.Raised_Dynamic:
+                    case GraphType.Raised_Static:
+                        // 被提起动画 - 不应该被打断
+                        Logger.Log($"AnimationStateChecker: VPet正在被提起 ({displayType.Type})，阻止VPetLLM动作执行");
+                        return true;
+
+                    case GraphType.Switch_Up:
+                    case GraphType.Switch_Down:
+                    case GraphType.Switch_Thirsty:
+                    case GraphType.Switch_Hunger:
+                        // 状态切换动画 - 不应该被打断
+                        Logger.Log($"AnimationStateChecker: VPet正在切换状态 ({displayType.Type})，阻止VPetLLM动作执行");
+                        return true;
+                }
+            }
+
+            // 其他状态可以被打断
+            return false;
         }
 
         /// <summary>
