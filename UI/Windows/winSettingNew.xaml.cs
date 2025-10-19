@@ -1034,7 +1034,19 @@ namespace VPetLLM.UI.Windows
 
             try
             {
-                var openAICore = new OpenAIChatCore(GetCurrentOpenAISetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+                // 使用界面上选中的节点，而不是当前启用的节点
+                var selectedNode = GetSelectedOpenAINode();
+                if (selectedNode == null)
+                {
+                    MessageBox.Show(
+                        ErrorMessageHelper.GetLocalizedMessage("RefreshOpenAIModels.NoNodeSelected", _plugin.Settings.Language, "请先选择一个OpenAI节点"),
+                        ErrorMessageHelper.GetLocalizedTitle("Warning", _plugin.Settings.Language, "警告"), 
+                        MessageBoxButton.OK, 
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                var openAICore = new OpenAIChatCore(selectedNode, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = await Task.Run(() => openAICore.RefreshModels());
                 ((ComboBox)this.FindName("ComboBox_OpenAIModel")).ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text))
@@ -1060,7 +1072,32 @@ namespace VPetLLM.UI.Windows
 
             try
             {
-                var geminiCore = new GeminiChatCore(_plugin.Settings.Gemini, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+                // 使用界面上选中的节点，而不是当前启用的节点
+                var selectedNode = GetSelectedGeminiNode();
+                Setting.GeminiSetting geminiSetting;
+                
+                if (selectedNode != null)
+                {
+                    // 如果选中了节点，使用选中节点的配置
+                    geminiSetting = new Setting.GeminiSetting
+                    {
+                        ApiKey = selectedNode.ApiKey,
+                        Model = selectedNode.Model,
+                        Url = selectedNode.Url,
+                        Temperature = selectedNode.Temperature,
+                        MaxTokens = selectedNode.MaxTokens,
+                        EnableAdvanced = selectedNode.EnableAdvanced,
+                        EnableStreaming = selectedNode.EnableStreaming,
+                        GeminiNodes = _plugin.Settings.Gemini.GeminiNodes
+                    };
+                }
+                else
+                {
+                    // 如果没有选中节点，使用当前设置
+                    geminiSetting = _plugin.Settings.Gemini;
+                }
+
+                var geminiCore = new GeminiChatCore(geminiSetting, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = await Task.Run(() => geminiCore.RefreshModels());
 
                 // 记录刷新前两个下拉框的文本，避免刷新后丢失用户输入
