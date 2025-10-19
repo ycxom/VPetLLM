@@ -15,7 +15,6 @@ namespace VPetLLM.Core.ChatCore
         private readonly Setting.OpenAISetting _openAISetting;
         private readonly Setting _setting;
 
-        private int _currentApiKeyIndex = 0;
         private readonly Random _random = new Random();
         // 单次请求上下文缓存：避免同一请求中多次随机选择不同节点
         private Setting.OpenAINodeSetting? _currentNodeContext;

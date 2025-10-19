@@ -26,14 +26,20 @@ namespace VPetLLM.Core
            {
                PromptHelper.Get("Role", lang)
                            .Replace("{AiName}", _settings.AiName)
-                           .Replace("{UserName}", _settings.UserName),
-              _settings.Role
+                           .Replace("{UserName}", _settings.UserName)
            };
+
+            // 只有在EnableAction开启时才添加自定义Role
+            if (_settings.EnableAction)
+            {
+                parts.Add(_settings.Role);
+            }
 
             if (_settings.EnableAction)
             {
                 parts.Add(PromptHelper.Get("Character_Setting", lang));
 
+                // 只有在EnableState开启时才添加状态信息
                 if (_settings.EnableState)
                 {
                     var core = _mainWindow.Core;
@@ -50,24 +56,30 @@ namespace VPetLLM.Core
                         .Replace("{StrengthFood:F0}", $"{(core.Save.StrengthFood / core.Save.StrengthMax * 100):F0}%")
                         .Replace("{StrengthDrink:F0}", $"{(core.Save.StrengthDrink / core.Save.StrengthMax * 100):F0}%");
 
-                    if (_settings.EnableTime)
-                    {
-                        status += PromptHelper.Get("Time_Prefix", lang)
-                                    .Replace("{CurrentTime:yyyy-MM-dd HH:mm:ss}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    }
                     parts.Add(status);
                 }
-
-                // Add dynamic info from plugins
-                var dynamicPluginInfos = VPetLLM.Instance.Plugins
-                    .OfType<IDynamicInfoPlugin>()
-                    .Where(p => p.Enabled)
-                    .Select(p => p.GetDynamicInfo())
-                    .Where(info => !string.IsNullOrEmpty(info));
-
-                if (dynamicPluginInfos.Any())
+                
+                // 只有在EnableTime开启时才添加时间信息（独立于EnableState）
+                if (_settings.EnableTime)
                 {
-                    parts.AddRange(dynamicPluginInfos);
+                    var timeInfo = PromptHelper.Get("Time_Prefix", lang)
+                                .Replace("{CurrentTime:yyyy-MM-dd HH:mm:ss}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    parts.Add(timeInfo);
+                }
+
+                // 只有在EnablePlugin开启时才添加插件动态信息
+                if (_settings.EnablePlugin)
+                {
+                    var dynamicPluginInfos = VPetLLM.Instance.Plugins
+                        .OfType<IDynamicInfoPlugin>()
+                        .Where(p => p.Enabled)
+                        .Select(p => p.GetDynamicInfo())
+                        .Where(info => !string.IsNullOrEmpty(info));
+
+                    if (dynamicPluginInfos.Any())
+                    {
+                        parts.AddRange(dynamicPluginInfos);
+                    }
                 }
 
                 var instructions = new List<string>();
@@ -75,11 +87,19 @@ namespace VPetLLM.Core
                 {
                     bool isEnabled = handler.ActionType switch
                     {
-                        ActionType.State => (_settings.EnableBuy && handler.Keyword == "buy") || (_settings.EnableAction && handler.Keyword != "buy"),
-                        ActionType.Body => (_settings.EnableActionExecution && handler.Keyword == "action") || (_settings.EnableMove && handler.Keyword == "move"),
+                        ActionType.State => _settings.EnableState,
+                        ActionType.Body => (handler.Keyword.ToLower() == "action" && _settings.EnableActionExecution) || 
+                                          (handler.Keyword.ToLower() == "move" && _settings.EnableMove),
                         ActionType.Talk => true,
+                        ActionType.Plugin => _settings.EnablePlugin,
                         _ => false
                     };
+                    
+                    // 特殊处理buy指令
+                    if (handler.Keyword.ToLower() == "buy")
+                    {
+                        isEnabled = _settings.EnableBuy;
+                    }
 
                     if (isEnabled)
                     {
@@ -91,15 +111,18 @@ namespace VPetLLM.Core
                 {
                     parts.Add(PromptHelper.Get("Available_Commands_Prefix", lang)
                                 .Replace("{CommandList}", string.Join("\n", instructions)));
-                    if (_settings.EnableActionExecution)
-                    {
-                        parts.Add(PromptHelper.Get("Available_Animations_Prefix", lang)
-                                    .Replace("{AnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableAnimations())));
-                        parts.Add(PromptHelper.Get("Available_Say_Animations_Prefix", lang)
-                                    .Replace("{SayAnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableSayAnimations())));
-                    }
+                }
+                
+                // 只有在EnableActionExecution开启时才添加动画列表
+                if (_settings.EnableActionExecution)
+                {
+                    parts.Add(PromptHelper.Get("Available_Animations_Prefix", lang)
+                                .Replace("{AnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableAnimations())));
+                    parts.Add(PromptHelper.Get("Available_Say_Animations_Prefix", lang)
+                                .Replace("{SayAnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableSayAnimations())));
                 }
 
+                // 只有在EnableBuy开启时才添加可购买物品列表
                 if (_settings.EnableBuy)
                 {
                     var items = string.Join(",", _mainWindow.Foods.Select(f => f.Name));
@@ -108,6 +131,7 @@ namespace VPetLLM.Core
                 }
             }
 
+            // 只有在EnablePlugin开启时才添加插件说明（独立于EnableAction）
             if (_settings.EnablePlugin && VPetLLM.Instance.Plugins.Any(p => p.Enabled))
             {
                 var pluginDescriptions = VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => $"{p.Name}: {p.Description} {p.Examples}");
