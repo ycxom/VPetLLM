@@ -13,10 +13,19 @@ namespace VPetLLM.Handlers
         private readonly StringBuilder _buffer = new StringBuilder();
         private readonly Action<string> _onCompleteCommand;
         private int _lastProcessedIndex = 0;
-        private readonly Queue<string> _commandQueue = new Queue<string>();
+        private readonly Queue<CommandTask> _commandQueue = new Queue<CommandTask>();
         private bool _isProcessing = false;
         private readonly object _lock = new object();
         private readonly VPetLLM _plugin;
+
+        /// <summary>
+        /// 命令任务，包含命令字符串和预下载的TTS音频文件路径
+        /// </summary>
+        private class CommandTask
+        {
+            public string Command { get; set; }
+            public Task<string> TTSDownloadTask { get; set; }
+        }
 
         public StreamingCommandProcessor(Action<string> onCompleteCommand, VPetLLM plugin = null)
         {
@@ -66,10 +75,27 @@ namespace VPetLLM.Handlers
                         // 构造完整的命令字符串
                         var fullCommand = match.Value;
                         
-                        // 将命令加入队列
+                        // 检查是否是say/talk命令，如果是且TTS启用，则立即开始下载音频
+                        Task<string> ttsDownloadTask = null;
+                        var plugin = _plugin ?? VPetLLM.Instance;
+                        if (plugin?.Settings?.TTS?.IsEnabled == true && plugin.TTSService != null)
+                        {
+                            var talkText = ExtractTalkText(fullCommand);
+                            if (!string.IsNullOrEmpty(talkText))
+                            {
+                                Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，立即开始下载TTS音频: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
+                                ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
+                            }
+                        }
+                        
+                        // 将命令和TTS下载任务加入队列
                         lock (_lock)
                         {
-                            _commandQueue.Enqueue(fullCommand);
+                            _commandQueue.Enqueue(new CommandTask
+                            {
+                                Command = fullCommand,
+                                TTSDownloadTask = ttsDownloadTask
+                            });
                         }
                         
                         // 更新已处理的位置
@@ -80,6 +106,21 @@ namespace VPetLLM.Handlers
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// 从命令中提取talk文本内容
+        /// </summary>
+        private string ExtractTalkText(string command)
+        {
+            // 匹配 [:say("文本", ...)] 或 [:talk(say("文本", ...))]
+            var sayPattern = @"\[:(?:say|talk)\((?:say\()?""([^""]+)""";
+            var match = Regex.Match(command, sayPattern);
+            if (match.Success && match.Groups.Count > 1)
+            {
+                return match.Groups[1].Value;
+            }
+            return string.Empty;
         }
 
         /// <summary>
@@ -98,7 +139,7 @@ namespace VPetLLM.Handlers
             {
                 while (true)
                 {
-                    string command;
+                    CommandTask commandTask;
                     lock (_lock)
                     {
                         if (_commandQueue.Count == 0)
@@ -106,11 +147,50 @@ namespace VPetLLM.Handlers
                             _isProcessing = false;
                             break;
                         }
-                        command = _commandQueue.Dequeue();
+                        commandTask = _commandQueue.Dequeue();
+                    }
+
+                    var command = commandTask.Command;
+                    
+                    // 如果有TTS下载任务，等待下载完成
+                    string audioFile = null;
+                    if (commandTask.TTSDownloadTask != null)
+                    {
+                        try
+                        {
+                            Utils.Logger.Log($"StreamingCommandProcessor: 等待TTS音频下载完成: {command}");
+                            audioFile = await commandTask.TTSDownloadTask;
+                            if (!string.IsNullOrEmpty(audioFile))
+                            {
+                                Utils.Logger.Log($"StreamingCommandProcessor: TTS音频下载完成: {audioFile}");
+                            }
+                            else
+                            {
+                                Utils.Logger.Log($"StreamingCommandProcessor: TTS音频下载失败");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Utils.Logger.Log($"StreamingCommandProcessor: TTS音频下载异常: {ex.Message}");
+                        }
                     }
 
                     // 执行命令（同步调用，等待完成）
                     Utils.Logger.Log($"StreamingCommandProcessor: 开始处理命令: {command}");
+                    
+                    // 如果有预下载的音频文件，通过特殊方式传递给处理器
+                    if (!string.IsNullOrEmpty(audioFile))
+                    {
+                        // 将音频文件路径临时存储，供SmartMessageProcessor使用
+                        var plugin = _plugin ?? VPetLLM.Instance;
+                        if (plugin?.TalkBox?.MessageProcessor != null)
+                        {
+                            // 通过自定义属性传递音频文件路径
+                            Utils.Logger.Log($"StreamingCommandProcessor: 传递预下载音频文件: {audioFile}");
+                            SetPredownloadedAudio(command, audioFile);
+                        }
+                    }
+                    
                     _onCompleteCommand?.Invoke(command);
                     
                     // 智能等待命令执行完成
@@ -126,6 +206,36 @@ namespace VPetLLM.Handlers
                 {
                     _isProcessing = false;
                 }
+            }
+        }
+
+        /// <summary>
+        /// 存储预下载的音频文件路径（用于流式处理）
+        /// </summary>
+        private static readonly Dictionary<string, string> _predownloadedAudioCache = new Dictionary<string, string>();
+        private static readonly object _audioCacheLock = new object();
+
+        private void SetPredownloadedAudio(string command, string audioFile)
+        {
+            lock (_audioCacheLock)
+            {
+                _predownloadedAudioCache[command] = audioFile;
+            }
+        }
+
+        /// <summary>
+        /// 获取并移除预下载的音频文件路径
+        /// </summary>
+        public static string GetAndRemovePredownloadedAudio(string command)
+        {
+            lock (_audioCacheLock)
+            {
+                if (_predownloadedAudioCache.TryGetValue(command, out var audioFile))
+                {
+                    _predownloadedAudioCache.Remove(command);
+                    return audioFile;
+                }
+                return null;
             }
         }
 

@@ -283,13 +283,25 @@ namespace VPetLLM.Handlers
             {
                 try
                 {
-                    // 等待当前索引的音频下载完成
-                    Logger.Log($"SmartMessageProcessor: 等待音频 #{talkIndex} 下载完成...");
-                    var audioFile = await WaitForTTSDownloadAsync(downloadTasks, talkIndex);
+                    // 首先检查是否有流式处理预下载的音频
+                    var predownloadedAudio = StreamingCommandProcessor.GetAndRemovePredownloadedAudio(segment.Content);
+                    string audioFile = null;
+
+                    if (!string.IsNullOrEmpty(predownloadedAudio))
+                    {
+                        Logger.Log($"SmartMessageProcessor: 使用流式预下载的音频: {predownloadedAudio}");
+                        audioFile = predownloadedAudio;
+                    }
+                    else if (downloadTasks != null)
+                    {
+                        // 等待当前索引的音频下载完成
+                        Logger.Log($"SmartMessageProcessor: 等待音频 #{talkIndex} 下载完成...");
+                        audioFile = await WaitForTTSDownloadAsync(downloadTasks, talkIndex);
+                    }
 
                     if (!string.IsNullOrEmpty(audioFile))
                     {
-                        Logger.Log($"SmartMessageProcessor: 音频 #{talkIndex} 下载完成，开始播放: {audioFile}");
+                        Logger.Log($"SmartMessageProcessor: 音频 #{talkIndex} 准备就绪，开始播放: {audioFile}");
 
                         // 立即显示气泡（与音频同步）
                         var bubbleTask = ExecuteActionAsync(segment.Content);
@@ -308,8 +320,8 @@ namespace VPetLLM.Handlers
                     }
                     else
                     {
-                        Logger.Log($"SmartMessageProcessor: 音频 #{talkIndex} 下载失败，仅显示气泡");
-                        // 音频下载失败，仅显示气泡
+                        Logger.Log($"SmartMessageProcessor: 音频 #{talkIndex} 不可用，仅显示气泡");
+                        // 音频不可用，仅显示气泡
                         await ExecuteActionAsync(segment.Content);
                     }
                 }
@@ -480,12 +492,24 @@ namespace VPetLLM.Handlers
 
                     try
                     {
+                        // 首先检查是否有流式处理预下载的音频
+                        var predownloadedAudio = StreamingCommandProcessor.GetAndRemovePredownloadedAudio(segment.Content);
+                        
                         // 立即显示气泡（与音频同步）
                         var bubbleTask = ExecuteActionAsync(segment.Content);
                         Logger.Log($"SmartMessageProcessor: 气泡显示任务已启动");
 
-                        // 播放音频（等待播放完成）
-                        await _plugin.TTSService.PlayTextAsync(talkText);
+                        if (!string.IsNullOrEmpty(predownloadedAudio))
+                        {
+                            Logger.Log($"SmartMessageProcessor: 使用流式预下载的音频: {predownloadedAudio}");
+                            // 播放预下载的音频（等待播放完成）
+                            await _plugin.TTSService.PlayAudioFileDirectAsync(predownloadedAudio);
+                        }
+                        else
+                        {
+                            // 播放音频（等待播放完成）
+                            await _plugin.TTSService.PlayTextAsync(talkText);
+                        }
                         Logger.Log($"SmartMessageProcessor: TTS播放完成");
 
                         // 等待气泡显示完成
