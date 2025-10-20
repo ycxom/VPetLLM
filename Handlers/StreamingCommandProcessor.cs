@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
@@ -17,6 +18,7 @@ namespace VPetLLM.Handlers
         private bool _isProcessing = false;
         private readonly object _lock = new object();
         private readonly VPetLLM _plugin;
+        private readonly PluginTakeoverManager _takeoverManager = new PluginTakeoverManager();
 
         /// <summary>
         /// 命令任务，包含命令字符串和预下载的TTS音频文件路径
@@ -35,15 +37,61 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 添加新的文本片段并检测完整的命令
+        /// 支持流式接管，但会先处理缓冲区中的完整命令
         /// </summary>
         /// <param name="chunk">新接收的文本片段</param>
-        public void AddChunk(string chunk)
+        public async void AddChunk(string chunk)
         {
             if (string.IsNullOrEmpty(chunk))
                 return;
 
+            // 先添加到缓冲区
             _buffer.Append(chunk);
+            
+            // 先处理缓冲区中的完整命令（确保顺序执行）
             ProcessCompleteCommands();
+
+            // 如果当前没有接管，检查是否需要启动接管
+            if (!_takeoverManager.IsTakingOver)
+            {
+                var currentBuffer = _buffer.ToString();
+                
+                // 检查是否有 plugin 接管请求
+                var takeoverMatch = System.Text.RegularExpressions.Regex.Match(currentBuffer, @"\[:plugin\((\w+)");
+                if (takeoverMatch.Success)
+                {
+                    var pluginName = takeoverMatch.Groups[1].Value;
+                    
+                    // 查找支持接管的插件
+                    var plugin = _plugin?.Plugins.Find(p => 
+                        p.Name.Replace(" ", "_").Equals(pluginName, StringComparison.OrdinalIgnoreCase) &&
+                        p is global::VPetLLM.Core.IPluginTakeover takeover && takeover.SupportsTakeover);
+
+                    if (plugin is global::VPetLLM.Core.IPluginTakeover)
+                    {
+                        // 提取从 plugin 开始到当前的内容
+                        var pluginStartIndex = takeoverMatch.Index;
+                        var pluginContent = currentBuffer.Substring(pluginStartIndex);
+                        
+                        // 启动接管（传递完整的 plugin 命令内容）
+                        var processedChunk = await _takeoverManager.ProcessChunkAsync(pluginContent);
+                        
+                        // 如果接管成功，从缓冲区移除已接管的内容
+                        if (_takeoverManager.IsTakingOver)
+                        {
+                            _buffer.Clear();
+                            _buffer.Append(currentBuffer.Substring(0, pluginStartIndex));
+                            _lastProcessedIndex = 0;
+                            Utils.Logger.Log($"StreamingCommandProcessor: 插件 {_takeoverManager.CurrentTakeoverPlugin} 开始接管");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // 如果正在接管中，继续传递内容给接管插件
+                await _takeoverManager.ProcessChunkAsync(chunk);
+            }
         }
 
         /// <summary>
@@ -415,6 +463,12 @@ namespace VPetLLM.Handlers
                 _commandQueue.Clear();
                 _isProcessing = false;
             }
+            _takeoverManager.Reset();
         }
+
+        /// <summary>
+        /// 获取接管管理器
+        /// </summary>
+        public PluginTakeoverManager TakeoverManager => _takeoverManager;
     }
 }

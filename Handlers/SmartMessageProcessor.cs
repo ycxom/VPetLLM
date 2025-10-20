@@ -123,33 +123,68 @@ namespace VPetLLM.Handlers
 
             Logger.Log($"SmartMessageProcessor: 开始解析消息，长度: {message.Length}");
 
-            // 匹配完整的动作指令，包括嵌套的括号
-            var actionPattern = @"\[:(\w+)\(([^[\]]*(?:\([^)]*\)[^[\]]*)*)\)\]";
-            var regex = new Regex(actionPattern);
-
-            var matches = regex.Matches(message);
-            Logger.Log($"SmartMessageProcessor: 找到 {matches.Count} 个动作指令");
-
-            if (matches.Count == 0)
+            // 使用手动解析来处理复杂的嵌套括号（特别是 plugin 调用）
+            int index = 0;
+            while (index < message.Length)
             {
-                // 没有找到动作指令，整个消息作为文本处理
-                segments.Add(new MessageSegment
+                // 查找下一个动作指令的开始
+                int startIndex = message.IndexOf("[:", index);
+                if (startIndex == -1)
                 {
-                    Type = SegmentType.Text,
-                    Content = message.Trim()
-                });
-                Logger.Log($"SmartMessageProcessor: 没有找到动作指令，作为纯文本处理");
-                return segments;
-            }
+                    // 没有更多动作指令
+                    break;
+                }
 
-            // 直接处理所有匹配到的动作指令
-            foreach (Match match in matches)
-            {
-                var actionType = match.Groups[1].Value.ToLower();
-                var actionValue = match.Groups[2].Value;
-                var fullMatch = match.Value;
+                // 提取动作类型
+                int typeStart = startIndex + 2;
+                int typeEnd = message.IndexOf('(', typeStart);
+                if (typeEnd == -1)
+                {
+                    index = startIndex + 2;
+                    continue;
+                }
 
-                Logger.Log($"SmartMessageProcessor: 解析到动作指令 - 类型: {actionType}, 值: {actionValue}");
+                string actionType = message.Substring(typeStart, typeEnd - typeStart).ToLower();
+                Logger.Log($"SmartMessageProcessor: 检测到动作类型: {actionType}");
+
+                // 使用括号计数来找到匹配的结束位置
+                int parenCount = 1;
+                int contentStart = typeEnd + 1;
+                int contentEnd = contentStart;
+
+                while (contentEnd < message.Length && parenCount > 0)
+                {
+                    char c = message[contentEnd];
+                    if (c == '(')
+                        parenCount++;
+                    else if (c == ')')
+                        parenCount--;
+
+                    if (parenCount > 0)
+                        contentEnd++;
+                }
+
+                if (parenCount != 0)
+                {
+                    // 括号不匹配，跳过
+                    Logger.Log($"SmartMessageProcessor: 括号不匹配，跳过");
+                    index = startIndex + 2;
+                    continue;
+                }
+
+                // 检查是否有闭合的 ]
+                if (contentEnd + 1 >= message.Length || message[contentEnd + 1] != ']')
+                {
+                    Logger.Log($"SmartMessageProcessor: 缺少闭合的 ]，跳过");
+                    index = startIndex + 2;
+                    continue;
+                }
+
+                // 提取动作值和完整匹配
+                string actionValue = message.Substring(contentStart, contentEnd - contentStart);
+                string fullMatch = message.Substring(startIndex, contentEnd - startIndex + 2);
+
+                Logger.Log($"SmartMessageProcessor: 解析到动作指令 - 类型: {actionType}, 值长度: {actionValue.Length}");
 
                 segments.Add(new MessageSegment
                 {
@@ -158,9 +193,26 @@ namespace VPetLLM.Handlers
                     ActionType = actionType,
                     ActionValue = actionValue
                 });
+
+                // 移动到下一个位置
+                index = contentEnd + 2;
             }
 
-            Logger.Log($"SmartMessageProcessor: 解析完成，共 {segments.Count} 个片段");
+            if (segments.Count == 0)
+            {
+                // 没有找到动作指令，整个消息作为文本处理
+                segments.Add(new MessageSegment
+                {
+                    Type = SegmentType.Text,
+                    Content = message.Trim()
+                });
+                Logger.Log($"SmartMessageProcessor: 没有找到动作指令，作为纯文本处理");
+            }
+            else
+            {
+                Logger.Log($"SmartMessageProcessor: 解析完成，共 {segments.Count} 个片段");
+            }
+
             return segments;
         }
 
@@ -181,6 +233,7 @@ namespace VPetLLM.Handlers
                 "action" => SegmentType.Action,
                 "buy" => SegmentType.Action,
                 "body" => SegmentType.Action,
+                "plugin" => SegmentType.Action,
                 _ => SegmentType.Action
             };
         }
