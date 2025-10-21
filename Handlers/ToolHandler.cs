@@ -22,11 +22,20 @@ namespace VPetLLM.Handlers
             // 若处于单条 AI 回复的执行会话中，则豁免限流（允许该回复内多次工具联合调用）
             var inMessageSession = global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value.HasValue;
 
-            // 跨消息限流：2分钟内最多5次，超限则直接终止
-            if (!inMessageSession && !RateLimiter.TryAcquire("tool", 5, TimeSpan.FromMinutes(2)))
+            // 跨消息限流：使用配置的参数
+            if (!inMessageSession)
             {
-                Logger.Log("ToolHandler: 超过工具调用上限（跨消息），终止调用");
-                return;
+                var config = RateLimiter.GetConfig("tool");
+                if (!RateLimiter.TryAcquire("tool", 5, TimeSpan.FromMinutes(2)))
+                {
+                    var stats = RateLimiter.GetStats("tool");
+                    Logger.Log($"ToolHandler: 触发熔断 - 工具调用超限（跨消息）");
+                    if (VPetLLM.Instance?.Settings?.RateLimiter?.LogRateLimitEvents == true && stats != null)
+                    {
+                        Logger.Log($"  当前: {stats.CurrentCount}/{config?.MaxCount}, 已阻止: {stats.BlockedRequests}次");
+                    }
+                    return;
+                }
             }
 
             var match = new Regex(@"(.*?)\((.*)\)").Match(value);

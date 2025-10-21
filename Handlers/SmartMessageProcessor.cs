@@ -651,16 +651,22 @@ namespace VPetLLM.Handlers
                 {
                     Logger.Log($"SmartMessageProcessor: 执行动作: {action.Keyword}, 值: {action.Value}");
 
-                    // 对插件类动作做非用户触发限流（会话内豁免）：2分钟内最多5次
+                    // 对插件类动作做非用户触发限流（会话内豁免）：使用配置的参数
                     var isPluginAction = action.Type == ActionType.Plugin || string.Equals(action.Keyword, "plugin", StringComparison.OrdinalIgnoreCase);
                     if (isPluginAction)
                     {
                         var inMessageSession = global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value.HasValue;
                         if (!inMessageSession)
                         {
+                            var config = Utils.RateLimiter.GetConfig("ai-plugin");
                             if (!Utils.RateLimiter.TryAcquire("ai-plugin", 5, TimeSpan.FromMinutes(2)))
                             {
-                                Logger.Log("SmartMessageProcessor: 插件动作频率超限（跨消息），终止剩余动作执行以丢弃非用户触发链。");
+                                var stats = Utils.RateLimiter.GetStats("ai-plugin");
+                                Logger.Log($"SmartMessageProcessor: 触发熔断 - 插件动作频率超限（跨消息），终止剩余动作执行");
+                                if (_plugin?.Settings?.RateLimiter?.LogRateLimitEvents == true && stats != null)
+                                {
+                                    Logger.Log($"  当前: {stats.CurrentCount}/{config?.MaxCount}, 已阻止: {stats.BlockedRequests}次");
+                                }
                                 break;
                             }
                         }

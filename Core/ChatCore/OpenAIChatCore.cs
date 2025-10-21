@@ -270,11 +270,12 @@ namespace VPetLLM.Core.ChatCore
             return "";
         }
 
-        public override async Task<string> Summarize(string text)
+        public override async Task<string> Summarize(string systemPrompt, string userContent)
         {
             var messages = new[]
             {
-                new { role = "user", content = text }
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userContent }
             };
 
             // 获取当前节点和API Key

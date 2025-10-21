@@ -21,11 +21,20 @@ namespace VPetLLM.Handlers
             // 若处于单条 AI 回复的执行会话中，则豁免限流（允许该回复内多次插件联合调用）
             var inMessageSession = global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value.HasValue;
 
-            // 非用户触发的跨消息限流：2分钟内最多5次，超限直接丢弃
-            if (!inMessageSession && !RateLimiter.TryAcquire("ai-plugin", 5, TimeSpan.FromMinutes(2)))
+            // 非用户触发的跨消息限流：使用配置的参数
+            if (!inMessageSession)
             {
-                VPetLLM.Instance.Log("PluginHandler: 插件触发频率超限（跨消息），丢弃此次调用。");
-                return;
+                var config = RateLimiter.GetConfig("ai-plugin");
+                if (!RateLimiter.TryAcquire("ai-plugin", 5, TimeSpan.FromMinutes(2)))
+                {
+                    var stats = RateLimiter.GetStats("ai-plugin");
+                    VPetLLM.Instance.Log($"PluginHandler: 触发熔断 - 插件调用超限（跨消息）");
+                    if (VPetLLM.Instance?.Settings?.RateLimiter?.LogRateLimitEvents == true && stats != null)
+                    {
+                        VPetLLM.Instance.Log($"  当前: {stats.CurrentCount}/{config?.MaxCount}, 已阻止: {stats.BlockedRequests}次");
+                    }
+                    return;
+                }
             }
 
             VPetLLM.Instance.Log($"PluginHandler: Received value: {value}");

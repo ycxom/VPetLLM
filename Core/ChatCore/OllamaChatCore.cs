@@ -163,14 +163,15 @@ namespace VPetLLM.Core.ChatCore
             }
         }
 
-        public override async Task<string> Summarize(string text)
+        public override async Task<string> Summarize(string systemPrompt, string userContent)
         {
             try
             {
+                var combinedPrompt = $"{systemPrompt}\n\n{userContent}";
                 var data = new
                 {
                     model = _ollamaSetting.Model,
-                    prompt = text,
+                    prompt = combinedPrompt,
                     stream = false
                 };
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");

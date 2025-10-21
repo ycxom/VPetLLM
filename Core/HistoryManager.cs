@@ -82,8 +82,8 @@ namespace VPetLLM.Core
             }
 
             var historyText = string.Join("\n", historyToCompress.Select(m => m.Content));
-            var prompt = PromptHelper.Get("Context_Summary_Prefix", _settings.PromptLanguage).Replace("{historyText}", historyText);
-            var summary = await _chatCore.Summarize(prompt);
+            var systemPrompt = PromptHelper.Get("Context_Summary_Prefix", _settings.PromptLanguage);
+            var summary = await _chatCore.Summarize(systemPrompt, historyText);
 
             if (string.IsNullOrWhiteSpace(summary))
             {

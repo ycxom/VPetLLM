@@ -96,6 +96,10 @@ namespace VPetLLM
         public override void LoadPlugin()
         {
             Utils.Logger.Log("LoadPlugin started.");
+            
+            // 初始化熔断器配置
+            InitializeRateLimiter();
+            
             ChatCore?.LoadHistory();
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -598,6 +602,41 @@ namespace VPetLLM
         {
             TTSService?.UpdateSettings(Settings.TTS, Settings.Proxy);
             // Logger.Log("TTS服务设置已更新");
+        }
+
+        /// <summary>
+        /// 初始化熔断器配置
+        /// </summary>
+        private void InitializeRateLimiter()
+        {
+            try
+            {
+                Logger.Log("开始初始化RateLimiter配置...");
+                
+                // 配置Tool限流
+                Utils.RateLimiter.SetConfig("tool", new Utils.RateLimiter.RateLimitConfig
+                {
+                    MaxCount = Settings.RateLimiter.ToolMaxCount,
+                    Window = TimeSpan.FromMinutes(Settings.RateLimiter.ToolWindowMinutes),
+                    Enabled = Settings.RateLimiter.EnableToolRateLimit,
+                    Description = "Tool调用限流"
+                });
+                
+                // 配置Plugin限流
+                Utils.RateLimiter.SetConfig("ai-plugin", new Utils.RateLimiter.RateLimitConfig
+                {
+                    MaxCount = Settings.RateLimiter.PluginMaxCount,
+                    Window = TimeSpan.FromMinutes(Settings.RateLimiter.PluginWindowMinutes),
+                    Enabled = Settings.RateLimiter.EnablePluginRateLimit,
+                    Description = "Plugin调用限流"
+                });
+                
+                Logger.Log($"RateLimiter配置完成 - Tool: {(Settings.RateLimiter.EnableToolRateLimit ? "启用" : "禁用")} ({Settings.RateLimiter.ToolMaxCount}次/{Settings.RateLimiter.ToolWindowMinutes}分钟), Plugin: {(Settings.RateLimiter.EnablePluginRateLimit ? "启用" : "禁用")} ({Settings.RateLimiter.PluginMaxCount}次/{Settings.RateLimiter.PluginWindowMinutes}分钟)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"初始化RateLimiter时发生错误: {ex.Message}");
+            }
         }
 
         /// <summary>

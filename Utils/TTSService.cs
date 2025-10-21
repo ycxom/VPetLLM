@@ -923,12 +923,12 @@ namespace VPetLLM.Utils
             var requestMethod = diyConfig.Method?.ToUpper() ?? "POST";
             var contentType = diyConfig.ContentType ?? "application/json";
 
-            Logger.Log($"TTS: DIY请求构建信息:");
-            Logger.Log($"TTS: 配置文件路径: {DIYTTSConfig.GetConfigFilePath()}");
-            Logger.Log($"TTS: 目标URL: '{baseUrl}'");
-            Logger.Log($"TTS: 请求方法: '{requestMethod}'");
-            Logger.Log($"TTS: Content-Type: '{contentType}'");
-            Logger.Log($"TTS: 原始文本: '{text}'");
+            // Logger.Log($"TTS: DIY请求构建信息:");
+            // Logger.Log($"TTS: 配置文件路径: {DIYTTSConfig.GetConfigFilePath()}");
+            // Logger.Log($"TTS: 目标URL: '{baseUrl}'");
+            // Logger.Log($"TTS: 请求方法: '{requestMethod}'");
+            // Logger.Log($"TTS: Content-Type: '{contentType}'");
+            // Logger.Log($"TTS: 原始文本: '{text}'");
 
             // 验证URL格式
             if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))

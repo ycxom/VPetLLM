@@ -36,8 +36,8 @@
         "zh": "可用的插件（所有插件都必须以`[:plugin(plugin_name(parameters))]`的格式调用）：\n{PluginList}"
     },
     "Context_Summary_Prefix": {
-        "en": "Please summarize the following multi-turn conversation into a concise summary so that the follow-up robot can understand the context. Do not imitate any characters during summarization, keep the content as concise as possible, retaining only core information, and avoid any words unrelated to the summarization task. The content to be summarized is as follows:\n{historyText}",
-        "zh": "请将以下多轮对话总结为一段摘要，以便后续机器人能理解上下文。总结时不要模仿任何角色，内容要尽可能简洁，只保留核心信息，避免任何与总结任务无关的词语。要总结的内容如下:\n{historyText}"
+        "en": "Please summarize the following multi-turn conversation into a concise summary so that the follow-up robot can understand the context. Do not imitate any characters during summarization, keep the content as concise as possible, retaining only core information, and avoid any words unrelated to the summarization task.",
+        "zh": "请将以下多轮对话总结为一段摘要，以便后续机器人能理解上下文。总结时不要模仿任何角色，内容要尽可能简洁，只保留核心信息，避免任何与总结任务无关的词语。"
     },
     "Handler_Action_Description": {
         "en": "Control actions with the 'action' command. For example: '[:body(action(touchhead))]'. Note: If the 'say' command includes a body animation, avoid using a separate 'body' command to prevent conflicts.",

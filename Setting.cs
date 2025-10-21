@@ -40,6 +40,7 @@ namespace VPetLLM
         public Handlers.TouchFeedbackSettings TouchFeedback { get; set; } = new Handlers.TouchFeedbackSettings();
         public bool EnableBuyFeedback { get; set; } = true;
         public bool EnableLiveMode { get; set; } = false;
+        public RateLimiterSetting RateLimiter { get; set; } = new RateLimiterSetting();
         private readonly string _path;
 
         public Setting(string path)
@@ -87,6 +88,10 @@ namespace VPetLLM
             if (Tools == null)
             {
                 Tools = new List<ToolSetting>();
+            }
+            if (RateLimiter == null)
+            {
+                RateLimiter = new RateLimiterSetting();
             }
 
             // 旧版OpenAI单节点配置迁移到多节点结构，避免用户配置丢失
@@ -454,6 +459,19 @@ namespace VPetLLM
             public string Key { get; set; } = "";
             public string Value { get; set; } = "";
             public bool IsEnabled { get; set; } = true;
+        }
+
+        public class RateLimiterSetting
+        {
+            public bool EnableToolRateLimit { get; set; } = true;
+            public int ToolMaxCount { get; set; } = 5;
+            public int ToolWindowMinutes { get; set; } = 2;
+
+            public bool EnablePluginRateLimit { get; set; } = true;
+            public int PluginMaxCount { get; set; } = 5;
+            public int PluginWindowMinutes { get; set; } = 2;
+
+            public bool LogRateLimitEvents { get; set; } = true;
         }
 
     }

@@ -19,7 +19,7 @@ namespace VPetLLM.Core
         protected Action<string> StreamingChunkHandler;
         public abstract Task<string> Chat(string prompt);
         public abstract Task<string> Chat(string prompt, bool isFunctionCall);
-        public abstract Task<string> Summarize(string text);
+        public abstract Task<string> Summarize(string systemPrompt, string userContent);
 
         protected string GetSystemMessage()
         {

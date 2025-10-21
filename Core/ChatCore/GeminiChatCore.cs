@@ -186,13 +186,17 @@ namespace VPetLLM.Core.ChatCore
         }
 
 
-        public override async Task<string> Summarize(string text)
+        public override async Task<string> Summarize(string systemPrompt, string userContent)
         {
             var requestData = new
             {
+                system_instruction = new
+                {
+                    parts = new[] { new { text = systemPrompt } }
+                },
                 contents = new[]
                 {
-                    new { parts = new[] { new { text = text } } }
+                    new { parts = new[] { new { text = userContent } } }
                 }
             };
 
