@@ -318,17 +318,34 @@ namespace VPetLLM.Handlers
             }
 
             // 尝试通过静态实例访问 MessageProcessor
-            var plugin = _plugin ?? VPetLLM.Instance;
-            Utils.Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: plugin = {(plugin != null ? "有效" : "null")}, TalkBox = {(plugin?.TalkBox != null ? "有效" : "null")}, MessageProcessor = {(plugin?.TalkBox?.MessageProcessor != null ? "有效" : "null")}");
+            var pluginInstance = _plugin ?? VPetLLM.Instance;
+            Utils.Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: plugin = {(pluginInstance != null ? "有效" : "null")}, TalkBox = {(pluginInstance?.TalkBox != null ? "有效" : "null")}, MessageProcessor = {(pluginInstance?.TalkBox?.MessageProcessor != null ? "有效" : "null")}");
             
             // 等待 SmartMessageProcessor 完成当前命令的处理
-            if (plugin?.TalkBox?.MessageProcessor != null)
+            if (pluginInstance?.TalkBox?.MessageProcessor != null)
             {
+                // 先等待一小段时间，让消息有机会开始处理
+                await Task.Delay(50);
+                
                 int maxWaitTime = 60000; // 最多等待 60 秒
                 int checkInterval = 100; // 每 100ms 检查一次
                 int elapsedTime = 0;
+                int startWaitTime = 0;
 
-                while (plugin.TalkBox.MessageProcessor.IsProcessing && elapsedTime < maxWaitTime)
+                // 等待消息开始处理（最多等待5秒）
+                while (!pluginInstance.TalkBox.MessageProcessor.IsProcessing && startWaitTime < 5000)
+                {
+                    await Task.Delay(50);
+                    startWaitTime += 50;
+                }
+
+                if (startWaitTime > 0)
+                {
+                    Utils.Logger.Log($"StreamingCommandProcessor: 等待消息开始处理，耗时: {startWaitTime}ms");
+                }
+
+                // 等待消息处理完成
+                while (pluginInstance.TalkBox.MessageProcessor.IsProcessing && elapsedTime < maxWaitTime)
                 {
                     await Task.Delay(checkInterval);
                     elapsedTime += checkInterval;
