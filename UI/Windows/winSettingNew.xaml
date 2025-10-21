@@ -1343,8 +1343,28 @@
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableHistoryCompression}"
                                         Margin="0,0,0,12"
                                         Style="{StaticResource ModernCheckBox}"/>
+                                <!-- 压缩触发模式 -->
                                 <StackPanel Orientation="Horizontal"
-                                        Margin="20,0,0,0">
+                                        Margin="20,0,0,12">
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.CompressionMode}"
+                                            VerticalAlignment="Center"
+                                            x:Name="TextBlock_CompressionMode"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="80"/>
+                                    <ComboBox x:Name="ComboBox_CompressionMode"
+                                            Width="150"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.CompressionMode_MessageCount}" Tag="MessageCount"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.CompressionMode_TokenCount}" Tag="TokenCount"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.CompressionMode_Both}" Tag="Both"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                
+                                <!-- 消息数量阈值 -->
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="20,0,0,12">
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.HistoryCompressionThreshold}"
                                             VerticalAlignment="Center"
                                             x:Name="TextBlock_HistoryCompressionThreshold"
@@ -1362,6 +1382,31 @@
                                             Foreground="{StaticResource PrimaryTextBrush}"
                                             FontSize="14"/>
                                     <TextBlock x:Name="TextBlock_CurrentContextLength"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                            FontSize="14"/>
+                                </StackPanel>
+                                
+                                <!-- Token数量阈值 -->
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="20,0,0,0">
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.HistoryCompressionTokenThreshold}"
+                                            VerticalAlignment="Center"
+                                            x:Name="TextBlock_HistoryCompressionTokenThreshold"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="80"/>
+                                    <TextBox x:Name="TextBox_HistoryCompressionTokenThreshold"
+                                            Width="110"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.CurrentTokenCount}"
+                                            VerticalAlignment="Center"
+                                            Margin="20,0,5,0"
+                                            x:Name="TextBlock_CurrentTokenCountLabel"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"/>
+                                    <TextBlock x:Name="TextBlock_CurrentTokenCount"
                                             VerticalAlignment="Center"
                                             Foreground="{StaticResource SecondaryTextBrush}"
                                             FontSize="14"/>

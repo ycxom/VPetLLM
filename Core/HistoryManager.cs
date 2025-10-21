@@ -21,6 +21,8 @@ namespace VPetLLM.Core
 
         public List<Message> GetHistory() => _history;
 
+        public int GetCurrentTokenCount() => EstimateTokenCount();
+
         public void LoadHistory()
         {
             if (File.Exists(_historyFilePath))
@@ -39,7 +41,7 @@ namespace VPetLLM.Core
 
         public async Task AddMessage(Message message)
         {
-            if (_settings.EnableHistoryCompression && _history.Count >= _settings.HistoryCompressionThreshold)
+            if (_settings.EnableHistoryCompression && ShouldCompress())
             {
                 await CompressHistory();
             }
@@ -51,6 +53,30 @@ namespace VPetLLM.Core
             }
 
             _history.Add(message);
+        }
+
+        private bool ShouldCompress()
+        {
+            switch (_settings.CompressionMode)
+            {
+                case Setting.CompressionTriggerMode.MessageCount:
+                    return _history.Count >= _settings.HistoryCompressionThreshold;
+
+                case Setting.CompressionTriggerMode.TokenCount:
+                    return EstimateTokenCount() >= _settings.HistoryCompressionTokenThreshold;
+
+                case Setting.CompressionTriggerMode.Both:
+                    return _history.Count >= _settings.HistoryCompressionThreshold ||
+                           EstimateTokenCount() >= _settings.HistoryCompressionTokenThreshold;
+
+                default:
+                    return _history.Count >= _settings.HistoryCompressionThreshold;
+            }
+        }
+
+        private int EstimateTokenCount()
+        {
+            return TokenCounter.EstimateMessagesTokenCount(_history);
         }
 
         public void ClearHistory()

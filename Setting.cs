@@ -30,7 +30,9 @@ namespace VPetLLM
         public bool EnableMove { get; set; } = true;
         public bool EnableTime { get; set; } = true;
         public bool EnableHistoryCompression { get; set; } = false;
+        public CompressionTriggerMode CompressionMode { get; set; } = CompressionTriggerMode.MessageCount;
         public int HistoryCompressionThreshold { get; set; } = 20;
+        public int HistoryCompressionTokenThreshold { get; set; } = 4000;
         public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         public bool ShowUninstallWarning { get; set; } = true;
@@ -381,6 +383,13 @@ namespace VPetLLM
             OpenAI,
             Gemini,
             Free
+        }
+
+        public enum CompressionTriggerMode
+        {
+            MessageCount,  // 按消息数量触发
+            TokenCount,    // 按Token数量触发
+            Both           // 两者任一达到阈值即触发
         }
         public class ProxySetting
         {

@@ -62,6 +62,14 @@ namespace VPetLLM.Core
         }
 
         /// <summary>
+        /// 获取当前聊天历史的Token数量估算
+        /// </summary>
+        public virtual int GetCurrentTokenCount()
+        {
+            return HistoryManager.GetCurrentTokenCount();
+        }
+
+        /// <summary>
         /// 更新聊天历史（用户编辑后）
         /// </summary>
         public virtual void UpdateHistory(List<Message> editedHistory)

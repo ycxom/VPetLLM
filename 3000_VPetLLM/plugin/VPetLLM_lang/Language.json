@@ -540,17 +540,53 @@
             "zh-hant": "啟用聊天記錄壓縮",
             "jp": "チャット履歴の圧縮を有効にする"
         },
+        "CompressionMode": {
+            "en": "Compression Mode:",
+            "zh-hans": "压缩模式:",
+            "zh-hant": "壓縮模式:",
+            "jp": "圧縮モード:"
+        },
+        "CompressionMode_MessageCount": {
+            "en": "By Message Count",
+            "zh-hans": "按消息数量",
+            "zh-hant": "按消息數量",
+            "jp": "メッセージ数による"
+        },
+        "CompressionMode_TokenCount": {
+            "en": "By Token Count",
+            "zh-hans": "按Token数量",
+            "zh-hant": "按Token數量",
+            "jp": "トークン数による"
+        },
+        "CompressionMode_Both": {
+            "en": "Either Threshold",
+            "zh-hans": "任一阈值",
+            "zh-hant": "任一閾值",
+            "jp": "いずれかのしきい値"
+        },
         "HistoryCompressionThreshold": {
-            "en": "Compression Threshold:",
-            "zh-hans": "压缩阈值:",
-            "zh-hant": "壓縮閾值:",
-            "jp": "圧縮しきい値:"
+            "en": "Message Threshold:",
+            "zh-hans": "消息阈值:",
+            "zh-hant": "消息閾值:",
+            "jp": "メッセージしきい値:"
+        },
+        "HistoryCompressionTokenThreshold": {
+            "en": "Token Threshold:",
+            "zh-hans": "Token阈值:",
+            "zh-hant": "Token閾值:",
+            "jp": "トークンしきい値:"
         },
         "CurrentContextLength": {
-            "en": "Current Context Length:",
-            "zh-hans": "当前上下文长度:",
-            "zh-hant": "當前上下文長度:",
-            "jp": "現在のコンテキスト長:"
+            "en": "Current Messages:",
+            "zh-hans": "当前消息数:",
+            "zh-hant": "當前消息數:",
+            "jp": "現在のメッセージ数:"
+        },
+        "CurrentTokenCount": {
+            "en": "Current Tokens:",
+            "zh-hans": "当前Token数:",
+            "zh-hant": "當前Token數:",
+            "jp": "現在のトークン数:"
         }
     },
     "Tools": {

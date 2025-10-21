@@ -31,6 +31,11 @@ namespace VPetLLM
         List<Core.Message> GetChatHistory();
 
         /// <summary>
+        /// 获取当前聊天历史的Token数量估算
+        /// </summary>
+        int GetCurrentTokenCount();
+
+        /// <summary>
         /// 设置聊天历史记录（用于切换提供商时恢复）
         /// </summary>
         void SetChatHistory(List<Core.Message> history);

@@ -313,7 +313,9 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableTime")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).Click += Control_Click;
+            ((ComboBox)this.FindName("ComboBox_CompressionMode")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
@@ -610,7 +612,20 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableBuyFeedback")).IsChecked = _plugin.Settings.EnableBuyFeedback;
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).IsChecked = _plugin.Settings.EnableLiveMode;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked = _plugin.Settings.EnableHistoryCompression;
+            
+            // 加载压缩模式
+            var compressionModeComboBox = (ComboBox)this.FindName("ComboBox_CompressionMode");
+            foreach (ComboBoxItem item in compressionModeComboBox.Items)
+            {
+                if (item.Tag.ToString() == _plugin.Settings.CompressionMode.ToString())
+                {
+                    compressionModeComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+            
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text = _plugin.Settings.HistoryCompressionThreshold.ToString();
+            ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).Text = _plugin.Settings.HistoryCompressionTokenThreshold.ToString();
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).Text = _plugin.Settings.MaxLogCount.ToString();
             ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
@@ -839,8 +854,23 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableBuyFeedback = enableBuyFeedbackCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableLiveMode = enableLiveModeCheckBox.IsChecked ?? false;
             _plugin.Settings.EnableHistoryCompression = ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked ?? false;
+            
+            // 保存压缩模式
+            var compressionModeComboBox = (ComboBox)this.FindName("ComboBox_CompressionMode");
+            if (compressionModeComboBox.SelectedItem is ComboBoxItem selectedItem)
+            {
+                if (Enum.TryParse<Setting.CompressionTriggerMode>(selectedItem.Tag.ToString(), out var mode))
+                {
+                    _plugin.Settings.CompressionMode = mode;
+                }
+            }
+            
             if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text, out int historyCompressionThreshold))
                 _plugin.Settings.HistoryCompressionThreshold = historyCompressionThreshold;
+            
+            if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).Text, out int historyCompressionTokenThreshold))
+                _plugin.Settings.HistoryCompressionTokenThreshold = historyCompressionTokenThreshold;
+            
             _plugin.Settings.LogAutoScroll = logAutoScrollCheckBox.IsChecked ?? true;
             if (int.TryParse(maxLogCountTextBox.Text, out int maxLogCount))
                 _plugin.Settings.MaxLogCount = maxLogCount;
@@ -1626,9 +1656,27 @@ namespace VPetLLM.UI.Windows
                 }
             }
             if (FindName("CheckBox_EnableHistoryCompression") is CheckBox checkBoxEnableHistoryCompression) checkBoxEnableHistoryCompression.Content = LanguageHelper.Get("Advanced_Options.EnableHistoryCompression", langCode);
+            
+            // 压缩模式
+            if (FindName("TextBlock_CompressionMode") is TextBlock textBlockCompressionMode) textBlockCompressionMode.Text = LanguageHelper.Get("Advanced_Options.CompressionMode", langCode);
+            if (FindName("ComboBox_CompressionMode") is ComboBox comboBoxCompressionMode)
+            {
+                foreach (ComboBoxItem item in comboBoxCompressionMode.Items)
+                {
+                    var tag = item.Tag.ToString();
+                    item.Content = LanguageHelper.Get($"Advanced_Options.CompressionMode_{tag}", langCode);
+                }
+            }
+            
+            // 消息数量阈值
             if (FindName("TextBlock_HistoryCompressionThreshold") is TextBlock textBlockHistoryCompressionThreshold) textBlockHistoryCompressionThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionThreshold", langCode);
             if (FindName("TextBlock_CurrentContextLengthLabel") is TextBlock textBlockCurrentContextLengthLabel) textBlockCurrentContextLengthLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentContextLength", langCode);
             if (FindName("TextBlock_CurrentContextLength") is TextBlock textBlockCurrentContextLength) textBlockCurrentContextLength.Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+            
+            // Token数量阈值
+            if (FindName("TextBlock_HistoryCompressionTokenThreshold") is TextBlock textBlockHistoryCompressionTokenThreshold) textBlockHistoryCompressionTokenThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionTokenThreshold", langCode);
+            if (FindName("TextBlock_CurrentTokenCountLabel") is TextBlock textBlockCurrentTokenCountLabel) textBlockCurrentTokenCountLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentTokenCount", langCode);
+            if (FindName("TextBlock_CurrentTokenCount") is TextBlock textBlockCurrentTokenCount) textBlockCurrentTokenCount.Text = _plugin.ChatCore.GetCurrentTokenCount().ToString();
 
             // 更新工具管理头部区域的多语言文本
             if (FindName("TextBlock_ToolsManagement") is TextBlock textBlockToolsManagement)
