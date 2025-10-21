@@ -52,7 +52,10 @@
                       ItemsSource="{Binding DisplayHistory}" 
                       x:Name="DataGrid_Context"
                       Style="{StaticResource ModernDataGrid}"
-                      ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}">
+                      ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+                      ScrollViewer.CanContentScroll="False"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="角色" 
                                         Binding="{Binding Role}" 

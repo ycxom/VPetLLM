@@ -1649,7 +1649,10 @@
                                 MinHeight="200"
                                 Background="{StaticResource BackgroundBrush}"
                                 BorderBrush="{StaticResource BorderBrush}"
-                                BorderThickness="1"/>
+                                BorderThickness="1"
+                                ScrollViewer.CanContentScroll="False"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                     </DockPanel>
                 </Border>
             </TabItem>

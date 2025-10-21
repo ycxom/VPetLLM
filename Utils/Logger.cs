@@ -40,13 +40,13 @@ namespace VPetLLM.Utils
                             if (settingWindow != null)
                             {
                                 var logBox = (ListBox)settingWindow.FindName("LogBox");
-                                if (logBox != null && Logs.Count > 0)
+                                if (logBox != null)
                                 {
-                                    // 再次检查集合大小，防止在访问时被其他线程修改
-                                    var lastIndex = Logs.Count - 1;
-                                    if (lastIndex >= 0 && lastIndex < Logs.Count)
+                                    // 使用 ScrollViewer 进行平滑滚动，而不是按条目跳转
+                                    var scrollViewer = FindScrollViewer(logBox);
+                                    if (scrollViewer != null)
                                     {
-                                        logBox.ScrollIntoView(Logs[lastIndex]);
+                                        scrollViewer.ScrollToEnd();
                                     }
                                     break;
                                 }
@@ -55,6 +55,31 @@ namespace VPetLLM.Utils
                     }));
                 }
             });
+        }
+
+        /// <summary>
+        /// 查找控件内部的 ScrollViewer
+        /// </summary>
+        private static ScrollViewer FindScrollViewer(System.Windows.DependencyObject obj)
+        {
+            if (obj == null) return null;
+
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(obj); i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(obj, i);
+                if (child is ScrollViewer scrollViewer)
+                {
+                    return scrollViewer;
+                }
+
+                var result = FindScrollViewer(child);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
         }
 
         public static void Clear()
