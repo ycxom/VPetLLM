@@ -311,6 +311,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableMove")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableTime")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
@@ -607,6 +608,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableMove")).IsChecked = _plugin.Settings.EnableMove;
             ((CheckBox)this.FindName("CheckBox_EnableTime")).IsChecked = _plugin.Settings.EnableTime;
             ((CheckBox)this.FindName("CheckBox_EnableBuyFeedback")).IsChecked = _plugin.Settings.EnableBuyFeedback;
+            ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).IsChecked = _plugin.Settings.EnableLiveMode;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked = _plugin.Settings.EnableHistoryCompression;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text = _plugin.Settings.HistoryCompressionThreshold.ToString();
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
@@ -779,6 +781,7 @@ namespace VPetLLM.UI.Windows
             var enableMoveCheckBox = (CheckBox)this.FindName("CheckBox_EnableMove");
             var enableTimeCheckBox = (CheckBox)this.FindName("CheckBox_EnableTime");
             var enableBuyFeedbackCheckBox = (CheckBox)this.FindName("CheckBox_EnableBuyFeedback");
+            var enableLiveModeCheckBox = (CheckBox)this.FindName("CheckBox_EnableLiveMode");
             var logAutoScrollCheckBox = (CheckBox)this.FindName("CheckBox_LogAutoScroll");
             var maxLogCountTextBox = (TextBox)this.FindName("TextBox_MaxLogCount");
             var ollamaEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced");
@@ -834,6 +837,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableMove = enableMoveCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableTime = enableTimeCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableBuyFeedback = enableBuyFeedbackCheckBox.IsChecked ?? true;
+            _plugin.Settings.EnableLiveMode = enableLiveModeCheckBox.IsChecked ?? false;
             _plugin.Settings.EnableHistoryCompression = ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked ?? false;
             if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text, out int historyCompressionThreshold))
                 _plugin.Settings.HistoryCompressionThreshold = historyCompressionThreshold;
@@ -1611,6 +1615,14 @@ namespace VPetLLM.UI.Windows
                 if (checkBoxEnableBuyFeedback.ToolTip is ToolTip toolTip && toolTip.Content is TextBlock textBlock)
                 {
                     textBlock.Text = LanguageHelper.Get("BuyInteraction.EnableTooltip", langCode);
+                }
+            }
+            if (FindName("CheckBox_EnableLiveMode") is CheckBox checkBoxEnableLiveMode)
+            {
+                checkBoxEnableLiveMode.Content = LanguageHelper.Get("Advanced_Options.EnableLiveMode", langCode);
+                if (checkBoxEnableLiveMode.ToolTip is ToolTip toolTip && toolTip.Content is TextBlock textBlock)
+                {
+                    textBlock.Text = LanguageHelper.Get("Advanced_Options.EnableLiveModeToolTip", langCode);
                 }
             }
             if (FindName("CheckBox_EnableHistoryCompression") is CheckBox checkBoxEnableHistoryCompression) checkBoxEnableHistoryCompression.Content = LanguageHelper.Get("Advanced_Options.EnableHistoryCompression", langCode);

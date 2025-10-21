@@ -1328,6 +1328,17 @@
                                         </ToolTip>
                                     </CheckBox.ToolTip>
                                 </CheckBox>
+                                <CheckBox x:Name="CheckBox_EnableLiveMode"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableLiveMode}"
+                                        IsChecked="False"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernCheckBox}">
+                                    <CheckBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableLiveModeToolTip}"/>
+                                        </ToolTip>
+                                    </CheckBox.ToolTip>
+                                </CheckBox>
                                 <CheckBox x:Name="CheckBox_EnableHistoryCompression"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableHistoryCompression}"
                                         Margin="0,0,0,12"

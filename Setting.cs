@@ -39,6 +39,7 @@ namespace VPetLLM
         public PluginStoreSetting PluginStore { get; set; } = new PluginStoreSetting();
         public Handlers.TouchFeedbackSettings TouchFeedback { get; set; } = new Handlers.TouchFeedbackSettings();
         public bool EnableBuyFeedback { get; set; } = true;
+        public bool EnableLiveMode { get; set; } = false;
         private readonly string _path;
 
         public Setting(string path)

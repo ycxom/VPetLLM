@@ -522,6 +522,18 @@
             "zh-hant": "允許獲取當前時間",
             "jp": "現在時刻の取得を許可する"
         },
+        "EnableLiveMode": {
+            "en": "Live Mode",
+            "zh-hans": "实况模式",
+            "zh-hant": "實況模式",
+            "jp": "ライブモード"
+        },
+        "EnableLiveModeToolTip": {
+            "en": "When enabled, tool and plugin results will be returned immediately without waiting for previous actions to complete. When disabled (default), results will be queued and processed sequentially with aggregation.",
+            "zh-hans": "启用后，工具和插件返回结果时会直接返回，不等待上一个动作完成。禁用时（默认），结果会进入队列模式，配合聚合等待顺序执行。",
+            "zh-hant": "啟用後，工具和插件返回結果時會直接返回，不等待上一個動作完成。禁用時（默認），結果會進入隊列模式，配合聚合等待順序執行。",
+            "jp": "有効にすると、ツールやプラグインの結果が前のアクションの完了を待たずに即座に返されます。無効（デフォルト）の場合、結果はキューに入り、集約と共に順次処理されます。"
+        },
         "EnableHistoryCompression": {
             "en": "Enable Chat History Compression",
             "zh-hans": "启用聊天记录压缩",

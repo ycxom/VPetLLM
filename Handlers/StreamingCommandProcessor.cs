@@ -37,7 +37,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 添加新的文本片段并检测完整的命令
-        /// 支持流式接管，但会先处理缓冲区中的完整命令
+        /// 优先检测接管请求，确保流式接管能够正常工作
         /// </summary>
         /// <param name="chunk">新接收的文本片段</param>
         public async void AddChunk(string chunk)
@@ -48,10 +48,7 @@ namespace VPetLLM.Handlers
             // 先添加到缓冲区
             _buffer.Append(chunk);
             
-            // 先处理缓冲区中的完整命令（确保顺序执行）
-            ProcessCompleteCommands();
-
-            // 如果当前没有接管，检查是否需要启动接管
+            // 优先检测接管请求（在处理完整命令之前）
             if (!_takeoverManager.IsTakingOver)
             {
                 var currentBuffer = _buffer.ToString();
@@ -73,6 +70,8 @@ namespace VPetLLM.Handlers
                         var pluginStartIndex = takeoverMatch.Index;
                         var pluginContent = currentBuffer.Substring(pluginStartIndex);
                         
+                        Utils.Logger.Log($"StreamingCommandProcessor: 检测到支持接管的插件 {pluginName}，准备启动接管");
+                        
                         // 启动接管（传递完整的 plugin 命令内容）
                         var processedChunk = await _takeoverManager.ProcessChunkAsync(pluginContent);
                         
@@ -83,6 +82,7 @@ namespace VPetLLM.Handlers
                             _buffer.Append(currentBuffer.Substring(0, pluginStartIndex));
                             _lastProcessedIndex = 0;
                             Utils.Logger.Log($"StreamingCommandProcessor: 插件 {_takeoverManager.CurrentTakeoverPlugin} 开始接管");
+                            return; // 接管成功，不再处理完整命令
                         }
                     }
                 }
@@ -91,7 +91,11 @@ namespace VPetLLM.Handlers
             {
                 // 如果正在接管中，继续传递内容给接管插件
                 await _takeoverManager.ProcessChunkAsync(chunk);
+                return; // 接管中，不处理完整命令
             }
+            
+            // 只有在没有接管的情况下，才处理完整命令
+            ProcessCompleteCommands();
         }
 
         /// <summary>
@@ -226,12 +230,14 @@ namespace VPetLLM.Handlers
                     // 执行命令（同步调用，等待完成）
                     Utils.Logger.Log($"StreamingCommandProcessor: 开始处理命令: {command}");
                     
+                    // 获取插件实例（用于后续操作）
+                    var pluginInstance = _plugin ?? VPetLLM.Instance;
+                    
                     // 如果有预下载的音频文件，通过特殊方式传递给处理器
                     if (!string.IsNullOrEmpty(audioFile))
                     {
                         // 将音频文件路径临时存储，供SmartMessageProcessor使用
-                        var plugin = _plugin ?? VPetLLM.Instance;
-                        if (plugin?.TalkBox?.MessageProcessor != null)
+                        if (pluginInstance?.TalkBox?.MessageProcessor != null)
                         {
                             // 通过自定义属性传递音频文件路径
                             Utils.Logger.Log($"StreamingCommandProcessor: 传递预下载音频文件: {audioFile}");
@@ -241,11 +247,21 @@ namespace VPetLLM.Handlers
                     
                     _onCompleteCommand?.Invoke(command);
                     
-                    // 智能等待命令执行完成
-                    Utils.Logger.Log($"StreamingCommandProcessor: 开始等待命令完成: {command}");
-                    await WaitForCommandCompleteAsync(command);
-                    Utils.Logger.Log($"StreamingCommandProcessor: 命令处理完成: {command}");
-
+                    // 检查是否启用实况模式
+                    bool isLiveMode = pluginInstance?.Settings?.EnableLiveMode ?? false;
+                    
+                    if (isLiveMode)
+                    {
+                        // 实况模式：直接返回，不等待命令完成
+                        Utils.Logger.Log($"StreamingCommandProcessor: 实况模式 - 命令已发送，不等待完成: {command}");
+                    }
+                    else
+                    {
+                        // 队列模式：等待命令执行完成
+                        Utils.Logger.Log($"StreamingCommandProcessor: 队列模式 - 开始等待命令完成: {command}");
+                        await WaitForCommandCompleteAsync(command);
+                        Utils.Logger.Log($"StreamingCommandProcessor: 队列模式 - 命令处理完成: {command}");
+                    }
                 }
             }
             catch
