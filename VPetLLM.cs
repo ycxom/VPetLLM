@@ -159,7 +159,7 @@ namespace VPetLLM
         private readonly List<PurchaseItem> _pendingPurchases = new();
         private readonly object _purchaseLock = new object();
         private System.Timers.Timer? _purchaseTimer;
-        private static readonly TimeSpan _batchProcessTime = TimeSpan.FromMilliseconds(1000); // 1秒批处理时间
+        private static readonly TimeSpan _batchProcessTime = TimeSpan.FromMilliseconds(500); // 优化：从1秒减少到500ms，提高响应速度
 
         /// <summary>
         /// 购买物品信息

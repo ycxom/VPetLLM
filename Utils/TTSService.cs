@@ -617,6 +617,7 @@ namespace VPetLLM.Utils
 
         /// <summary>
         /// 播放音频文件
+        /// 优化：使用BeginInvoke异步调度UI操作，减少阻塞
         /// </summary>
         /// <param name="filePath">音频文件路径</param>
         /// <returns></returns>
@@ -636,7 +637,8 @@ namespace VPetLLM.Utils
 
                 var tcs = new TaskCompletionSource<bool>();
 
-                await Application.Current.Dispatcher.InvokeAsync(() =>
+                // 优化：使用BeginInvoke异步调度，避免阻塞当前线程
+                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     try
                     {
@@ -732,17 +734,17 @@ namespace VPetLLM.Utils
 
                         tcs.TrySetResult(false);
                     }
-                });
+                }), System.Windows.Threading.DispatcherPriority.Normal);
 
-                // 等待播放完成
+                // 等待播放完成（使用ConfigureAwait(false)避免UI线程阻塞）
                 Logger.Log($"TTS: 等待音频播放完成: {filePath}");
-                var playbackResult = await tcs.Task;
+                var playbackResult = await tcs.Task.ConfigureAwait(false);
                 Logger.Log($"TTS: 音频播放结果: {playbackResult}, 文件: {filePath}");
 
-                // 清理临时文件（延迟删除）
+                // 清理临时文件（延迟删除，优化：减少延迟到1秒）
                 _ = Task.Run(async () =>
                 {
-                    await Task.Delay(2000); // 等待2秒后删除，确保播放完成
+                    await Task.Delay(1000).ConfigureAwait(false); // 优化：从2秒减少到1秒
                     try
                     {
                         if (File.Exists(filePath) && filePath.Contains("VPetLLM_TTS_"))

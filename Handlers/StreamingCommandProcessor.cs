@@ -153,11 +153,24 @@ namespace VPetLLM.Handlers
                         // 更新已处理的位置
                         _lastProcessedIndex = match.Index + match.Length;
                         
+                        // 记录检测到的命令类型
+                        var commandType = GetCommandType(fullCommand);
+                        Utils.Logger.Log($"StreamingCommandProcessor: 检测到完整命令类型: {commandType}, 命令: {fullCommand.Substring(0, Math.Min(fullCommand.Length, 100))}...");
+                        
                         // 启动队列处理（如果还没有在处理）
                         _ = ProcessQueueAsync();
                     }
                 }
             }
+        }
+        
+        /// <summary>
+        /// 获取命令类型
+        /// </summary>
+        private string GetCommandType(string command)
+        {
+            var match = Regex.Match(command, @"\[:(\w+)");
+            return match.Success ? match.Groups[1].Value : "unknown";
         }
 
         /// <summary>
@@ -177,6 +190,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 异步处理命令队列，确保命令按顺序执行
+        /// 优化：使用ConfigureAwait(false)避免UI线程阻塞
         /// </summary>
         private async Task ProcessQueueAsync()
         {
@@ -204,14 +218,14 @@ namespace VPetLLM.Handlers
 
                     var command = commandTask.Command;
                     
-                    // 如果有TTS下载任务，等待下载完成
+                    // 如果有TTS下载任务，等待下载完成（不阻塞UI线程）
                     string audioFile = null;
                     if (commandTask.TTSDownloadTask != null)
                     {
                         try
                         {
                             Utils.Logger.Log($"StreamingCommandProcessor: 等待TTS音频下载完成: {command}");
-                            audioFile = await commandTask.TTSDownloadTask;
+                            audioFile = await commandTask.TTSDownloadTask.ConfigureAwait(false);
                             if (!string.IsNullOrEmpty(audioFile))
                             {
                                 Utils.Logger.Log($"StreamingCommandProcessor: TTS音频下载完成: {audioFile}");
@@ -257,9 +271,9 @@ namespace VPetLLM.Handlers
                     }
                     else
                     {
-                        // 队列模式：等待命令执行完成
+                        // 队列模式：等待命令执行完成（不阻塞UI线程）
                         Utils.Logger.Log($"StreamingCommandProcessor: 队列模式 - 开始等待命令完成: {command}");
-                        await WaitForCommandCompleteAsync(command);
+                        await WaitForCommandCompleteAsync(command).ConfigureAwait(false);
                         Utils.Logger.Log($"StreamingCommandProcessor: 队列模式 - 命令处理完成: {command}");
                     }
                 }
@@ -305,6 +319,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 智能等待命令执行完成
+        /// 优化：减少轮询频率，使用更高效的等待策略
         /// </summary>
         private async Task WaitForCommandCompleteAsync(string command)
         {
@@ -313,30 +328,55 @@ namespace VPetLLM.Handlers
             if (string.IsNullOrEmpty(command))
             {
                 Utils.Logger.Log("StreamingCommandProcessor.WaitForCommandCompleteAsync: 命令为空，跳过");
-                await Task.Delay(100);
+                await Task.Delay(50).ConfigureAwait(false);
                 return;
             }
+
+            // 获取命令类型
+            var match = Regex.Match(command, @"\[:(\w+)");
+            if (!match.Success)
+            {
+                await Task.Delay(50).ConfigureAwait(false);
+                return;
+            }
+            var commandType = match.Groups[1].Value.ToLower();
+            Utils.Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: 命令类型: {commandType}");
 
             // 尝试通过静态实例访问 MessageProcessor
             var pluginInstance = _plugin ?? VPetLLM.Instance;
             Utils.Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: plugin = {(pluginInstance != null ? "有效" : "null")}, TalkBox = {(pluginInstance?.TalkBox != null ? "有效" : "null")}, MessageProcessor = {(pluginInstance?.TalkBox?.MessageProcessor != null ? "有效" : "null")}");
             
-            // 等待 SmartMessageProcessor 完成当前命令的处理
+            // 对于plugin和tool命令，使用特殊的等待逻辑
+            if (commandType == "plugin" || commandType == "tool")
+            {
+                Utils.Logger.Log($"StreamingCommandProcessor: 检测到{commandType}命令，使用特殊等待逻辑");
+                
+                // 等待一小段时间让命令开始执行
+                await Task.Delay(50).ConfigureAwait(false);
+                
+                // 简单等待，确保plugin/tool有足够时间执行（优化：减少到1.5秒）
+                await Task.Delay(1500).ConfigureAwait(false);
+                
+                Utils.Logger.Log($"StreamingCommandProcessor: {commandType}命令等待完成");
+                return;
+            }
+            
+            // 等待 SmartMessageProcessor 完成当前命令的处理（主要用于talk/say命令）
             if (pluginInstance?.TalkBox?.MessageProcessor != null)
             {
                 // 先等待一小段时间，让消息有机会开始处理
-                await Task.Delay(50);
+                await Task.Delay(30).ConfigureAwait(false);
                 
                 int maxWaitTime = 60000; // 最多等待 60 秒
-                int checkInterval = 100; // 每 100ms 检查一次
+                int checkInterval = 200; // 优化：增加检查间隔到200ms，减少CPU占用
                 int elapsedTime = 0;
                 int startWaitTime = 0;
 
-                // 等待消息开始处理（最多等待5秒）
-                while (!pluginInstance.TalkBox.MessageProcessor.IsProcessing && startWaitTime < 5000)
+                // 等待消息开始处理（最多等待3秒，优化：从5秒减少到3秒）
+                while (!pluginInstance.TalkBox.MessageProcessor.IsProcessing && startWaitTime < 3000)
                 {
-                    await Task.Delay(50);
-                    startWaitTime += 50;
+                    await Task.Delay(100).ConfigureAwait(false);
+                    startWaitTime += 100;
                 }
 
                 if (startWaitTime > 0)
@@ -344,10 +384,10 @@ namespace VPetLLM.Handlers
                     Utils.Logger.Log($"StreamingCommandProcessor: 等待消息开始处理，耗时: {startWaitTime}ms");
                 }
 
-                // 等待消息处理完成
+                // 等待消息处理完成（优化：使用更长的检查间隔）
                 while (pluginInstance.TalkBox.MessageProcessor.IsProcessing && elapsedTime < maxWaitTime)
                 {
-                    await Task.Delay(checkInterval);
+                    await Task.Delay(checkInterval).ConfigureAwait(false);
                     elapsedTime += checkInterval;
                 }
 
@@ -358,42 +398,40 @@ namespace VPetLLM.Handlers
             }
             else
             {
-                // 如果无法访问 MessageProcessor，使用传统的等待策略
+                // 如果无法访问 MessageProcessor，使用传统的等待策略（优化：减少延迟时间）
                 Utils.Logger.Log("StreamingCommandProcessor: 无法访问 MessageProcessor，使用传统等待策略");
-                var match = Regex.Match(command, @"\[:(\w+)");
-                if (!match.Success)
-                {
-                    await Task.Delay(100);
-                    return;
-                }
-
-                var commandType = match.Groups[1].Value.ToLower();
 
                 // 根据命令类型采用不同的等待策略
                 switch (commandType)
                 {
                     case "say":
                     case "talk":
-                        // 语音命令：使用保守的延迟估算
-                        await Task.Delay(3000);
+                        // 语音命令：优化延迟估算（从3秒减少到2秒）
+                        await Task.Delay(2000).ConfigureAwait(false);
                         break;
                     
                     case "action":
                     case "move":
-                        // 动作命令：等待动画完成
-                        await Task.Delay(1000);
+                        // 动作命令：等待动画完成（从1秒减少到800ms）
+                        await Task.Delay(800).ConfigureAwait(false);
                         break;
                     
                     case "buy":
                     case "happy":
                     case "health":
                     case "exp":
-                        // 状态命令：短暂延迟
-                        await Task.Delay(500);
+                        // 状态命令：短暂延迟（从500ms减少到300ms）
+                        await Task.Delay(300).ConfigureAwait(false);
+                        break;
+                    
+                    case "plugin":
+                    case "tool":
+                        // Plugin/Tool命令：优化等待时间（从2秒减少到1.5秒）
+                        await Task.Delay(1500).ConfigureAwait(false);
                         break;
                     
                     default:
-                        await Task.Delay(100);
+                        await Task.Delay(50).ConfigureAwait(false);
                         break;
                 }
             }

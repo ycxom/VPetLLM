@@ -37,6 +37,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 处理AI回复消息，解析动作指令并按顺序执行
+        /// 优化：使用ConfigureAwait(false)避免UI线程阻塞
         /// </summary>
         /// <param name="response">AI回复内容</param>
         public async Task ProcessMessageAsync(string response)
@@ -73,7 +74,7 @@ namespace VPetLLM.Handlers
                     downloadTasks = StartParallelTTSDownload(messageSegments);
                 }
 
-                // 按顺序处理每个片段，使用智能等待机制
+                // 按顺序处理每个片段，使用智能等待机制（优化：不阻塞UI线程）
                 int talkIndex = 0;
                 try
                 {
@@ -81,11 +82,11 @@ namespace VPetLLM.Handlers
                     {
                         if (segment.Type == SegmentType.Talk && downloadTasks != null)
                         {
-                            await ProcessTalkSegmentWithQueueAsync(segment, downloadTasks, talkIndex++);
+                            await ProcessTalkSegmentWithQueueAsync(segment, downloadTasks, talkIndex++).ConfigureAwait(false);
                         }
                         else
                         {
-                            await ProcessSegmentAsync(segment, null);
+                            await ProcessSegmentAsync(segment, null).ConfigureAwait(false);
                         }
                     }
                 }
@@ -287,6 +288,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 等待指定索引的音频下载完成
+        /// 优化：使用ConfigureAwait(false)避免UI线程阻塞
         /// </summary>
         private async Task<string> WaitForTTSDownloadAsync(List<TTSDownloadTask> downloadTasks, int targetIndex)
         {
@@ -306,7 +308,7 @@ namespace VPetLLM.Handlers
             try
             {
                 Logger.Log($"SmartMessageProcessor: 等待任务 #{targetIndex} 下载完成...");
-                var audioFile = await targetTask.DownloadTask;
+                var audioFile = await targetTask.DownloadTask.ConfigureAwait(false);
                 targetTask.AudioFile = audioFile;
                 targetTask.IsCompleted = true;
 
@@ -324,6 +326,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 使用智能队列处理talk动作片段
+        /// 优化：使用ConfigureAwait(false)避免UI线程阻塞
         /// </summary>
         private async Task ProcessTalkSegmentWithQueueAsync(MessageSegment segment, List<TTSDownloadTask> downloadTasks, int talkIndex)
         {
@@ -347,9 +350,9 @@ namespace VPetLLM.Handlers
                     }
                     else if (downloadTasks != null)
                     {
-                        // 等待当前索引的音频下载完成
+                        // 等待当前索引的音频下载完成（不阻塞UI线程）
                         Logger.Log($"SmartMessageProcessor: 等待音频 #{talkIndex} 下载完成...");
-                        audioFile = await WaitForTTSDownloadAsync(downloadTasks, talkIndex);
+                        audioFile = await WaitForTTSDownloadAsync(downloadTasks, talkIndex).ConfigureAwait(false);
                     }
 
                     if (!string.IsNullOrEmpty(audioFile))
@@ -360,22 +363,22 @@ namespace VPetLLM.Handlers
                         var bubbleTask = ExecuteActionAsync(segment.Content);
                         Logger.Log($"SmartMessageProcessor: 气泡显示任务已启动");
 
-                        // 播放音频（等待播放完成）
-                        await _plugin.TTSService.PlayAudioFileDirectAsync(audioFile);
+                        // 播放音频（等待播放完成，不阻塞UI线程）
+                        await _plugin.TTSService.PlayAudioFileDirectAsync(audioFile).ConfigureAwait(false);
                         Logger.Log($"SmartMessageProcessor: 音频 #{talkIndex} 播放完成");
 
                         // 等待气泡显示完成
-                        await bubbleTask;
+                        await bubbleTask.ConfigureAwait(false);
                         Logger.Log($"SmartMessageProcessor: 音频和气泡 #{talkIndex} 处理完成");
                         
                         // 等待 EdgeTTS 或其他 TTS 插件播放完成
-                        await WaitForVPetVoiceCompleteAsync();
+                        await WaitForVPetVoiceCompleteAsync().ConfigureAwait(false);
                     }
                     else
                     {
                         Logger.Log($"SmartMessageProcessor: 音频 #{talkIndex} 不可用，仅显示气泡");
                         // 音频不可用，仅显示气泡
-                        await ExecuteActionAsync(segment.Content);
+                        await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
                     }
                 }
                 catch (Exception ex)
@@ -383,18 +386,19 @@ namespace VPetLLM.Handlers
                     Logger.Log($"SmartMessageProcessor: 处理音频 #{talkIndex} 失败: {ex.Message}");
                     Logger.Log($"SmartMessageProcessor: 异常堆栈: {ex.StackTrace}");
                     // 失败时仍然显示气泡
-                    await ExecuteActionAsync(segment.Content);
+                    await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
                 }
             }
             else
             {
                 // 如果没有文本内容，直接执行动作
-                await ExecuteActionAsync(segment.Content);
+                await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
             }
         }
 
         /// <summary>
         /// 等待 VPet 主程序的语音播放完成（EdgeTTS 或其他 TTS 插件）
+        /// 优化：减少轮询频率，使用ConfigureAwait(false)避免UI线程阻塞
         /// </summary>
         private async Task WaitForVPetVoiceCompleteAsync()
         {
@@ -414,14 +418,14 @@ namespace VPetLLM.Handlers
                     return;
                 }
 
-                // 等待 VPet 主程序的语音播放完成
+                // 等待 VPet 主程序的语音播放完成（优化：增加检查间隔到200ms，减少CPU占用）
                 int maxWaitTime = 30000; // 最多等待 30 秒
-                int checkInterval = 100; // 每 100ms 检查一次
+                int checkInterval = 200; // 优化：从100ms增加到200ms
                 int elapsedTime = 0;
 
                 while (_plugin.MW.Main.PlayingVoice && elapsedTime < maxWaitTime)
                 {
-                    await Task.Delay(checkInterval);
+                    await Task.Delay(checkInterval).ConfigureAwait(false);
                     elapsedTime += checkInterval;
                 }
 
