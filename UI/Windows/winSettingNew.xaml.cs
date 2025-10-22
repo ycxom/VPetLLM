@@ -1221,10 +1221,11 @@ namespace VPetLLM.UI.Windows
                     _plugin.Settings.Tools.Add(newTool);
                 });
 
+                var dataGrid = (DataGrid)this.FindName("DataGrid_Tools");
                 Dispatcher.Invoke(() =>
                 {
-                    ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
-                    ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
+                    dataGrid.ItemsSource = null;
+                    dataGrid.ItemsSource = _plugin.Settings.Tools;
                 });
             }
             finally
@@ -1240,19 +1241,22 @@ namespace VPetLLM.UI.Windows
 
             try
             {
-                await Task.Run(() =>
+                var dataGrid = (DataGrid)this.FindName("DataGrid_Tools");
+                var selectedTool = dataGrid.SelectedItem as Setting.ToolSetting;
+
+                if (selectedTool != null)
                 {
-                    if (((DataGrid)this.FindName("DataGrid_Tools")).SelectedItem is Setting.ToolSetting selectedTool)
+                    await Task.Run(() =>
                     {
                         _plugin.Settings.Tools.Remove(selectedTool);
-                    }
-                });
+                    });
 
-                Dispatcher.Invoke(() =>
-                {
-                    ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = null;
-                    ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
-                });
+                    Dispatcher.Invoke(() =>
+                    {
+                        dataGrid.ItemsSource = null;
+                        dataGrid.ItemsSource = _plugin.Settings.Tools;
+                    });
+                }
             }
             finally
             {
@@ -1693,12 +1697,13 @@ namespace VPetLLM.UI.Windows
             if (FindName("Button_DeleteTool") is Button buttonDeleteTool) buttonDeleteTool.Content = LanguageHelper.Get("Tools.Delete", langCode);
             if (FindName("DataGrid_Tools") is DataGrid dataGridTools)
             {
-                if (dataGridTools.Columns.Count >= 4)
+                if (dataGridTools.Columns.Count >= 5)
                 {
-                    dataGridTools.Columns[0].Header = LanguageHelper.Get("Tools.Name", langCode) ?? "名称";
-                    dataGridTools.Columns[1].Header = LanguageHelper.Get("Tools.URL", langCode) ?? "URL";
-                    dataGridTools.Columns[2].Header = LanguageHelper.Get("Tools.ApiKey", langCode) ?? "API Key";
+                    dataGridTools.Columns[0].Header = LanguageHelper.Get("Tools.Enabled", langCode) ?? "启用";
+                    dataGridTools.Columns[1].Header = LanguageHelper.Get("Tools.Name", langCode) ?? "名称";
+                    dataGridTools.Columns[2].Header = LanguageHelper.Get("Tools.URL", langCode) ?? "URL";
                     dataGridTools.Columns[3].Header = LanguageHelper.Get("Tools.Description", langCode) ?? "描述";
+                    dataGridTools.Columns[4].Header = LanguageHelper.Get("Tools.ApiKey", langCode) ?? "API Key";
                 }
             }
 

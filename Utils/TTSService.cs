@@ -638,7 +638,7 @@ namespace VPetLLM.Utils
                 var tcs = new TaskCompletionSource<bool>();
 
                 // 优化：使用BeginInvoke异步调度，避免阻塞当前线程
-                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                _ = Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     try
                     {
@@ -757,7 +757,13 @@ namespace VPetLLM.Utils
                     {
                         Logger.Log($"TTS: 删除临时文件失败: {ex.Message}");
                     }
-                });
+                }).ContinueWith(t =>
+                {
+                    if (t.IsFaulted && t.Exception != null)
+                    {
+                        Logger.Log($"TTS: 清理临时文件任务异常: {t.Exception.GetBaseException().Message}");
+                    }
+                }, TaskScheduler.Default);
             }
             catch (Exception ex)
             {

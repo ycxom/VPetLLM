@@ -1436,118 +1436,83 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <!-- 工具管理头部 -->
+                        <!-- 简化的工具管理头部 -->
                         <Border Background="{StaticResource ControlBackgroundBrush}"
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
-                                CornerRadius="8"
-                                Padding="20,16"
-                                Margin="0,0,0,20">
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock x:Name="TextBlock_ToolsManagement"
-                                        Text="{utils:Localize KeyPath=Tools.Management}"
-                                        FontSize="18"
-                                        FontWeight="SemiBold"
-                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                        Margin="0,0,0,4"/>
-                                <TextBlock x:Name="TextBlock_ToolsManagementDescription"
-                                        Text="{utils:Localize KeyPath=Tools.ManagementDescription}"
-                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                        FontSize="13"/>
-                            </StackPanel>
+                                CornerRadius="6"
+                                Padding="16,12"
+                                Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 标题区域 -->
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TextBlock_ToolsManagement"
+                                            Text="{utils:Localize KeyPath=Tools.Management}"
+                                            FontSize="16"
+                                            FontWeight="SemiBold"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="TextBlock_ToolsManagementDescription"
+                                            Text="{utils:Localize KeyPath=Tools.ManagementDescription}"
+                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                            FontSize="12"/>
+                                </StackPanel>
+
+                                <!-- 操作按钮 -->
+                                <StackPanel Grid.Column="1" 
+                                           Orientation="Horizontal" 
+                                           VerticalAlignment="Center">
+                                    <Button x:Name="Button_AddTool"
+                                            Content="{utils:Localize KeyPath=Tools.Add}"
+                                            Margin="0,0,8,0"
+                                            Padding="12,6"
+                                            Click="Button_AddTool_Click"
+                                            Style="{StaticResource PrimaryButton}"/>
+                                    <Button x:Name="Button_DeleteTool"
+                                            Content="{utils:Localize KeyPath=Tools.Delete}"
+                                            Padding="12,6"
+                                            Click="Button_DeleteTool_Click"
+                                            Style="{StaticResource SecondaryButton}"/>
+                                </StackPanel>
+                            </Grid>
                         </Border>
 
-                        <!-- 工具列表 -->
-                        <Border Background="White"
+                        <!-- 简化的工具列表容器 -->
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
-                                CornerRadius="8"
+                                CornerRadius="6"
                                 Grid.Row="1">
                             <DataGrid x:Name="DataGrid_Tools"
                                     AutoGenerateColumns="False"
                                     CanUserAddRows="False"
-                                    RowHeight="70"
+                                    RowHeight="60"
                                     GridLinesVisibility="Horizontal"
                                     HeadersVisibility="Column"
-                                    AlternatingRowBackground="#FAFBFC"
+                                    AlternatingRowBackground="{StaticResource SecondaryBrush}"
                                     Background="Transparent"
                                     BorderThickness="0"
                                     Style="{StaticResource ModernDataGrid}"
-                                    ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}">
+                                    ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+                                    HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                                    SelectionMode="Single"
+                                    SelectionUnit="FullRow">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.Name}"
-                                    Binding="{Binding Name}"
-                                    Width="120"
-                                    MinWidth="100">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Padding" Value="12,8"/>
-                                                <Setter Property="FontWeight" Value="SemiBold"/>
-                                                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.URL}"
-                                    Binding="{Binding Url}"
-                                    Width="200"
-                                    MinWidth="150">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Padding" Value="12,8"/>
-                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                                <Setter Property="ToolTip" Value="{Binding Url}"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.ApiKey}"
-                                    Binding="{Binding ApiKey}"
-                                    Width="150"
-                                    MinWidth="120">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Padding" Value="12,8"/>
-                                                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                                <Setter Property="ToolTip" Value="{Binding ApiKey}"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.Description}"
-                                    Binding="{Binding Description}"
-                                    Width="*"
-                                    MinWidth="200">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Padding" Value="12,8"/>
-                                                <Setter Property="TextWrapping" Value="Wrap"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-                                                <Setter Property="LineHeight" Value="18"/>
-                                                <Setter Property="MaxHeight" Value="44"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Tools.Enabled}"
-                                    Width="80">
+                                    <!-- 简化的启用状态列 -->
+                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Tools.Enabled}" Width="60">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <Grid HorizontalAlignment="Stretch" 
-                                                  VerticalAlignment="Stretch">
-                                                    <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"
-                                                    Margin="0"
-                                                    Style="{StaticResource ModernCheckBox}"/>
-                                                </Grid>
+                                                <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"
+                                                         Style="{StaticResource ModernCheckBox}"/>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                         <DataGridTemplateColumn.HeaderStyle>
@@ -1556,53 +1521,75 @@
                                             </Style>
                                         </DataGridTemplateColumn.HeaderStyle>
                                     </DataGridTemplateColumn>
+
+                                    <!-- 工具名称列 -->
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.Name}"
+                                    Binding="{Binding Name}"
+                                    Width="150"
+                                    MinWidth="120">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Padding" Value="8,6"/>
+                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                <Setter Property="ToolTip" Value="{Binding Name}"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- URL 列 -->
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.URL}"
+                                    Binding="{Binding Url}"
+                                    Width="200"
+                                    MinWidth="150">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Padding" Value="8,6"/>
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                <Setter Property="ToolTip" Value="{Binding Url}"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- 工具描述列 -->
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.Description}"
+                                    Binding="{Binding Description}"
+                                    Width="*"
+                                    MinWidth="200">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Padding" Value="8,6"/>
+                                                <Setter Property="TextWrapping" Value="Wrap"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                                                <Setter Property="LineHeight" Value="18"/>
+                                                <Setter Property="MaxHeight" Value="44"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- ApiKey 列 -->
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Tools.ApiKey}"
+                                    Binding="{Binding ApiKey}"
+                                    Width="150"
+                                    MinWidth="120">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Padding" Value="8,6"/>
+                                                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="FontFamily" Value="Consolas"/>
+                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                <Setter Property="ToolTip" Value="{Binding ApiKey}"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
-                        </Border>
-
-                        <!-- 底部操作区域 -->
-                        <Border Background="{StaticResource ControlBackgroundBrush}"
-                                BorderBrush="{StaticResource BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8"
-                                Padding="20,12"
-                                Grid.Row="2"
-                                Margin="0,20,0,0">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="TextBlock_MCPToolsConfig"
-                                            Text="{utils:Localize KeyPath=Tools.MCPConfig}"
-                                            FontWeight="Medium"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"
-                                            Margin="0,0,0,2"/>
-                                    <TextBlock Text="{utils:Localize KeyPath=Tools.ToolsDescription}"
-                                            x:Name="TextBlock_ToolsDescription"
-                                            Foreground="{StaticResource SecondaryTextBrush}"
-                                            FontSize="12"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="1" 
-                                           Orientation="Horizontal" 
-                                           VerticalAlignment="Center">
-                                    <Button Content="{utils:Localize KeyPath=Tools.Add, Prefix=➕ }"
-                                            Click="Button_AddTool_Click"
-                                            Margin="0,0,12,0"
-                                            Padding="16,8"
-                                            x:Name="Button_AddTool"
-                                            Style="{StaticResource PrimaryButton}"/>
-                                    <Button Content="{utils:Localize KeyPath=Tools.Delete, Prefix=🗑️ }"
-                                            Click="Button_DeleteTool_Click"
-                                            Padding="16,8"
-                                            x:Name="Button_DeleteTool"
-                                            Style="{StaticResource SecondaryButton}"/>
-                                </StackPanel>
-                            </Grid>
                         </Border>
                     </Grid>
                 </Border>

@@ -1,5 +1,5 @@
 using System;
-using System.Text.RegularExpressions;
+using System.Linq;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
 using VPetLLM.Utils;
@@ -29,29 +29,56 @@ namespace VPetLLM.Handlers
                 if (!RateLimiter.TryAcquire("tool", 5, TimeSpan.FromMinutes(2)))
                 {
                     var stats = RateLimiter.GetStats("tool");
-                    Logger.Log($"ToolHandler: 触发熔断 - 工具调用超限（跨消息）");
+                    VPetLLM.Instance.Log($"ToolHandler: 触发熔断 - 工具调用超限（跨消息）");
                     if (VPetLLM.Instance?.Settings?.RateLimiter?.LogRateLimitEvents == true && stats != null)
                     {
-                        Logger.Log($"  当前: {stats.CurrentCount}/{config?.MaxCount}, 已阻止: {stats.BlockedRequests}次");
+                        VPetLLM.Instance.Log($"  当前: {stats.CurrentCount}/{config?.MaxCount}, 已阻止: {stats.BlockedRequests}次");
                     }
                     return;
                 }
             }
 
-            var match = new Regex(@"(.*?)\((.*)\)").Match(value);
-            if (match.Success)
-            {
-                var toolName = match.Groups[1].Value;
-                var arguments = match.Groups[2].Value;
-                var tool = VPetLLM.Instance.Plugins.Find(p => p.Name.Replace(" ", "_").ToLower() == toolName);
-                if (tool is IActionPlugin actionPlugin)
-                {
-                    var result = await actionPlugin.Function(arguments);
+            VPetLLM.Instance.Log($"ToolHandler: Received value: {value}");
+            var firstParen = value.IndexOf('(');
+            var lastParen = value.LastIndexOf(')');
 
-                    // 旧逻辑：直接写入History的tool消息会触发二次会话，这里改为进入2秒聚合，统一回灌
-                    var formatted = $"[Tool.{toolName}: \"{result}\"]";
-                    ResultAggregator.Enqueue(formatted);
+            if (firstParen != -1 && lastParen != -1 && lastParen > firstParen)
+            {
+                var toolName = value.Substring(0, firstParen).Trim();
+                var arguments = value.Substring(firstParen + 1, lastParen - firstParen - 1);
+                VPetLLM.Instance.Log($"ToolHandler: Parsed tool name: {toolName}, arguments: {arguments}");
+                var tool = VPetLLM.Instance.Plugins.Find(p => p.Name.Replace(" ", "_").ToLower() == toolName.ToLower());
+                if (tool != null)
+                {
+                    if (!tool.Enabled)
+                    {
+                        VPetLLM.Instance.Log($"ToolHandler: Tool '{tool.Name}' is disabled.");
+                        return;
+                    }
+                    VPetLLM.Instance.Log($"ToolHandler: Found tool: {tool.Name}");
+                    if (tool is IActionPlugin actionPlugin)
+                    {
+                        var result = await actionPlugin.Function(arguments);
+                        var formattedResult = $"[Tool Result: {toolName}] {result}";
+                        VPetLLM.Instance.Log($"ToolHandler: Tool function returned: {result}, formatted: {formattedResult}");
+
+                        // 聚合到2秒窗口，统一回灌，避免连续触发LLM
+                        ResultAggregator.Enqueue(formattedResult);
+                    }
                 }
+                else
+                {
+                    VPetLLM.Instance.Log($"ToolHandler: Tool not found: {toolName}");
+                    var availableTools = string.Join(", ", VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => p.Name));
+                    var errorMessage = $"[SYSTEM] Error: Tool '{toolName}' not found. Available tools are: {availableTools}";
+
+                    // 错误信息也进入聚合，避免多次触发LLM
+                    ResultAggregator.Enqueue(errorMessage);
+                }
+            }
+            else
+            {
+                VPetLLM.Instance.Log($"ToolHandler: Parentheses not found or mismatched for value: {value}");
             }
         }
 
@@ -60,5 +87,23 @@ namespace VPetLLM.Handlers
             return Task.CompletedTask;
         }
         public int GetAnimationDuration(string animationName) => 0;
+
+        /// <summary>
+        /// 供工具直接调用的方法，确保工具消息经过正确的格式化
+        /// </summary>
+        public static void SendToolMessage(string toolName, string message)
+        {
+            if (string.IsNullOrEmpty(toolName) || string.IsNullOrEmpty(message))
+            {
+                VPetLLM.Instance.Log("Tool message skipped: tool name or message is empty");
+                return;
+            }
+
+            var formattedResult = $"[Tool Result: {toolName}] {message}";
+            VPetLLM.Instance.Log($"Tool message formatted: {formattedResult}");
+
+            // 使用聚合器确保消息正确处理
+            ResultAggregator.Enqueue(formattedResult);
+        }
     }
 }
