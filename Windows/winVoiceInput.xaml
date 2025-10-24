@@ -6,165 +6,252 @@
         xmlns:utils="clr-namespace:VPetLLM.Utils"
         mc:Ignorable="d"
         Title="{utils:Localize KeyPath=VoiceInput.Title, Default=语音输入}"
-        Height="300" Width="400"
+        Height="Auto" Width="420"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Topmost="True"
-        Background="#F5F5F5"
+        Background="Transparent"
         WindowStyle="None"
         AllowsTransparency="True"
-        BorderBrush="#2196F3"
-        BorderThickness="2">
+        SizeToContent="Height"
+        ShowInTaskbar="False">
     
     <Window.Resources>
-        <Style x:Key="ModernButton" TargetType="Button">
-            <Setter Property="Background" Value="#2196F3"/>
+        <!-- Windows 11 风格按钮 -->
+        <Style x:Key="Win11Button" TargetType="Button">
+            <Setter Property="Background" Value="#0078D4"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="Padding" Value="20,10"/>
             <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
+                        <Border x:Name="border" 
+                                Background="{TemplateBinding Background}"
                                 CornerRadius="4"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#005A9E"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#004275"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="#CCCCCC"/>
+                                <Setter Property="Foreground" Value="#666666"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#1976D2"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDBDBD"/>
-                    <Setter Property="Cursor" Value="Arrow"/>
-                </Trigger>
-            </Style.Triggers>
         </Style>
 
-        <Style x:Key="RecordingButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Background" Value="#F44336"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#D32F2F"/>
-                </Trigger>
-            </Style.Triggers>
+        <Style x:Key="Win11SecondaryButton" TargetType="Button" BasedOn="{StaticResource Win11Button}">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#1F1F1F"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#D1D1D1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" 
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#F3F3F3"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#E5E5E5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Windows 11 风格文本框 -->
+        <Style x:Key="Win11TextBox" TargetType="TextBox">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#1F1F1F"/>
+            <Setter Property="BorderBrush" Value="#D1D1D1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ScrollViewer x:Name="PART_ContentHost" 
+                                        Margin="{TemplateBinding Padding}"
+                                        VerticalScrollBarVisibility="Auto"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#8A8A8A"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#0078D4"/>
+                                <Setter TargetName="border" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
     <Grid>
-        <!-- 标题栏 -->
-        <Grid Height="40" VerticalAlignment="Top" Background="#2196F3" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-            <TextBlock Text="{utils:Localize KeyPath=VoiceInput.Title, Default=语音输入}" 
-                       Foreground="White" 
-                       FontSize="16" 
-                       FontWeight="Bold"
-                       VerticalAlignment="Center" 
-                       Margin="15,0"/>
-            <Button Content="✕" 
-                    Width="40" 
-                    Height="40" 
-                    HorizontalAlignment="Right"
-                    Background="Transparent"
-                    Foreground="White"
-                    BorderThickness="0"
-                    FontSize="20"
-                    FontWeight="Bold"
-                    Click="CloseButton_Click"
-                    Cursor="Hand">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#1976D2"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-            </Button>
-        </Grid>
+        <!-- Windows 11 风格气泡框 -->
+        <Border x:Name="BubbleContainer"
+                Background="White"
+                CornerRadius="12"
+                Padding="0"
+                Margin="12"
+                MouseLeftButtonDown="BubbleContainer_MouseLeftButtonDown"
+                Cursor="SizeAll">
+            <Border.Effect>
+                <DropShadowEffect Color="#000000" 
+                                  Direction="270" 
+                                  ShadowDepth="2" 
+                                  BlurRadius="20" 
+                                  Opacity="0.15"/>
+            </Border.Effect>
 
-        <!-- 主内容区 -->
-        <StackPanel Margin="20,60,20,20" VerticalAlignment="Center">
-            <!-- 状态指示器 -->
-            <Grid Height="80" Margin="0,0,0,20">
-                <Ellipse x:Name="StatusIndicator" 
-                         Width="60" 
-                         Height="60" 
-                         Fill="#4CAF50"
-                         HorizontalAlignment="Center"/>
-                <Ellipse x:Name="RecordingPulse" 
-                         Width="60" 
-                         Height="60" 
-                         Fill="#F44336"
-                         HorizontalAlignment="Center"
-                         Visibility="Collapsed">
-                    <Ellipse.RenderTransform>
-                        <ScaleTransform x:Name="PulseTransform" ScaleX="1" ScaleY="1" CenterX="30" CenterY="30"/>
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-                <TextBlock x:Name="MicIcon" 
-                           Text="🎤" 
-                           FontSize="32" 
-                           HorizontalAlignment="Center" 
-                           VerticalAlignment="Center"/>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- 录音状态面板 -->
+                <Grid x:Name="RecordingPanel" Grid.Row="0" Visibility="Visible">
+                    <StackPanel Margin="24,24,24,24">
+                        <!-- 麦克风图标和动画 -->
+                        <Grid Height="80" Margin="0,0,0,16">
+                            <Ellipse x:Name="RecordingPulse" 
+                                     Width="64" 
+                                     Height="64" 
+                                     Fill="#0078D4"
+                                     Opacity="0.2"
+                                     HorizontalAlignment="Center"
+                                     Visibility="Collapsed">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform x:Name="PulseTransform" ScaleX="1" ScaleY="1" CenterX="32" CenterY="32"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse Width="64" 
+                                     Height="64" 
+                                     Fill="#F3F3F3"
+                                     HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="MicIcon" 
+                                       Text="🎤" 
+                                       FontSize="32" 
+                                       HorizontalAlignment="Center" 
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- 状态文本 -->
+                        <TextBlock x:Name="StatusText" 
+                                   Text="{utils:Localize KeyPath=VoiceInput.Ready, Default=准备就绪}"
+                                   FontSize="15" 
+                                   FontFamily="Segoe UI"
+                                   TextAlignment="Center" 
+                                   Foreground="#1F1F1F"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock x:Name="StatusHint" 
+                                   Text="{utils:Localize KeyPath=VoiceInput.Hint, Default=点击麦克风开始说话}"
+                                   FontSize="13" 
+                                   FontFamily="Segoe UI"
+                                   TextAlignment="Center" 
+                                   Foreground="#707070"
+                                   Margin="0,0,0,20"/>
+
+                        <!-- 按钮区 -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Button x:Name="RecordButton" 
+                                    Content="{utils:Localize KeyPath=VoiceInput.StartRecording, Default=开始录音}"
+                                    Style="{StaticResource Win11Button}"
+                                    Click="RecordButton_Click"
+                                    MinWidth="100"
+                                    Margin="0,0,8,0"/>
+                            <Button x:Name="CancelButton" 
+                                    Content="{utils:Localize KeyPath=VoiceInput.Cancel, Default=取消}"
+                                    Style="{StaticResource Win11SecondaryButton}"
+                                    Click="CancelButton_Click"
+                                    MinWidth="100"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+
+                <!-- 转录结果面板（可编辑模式） -->
+                <Grid x:Name="TranscriptionPanel" Grid.Row="0" Visibility="Collapsed">
+                    <StackPanel Margin="24,24,24,24">
+                        <!-- 标题 -->
+                        <TextBlock Text="{utils:Localize KeyPath=VoiceInput.Recognized, Default=识别结果}"
+                                   FontSize="15" 
+                                   FontFamily="Segoe UI"
+                                   FontWeight="SemiBold"
+                                   Foreground="#1F1F1F"
+                                   Margin="0,0,0,12"/>
+
+                        <!-- 可编辑文本框 -->
+                        <TextBox x:Name="TranscriptionTextBox" 
+                                 Style="{StaticResource Win11TextBox}"
+                                 TextWrapping="Wrap" 
+                                 AcceptsReturn="True"
+                                 MinHeight="80"
+                                 MaxHeight="200"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Margin="0,0,0,16"/>
+
+                        <!-- 按钮区 -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="ConfirmButton" 
+                                    Content="{utils:Localize KeyPath=VoiceInput.Confirm, Default=确定}"
+                                    Style="{StaticResource Win11Button}"
+                                    Click="ConfirmButton_Click"
+                                    MinWidth="100"
+                                    Margin="0,0,8,0"/>
+                            <Button x:Name="CancelEditButton" 
+                                    Content="{utils:Localize KeyPath=VoiceInput.Cancel, Default=取消}"
+                                    Style="{StaticResource Win11SecondaryButton}"
+                                    Click="CancelButton_Click"
+                                    MinWidth="100"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+
+                <!-- 快速显示面板（立即返回模式） -->
+                <Grid x:Name="QuickDisplayPanel" Grid.Row="0" Visibility="Collapsed">
+                    <StackPanel Margin="24,20,24,20">
+                        <TextBlock x:Name="QuickDisplayText" 
+                                   TextWrapping="Wrap" 
+                                   FontSize="14"
+                                   FontFamily="Segoe UI"
+                                   Foreground="#1F1F1F"
+                                   LineHeight="22"/>
+                    </StackPanel>
+                </Grid>
             </Grid>
-
-            <!-- 状态文本 -->
-            <TextBlock x:Name="StatusText" 
-                       Text="{utils:Localize KeyPath=VoiceInput.Ready, Default=准备就绪，点击开始录音}"
-                       FontSize="14" 
-                       TextAlignment="Center" 
-                       Foreground="#424242"
-                       Margin="0,0,0,20"
-                       TextWrapping="Wrap"/>
-
-            <!-- 转录文本 -->
-            <Border Background="White" 
-                    BorderBrush="#E0E0E0" 
-                    BorderThickness="1" 
-                    CornerRadius="4"
-                    Padding="10"
-                    Margin="0,0,0,20"
-                    MinHeight="60"
-                    Visibility="Collapsed"
-                    x:Name="TranscriptionPanel">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="80">
-                    <TextBlock x:Name="TranscriptionText" 
-                               TextWrapping="Wrap" 
-                               FontSize="13"
-                               Foreground="#212121"/>
-                </ScrollViewer>
-            </Border>
-
-            <!-- 按钮区 -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <Button x:Name="RecordButton" 
-                        Content="{utils:Localize KeyPath=VoiceInput.StartRecording, Default=开始录音}"
-                        Style="{StaticResource ModernButton}"
-                        Click="RecordButton_Click"
-                        Width="120"
-                        Margin="0,0,10,0"/>
-                <Button x:Name="CancelButton" 
-                        Content="{utils:Localize KeyPath=VoiceInput.Cancel, Default=取消}"
-                        Style="{StaticResource ModernButton}"
-                        Background="#757575"
-                        Click="CancelButton_Click"
-                        Width="120"/>
-            </StackPanel>
-        </StackPanel>
+        </Border>
     </Grid>
 </Window>

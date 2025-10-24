@@ -260,10 +260,7 @@ namespace VPetLLM.Utils
                 _recordingStream.Position = 0;
                 byte[] audioData = _recordingStream.ToArray();
                 
-                Logger.Log($"ASR: Audio data prepared, size: {audioData.Length} bytes");
-                
-                // 调试：保存音频文件到本地
-                SaveAudioForDebug(audioData);
+                Logger.Log($"ASR: Audio data prepared, size: {audioData.Length} bytes ({audioData.Length / 1024.0:F2} KB)");
                 
                 // 现在可以安全地 Dispose
                 _waveWriter?.Dispose();
@@ -316,8 +313,16 @@ namespace VPetLLM.Utils
 
 
 
+        private static bool _devicesLogged = false;
+
         private void LogAvailableRecordingDevices()
         {
+            // 只在程序启动时或用户刷新时记录设备列表
+            if (_devicesLogged)
+            {
+                return;
+            }
+
             try
             {
                 var deviceCount = WaveInEvent.DeviceCount;
@@ -333,6 +338,8 @@ namespace VPetLLM.Utils
                 {
                     Logger.Log("ASR: WARNING - No recording devices found!");
                 }
+
+                _devicesLogged = true;
             }
             catch (Exception ex)
             {
@@ -340,30 +347,15 @@ namespace VPetLLM.Utils
             }
         }
 
-        private void SaveAudioForDebug(byte[] audioData)
+        /// <summary>
+        /// 刷新设备列表（用户手动触发）
+        /// </summary>
+        public static void RefreshDeviceList()
         {
-            try
-            {
-                // 创建调试目录
-                var debugDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "ASR_Debug");
-                Directory.CreateDirectory(debugDir);
-
-                // 生成文件名（带时间戳）
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var filename = $"recording_{timestamp}.wav";
-                var filepath = Path.Combine(debugDir, filename);
-
-                // 保存音频文件
-                File.WriteAllBytes(filepath, audioData);
-                Logger.Log($"ASR: Debug audio saved to: {filepath}");
-                Logger.Log($"ASR: Audio file size: {audioData.Length} bytes ({audioData.Length / 1024.0:F2} KB)");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ASR: Failed to save debug audio: {ex.Message}");
-                // 不抛出异常，调试功能失败不影响主流程
-            }
+            _devicesLogged = false;
         }
+
+        // Debug 音频保存功能已移除，以减少不必要的文件生成
 
         private void CleanupRecording()
         {

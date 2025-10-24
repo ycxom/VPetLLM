@@ -1525,16 +1525,28 @@
             "jp": "音声入力"
         },
         "Ready": {
-            "en": "Ready, click to start recording",
-            "zh-hans": "准备就绪，点击开始录音",
-            "zh-hant": "準備就緒，點擊開始錄音",
-            "jp": "準備完了、クリックして録音開始"
+            "en": "Ready",
+            "zh-hans": "准备就绪",
+            "zh-hant": "準備就緒",
+            "jp": "準備完了"
+        },
+        "Hint": {
+            "en": "Click microphone to start speaking",
+            "zh-hans": "点击麦克风开始说话",
+            "zh-hant": "點擊麥克風開始說話",
+            "jp": "マイクをクリックして話し始める"
         },
         "Recording": {
             "en": "Recording...",
             "zh-hans": "正在录音...",
             "zh-hant": "正在錄音...",
             "jp": "録音中..."
+        },
+        "RecordingHint": {
+            "en": "Click again to stop recording",
+            "zh-hans": "再次点击停止录音",
+            "zh-hant": "再次點擊停止錄音",
+            "jp": "もう一度クリックして録音を停止"
         },
         "Processing": {
             "en": "Processing...",
@@ -1548,6 +1560,12 @@
             "zh-hant": "識別完成",
             "jp": "認識完了"
         },
+        "Recognized": {
+            "en": "Recognition Result",
+            "zh-hans": "识别结果",
+            "zh-hant": "識別結果",
+            "jp": "認識結果"
+        },
         "StartRecording": {
             "en": "Start Recording",
             "zh-hans": "开始录音",
@@ -1559,6 +1577,12 @@
             "zh-hans": "停止录音",
             "zh-hant": "停止錄音",
             "jp": "録音停止"
+        },
+        "Confirm": {
+            "en": "Confirm",
+            "zh-hans": "确定",
+            "zh-hant": "確定",
+            "jp": "確認"
         },
         "Cancel": {
             "en": "Cancel",

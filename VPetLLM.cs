@@ -159,12 +159,15 @@ namespace VPetLLM
         {
             try
             {
-                var voiceInputWindow = new Windows.winVoiceInput(this);
+                // 根据设置决定是否使用快速显示模式
+                bool quickMode = Settings.ASR.AutoSend;
+                var voiceInputWindow = new Windows.winVoiceInput(this, quickMode);
+                
                 voiceInputWindow.TranscriptionCompleted += (s, transcription) =>
                 {
-                    if (Settings.ASR.AutoSend && !string.IsNullOrWhiteSpace(transcription))
+                    if (!string.IsNullOrWhiteSpace(transcription))
                     {
-                        // 自动发送到聊天
+                        // 发送到 LLM 进行处理
                         Application.Current.Dispatcher.InvokeAsync(async () =>
                         {
                             try

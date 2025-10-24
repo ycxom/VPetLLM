@@ -354,11 +354,11 @@ namespace VPetLLM.Core.ASRCore
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Utils.Logger.Log($"ASR (Soniox): 获取详细模型列表失败: {response.StatusCode} - {responseContent}");
+                    // Utils.Logger.Log($"ASR (Soniox): 获取详细模型列表失败: {response.StatusCode} - {responseContent}");
                     return new List<Setting.SonioxModelInfo>();
                 }
 
-                Utils.Logger.Log($"ASR (Soniox): 详细模型响应: {responseContent}");
+                // Utils.Logger.Log($"ASR (Soniox): 详细模型响应: {responseContent}");
                 var result = JObject.Parse(responseContent);
                 var models = new List<Setting.SonioxModelInfo>();
 
