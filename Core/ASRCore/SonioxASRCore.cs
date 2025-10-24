@@ -78,7 +78,7 @@ namespace VPetLLM.Core.ASRCore
 
         private async Task<string> UploadFileAsync(byte[] audioData, string baseUrl)
         {
-            var url = $"{baseUrl}/files";
+            var url = $"{baseUrl}/v1/files";
             
             using var content = new MultipartFormDataContent();
             var audioContent = new ByteArrayContent(audioData);
@@ -107,7 +107,7 @@ namespace VPetLLM.Core.ASRCore
 
         private async Task<string> CreateTranscriptionAsync(string fileId, string baseUrl)
         {
-            var url = $"{baseUrl}/transcriptions";
+            var url = $"{baseUrl}/v1/transcriptions";
 
             var requestBody = new
             {
@@ -145,7 +145,7 @@ namespace VPetLLM.Core.ASRCore
 
         private async Task WaitForTranscriptionAsync(string transcriptionId, string baseUrl)
         {
-            var url = $"{baseUrl}/transcriptions/{transcriptionId}";
+            var url = $"{baseUrl}/v1/transcriptions/{transcriptionId}";
             var maxAttempts = 60;
             var attempt = 0;
 
@@ -192,7 +192,7 @@ namespace VPetLLM.Core.ASRCore
 
         private async Task<string> GetTranscriptAsync(string transcriptionId, string baseUrl)
         {
-            var url = $"{baseUrl}/transcriptions/{transcriptionId}/transcript";
+            var url = $"{baseUrl}/v1/transcriptions/{transcriptionId}/transcript";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             if (!string.IsNullOrWhiteSpace(_sonioxSetting.ApiKey))
@@ -243,7 +243,7 @@ namespace VPetLLM.Core.ASRCore
         {
             try
             {
-                var url = $"{baseUrl}/transcriptions/{transcriptionId}";
+                var url = $"{baseUrl}/v1/transcriptions/{transcriptionId}";
                 var request = new HttpRequestMessage(HttpMethod.Delete, url);
                 if (!string.IsNullOrWhiteSpace(_sonioxSetting.ApiKey))
                 {
@@ -264,7 +264,7 @@ namespace VPetLLM.Core.ASRCore
         {
             try
             {
-                var url = $"{baseUrl}/files/{fileId}";
+                var url = $"{baseUrl}/v1/files/{fileId}";
                 var request = new HttpRequestMessage(HttpMethod.Delete, url);
                 if (!string.IsNullOrWhiteSpace(_sonioxSetting.ApiKey))
                 {
@@ -328,6 +328,75 @@ namespace VPetLLM.Core.ASRCore
             {
                 Utils.Logger.Log($"ASR (Soniox): 获取模型列表错误: {ex.Message}");
                 return new List<string>();
+            }
+        }
+
+        /// <summary>
+        /// 获取详细的模型信息（包含语言支持）
+        /// </summary>
+        public async Task<List<Setting.SonioxModelInfo>> GetModelsWithDetailsAsync()
+        {
+            try
+            {
+                var url = $"{_sonioxSetting.BaseUrl.TrimEnd('/')}/v1/models";
+                Utils.Logger.Log($"ASR (Soniox): 从 {url} 获取详细模型列表");
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                
+                if (!string.IsNullOrWhiteSpace(_sonioxSetting.ApiKey))
+                {
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _sonioxSetting.ApiKey);
+                }
+
+                using var client = CreateHttpClient();
+                var response = await client.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Utils.Logger.Log($"ASR (Soniox): 获取详细模型列表失败: {response.StatusCode} - {responseContent}");
+                    return new List<Setting.SonioxModelInfo>();
+                }
+
+                Utils.Logger.Log($"ASR (Soniox): 详细模型响应: {responseContent}");
+                var result = JObject.Parse(responseContent);
+                var models = new List<Setting.SonioxModelInfo>();
+
+                if (result["models"] is JArray modelsArray)
+                {
+                    foreach (var model in modelsArray)
+                    {
+                        var modelInfo = new Setting.SonioxModelInfo
+                        {
+                            Id = model["id"]?.ToString() ?? "",
+                            Name = model["name"]?.ToString() ?? model["id"]?.ToString() ?? "",
+                            TranscriptionMode = model["transcription_mode"]?.ToString() ?? "",
+                            Languages = new List<Setting.SonioxLanguageInfo>()
+                        };
+
+                        if (model["languages"] is JArray languagesArray)
+                        {
+                            foreach (var lang in languagesArray)
+                            {
+                                modelInfo.Languages.Add(new Setting.SonioxLanguageInfo
+                                {
+                                    Code = lang["code"]?.ToString() ?? "",
+                                    Name = lang["name"]?.ToString() ?? ""
+                                });
+                            }
+                        }
+
+                        models.Add(modelInfo);
+                    }
+                }
+
+                Utils.Logger.Log($"ASR (Soniox): 获取到 {models.Count} 个详细模型");
+                return models;
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"ASR (Soniox): 获取详细模型列表错误: {ex.Message}");
+                return new List<Setting.SonioxModelInfo>();
             }
         }
     }

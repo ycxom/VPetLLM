@@ -393,21 +393,9 @@ namespace VPetLLM.Utils
             {
                 if (_asrCore is SonioxASRCore sonioxCore)
                 {
-                    var modelIds = await sonioxCore.GetModelsAsync();
-                    var models = new List<Setting.SonioxModelInfo>();
-                    
-                    foreach (var modelId in modelIds)
-                    {
-                        models.Add(new Setting.SonioxModelInfo
-                        {
-                            Id = modelId,
-                            Name = modelId,
-                            TranscriptionMode = "",
-                            Languages = new List<Setting.SonioxLanguageInfo>()
-                        });
-                    }
-                    
-                    Logger.Log($"ASR: Fetched {models.Count} Soniox models");
+                    // 使用新的详细模型获取方法
+                    var models = await sonioxCore.GetModelsWithDetailsAsync();
+                    Logger.Log($"ASR: Fetched {models.Count} Soniox models with details");
                     return models;
                 }
                 else
