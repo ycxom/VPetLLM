@@ -235,29 +235,20 @@ namespace VPetLLM
                     
                     if (!string.IsNullOrWhiteSpace(transcription))
                     {
-                        if (Settings.ASR.AutoSend)
+                        // 无论是自动发送还是手动确认，都发送到LLM
+                        Logger.Log("Sending transcription to LLM and resetting to Idle");
+                        _voiceInputState = VoiceInputState.Idle;
+                        Application.Current.Dispatcher.InvokeAsync(async () =>
                         {
-                            // 自动发送模式：直接发送到LLM
-                            Logger.Log("Auto-send mode: sending to LLM and resetting to Idle");
-                            _voiceInputState = VoiceInputState.Idle;
-                            Application.Current.Dispatcher.InvokeAsync(async () =>
+                            try
                             {
-                                try
-                                {
-                                    await SendChat(transcription);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Logger.Log($"Error sending voice input to chat: {ex.Message}");
-                                }
-                            });
-                        }
-                        else
-                        {
-                            // 编辑模式：进入编辑状态
-                            Logger.Log("Edit mode: entering Editing state");
-                            _voiceInputState = VoiceInputState.Editing;
-                        }
+                                await SendChat(transcription);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"Error sending voice input to chat: {ex.Message}");
+                            }
+                        });
                     }
                     else
                     {
