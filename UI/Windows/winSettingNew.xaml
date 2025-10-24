@@ -888,6 +888,11 @@
                                         Margin="0,0,0,12"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_Proxy_ForASR"
+                                        Content="{utils:Localize KeyPath=Proxy.ForASR}"
+                                        Margin="0,0,0,12"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_Proxy_ForMcp"
                                         Content="{utils:Localize KeyPath=Proxy.ForMcp}"
                                         Margin="0,0,0,8"
@@ -930,20 +935,25 @@
                     </Border>
                 </ScrollViewer>
             </TabItem>
-            <TabItem Header="{utils:Localize KeyPath=TTS.Tab}"
-                    x:Name="Tab_TTS"
+            <TabItem Header="{utils:Localize KeyPath=Voice.Tab}"
+                    x:Name="Tab_Voice"
                     Style="{StaticResource ModernTabItem}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+                <TabControl Style="{StaticResource ModernTabControl}">
+                    <!-- TTS 子标签页 -->
+                    <TabItem Header="{utils:Localize KeyPath=TTS.Tab}"
+                            x:Name="Tab_TTS"
+                            Style="{StaticResource ModernTabItem}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                    <ScrollViewer Grid.Column="0"
-                            VerticalScrollBarVisibility="Auto">
-                        <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
-                            <StackPanel Style="{StaticResource SettingGroup}">
-                                <CheckBox x:Name="CheckBox_TTS_IsEnabled"
+                            <ScrollViewer Grid.Column="0"
+                                    VerticalScrollBarVisibility="Auto">
+                                <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
+                                    <StackPanel Style="{StaticResource SettingGroup}">
+                                        <CheckBox x:Name="CheckBox_TTS_IsEnabled"
                                         Content="{utils:Localize KeyPath=TTS.Enable}"
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernCheckBox}"/>
@@ -1241,6 +1251,285 @@
                     </ScrollViewer>
                 </Grid>
             </TabItem>
+            
+            <!-- ASR 子标签页 -->
+            <TabItem Header="{utils:Localize KeyPath=ASR.Tab, Default=语音输入}"
+                    x:Name="Tab_ASR"
+                    Style="{StaticResource ModernTabItem}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollViewer Grid.Column="0"
+                            VerticalScrollBarVisibility="Auto">
+                        <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
+                            <StackPanel Style="{StaticResource SettingGroup}">
+                                <CheckBox x:Name="CheckBox_ASR_IsEnabled"
+                                        Content="{utils:Localize KeyPath=ASR.Enable, Default=启用语音输入}"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernCheckBox}">
+                                    <CheckBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.EnableTooltip, Default=启用后可以使用快捷键进行语音输入}"/>
+                                        </ToolTip>
+                                    </CheckBox.ToolTip>
+                                </CheckBox>
+
+                                <StackPanel IsEnabled="{Binding ElementName=CheckBox_ASR_IsEnabled, Path=IsChecked}">
+                                    <Label Content="{utils:Localize KeyPath=ASR.Provider, Default=识别提供商}"
+                                            x:Name="Label_ASR_Provider"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_ASR_Provider"
+                                            Margin="0,0,0,16"
+                                            SelectionChanged="ComboBox_ASR_Provider_SelectionChanged"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="OpenAI Whisper" Tag="OpenAI" IsSelected="True"/>
+                                        <ComboBoxItem Content="Soniox" Tag="Soniox"/>
+                                    </ComboBox>
+
+                                    <Label Content="{utils:Localize KeyPath=ASR.RecordingDevice, Default=输入设备}"
+                                            x:Name="Label_ASR_RecordingDevice"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="ComboBox_ASR_RecordingDevice"
+                                                Grid.Column="0"
+                                                Margin="0,0,8,0"
+                                                Style="{StaticResource ModernComboBox}">
+                                            <ComboBoxItem Content="设备 #0 (默认)" Tag="0" IsSelected="True"/>
+                                        </ComboBox>
+                                        <Button x:Name="Button_ASR_RefreshDevices"
+                                                Grid.Column="1"
+                                                Content="{utils:Localize KeyPath=ASR.RefreshDevices, Default=刷新设备}"
+                                                Click="Button_ASR_RefreshDevices_Click"
+                                                Padding="12,6"
+                                                Style="{StaticResource ModernButton}"/>
+                                    </Grid>
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.RecordingDeviceTip, Default=选择用于语音输入的麦克风设备}"
+                                            x:Name="TextBlock_ASR_RecordingDevice_Tip"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <CheckBox x:Name="CheckBox_ASR_AutoSend"
+                                            Content="{utils:Localize KeyPath=ASR.AutoSend, Default=识别完成后自动发送}"
+                                            Margin="0,0,0,8"
+                                            Style="{StaticResource ModernCheckBox}"/>
+
+                                    <CheckBox x:Name="CheckBox_ASR_ShowTranscriptionWindow"
+                                            Content="{utils:Localize KeyPath=ASR.ShowTranscriptionWindow, Default=显示识别结果窗口}"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernCheckBox}"/>
+
+                                    <Label Content="{utils:Localize KeyPath=ASR.Hotkey, Default=快捷键}"
+                                            x:Name="Label_ASR_Hotkey"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="10"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0"
+                                                x:Name="TextBox_ASR_HotkeyModifiers"
+                                                Style="{StaticResource ModernTextBox}"
+                                                ToolTip="修饰键，例如: Win+Alt"/>
+                                        <TextBlock Grid.Column="1"
+                                                Text="+"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Center"
+                                                Foreground="{StaticResource SecondaryTextBrush}"/>
+                                        <TextBox Grid.Column="2"
+                                                x:Name="TextBox_ASR_HotkeyKey"
+                                                Style="{StaticResource ModernTextBox}"
+                                                ToolTip="按键，例如: V"/>
+                                    </Grid>
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.HotkeyDescription, Default=默认快捷键: Win + Alt + V}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
+                                        <Button x:Name="Button_ASR_Test"
+                                                Content="{utils:Localize KeyPath=ASR.TestButton, Default=测试语音输入}"
+                                                Click="Button_ASR_Test_Click"
+                                                Style="{StaticResource ModernButton}"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+
+                    <ScrollViewer Grid.Column="1"
+                            VerticalScrollBarVisibility="Auto">
+                        <Border Style="{StaticResource CardContainer}">
+                            <StackPanel Style="{StaticResource SettingGroup}"
+
+                                IsEnabled="{Binding ElementName=CheckBox_ASR_IsEnabled, Path=IsChecked}">
+                                <!-- OpenAI Whisper 配置 -->
+                                <StackPanel x:Name="Panel_ASR_OpenAI"
+                                        Visibility="Visible">
+                                    <TextBlock x:Name="TextBlock_ASR_OpenAI_Config"
+                                            Text="{utils:Localize KeyPath=ASR.OpenAISettings, Default=OpenAI Whisper 配置}"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Label x:Name="Label_ASR_OpenAI_BaseUrl"
+                                            Content="{utils:Localize KeyPath=ASR.OpenAI.BaseUrl, Default=API 地址}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_ASR_OpenAI_BaseUrl"
+                                            Text="https://api.openai.com/v1"
+                                            Margin="0,0,0,8"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.OpenAI.BaseUrlTip, Default=请输入 API 基础地址（不含 /audio/transcriptions）}"
+                                            x:Name="TextBlock_ASR_OpenAI_BaseUrl_Tip"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Label x:Name="Label_ASR_OpenAI_ApiKey"
+                                            Content="{utils:Localize KeyPath=ASR.OpenAI.ApiKey, Default=API Key}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_ASR_OpenAI_ApiKey"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernTextBox}"/>
+
+                                    <Label x:Name="Label_ASR_OpenAI_Model"
+                                            Content="{utils:Localize KeyPath=ASR.OpenAI.Model, Default=模型}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_ASR_OpenAI_Model"
+                                            IsEditable="True"
+                                            Text="whisper-1"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="whisper-1" Tag="whisper-1"/>
+                                        <ComboBoxItem Content="FunAudioLLM/SenseVoiceSmall" Tag="FunAudioLLM/SenseVoiceSmall"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.OpenAI.Description, Default=支持 OpenAI Whisper API 格式的语音识别服务}"
+                                            x:Name="TextBlock_ASR_OpenAI_Description"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,8"/>
+
+                                    <!-- 服务示例 -->
+                                    <TextBlock Style="{StaticResource SectionHeader}"
+                                            Margin="0,16,0,8">
+                                        <Run Text="{utils:Localize KeyPath=ASR.Examples, Default=服务示例}" FontSize="14"/>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,4">
+                                        <Run Text="• OpenAI: " FontWeight="SemiBold"/>
+                                        <Run Text="https://api.openai.com/v1" Foreground="#2196F3"/>
+                                        <Run Text=" | whisper-1"/>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,4">
+                                        <Run Text="• SiliconFlow: " FontWeight="SemiBold"/>
+                                        <Run Text="https://api.siliconflow.cn/v1" Foreground="#2196F3"/>
+                                        <Run Text=" | FunAudioLLM/SenseVoiceSmall"/>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16">
+                                        <Run Text="• 自定义: 任何兼容 OpenAI Whisper API 格式的服务"/>
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <!-- Soniox 配置 -->
+                                <StackPanel x:Name="Panel_ASR_Soniox"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="TextBlock_ASR_Soniox_Config"
+                                            Text="{utils:Localize KeyPath=ASR.SonioxSettings, Default=Soniox 配置}"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Label x:Name="Label_ASR_Soniox_BaseUrl"
+                                            Content="{utils:Localize KeyPath=ASR.Soniox.BaseUrl, Default=API 地址}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_ASR_Soniox_BaseUrl"
+                                            Text="https://api.soniox.com"
+                                            Margin="0,0,0,8"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.BaseUrlTip, Default=请输入 Soniox API 基础地址（不含 /v1）}"
+                                            x:Name="TextBlock_ASR_Soniox_BaseUrl_Tip"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Label x:Name="Label_ASR_Soniox_ApiKey"
+                                            Content="{utils:Localize KeyPath=ASR.Soniox.ApiKey, Default=API Key}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_ASR_Soniox_ApiKey"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernTextBox}"/>
+
+                                    <Label x:Name="Label_ASR_Soniox_Model"
+                                            Content="{utils:Localize KeyPath=ASR.Soniox.Model, Default=模型}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="ComboBox_ASR_Soniox_Model"
+                                                Grid.Column="0"
+                                                IsEditable="True"
+                                                Text="stt-rt-v3"
+                                                Margin="0,0,8,0"
+                                                Style="{StaticResource ModernComboBox}">
+                                            <ComboBoxItem Content="stt-rt-v3 (Speech-to-Text Real-time v3)" Tag="stt-rt-v3"/>
+                                            <ComboBoxItem Content="stt-async-v3 (Speech-to-Text Async v3)" Tag="stt-async-v3"/>
+                                        </ComboBox>
+                                        <Button x:Name="Button_ASR_Soniox_RefreshModels"
+                                                Grid.Column="1"
+                                                Content="{utils:Localize KeyPath=ASR.Soniox.RefreshModels, Default=刷新模型列表}"
+                                                Click="Button_ASR_Soniox_RefreshModels_Click"
+                                                Padding="12,6"
+                                                Style="{StaticResource ModernButton}"/>
+                                    </Grid>
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.ModelTip, Default=选择 Soniox 语音识别模型，点击刷新按钮获取最新模型列表}"
+                                            x:Name="TextBlock_ASR_Soniox_Model_Tip"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Label x:Name="Label_ASR_Soniox_Language"
+                                            Content="{utils:Localize KeyPath=ASR.Soniox.Language, Default=语言}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_ASR_Soniox_Language"
+                                            IsEditable="False"
+                                            Margin="0,0,0,8"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <!-- 语言列表将根据选择的模型动态填充 -->
+                                    </ComboBox>
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.LanguageTip, Default=选择语音识别语言，语言列表根据所选模型动态更新}"
+                                            x:Name="TextBlock_ASR_Soniox_Language_Tip"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <CheckBox x:Name="CheckBox_ASR_Soniox_EnablePunctuation"
+                                            Content="{utils:Localize KeyPath=ASR.Soniox.EnablePunctuation, Default=启用标点符号}"
+                                            Margin="0,0,0,8"
+                                            IsChecked="True"
+                                            Style="{StaticResource ModernCheckBox}"/>
+
+                                    <CheckBox x:Name="CheckBox_ASR_Soniox_EnableProfanityFilter"
+                                            Content="{utils:Localize KeyPath=ASR.Soniox.EnableProfanityFilter, Default=启用脏话过滤}"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernCheckBox}"/>
+
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.Description, Default=Soniox 提供高精度的语音识别服务，支持多种语言}"
+                                            x:Name="TextBlock_ASR_Soniox_Description"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+        </TabControl>
+            </TabItem>
+            
             <TabItem Header="{utils:Localize KeyPath=Language.Tab}"
                     x:Name="Tab_Language"
                     Style="{StaticResource ModernTabItem}">

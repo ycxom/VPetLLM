@@ -43,6 +43,7 @@ namespace VPetLLM
         public bool EnableBuyFeedback { get; set; } = true;
         public bool EnableLiveMode { get; set; } = false;
         public RateLimiterSetting RateLimiter { get; set; } = new RateLimiterSetting();
+        public ASRSetting ASR { get; set; } = new ASRSetting();
         private readonly string _path;
 
         public Setting(string path)
@@ -94,6 +95,10 @@ namespace VPetLLM
             if (RateLimiter == null)
             {
                 RateLimiter = new RateLimiterSetting();
+            }
+            if (ASR == null)
+            {
+                ASR = new ASRSetting();
             }
 
             // 旧版OpenAI单节点配置迁移到多节点结构，避免用户配置丢失
@@ -403,6 +408,7 @@ namespace VPetLLM
             public bool ForGemini { get; set; } = false;
             public bool ForFree { get; set; } = false;
             public bool ForTTS { get; set; } = false;
+            public bool ForASR { get; set; } = false;
             public bool ForMcp { get; set; } = false;
             public bool ForPlugin { get; set; } = false;
         }
@@ -481,6 +487,54 @@ namespace VPetLLM
             public int PluginWindowMinutes { get; set; } = 2;
 
             public bool LogRateLimitEvents { get; set; } = true;
+        }
+
+        public class ASRSetting
+        {
+            public bool IsEnabled { get; set; } = false;
+            public string Provider { get; set; } = "OpenAI";
+            public string HotkeyModifiers { get; set; } = "Win+Alt";
+            public string HotkeyKey { get; set; } = "V";
+            public string Language { get; set; } = "zh";
+            public bool AutoSend { get; set; } = true;
+            public bool ShowTranscriptionWindow { get; set; } = true;
+            public int RecordingDeviceNumber { get; set; } = 0; // 录音设备编号，0 = 默认设备
+            
+            // OpenAI Whisper 设置
+            public OpenAIASRSetting OpenAI { get; set; } = new OpenAIASRSetting();
+            
+            // Soniox 设置
+            public SonioxASRSetting Soniox { get; set; } = new SonioxASRSetting();
+        }
+
+        public class OpenAIASRSetting
+        {
+            public string ApiKey { get; set; } = "";
+            public string BaseUrl { get; set; } = "https://api.openai.com/v1";
+            public string Model { get; set; } = "whisper-1";
+        }
+
+        public class SonioxASRSetting
+        {
+            public string ApiKey { get; set; } = "";
+            public string BaseUrl { get; set; } = "https://api.soniox.com";
+            public string Model { get; set; } = "stt-rt-v3";
+            public bool EnablePunctuation { get; set; } = true;
+            public bool EnableProfanityFilter { get; set; } = false;
+        }
+
+        public class SonioxModelInfo
+        {
+            public string Id { get; set; } = "";
+            public string Name { get; set; } = "";
+            public string TranscriptionMode { get; set; } = "";
+            public List<SonioxLanguageInfo> Languages { get; set; } = new List<SonioxLanguageInfo>();
+        }
+
+        public class SonioxLanguageInfo
+        {
+            public string Code { get; set; } = "";
+            public string Name { get; set; } = "";
         }
 
     }

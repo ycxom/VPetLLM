@@ -24,6 +24,8 @@ namespace VPetLLM
         public string PluginPath => PluginManager.PluginPath;
         public winSettingNew? SettingWindow;
         public TTSService? TTSService;
+        private GlobalHotkey? _voiceInputHotkey;
+        private const int VOICE_INPUT_HOTKEY_ID = 9001;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -81,6 +83,110 @@ namespace VPetLLM
             LoadPlugins();
         }
 
+        private void InitializeVoiceInputHotkey()
+        {
+            try
+            {
+                if (!Settings.ASR.IsEnabled)
+                {
+                    Logger.Log("ASR is disabled, skipping hotkey registration");
+                    return;
+                }
+
+                // 获取主窗口句柄
+                var mainWindow = Application.Current.MainWindow;
+                if (mainWindow == null)
+                {
+                    Logger.Log("Main window not found, cannot register voice input hotkey");
+                    return;
+                }
+
+                var windowHandle = new System.Windows.Interop.WindowInteropHelper(mainWindow).Handle;
+                if (windowHandle == IntPtr.Zero)
+                {
+                    Logger.Log("Window handle is zero, cannot register voice input hotkey");
+                    return;
+                }
+
+                // 创建全局快捷键
+                _voiceInputHotkey = new GlobalHotkey(windowHandle, VOICE_INPUT_HOTKEY_ID);
+                
+                // 解析快捷键配置
+                uint modifiers = GlobalHotkey.ParseModifiers(Settings.ASR.HotkeyModifiers);
+                uint key = GlobalHotkey.ParseKey(Settings.ASR.HotkeyKey);
+
+                if (key == 0)
+                {
+                    Logger.Log($"Invalid hotkey key: {Settings.ASR.HotkeyKey}");
+                    return;
+                }
+
+                // 注册快捷键
+                bool registered = _voiceInputHotkey.Register(modifiers, key);
+                if (registered)
+                {
+                    _voiceInputHotkey.HotkeyPressed += OnVoiceInputHotkeyPressed;
+                    Logger.Log($"Voice input hotkey registered: {Settings.ASR.HotkeyModifiers}+{Settings.ASR.HotkeyKey}");
+                }
+                else
+                {
+                    Logger.Log($"Failed to register voice input hotkey: {Settings.ASR.HotkeyModifiers}+{Settings.ASR.HotkeyKey}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error initializing voice input hotkey: {ex.Message}");
+            }
+        }
+
+        private void OnVoiceInputHotkeyPressed(object? sender, EventArgs e)
+        {
+            try
+            {
+                Logger.Log("Voice input hotkey pressed");
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    ShowVoiceInputWindow();
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling voice input hotkey: {ex.Message}");
+            }
+        }
+
+        public void ShowVoiceInputWindow()
+        {
+            try
+            {
+                var voiceInputWindow = new Windows.winVoiceInput(this);
+                voiceInputWindow.TranscriptionCompleted += (s, transcription) =>
+                {
+                    if (Settings.ASR.AutoSend && !string.IsNullOrWhiteSpace(transcription))
+                    {
+                        // 自动发送到聊天
+                        Application.Current.Dispatcher.InvokeAsync(async () =>
+                        {
+                            try
+                            {
+                                await SendChat(transcription);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"Error sending voice input to chat: {ex.Message}");
+                            }
+                        });
+                    }
+                };
+                voiceInputWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error showing voice input window: {ex.Message}");
+                MessageBox.Show($"打开语音输入窗口失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void SyncNames(object sender, System.Timers.ElapsedEventArgs e)
         {
             if (Settings.FollowVPetName)
@@ -125,6 +231,9 @@ namespace VPetLLM
                 MW.Event_TakeItem += OnTakeItem;
                 Utils.Logger.Log("Purchase event listener registered.");
                 
+                // 初始化语音输入快捷键
+                InitializeVoiceInputHotkey();
+                
                 Utils.Logger.Log("Dispatcher.Invoke finished.");
             });
             Utils.Logger.Log("LoadPlugin finished.");
@@ -151,8 +260,16 @@ namespace VPetLLM
             
             TTSService?.Dispose();
             TouchInteractionHandler?.Dispose();
+            _voiceInputHotkey?.Dispose();
             _syncTimer?.Stop();
             _syncTimer?.Dispose();
+        }
+
+        public void UpdateVoiceInputHotkey()
+        {
+            _voiceInputHotkey?.Dispose();
+            _voiceInputHotkey = null;
+            InitializeVoiceInputHotkey();
         }
 
         // 购买批处理相关字段

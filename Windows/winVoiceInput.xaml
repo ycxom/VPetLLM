@@ -1,0 +1,170 @@
+<Window x:Class="VPetLLM.Windows.winVoiceInput"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:utils="clr-namespace:VPetLLM.Utils"
+        mc:Ignorable="d"
+        Title="{utils:Localize KeyPath=VoiceInput.Title, Default=语音输入}"
+        Height="300" Width="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Topmost="True"
+        Background="#F5F5F5"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        BorderBrush="#2196F3"
+        BorderThickness="2">
+    
+    <Window.Resources>
+        <Style x:Key="ModernButton" TargetType="Button">
+            <Setter Property="Background" Value="#2196F3"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1976D2"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#BDBDBD"/>
+                    <Setter Property="Cursor" Value="Arrow"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecordingButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
+            <Setter Property="Background" Value="#F44336"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#D32F2F"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <!-- 标题栏 -->
+        <Grid Height="40" VerticalAlignment="Top" Background="#2196F3" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <TextBlock Text="{utils:Localize KeyPath=VoiceInput.Title, Default=语音输入}" 
+                       Foreground="White" 
+                       FontSize="16" 
+                       FontWeight="Bold"
+                       VerticalAlignment="Center" 
+                       Margin="15,0"/>
+            <Button Content="✕" 
+                    Width="40" 
+                    Height="40" 
+                    HorizontalAlignment="Right"
+                    Background="Transparent"
+                    Foreground="White"
+                    BorderThickness="0"
+                    FontSize="20"
+                    FontWeight="Bold"
+                    Click="CloseButton_Click"
+                    Cursor="Hand">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1976D2"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
+
+        <!-- 主内容区 -->
+        <StackPanel Margin="20,60,20,20" VerticalAlignment="Center">
+            <!-- 状态指示器 -->
+            <Grid Height="80" Margin="0,0,0,20">
+                <Ellipse x:Name="StatusIndicator" 
+                         Width="60" 
+                         Height="60" 
+                         Fill="#4CAF50"
+                         HorizontalAlignment="Center"/>
+                <Ellipse x:Name="RecordingPulse" 
+                         Width="60" 
+                         Height="60" 
+                         Fill="#F44336"
+                         HorizontalAlignment="Center"
+                         Visibility="Collapsed">
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="PulseTransform" ScaleX="1" ScaleY="1" CenterX="30" CenterY="30"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+                <TextBlock x:Name="MicIcon" 
+                           Text="🎤" 
+                           FontSize="32" 
+                           HorizontalAlignment="Center" 
+                           VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- 状态文本 -->
+            <TextBlock x:Name="StatusText" 
+                       Text="{utils:Localize KeyPath=VoiceInput.Ready, Default=准备就绪，点击开始录音}"
+                       FontSize="14" 
+                       TextAlignment="Center" 
+                       Foreground="#424242"
+                       Margin="0,0,0,20"
+                       TextWrapping="Wrap"/>
+
+            <!-- 转录文本 -->
+            <Border Background="White" 
+                    BorderBrush="#E0E0E0" 
+                    BorderThickness="1" 
+                    CornerRadius="4"
+                    Padding="10"
+                    Margin="0,0,0,20"
+                    MinHeight="60"
+                    Visibility="Collapsed"
+                    x:Name="TranscriptionPanel">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="80">
+                    <TextBlock x:Name="TranscriptionText" 
+                               TextWrapping="Wrap" 
+                               FontSize="13"
+                               Foreground="#212121"/>
+                </ScrollViewer>
+            </Border>
+
+            <!-- 按钮区 -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button x:Name="RecordButton" 
+                        Content="{utils:Localize KeyPath=VoiceInput.StartRecording, Default=开始录音}"
+                        Style="{StaticResource ModernButton}"
+                        Click="RecordButton_Click"
+                        Width="120"
+                        Margin="0,0,10,0"/>
+                <Button x:Name="CancelButton" 
+                        Content="{utils:Localize KeyPath=VoiceInput.Cancel, Default=取消}"
+                        Style="{StaticResource ModernButton}"
+                        Background="#757575"
+                        Click="CancelButton_Click"
+                        Width="120"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

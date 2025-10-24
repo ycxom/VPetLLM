@@ -970,6 +970,12 @@
             "zh-hant": "TTS",
             "jp": "TTS"
         },
+        "ForASR": {
+            "en": "ASR (Voice Input)",
+            "zh-hans": "ASR（语音输入）",
+            "zh-hant": "ASR（語音輸入）",
+            "jp": "ASR（音声入力）"
+        },
         "ForMcp": {
             "en": "MCP",
             "zh-hans": "MCP",
@@ -1065,12 +1071,20 @@
             "jp": "いいえ"
         }
     },
+    "Voice": {
+        "Tab": {
+            "en": "Voice",
+            "zh-hans": "语音",
+            "zh-hant": "語音",
+            "jp": "音声"
+        }
+    },
     "TTS": {
         "Tab": {
-            "en": "TTS Voice",
-            "zh-hans": "TTS语音",
-            "zh-hant": "TTS語音",
-            "jp": "TTS音声"
+            "en": "TTS (Synthesis)",
+            "zh-hans": "TTS（语音合成）",
+            "zh-hant": "TTS（語音合成）",
+            "jp": "TTS（音声合成）"
         },
         "Enable": {
             "en": "Enable TTS Voice Synthesis",
@@ -1273,6 +1287,284 @@
                 "zh-hant": "獲取模型列表出錯",
                 "jp": "モデルリスト取得エラー"
             }
+        }
+    },
+    "ASR": {
+        "Tab": {
+            "en": "ASR (Input)",
+            "zh-hans": "ASR（语音输入）",
+            "zh-hant": "ASR（語音輸入）",
+            "jp": "ASR（音声入力）"
+        },
+        "BasicSettings": {
+            "en": "Basic Settings",
+            "zh-hans": "基本设置",
+            "zh-hant": "基本設置",
+            "jp": "基本設定"
+        },
+        "Enable": {
+            "en": "Enable Voice Input",
+            "zh-hans": "启用语音输入",
+            "zh-hant": "啟用語音輸入",
+            "jp": "音声入力を有効にする"
+        },
+        "EnableTooltip": {
+            "en": "Enable voice input with hotkey",
+            "zh-hans": "启用后可以使用快捷键进行语音输入",
+            "zh-hant": "啟用後可以使用快捷鍵進行語音輸入",
+            "jp": "有効にすると、ホットキーで音声入力が使用できます"
+        },
+        "HotkeySettings": {
+            "en": "Hotkey Settings",
+            "zh-hans": "快捷键设置",
+            "zh-hant": "快捷鍵設置",
+            "jp": "ホットキー設定"
+        },
+        "HotkeyModifiers": {
+            "en": "Modifiers:",
+            "zh-hans": "修饰键:",
+            "zh-hant": "修飾鍵:",
+            "jp": "修飾キー:"
+        },
+        "HotkeyKey": {
+            "en": "Key:",
+            "zh-hans": "按键:",
+            "zh-hant": "按鍵:",
+            "jp": "キー:"
+        },
+        "HotkeyDescription": {
+            "en": "Default hotkey: Win + Alt + V",
+            "zh-hans": "默认快捷键: Win + Alt + V",
+            "zh-hant": "默認快捷鍵: Win + Alt + V",
+            "jp": "デフォルトホットキー: Win + Alt + V"
+        },
+        "RecognitionSettings": {
+            "en": "Recognition Settings",
+            "zh-hans": "识别设置",
+            "zh-hant": "識別設置",
+            "jp": "認識設定"
+        },
+        "Provider": {
+            "en": "Recognition Provider",
+            "zh-hans": "识别提供商",
+            "zh-hant": "識別提供商",
+            "jp": "認識プロバイダー"
+        },
+        "Language": {
+            "en": "Recognition Language",
+            "zh-hans": "识别语言",
+            "zh-hant": "識別語言",
+            "jp": "認識言語"
+        },
+        "Hotkey": {
+            "en": "Hotkey",
+            "zh-hans": "快捷键",
+            "zh-hant": "快捷鍵",
+            "jp": "ホットキー"
+        },
+        "Examples": {
+            "en": "Service Examples",
+            "zh-hans": "服务示例",
+            "zh-hant": "服務示例",
+            "jp": "サービス例"
+        },
+        "RecordingDevice": {
+            "en": "Input Device",
+            "zh-hans": "输入设备",
+            "zh-hant": "輸入設備",
+            "jp": "入力デバイス"
+        },
+        "RecordingDeviceTip": {
+            "en": "Select the microphone device for voice input",
+            "zh-hans": "选择用于语音输入的麦克风设备",
+            "zh-hant": "選擇用於語音輸入的麥克風設備",
+            "jp": "音声入力用のマイクデバイスを選択"
+        },
+        "RefreshDevices": {
+            "en": "Refresh Devices",
+            "zh-hans": "刷新设备",
+            "zh-hant": "刷新設備",
+            "jp": "デバイスを更新"
+        },
+        "AutoSend": {
+            "en": "Auto-send after recognition",
+            "zh-hans": "识别完成后自动发送",
+            "zh-hant": "識別完成後自動發送",
+            "jp": "認識後に自動送信"
+        },
+        "ShowTranscriptionWindow": {
+            "en": "Show transcription window",
+            "zh-hans": "显示识别结果窗口",
+            "zh-hant": "顯示識別結果窗口",
+            "jp": "認識結果ウィンドウを表示"
+        },
+        "OpenAISettings": {
+            "en": "OpenAI Whisper Settings",
+            "zh-hans": "OpenAI Whisper 设置",
+            "zh-hant": "OpenAI Whisper 設置",
+            "jp": "OpenAI Whisper 設定"
+        },
+        "SonioxSettings": {
+            "en": "Soniox Settings",
+            "zh-hans": "Soniox 设置",
+            "zh-hant": "Soniox 設置",
+            "jp": "Soniox 設定"
+        },
+        "OpenAI": {
+            "ApiKey": {
+                "en": "API Key",
+                "zh-hans": "API Key",
+                "zh-hant": "API Key",
+                "jp": "API Key"
+            },
+            "BaseUrl": {
+                "en": "API URL",
+                "zh-hans": "API 地址",
+                "zh-hant": "API 地址",
+                "jp": "API URL"
+            },
+            "BaseUrlTip": {
+                "en": "Enter the API base URL (without /audio/transcriptions)",
+                "zh-hans": "请输入 API 基础地址（不含 /audio/transcriptions）",
+                "zh-hant": "請輸入 API 基礎地址（不含 /audio/transcriptions）",
+                "jp": "API ベース URL を入力（/audio/transcriptions を含まない）"
+            },
+            "Model": {
+                "en": "Model",
+                "zh-hans": "模型",
+                "zh-hant": "模型",
+                "jp": "モデル"
+            },
+            "Description": {
+                "en": "Supports OpenAI Whisper API format speech recognition services (OpenAI, SiliconFlow, etc.)",
+                "zh-hans": "支持 OpenAI Whisper API 格式的语音识别服务（OpenAI、SiliconFlow 等）",
+                "zh-hant": "支持 OpenAI Whisper API 格式的語音識別服務（OpenAI、SiliconFlow 等）",
+                "jp": "OpenAI Whisper API形式の音声認識サービスをサポート（OpenAI、SiliconFlow など）"
+            }
+        },
+        "Soniox": {
+            "ApiKey": {
+                "en": "API Key",
+                "zh-hans": "API Key",
+                "zh-hant": "API Key",
+                "jp": "API Key"
+            },
+            "BaseUrl": {
+                "en": "API URL",
+                "zh-hans": "API 地址",
+                "zh-hant": "API 地址",
+                "jp": "API URL"
+            },
+            "BaseUrlTip": {
+                "en": "Enter the Soniox API base URL (without /v1)",
+                "zh-hans": "请输入 Soniox API 基础地址（不含 /v1）",
+                "zh-hant": "請輸入 Soniox API 基礎地址（不含 /v1）",
+                "jp": "Soniox API ベース URL を入力（/v1 を含まない）"
+            },
+            "Model": {
+                "en": "Model",
+                "zh-hans": "模型",
+                "zh-hant": "模型",
+                "jp": "モデル"
+            },
+            "ModelTip": {
+                "en": "Select Soniox speech recognition model, click refresh button to get latest model list",
+                "zh-hans": "选择 Soniox 语音识别模型，点击刷新按钮获取最新模型列表",
+                "zh-hant": "選擇 Soniox 語音識別模型，點擊刷新按鈕獲取最新模型列表",
+                "jp": "Soniox 音声認識モデルを選択、更新ボタンをクリックして最新のモデルリストを取得"
+            },
+            "RefreshModels": {
+                "en": "Refresh Model List",
+                "zh-hans": "刷新模型列表",
+                "zh-hant": "刷新模型列表",
+                "jp": "モデルリストを更新"
+            },
+            "Language": {
+                "en": "Language",
+                "zh-hans": "语言",
+                "zh-hant": "語言",
+                "jp": "言語"
+            },
+            "LanguageTip": {
+                "en": "Select speech recognition language, language list updates dynamically based on selected model",
+                "zh-hans": "选择语音识别语言，语言列表根据所选模型动态更新",
+                "zh-hant": "選擇語音識別語言，語言列表根據所選模型動態更新",
+                "jp": "音声認識言語を選択、言語リストは選択したモデルに基づいて動的に更新されます"
+            },
+            "EnablePunctuation": {
+                "en": "Enable Punctuation",
+                "zh-hans": "启用标点符号",
+                "zh-hant": "啟用標點符號",
+                "jp": "句読点を有効にする"
+            },
+            "EnableProfanityFilter": {
+                "en": "Enable Profanity Filter",
+                "zh-hans": "启用脏话过滤",
+                "zh-hant": "啟用髒話過濾",
+                "jp": "不適切な言葉のフィルターを有効にする"
+            },
+            "Description": {
+                "en": "Soniox provides high-precision speech recognition services with support for multiple languages",
+                "zh-hans": "Soniox 提供高精度的语音识别服务，支持多种语言",
+                "zh-hant": "Soniox 提供高精度的語音識別服務，支持多種語言",
+                "jp": "Soniox は複数の言語をサポートする高精度の音声認識サービスを提供します"
+            }
+        },
+        "TestButton": {
+            "en": "Test Voice Input",
+            "zh-hans": "测试语音输入",
+            "zh-hant": "測試語音輸入",
+            "jp": "音声入力をテスト"
+        }
+    },
+    "VoiceInput": {
+        "Title": {
+            "en": "Voice Input",
+            "zh-hans": "语音输入",
+            "zh-hant": "語音輸入",
+            "jp": "音声入力"
+        },
+        "Ready": {
+            "en": "Ready, click to start recording",
+            "zh-hans": "准备就绪，点击开始录音",
+            "zh-hant": "準備就緒，點擊開始錄音",
+            "jp": "準備完了、クリックして録音開始"
+        },
+        "Recording": {
+            "en": "Recording...",
+            "zh-hans": "正在录音...",
+            "zh-hant": "正在錄音...",
+            "jp": "録音中..."
+        },
+        "Processing": {
+            "en": "Processing...",
+            "zh-hans": "正在处理...",
+            "zh-hant": "正在處理...",
+            "jp": "処理中..."
+        },
+        "Completed": {
+            "en": "Recognition completed",
+            "zh-hans": "识别完成",
+            "zh-hant": "識別完成",
+            "jp": "認識完了"
+        },
+        "StartRecording": {
+            "en": "Start Recording",
+            "zh-hans": "开始录音",
+            "zh-hant": "開始錄音",
+            "jp": "録音開始"
+        },
+        "StopRecording": {
+            "en": "Stop Recording",
+            "zh-hans": "停止录音",
+            "zh-hant": "停止錄音",
+            "jp": "録音停止"
+        },
+        "Cancel": {
+            "en": "Cancel",
+            "zh-hans": "取消",
+            "zh-hant": "取消",
+            "jp": "キャンセル"
         }
     },
     "PluginStore": {

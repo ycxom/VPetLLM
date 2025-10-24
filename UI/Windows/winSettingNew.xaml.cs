@@ -1,6 +1,7 @@
  using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Windows;
@@ -342,6 +343,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForFree")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForTTS")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForASR")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).Click += Control_Click;
 
@@ -363,6 +365,32 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Format")).SelectionChanged += Control_SelectionChanged;
 
             // DIY TTS 按钮事件绑定 - 已在 XAML 中绑定，无需重复绑定
+
+            // ASR settings
+            ((CheckBox)this.FindName("CheckBox_ASR_IsEnabled")).Click += Control_Click;
+            ((ComboBox)this.FindName("ComboBox_ASR_Provider")).SelectionChanged += Control_SelectionChanged;
+            ((TextBox)this.FindName("TextBox_ASR_HotkeyModifiers")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_ASR_HotkeyKey")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_ASR_RecordingDevice")).SelectionChanged += Control_SelectionChanged;
+            ((CheckBox)this.FindName("CheckBox_ASR_AutoSend")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_ASR_ShowTranscriptionWindow")).Click += Control_Click;
+            
+            // OpenAI ASR settings
+            ((TextBox)this.FindName("TextBox_ASR_OpenAI_ApiKey")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_ASR_OpenAI_BaseUrl")).TextChanged += Control_TextChanged;
+            var comboBoxASROpenAIModel = (ComboBox)this.FindName("ComboBox_ASR_OpenAI_Model");
+            comboBoxASROpenAIModel.SelectionChanged += Control_SelectionChanged;
+            comboBoxASROpenAIModel.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(Control_TextChanged), true);
+            
+            // Soniox ASR settings
+            ((TextBox)this.FindName("TextBox_ASR_Soniox_ApiKey")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_ASR_Soniox_BaseUrl")).TextChanged += Control_TextChanged;
+            var comboBoxASRSonioxModel = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Model");
+            comboBoxASRSonioxModel.SelectionChanged += ComboBox_ASR_Soniox_Model_SelectionChanged;
+            comboBoxASRSonioxModel.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(Control_TextChanged), true);
+            ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnablePunctuation")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnableProfanityFilter")).Click += Control_Click;
+            ((ComboBox)this.FindName("ComboBox_ASR_OpenAI_Model")).SelectionChanged += Control_SelectionChanged;
 
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
 
@@ -680,6 +708,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked = _plugin.Settings.Proxy.ForGemini;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForFree")).IsChecked = _plugin.Settings.Proxy.ForFree;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForTTS")).IsChecked = _plugin.Settings.Proxy.ForTTS;
+            ((CheckBox)this.FindName("CheckBox_Proxy_ForASR")).IsChecked = _plugin.Settings.Proxy.ForASR;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked = _plugin.Settings.Proxy.ForMcp;
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked = _plugin.Settings.Proxy.ForPlugin;
 
@@ -765,6 +794,51 @@ namespace VPetLLM.UI.Windows
 
             // 初始化TTS服务
             _ttsService = new TTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
+
+            // ASR settings
+            if (_plugin.Settings.ASR == null)
+            {
+                _plugin.Settings.ASR = new Setting.ASRSetting();
+            }
+
+            ((CheckBox)this.FindName("CheckBox_ASR_IsEnabled")).IsChecked = _plugin.Settings.ASR.IsEnabled;
+            ((TextBox)this.FindName("TextBox_ASR_HotkeyModifiers")).Text = _plugin.Settings.ASR.HotkeyModifiers;
+            ((TextBox)this.FindName("TextBox_ASR_HotkeyKey")).Text = _plugin.Settings.ASR.HotkeyKey;
+            ((CheckBox)this.FindName("CheckBox_ASR_AutoSend")).IsChecked = _plugin.Settings.ASR.AutoSend;
+            ((CheckBox)this.FindName("CheckBox_ASR_ShowTranscriptionWindow")).IsChecked = _plugin.Settings.ASR.ShowTranscriptionWindow;
+
+            // ASR Provider 设置
+            var asrProviderComboBox = (ComboBox)this.FindName("ComboBox_ASR_Provider");
+            foreach (ComboBoxItem item in asrProviderComboBox.Items)
+            {
+                if (item.Tag?.ToString() == _plugin.Settings.ASR.Provider)
+                {
+                    asrProviderComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
+            // ASR 录音设备设置
+            LoadRecordingDevices();
+
+            // OpenAI ASR 设置
+            ((TextBox)this.FindName("TextBox_ASR_OpenAI_ApiKey")).Text = _plugin.Settings.ASR.OpenAI.ApiKey;
+            ((TextBox)this.FindName("TextBox_ASR_OpenAI_BaseUrl")).Text = _plugin.Settings.ASR.OpenAI.BaseUrl;
+            ((ComboBox)this.FindName("ComboBox_ASR_OpenAI_Model")).Text = _plugin.Settings.ASR.OpenAI.Model;
+
+            // Soniox ASR 设置
+            ((TextBox)this.FindName("TextBox_ASR_Soniox_ApiKey")).Text = _plugin.Settings.ASR.Soniox.ApiKey;
+            ((TextBox)this.FindName("TextBox_ASR_Soniox_BaseUrl")).Text = _plugin.Settings.ASR.Soniox.BaseUrl;
+            ((ComboBox)this.FindName("ComboBox_ASR_Soniox_Model")).Text = _plugin.Settings.ASR.Soniox.Model;
+            
+            // 初始化 Soniox 语言列表（如果有 API Key，尝试自动加载）
+            InitializeSonioxLanguages();
+            
+            ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnablePunctuation")).IsChecked = _plugin.Settings.ASR.Soniox.EnablePunctuation;
+            ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnableProfanityFilter")).IsChecked = _plugin.Settings.ASR.Soniox.EnableProfanityFilter;
+
+            // 更新 ASR Provider 面板显示
+            UpdateASRProviderPanel();
         }
 
         private void SaveSettings()
@@ -925,6 +999,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Proxy.ForGemini = ((CheckBox)this.FindName("CheckBox_Proxy_ForGemini")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForFree = ((CheckBox)this.FindName("CheckBox_Proxy_ForFree")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForTTS = ((CheckBox)this.FindName("CheckBox_Proxy_ForTTS")).IsChecked ?? true;
+            _plugin.Settings.Proxy.ForASR = ((CheckBox)this.FindName("CheckBox_Proxy_ForASR")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForMcp = ((CheckBox)this.FindName("CheckBox_Proxy_ForMcp")).IsChecked ?? true;
             _plugin.Settings.Proxy.ForPlugin = ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked ?? true;
 
@@ -979,6 +1054,64 @@ namespace VPetLLM.UI.Windows
             // 更新TTS服务设置
             _ttsService?.UpdateSettings(_plugin.Settings.TTS, _plugin.Settings.Proxy);
             _plugin.UpdateTTSService();
+
+            // ASR settings
+            _plugin.Settings.ASR.IsEnabled = ((CheckBox)this.FindName("CheckBox_ASR_IsEnabled")).IsChecked ?? false;
+            _plugin.Settings.ASR.HotkeyModifiers = ((TextBox)this.FindName("TextBox_ASR_HotkeyModifiers")).Text;
+            _plugin.Settings.ASR.HotkeyKey = ((TextBox)this.FindName("TextBox_ASR_HotkeyKey")).Text;
+            _plugin.Settings.ASR.AutoSend = ((CheckBox)this.FindName("CheckBox_ASR_AutoSend")).IsChecked ?? true;
+            _plugin.Settings.ASR.ShowTranscriptionWindow = ((CheckBox)this.FindName("CheckBox_ASR_ShowTranscriptionWindow")).IsChecked ?? true;
+
+            // ASR Provider 设置
+            var selectedASRProviderItem = ((ComboBox)this.FindName("ComboBox_ASR_Provider")).SelectedItem as ComboBoxItem;
+            if (selectedASRProviderItem != null)
+            {
+                _plugin.Settings.ASR.Provider = selectedASRProviderItem.Tag?.ToString() ?? "OpenAI";
+            }
+
+            // ASR 录音设备设置
+            var selectedDeviceItem = ((ComboBox)this.FindName("ComboBox_ASR_RecordingDevice")).SelectedItem as ComboBoxItem;
+            if (selectedDeviceItem != null && selectedDeviceItem.Tag != null)
+            {
+                _plugin.Settings.ASR.RecordingDeviceNumber = int.Parse(selectedDeviceItem.Tag.ToString());
+            }
+
+            // ASR 语言设置 - 根据 Provider 选择对应的语言设置
+            if (_plugin.Settings.ASR.Provider == "Soniox")
+            {
+                // Soniox 使用独立的语言选择
+                var selectedSonioxLanguageItem = ((ComboBox)this.FindName("ComboBox_ASR_Soniox_Language")).SelectedItem as ComboBoxItem;
+                if (selectedSonioxLanguageItem != null)
+                {
+                    _plugin.Settings.ASR.Language = selectedSonioxLanguageItem.Tag?.ToString() ?? "en";
+                }
+            }
+
+            // OpenAI ASR 设置
+            _plugin.Settings.ASR.OpenAI.ApiKey = ((TextBox)this.FindName("TextBox_ASR_OpenAI_ApiKey")).Text;
+            _plugin.Settings.ASR.OpenAI.BaseUrl = ((TextBox)this.FindName("TextBox_ASR_OpenAI_BaseUrl")).Text;
+            _plugin.Settings.ASR.OpenAI.Model = ((ComboBox)this.FindName("ComboBox_ASR_OpenAI_Model")).Text;
+
+            // Soniox ASR 设置
+            _plugin.Settings.ASR.Soniox.ApiKey = ((TextBox)this.FindName("TextBox_ASR_Soniox_ApiKey")).Text;
+            _plugin.Settings.ASR.Soniox.BaseUrl = ((TextBox)this.FindName("TextBox_ASR_Soniox_BaseUrl")).Text;
+            
+            // 获取 Soniox 模型 ID（从 Tag 获取，而不是显示文本）
+            var sonioxModelComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Model");
+            if (sonioxModelComboBox.SelectedItem is ComboBoxItem selectedModelItem)
+            {
+                _plugin.Settings.ASR.Soniox.Model = selectedModelItem.Tag?.ToString() ?? sonioxModelComboBox.Text;
+            }
+            else
+            {
+                _plugin.Settings.ASR.Soniox.Model = sonioxModelComboBox.Text;
+            }
+            
+            _plugin.Settings.ASR.Soniox.EnablePunctuation = ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnablePunctuation")).IsChecked ?? true;
+            _plugin.Settings.ASR.Soniox.EnableProfanityFilter = ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnableProfanityFilter")).IsChecked ?? false;
+
+            // 更新语音输入快捷键
+            _plugin.UpdateVoiceInputHotkey();
 
             _plugin.Settings.Save();
 
@@ -1846,6 +1979,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("CheckBox_Proxy_ForGemini") is CheckBox checkBoxProxyForGemini) checkBoxProxyForGemini.Content = LanguageHelper.Get("Proxy.ForGemini", langCode);
             if (FindName("CheckBox_Proxy_ForFree") is CheckBox checkBoxProxyForFree) checkBoxProxyForFree.Content = LanguageHelper.Get("Proxy.ForFree", langCode);
             if (FindName("CheckBox_Proxy_ForTTS") is CheckBox checkBoxProxyForTTS) checkBoxProxyForTTS.Content = LanguageHelper.Get("Proxy.ForTTS", langCode);
+            if (FindName("CheckBox_Proxy_ForASR") is CheckBox checkBoxProxyForASR) checkBoxProxyForASR.Content = LanguageHelper.Get("Proxy.ForASR", langCode);
             if (FindName("CheckBox_Proxy_ForMcp") is CheckBox checkBoxProxyForMcp) checkBoxProxyForMcp.Content = LanguageHelper.Get("Proxy.ForMcp", langCode);
             if (FindName("CheckBox_Proxy_ForPlugin") is CheckBox checkBoxProxyForPlugin) checkBoxProxyForPlugin.Content = LanguageHelper.Get("Proxy.ForPlugin", langCode);
 
@@ -3429,6 +3563,426 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 OpenAIModel_LostFocus(sender, null);
                 e.Handled = true;
+            }
+        }
+
+        private void ComboBox_ASR_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateASRProviderPanel();
+        }
+
+        private void UpdateASRProviderPanel()
+        {
+            try
+            {
+                var comboBox = FindName("ComboBox_ASR_Provider") as ComboBox;
+                if (comboBox?.SelectedItem is ComboBoxItem selectedItem)
+                {
+                    var provider = selectedItem.Tag?.ToString();
+                    System.Diagnostics.Debug.WriteLine($"[ASR Provider] 切换到提供商: {provider}");
+
+                    // 先隐藏所有面板
+                    var openAIPanel = FindName("Panel_ASR_OpenAI") as StackPanel;
+                    var sonioxPanel = FindName("Panel_ASR_Soniox") as StackPanel;
+
+                    if (openAIPanel != null) openAIPanel.Visibility = Visibility.Collapsed;
+                    if (sonioxPanel != null) sonioxPanel.Visibility = Visibility.Collapsed;
+
+                    // 显示对应的面板
+                    switch (provider)
+                    {
+                        case "OpenAI":
+                            if (openAIPanel != null)
+                            {
+                                openAIPanel.Visibility = Visibility.Visible;
+                                System.Diagnostics.Debug.WriteLine("[ASR Provider] 显示OpenAI面板");
+                            }
+                            break;
+                        case "Soniox":
+                            if (sonioxPanel != null)
+                            {
+                                sonioxPanel.Visibility = Visibility.Visible;
+                                System.Diagnostics.Debug.WriteLine("[ASR Provider] 显示Soniox面板");
+                            }
+                            break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ASR Provider] 切换提供商时出错: {ex.Message}");
+            }
+        }
+
+        private void Button_ASR_Test_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 先保存当前设置
+                SaveSettings();
+                
+                // 显示语音输入窗口
+                _plugin.ShowVoiceInputWindow();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error testing ASR: {ex.Message}");
+                MessageBox.Show($"测试语音输入失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private List<Setting.SonioxModelInfo> _sonioxModels = new List<Setting.SonioxModelInfo>();
+
+        private async void Button_ASR_Soniox_RefreshModels_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            if (button == null) return;
+
+            try
+            {
+                button.IsEnabled = false;
+                button.Content = "刷新中...";
+
+                // 先保存当前设置以获取最新的 API Key 和 BaseUrl
+                SaveSettings();
+
+                // 创建临时 ASR 服务来获取模型列表
+                var asrService = new Utils.ASRService(_plugin.Settings);
+                _sonioxModels = await asrService.FetchSonioxModels();
+                asrService.Dispose();
+
+                if (_sonioxModels.Count == 0)
+                {
+                    MessageBox.Show("未能获取模型列表，请检查 API Key 和网络连接", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // 更新模型下拉框
+                var comboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Model");
+                var currentModel = comboBox.Text;
+                comboBox.Items.Clear();
+
+                foreach (var model in _sonioxModels)
+                {
+                    var item = new ComboBoxItem
+                    {
+                        Content = $"{model.Id} ({model.Name})",
+                        Tag = model.Id
+                    };
+                    comboBox.Items.Add(item);
+                }
+
+                // 恢复之前选择的模型
+                bool found = false;
+                foreach (ComboBoxItem item in comboBox.Items)
+                {
+                    if (item.Tag?.ToString() == currentModel)
+                    {
+                        comboBox.SelectedItem = item;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found && comboBox.Items.Count > 0)
+                {
+                    comboBox.SelectedIndex = 0;
+                }
+
+                MessageBox.Show($"成功获取 {_sonioxModels.Count} 个模型", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error refreshing Soniox models: {ex.Message}");
+                MessageBox.Show($"刷新模型列表失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                button.IsEnabled = true;
+                button.Content = "刷新模型列表";
+            }
+        }
+
+        private void ComboBox_ASR_Soniox_Model_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                var comboBox = sender as ComboBox;
+                if (comboBox == null) return;
+
+                string selectedModelId = "";
+                if (comboBox.SelectedItem is ComboBoxItem item)
+                {
+                    selectedModelId = item.Tag?.ToString() ?? "";
+                }
+                else
+                {
+                    selectedModelId = comboBox.Text;
+                }
+
+                if (string.IsNullOrEmpty(selectedModelId)) return;
+
+                // 查找对应的模型信息
+                var modelInfo = _sonioxModels.FirstOrDefault(m => m.Id == selectedModelId);
+                if (modelInfo == null || modelInfo.Languages.Count == 0) return;
+
+                // 更新语言下拉框
+                var languageComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Language");
+                if (languageComboBox == null) return;
+
+                var currentLanguage = "";
+                if (languageComboBox.SelectedItem is ComboBoxItem currentItem)
+                {
+                    currentLanguage = currentItem.Tag?.ToString() ?? "";
+                }
+
+                languageComboBox.Items.Clear();
+
+                foreach (var lang in modelInfo.Languages)
+                {
+                    var langItem = new ComboBoxItem
+                    {
+                        Content = $"{lang.Code} ({lang.Name})",
+                        Tag = lang.Code
+                    };
+                    languageComboBox.Items.Add(langItem);
+                }
+
+                // 尝试恢复之前选择的语言
+                bool found = false;
+                foreach (ComboBoxItem langItem in languageComboBox.Items)
+                {
+                    if (langItem.Tag?.ToString() == currentLanguage)
+                    {
+                        languageComboBox.SelectedItem = langItem;
+                        found = true;
+                        break;
+                    }
+                }
+
+                // 如果没找到，尝试选择英语或中文
+                if (!found)
+                {
+                    foreach (ComboBoxItem langItem in languageComboBox.Items)
+                    {
+                        var code = langItem.Tag?.ToString() ?? "";
+                        if (code == "en" || code == "zh")
+                        {
+                            languageComboBox.SelectedItem = langItem;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+
+                // 如果还是没找到，选择第一个
+                if (!found && languageComboBox.Items.Count > 0)
+                {
+                    languageComboBox.SelectedIndex = 0;
+                }
+
+                // 触发保存
+                Control_SelectionChanged(sender, e);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error updating Soniox language list: {ex.Message}");
+            }
+        }
+
+        private async void InitializeSonioxLanguages()
+        {
+            try
+            {
+                var languageComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Language");
+                if (languageComboBox == null) return;
+
+                // 如果已经有 API Key，尝试自动加载模型列表
+                if (!string.IsNullOrWhiteSpace(_plugin.Settings.ASR.Soniox.ApiKey))
+                {
+                    var asrService = new Utils.ASRService(_plugin.Settings);
+                    _sonioxModels = await asrService.FetchSonioxModels();
+                    asrService.Dispose();
+
+                    if (_sonioxModels.Count > 0)
+                    {
+                        // 更新模型下拉框
+                        var modelComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Model");
+                        if (modelComboBox != null)
+                        {
+                            var currentModel = modelComboBox.Text;
+                            modelComboBox.Items.Clear();
+
+                            foreach (var model in _sonioxModels)
+                            {
+                                var item = new ComboBoxItem
+                                {
+                                    Content = $"{model.Id} ({model.Name})",
+                                    Tag = model.Id
+                                };
+                                modelComboBox.Items.Add(item);
+                            }
+
+                            // 恢复之前选择的模型
+                            bool found = false;
+                            foreach (ComboBoxItem item in modelComboBox.Items)
+                            {
+                                if (item.Tag?.ToString() == currentModel)
+                                {
+                                    modelComboBox.SelectedItem = item;
+                                    found = true;
+                                    break;
+                                }
+                            }
+
+                            if (!found && !string.IsNullOrEmpty(currentModel))
+                            {
+                                modelComboBox.Text = currentModel;
+                            }
+                        }
+
+                        // 根据当前选择的模型更新语言列表
+                        var selectedModelId = _plugin.Settings.ASR.Soniox.Model;
+                        var modelInfo = _sonioxModels.FirstOrDefault(m => m.Id == selectedModelId);
+                        
+                        if (modelInfo != null && modelInfo.Languages.Count > 0)
+                        {
+                            languageComboBox.Items.Clear();
+
+                            foreach (var lang in modelInfo.Languages)
+                            {
+                                var langItem = new ComboBoxItem
+                                {
+                                    Content = $"{lang.Code} ({lang.Name})",
+                                    Tag = lang.Code
+                                };
+                                languageComboBox.Items.Add(langItem);
+                            }
+
+                            // 尝试选中保存的语言
+                            if (!string.IsNullOrEmpty(_plugin.Settings.ASR.Language))
+                            {
+                                bool found = false;
+                                foreach (ComboBoxItem item in languageComboBox.Items)
+                                {
+                                    if (item.Tag?.ToString() == _plugin.Settings.ASR.Language)
+                                    {
+                                        languageComboBox.SelectedItem = item;
+                                        found = true;
+                                        break;
+                                    }
+                                }
+
+                                // 如果没找到，尝试选择英语或中文
+                                if (!found)
+                                {
+                                    foreach (ComboBoxItem item in languageComboBox.Items)
+                                    {
+                                        var code = item.Tag?.ToString() ?? "";
+                                        if (code == "en" || code == "zh")
+                                        {
+                                            languageComboBox.SelectedItem = item;
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // 如果还是没找到，选择第一个
+                                if (!found && languageComboBox.Items.Count > 0)
+                                {
+                                    languageComboBox.SelectedIndex = 0;
+                                }
+                            }
+                        }
+
+                        Logger.Log($"ASR: Initialized Soniox with {_sonioxModels.Count} models");
+                    }
+                }
+                else
+                {
+                    // 没有 API Key，显示提示信息
+                    languageComboBox.Items.Clear();
+                    var placeholderItem = new ComboBoxItem
+                    {
+                        Content = "请先配置 API Key 并刷新模型列表",
+                        IsEnabled = false
+                    };
+                    languageComboBox.Items.Add(placeholderItem);
+                    languageComboBox.SelectedIndex = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error initializing Soniox languages: {ex.Message}");
+                // 静默失败，用户可以手动点击刷新按钮
+            }
+        }
+
+        private void LoadRecordingDevices()
+        {
+            try
+            {
+                var comboBox = (ComboBox)this.FindName("ComboBox_ASR_RecordingDevice");
+                if (comboBox == null) return;
+
+                comboBox.Items.Clear();
+
+                var deviceCount = NAudio.Wave.WaveInEvent.DeviceCount;
+                
+                if (deviceCount == 0)
+                {
+                    var item = new ComboBoxItem
+                    {
+                        Content = "未找到录音设备",
+                        Tag = 0,
+                        IsEnabled = false
+                    };
+                    comboBox.Items.Add(item);
+                    comboBox.SelectedIndex = 0;
+                    return;
+                }
+
+                for (int i = 0; i < deviceCount; i++)
+                {
+                    var capabilities = NAudio.Wave.WaveInEvent.GetCapabilities(i);
+                    var item = new ComboBoxItem
+                    {
+                        Content = $"设备 #{i}: {capabilities.ProductName}",
+                        Tag = i
+                    };
+                    comboBox.Items.Add(item);
+
+                    if (i == _plugin.Settings.ASR.RecordingDeviceNumber)
+                    {
+                        comboBox.SelectedItem = item;
+                    }
+                }
+
+                if (comboBox.SelectedItem == null && comboBox.Items.Count > 0)
+                {
+                    comboBox.SelectedIndex = 0;
+                }
+
+                Logger.Log($"ASR Settings: Loaded {deviceCount} recording device(s)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error loading recording devices: {ex.Message}");
+            }
+        }
+
+        private void Button_ASR_RefreshDevices_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                LoadRecordingDevices();
+                MessageBox.Show("设备列表已刷新", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error refreshing devices: {ex.Message}");
+                MessageBox.Show($"刷新设备列表失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
