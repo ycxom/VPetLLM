@@ -7,6 +7,7 @@ using VPetLLM.Core.ChatCore;
 using VPetLLM.Handlers;
 using VPetLLM.UI.Windows;
 using VPetLLM.Utils;
+using TalkBox = VPetLLM.UI.Windows.TalkBox;
 
 namespace VPetLLM
 {
@@ -15,7 +16,7 @@ namespace VPetLLM
         public static VPetLLM? Instance { get; private set; }
         public Setting Settings;
         public IChatCore? ChatCore;
-        public Windows.TalkBox? TalkBox;
+        public TalkBox? TalkBox;
         public ActionProcessor? ActionProcessor;
         public TouchInteractionHandler? TouchInteractionHandler;
         private System.Timers.Timer _syncTimer;
@@ -161,7 +162,7 @@ namespace VPetLLM
             {
                 // 根据设置决定是否使用快速显示模式
                 bool quickMode = Settings.ASR.AutoSend;
-                var voiceInputWindow = new Windows.winVoiceInput(this, quickMode);
+                var voiceInputWindow = new winVoiceInput(this, quickMode);
                 
                 voiceInputWindow.TranscriptionCompleted += (s, transcription) =>
                 {
@@ -217,7 +218,7 @@ namespace VPetLLM
                 {
                     MW.TalkAPI.Remove(TalkBox);
                 }
-                TalkBox = new Windows.TalkBox(this);
+                TalkBox = new TalkBox(this);
                 MW.TalkAPI.Add(TalkBox);
                 var menuItem = new MenuItem()
                 {
@@ -598,7 +599,7 @@ namespace VPetLLM
                     MW.TalkAPI.Remove(TalkBox);
                     Utils.Logger.Log("Old TalkBox removed from TalkAPI");
                 }
-                TalkBox = new Windows.TalkBox(this);
+                TalkBox = new TalkBox(this);
                 MW.TalkAPI.Add(TalkBox);
                 Utils.Logger.Log("New TalkBox added to TalkAPI");
 

@@ -6,7 +6,7 @@ using System.Windows;
 using VPetLLM.Handlers;
 using VPetLLM.Utils;
 
-namespace VPetLLM.Windows
+namespace VPetLLM.UI.Windows
 {
     public class TalkBox : VPet_Simulator.Windows.Interface.TalkBox
     {

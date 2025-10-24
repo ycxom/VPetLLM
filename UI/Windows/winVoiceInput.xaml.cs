@@ -7,7 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using VPetLLM.Utils;
 
-namespace VPetLLM.Windows
+namespace VPetLLM.UI.Windows
 {
     public partial class winVoiceInput : Window
     {
