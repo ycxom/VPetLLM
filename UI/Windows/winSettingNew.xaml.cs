@@ -369,8 +369,7 @@ namespace VPetLLM.UI.Windows
             // ASR settings
             ((CheckBox)this.FindName("CheckBox_ASR_IsEnabled")).Click += Control_Click;
             ((ComboBox)this.FindName("ComboBox_ASR_Provider")).SelectionChanged += Control_SelectionChanged;
-            ((TextBox)this.FindName("TextBox_ASR_HotkeyModifiers")).TextChanged += Control_TextChanged;
-            ((TextBox)this.FindName("TextBox_ASR_HotkeyKey")).TextChanged += Control_TextChanged;
+            // 快捷键现在通过捕获功能设置，不需要绑定TextChanged事件
             ((ComboBox)this.FindName("ComboBox_ASR_RecordingDevice")).SelectionChanged += Control_SelectionChanged;
             ((CheckBox)this.FindName("CheckBox_ASR_AutoSend")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_ASR_ShowTranscriptionWindow")).Click += Control_Click;
@@ -802,8 +801,8 @@ namespace VPetLLM.UI.Windows
             }
 
             ((CheckBox)this.FindName("CheckBox_ASR_IsEnabled")).IsChecked = _plugin.Settings.ASR.IsEnabled;
-            ((TextBox)this.FindName("TextBox_ASR_HotkeyModifiers")).Text = _plugin.Settings.ASR.HotkeyModifiers;
-            ((TextBox)this.FindName("TextBox_ASR_HotkeyKey")).Text = _plugin.Settings.ASR.HotkeyKey;
+            // 显示当前快捷键
+            UpdateHotkeyDisplay();
             ((CheckBox)this.FindName("CheckBox_ASR_AutoSend")).IsChecked = _plugin.Settings.ASR.AutoSend;
             ((CheckBox)this.FindName("CheckBox_ASR_ShowTranscriptionWindow")).IsChecked = _plugin.Settings.ASR.ShowTranscriptionWindow;
 
@@ -1057,8 +1056,7 @@ namespace VPetLLM.UI.Windows
 
             // ASR settings
             _plugin.Settings.ASR.IsEnabled = ((CheckBox)this.FindName("CheckBox_ASR_IsEnabled")).IsChecked ?? false;
-            _plugin.Settings.ASR.HotkeyModifiers = ((TextBox)this.FindName("TextBox_ASR_HotkeyModifiers")).Text;
-            _plugin.Settings.ASR.HotkeyKey = ((TextBox)this.FindName("TextBox_ASR_HotkeyKey")).Text;
+            // 快捷键已通过捕获功能直接保存到设置中
             _plugin.Settings.ASR.AutoSend = ((CheckBox)this.FindName("CheckBox_ASR_AutoSend")).IsChecked ?? true;
             _plugin.Settings.ASR.ShowTranscriptionWindow = ((CheckBox)this.FindName("CheckBox_ASR_ShowTranscriptionWindow")).IsChecked ?? true;
 
@@ -3983,6 +3981,102 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 Logger.Log($"Error refreshing devices: {ex.Message}");
                 MessageBox.Show($"刷新设备列表失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void Button_ASR_CaptureHotkey_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Log("ASR: Opening hotkey capture window...");
+                
+                // 创建并显示捕获窗口
+                var captureWindow = new HotkeyCapture
+                {
+                    Owner = this
+                };
+                
+                var result = captureWindow.ShowDialog();
+                
+                if (result == true && captureWindow.IsCaptured)
+                {
+                    // 保存捕获的快捷键
+                    _plugin.Settings.ASR.HotkeyModifiers = captureWindow.CapturedModifiers;
+                    _plugin.Settings.ASR.HotkeyKey = captureWindow.CapturedKey;
+                    
+                    Logger.Log($"ASR: Hotkey captured - Modifiers: {captureWindow.CapturedModifiers}, Key: {captureWindow.CapturedKey}");
+                    
+                    // 保存设置
+                    SaveSettings();
+                    
+                    // 更新显示
+                    UpdateHotkeyDisplay();
+                    
+                    Logger.Log("ASR: Hotkey saved successfully");
+                }
+                else
+                {
+                    Logger.Log("ASR: Hotkey capture cancelled");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ASR: Error capturing hotkey: {ex.Message}");
+                MessageBox.Show($"捕获快捷键失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void Button_ASR_ResetHotkey_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Log("ASR: Resetting hotkey to default...");
+                
+                // 还原为默认快捷键: Win + Alt + V
+                _plugin.Settings.ASR.HotkeyModifiers = "Win+Alt";
+                _plugin.Settings.ASR.HotkeyKey = "V";
+                
+                // 保存设置
+                SaveSettings();
+                
+                // 更新显示
+                UpdateHotkeyDisplay();
+                
+                Logger.Log("ASR: Hotkey reset to default (Win+Alt+V)");
+                
+                MessageBox.Show(
+                    LanguageHelper.Get("ASR.HotkeyResetSuccess", _plugin.Settings.Language) ?? "快捷键已还原为默认值: Win + Alt + V",
+                    LanguageHelper.Get("Success", _plugin.Settings.Language) ?? "成功",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ASR: Error resetting hotkey: {ex.Message}");
+                MessageBox.Show($"还原快捷键失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void UpdateHotkeyDisplay()
+        {
+            var textBox = (TextBox)this.FindName("TextBox_ASR_HotkeyDisplay");
+            if (textBox != null)
+            {
+                var modifiers = _plugin.Settings.ASR.HotkeyModifiers;
+                var key = _plugin.Settings.ASR.HotkeyKey;
+                
+                if (string.IsNullOrEmpty(modifiers) && string.IsNullOrEmpty(key))
+                {
+                    textBox.Text = LanguageHelper.Get("ASR.NoHotkey", _plugin.Settings.Language) ?? "未设置";
+                }
+                else if (string.IsNullOrEmpty(modifiers))
+                {
+                    textBox.Text = key;
+                }
+                else
+                {
+                    textBox.Text = $"{modifiers} + {key}";
+                }
             }
         }
     }

@@ -17,8 +17,13 @@ namespace VPetLLM.UI.Windows
         private CancellationTokenSource? _cancellationTokenSource;
         private bool _isQuickDisplayMode;
         private string? _recognizedText;
+        private bool _isCancelled = false;  // 防止重复取消
 
         public event EventHandler<string>? TranscriptionCompleted;
+        public event EventHandler? RecordingStopped;
+        
+        // 公开IsRecording属性供外部检查
+        public bool IsRecording => _isRecording;
 
         public winVoiceInput(VPetLLM plugin, bool quickDisplayMode = false)
         {
@@ -102,8 +107,18 @@ namespace VPetLLM.UI.Windows
         /// </summary>
         private void CancelAllOperations()
         {
+            // 防止重复调用
+            if (_isCancelled)
+            {
+                return;
+            }
+            
+            _isCancelled = true;
+            
             try
             {
+                Logger.Log("VoiceInput: Cancelling all operations...");
+                
                 // 取消所有异步操作
                 _cancellationTokenSource?.Cancel();
                 
@@ -174,7 +189,7 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private void StopRecording()
+        public void StopRecording()
         {
             try
             {
@@ -226,6 +241,9 @@ namespace VPetLLM.UI.Windows
                 // 停止录音动画
                 RecordingPulse.Visibility = Visibility.Collapsed;
                 StopPulseAnimation();
+                
+                // 触发录音停止事件
+                RecordingStopped?.Invoke(this, EventArgs.Empty);
             });
         }
 

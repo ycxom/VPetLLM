@@ -27,6 +27,14 @@ namespace VPetLLM
         public TTSService? TTSService;
         private GlobalHotkey? _voiceInputHotkey;
         private const int VOICE_INPUT_HOTKEY_ID = 9001;
+        private winVoiceInput? _currentVoiceInputWindow;
+        private enum VoiceInputState
+        {
+            Idle,           // 空闲状态
+            Recording,      // 正在录音
+            Editing         // 编辑状态（识别完成但未自动发送）
+        }
+        private VoiceInputState _voiceInputState = VoiceInputState.Idle;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -144,10 +152,10 @@ namespace VPetLLM
         {
             try
             {
-                Logger.Log("Voice input hotkey pressed");
+                Logger.Log($"Voice input hotkey pressed, current state: {_voiceInputState}");
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    ShowVoiceInputWindow();
+                    HandleVoiceInputHotkey();
                 });
             }
             catch (Exception ex)
@@ -156,39 +164,174 @@ namespace VPetLLM
             }
         }
 
-        public void ShowVoiceInputWindow()
+        private void HandleVoiceInputHotkey()
+        {
+            switch (_voiceInputState)
+            {
+                case VoiceInputState.Idle:
+                    // 空闲状态：开始录音
+                    StartVoiceInput();
+                    break;
+                    
+                case VoiceInputState.Recording:
+                    // 录音状态：停止录音
+                    StopVoiceInput();
+                    break;
+                    
+                case VoiceInputState.Editing:
+                    // 编辑状态：关闭当前窗口，重新开始录音
+                    CloseVoiceInputWindow();
+                    StartVoiceInput();
+                    break;
+            }
+        }
+
+        private void StartVoiceInput()
         {
             try
             {
+                Logger.Log("Starting voice input...");
+                
+                // 如果窗口已存在，先关闭它
+                if (_currentVoiceInputWindow != null)
+                {
+                    Logger.Log("Previous voice input window still exists, closing it first");
+                    try
+                    {
+                        _currentVoiceInputWindow.Close();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error closing previous window: {ex.Message}");
+                    }
+                    _currentVoiceInputWindow = null;
+                }
+                
+                _voiceInputState = VoiceInputState.Recording;
+                
                 // 根据设置决定是否使用快速显示模式
                 bool quickMode = Settings.ASR.AutoSend;
-                var voiceInputWindow = new winVoiceInput(this, quickMode);
+                _currentVoiceInputWindow = new winVoiceInput(this, quickMode);
                 
-                voiceInputWindow.TranscriptionCompleted += (s, transcription) =>
+                // 监听窗口关闭事件
+                _currentVoiceInputWindow.Closed += (s, e) =>
                 {
+                    _currentVoiceInputWindow = null;
+                    _voiceInputState = VoiceInputState.Idle;
+                    Logger.Log("Voice input window closed, state reset to Idle");
+                };
+                
+                // 监听录音停止事件
+                _currentVoiceInputWindow.RecordingStopped += (s, e) =>
+                {
+                    Logger.Log("Recording stopped, waiting for transcription...");
+                    // 不在这里改变状态，等待转录完成
+                };
+                
+                // 监听转录完成事件
+                _currentVoiceInputWindow.TranscriptionCompleted += (s, transcription) =>
+                {
+                    Logger.Log($"Transcription completed, text length: {transcription?.Length ?? 0}");
+                    
                     if (!string.IsNullOrWhiteSpace(transcription))
                     {
-                        // 发送到 LLM 进行处理
-                        Application.Current.Dispatcher.InvokeAsync(async () =>
+                        if (Settings.ASR.AutoSend)
                         {
-                            try
+                            // 自动发送模式：直接发送到LLM
+                            Logger.Log("Auto-send mode: sending to LLM and resetting to Idle");
+                            _voiceInputState = VoiceInputState.Idle;
+                            Application.Current.Dispatcher.InvokeAsync(async () =>
                             {
-                                await SendChat(transcription);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Log($"Error sending voice input to chat: {ex.Message}");
-                            }
-                        });
+                                try
+                                {
+                                    await SendChat(transcription);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Log($"Error sending voice input to chat: {ex.Message}");
+                                }
+                            });
+                        }
+                        else
+                        {
+                            // 编辑模式：进入编辑状态
+                            Logger.Log("Edit mode: entering Editing state");
+                            _voiceInputState = VoiceInputState.Editing;
+                        }
+                    }
+                    else
+                    {
+                        // 如果转录结果为空，重置为空闲状态
+                        Logger.Log("Empty transcription, resetting to Idle");
+                        _voiceInputState = VoiceInputState.Idle;
                     }
                 };
-                voiceInputWindow.Show();
+                
+                _currentVoiceInputWindow.Show();
+                Logger.Log("Voice input window shown");
             }
             catch (Exception ex)
             {
-                Logger.Log($"Error showing voice input window: {ex.Message}");
-                MessageBox.Show($"打开语音输入窗口失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                Logger.Log($"Error starting voice input: {ex.Message}");
+                _voiceInputState = VoiceInputState.Idle;
+                MessageBox.Show($"启动语音输入失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void StopVoiceInput()
+        {
+            try
+            {
+                Logger.Log("Stopping voice input...");
+                
+                if (_currentVoiceInputWindow == null)
+                {
+                    Logger.Log("No voice input window to stop, resetting state to Idle");
+                    _voiceInputState = VoiceInputState.Idle;
+                    return;
+                }
+                
+                // 检查窗口是否正在录音
+                if (!_currentVoiceInputWindow.IsRecording)
+                {
+                    Logger.Log("Window is not recording, resetting state to Idle");
+                    _voiceInputState = VoiceInputState.Idle;
+                    return;
+                }
+                
+                _currentVoiceInputWindow.StopRecording();
+                // 状态将在转录完成后更新
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error stopping voice input: {ex.Message}");
+                _voiceInputState = VoiceInputState.Idle;
+            }
+        }
+
+        private void CloseVoiceInputWindow()
+        {
+            try
+            {
+                Logger.Log("Closing voice input window...");
+                if (_currentVoiceInputWindow != null)
+                {
+                    _currentVoiceInputWindow.Close();
+                    _currentVoiceInputWindow = null;
+                }
+                _voiceInputState = VoiceInputState.Idle;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error closing voice input window: {ex.Message}");
+                _voiceInputState = VoiceInputState.Idle;
+            }
+        }
+
+        public void ShowVoiceInputWindow()
+        {
+            // 使用新的快捷键处理逻辑
+            HandleVoiceInputHotkey();
         }
 
         private void SyncNames(object sender, System.Timers.ElapsedEventArgs e)

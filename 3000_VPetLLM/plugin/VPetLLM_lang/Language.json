@@ -1333,10 +1333,10 @@
             "jp": "キー:"
         },
         "HotkeyDescription": {
-            "en": "Default hotkey: Win + Alt + V",
-            "zh-hans": "默认快捷键: Win + Alt + V",
-            "zh-hant": "默認快捷鍵: Win + Alt + V",
-            "jp": "デフォルトホットキー: Win + Alt + V"
+            "en": "Click the capture button, then press your desired hotkey combination.",
+            "zh-hans": "点击捕获按钮后，按下您想要的快捷键组合",
+            "zh-hant": "點擊捕獲按鈕後，按下您想要的快速鍵組合",
+            "jp": "キャプチャボタンをクリックしてから、ご希望のホットキーの組み合わせを押してください。"
         },
         "RecognitionSettings": {
             "en": "Recognition Settings",
@@ -1515,6 +1515,48 @@
             "zh-hans": "测试语音输入",
             "zh-hant": "測試語音輸入",
             "jp": "音声入力をテスト"
+        },
+        "CaptureHotkey": {
+            "en": "Capture Hotkey",
+            "zh-hans": "捕获快捷键",
+            "zh-hant": "捕獲快捷鍵",
+            "jp": "ホットキーをキャプチャ"
+        },
+        "EndCapture": {
+            "en": "End Capture",
+            "zh-hans": "结束捕获",
+            "zh-hant": "結束捕獲",
+            "jp": "キャプチャ終了"
+        },
+        "PressKey": {
+            "en": "Press your hotkey combination...",
+            "zh-hans": "请按下快捷键...",
+            "zh-hant": "請按下快捷鍵...",
+            "jp": "ホットキーを押してください..."
+        },
+        "NoHotkey": {
+            "en": "Not set",
+            "zh-hans": "未设置",
+            "zh-hant": "未設置",
+            "jp": "未設定"
+        },
+        "ResetHotkey": {
+            "en": "Reset Default",
+            "zh-hans": "还原默认",
+            "zh-hant": "還原默認",
+            "jp": "デフォルトに戻す"
+        },
+        "DefaultHotkey": {
+            "en": "Default hotkey: Win + Alt + V",
+            "zh-hans": "默认快捷键: Win + Alt + V",
+            "zh-hant": "默認快捷鍵: Win + Alt + V",
+            "jp": "デフォルトホットキー: Win + Alt + V"
+        },
+        "HotkeyResetSuccess": {
+            "en": "Hotkey has been reset to default: Win + Alt + V",
+            "zh-hans": "快捷键已还原为默认值: Win + Alt + V",
+            "zh-hant": "快捷鍵已還原為默認值: Win + Alt + V",
+            "jp": "ホットキーがデフォルトにリセットされました: Win + Alt + V"
         }
     },
     "VoiceInput": {

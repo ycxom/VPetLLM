@@ -1331,25 +1331,36 @@
                                     <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="10"/>
-                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox Grid.Column="0"
-                                                x:Name="TextBox_ASR_HotkeyModifiers"
+                                                x:Name="TextBox_ASR_HotkeyDisplay"
+                                                IsReadOnly="True"
                                                 Style="{StaticResource ModernTextBox}"
-                                                ToolTip="修饰键，例如: Win+Alt"/>
-                                        <TextBlock Grid.Column="1"
-                                                Text="+"
-                                                VerticalAlignment="Center"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource SecondaryTextBrush}"/>
-                                        <TextBox Grid.Column="2"
-                                                x:Name="TextBox_ASR_HotkeyKey"
-                                                Style="{StaticResource ModernTextBox}"
-                                                ToolTip="按键，例如: V"/>
+                                                ToolTip="当前快捷键"/>
+                                        <Button Grid.Column="1"
+                                                x:Name="Button_ASR_CaptureHotkey"
+                                                Content="{utils:Localize KeyPath=ASR.CaptureHotkey, Default=捕获快捷键}"
+                                                Click="Button_ASR_CaptureHotkey_Click"
+                                                Margin="8,0,0,0"
+                                                Padding="12,6"
+                                                Style="{StaticResource ModernButton}"/>
+                                        <Button Grid.Column="2"
+                                                x:Name="Button_ASR_ResetHotkey"
+                                                Content="{utils:Localize KeyPath=ASR.ResetHotkey, Default=还原默认}"
+                                                Click="Button_ASR_ResetHotkey_Click"
+                                                Margin="8,0,0,0"
+                                                Padding="12,6"
+                                                Style="{StaticResource ModernButton}"/>
                                     </Grid>
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.HotkeyDescription, Default=默认快捷键: Win + Alt + V}"
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.HotkeyDescription, Default=点击捕获按钮后，按下您想要的快捷键组合}"
                                             Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,8"/>
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.DefaultHotkey, Default=默认快捷键: Win + Alt + V}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Foreground="#666666"
+                                            FontSize="11"
                                             Margin="0,0,0,16"/>
 
                                     <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
