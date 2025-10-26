@@ -53,7 +53,7 @@ namespace VPetLLM.UI.Windows
             // 获取当前活跃的OpenAI节点设置
             if (_plugin.Settings.OpenAI.OpenAINodes.Count == 0)
             {
-                // 如果没有配置节点，返回默认设置（并在渠道内多 key 自动随机）
+                // 如果没有配置节点，返回默认设置（并在渠道内多 key 自动随机�?
                 return new Setting.OpenAINodeSetting
                 {
                     ApiKey = SelectRandomKey(_plugin.Settings.OpenAI.ApiKey),
@@ -67,14 +67,14 @@ namespace VPetLLM.UI.Windows
                 };
             }
 
-            // 使用负载均衡或当前索引获取节点
+            // 使用负载均衡或当前索引获取节�?
             if (_plugin.Settings.OpenAI.EnableLoadBalancing)
             {
                 // 负载均衡：随机在已启用节点中选择
                 var enabledNodes = _plugin.Settings.OpenAI.OpenAINodes.Where(n => n.Enabled).ToList();
                 if (enabledNodes.Count == 0)
                 {
-                    // 如果没有启用的节点，返回第一个节点（并随机化其 ApiKey）
+                    // 如果没有启用的节点，返回第一个节点（并随机化�?ApiKey�?
                     return CloneOpenAINodeWithRandomKey(_plugin.Settings.OpenAI.OpenAINodes.First());
                 }
                 var idx = _rand.Next(enabledNodes.Count);
@@ -95,7 +95,7 @@ namespace VPetLLM.UI.Windows
         {
             var g = _plugin.Settings.Gemini;
 
-            // 未启用负载均衡：仍进行渠道内多 key 自动随机
+            // 未启用负载均衡：仍进行渠道内�?key 自动随机
             if (!g.EnableLoadBalancing)
             {
                 return new Setting.GeminiSetting
@@ -130,7 +130,7 @@ namespace VPetLLM.UI.Windows
                 };
             }
 
-            // 在启用节点中随机选一个，并对其 ApiKey 做随机化
+            // 在启用节点中随机选一个，并对�?ApiKey 做随机化
             var picked = enabledNodes[_rand.Next(enabledNodes.Count)];
 
             return new Setting.GeminiSetting
@@ -151,7 +151,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 // 尝试获取插件的多语言描述
-                // 如果插件支持多语言，它应该能根据当前语言返回正确的描述
+                // 如果插件支持多语言，它应该能根据当前语言返回正确的描�?
                 if (plugin.Enabled)
                 {
                     // 启用的插件应该已经正确初始化，可以直接获取Description
@@ -167,7 +167,7 @@ namespace VPetLLM.UI.Windows
                         plugin.Initialize(_plugin);
                         var description = plugin.Description;
 
-                        // 如果插件原本是禁用的，恢复禁用状态
+                        // 如果插件原本是禁用的，恢复禁用状�?
                         if (!wasEnabled)
                         {
                             plugin.Unload();
@@ -178,7 +178,7 @@ namespace VPetLLM.UI.Windows
                     catch (Exception ex)
                     {
                         Utils.Logger.Log($"Failed to get localized description for disabled plugin {plugin.Name}: {ex.Message}");
-                        // 回退到原始描述
+                        // 回退到原始描�?
                         return plugin.Description;
                     }
                 }
@@ -200,7 +200,7 @@ namespace VPetLLM.UI.Windows
         private DispatcherTimer? _geminiRefreshTimer;
         private bool _hasUnsavedChanges = false;
         private readonly object _saveLock = new object();
-        // 合并异步保存标记，防止重复排队
+        // 合并异步保存标记，防止重复排�?
         private bool _isSaveScheduled = false;
         // UI 就绪标记：Loaded 后才允许保存，避免初始化阶段触发立即保存导致 NRE
         private bool _isReadyToSave = false;
@@ -211,7 +211,7 @@ namespace VPetLLM.UI.Windows
         // 随机选择器（负载均衡随机用）
         private readonly Random _rand = new Random();
 
-        // 在同一渠道内，若 ApiKey 包含多个 key，则自动随机选择一个（不受负载均衡开关影响）
+        // 在同一渠道内，�?ApiKey 包含多个 key，则自动随机选择一个（不受负载均衡开关影响）
         private string SelectRandomKey(string raw)
         {
             if (string.IsNullOrWhiteSpace(raw)) return raw;
@@ -226,7 +226,7 @@ namespace VPetLLM.UI.Windows
             return parts[idx];
         }
 
-        // 克隆一个 OpenAI 节点，并将 ApiKey 随机拆分后取单个 key
+        // 克隆一�?OpenAI 节点，并�?ApiKey 随机拆分后取单个 key
         private Setting.OpenAINodeSetting CloneOpenAINodeWithRandomKey(Setting.OpenAINodeSetting src)
         {
             if (src == null) return null;
@@ -248,7 +248,7 @@ namespace VPetLLM.UI.Windows
             InitializeComponent();
             _plugin = plugin;
             
-            // 初始化触摸反馈设置控件
+            // 初始化触摸反馈设置控�?
             InitializeTouchFeedbackSettings();
             _plugin.SettingWindow = this;
             LoadSettings();
@@ -256,9 +256,9 @@ namespace VPetLLM.UI.Windows
             Loaded += (s, e) =>
             {
                 UpdateUIForLanguage();
-                // 同步本地化服务的语言，确保 XAML 中 {utils:Localize} 初次加载和后续切换都正确刷新
+                // 同步本地化服务的语言，确�?XAML �?{utils:Localize} 初次加载和后续切换都正确刷新
                 LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
-                // 监听全局本地化变更，自动刷新手动赋值的 UI（如列头）
+                // 监听全局本地化变更，自动刷新手动赋值的 UI（如列头�?
                 LocalizationService.Instance.PropertyChanged += (sender2, e2) =>
                 {
                     if (e2.PropertyName == "Item[]")
@@ -267,16 +267,16 @@ namespace VPetLLM.UI.Windows
                     }
                 };
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
-                // 标记界面已就绪，允许后续的立即保存
+                // 标记界面已就绪，允许后续的立即保�?
                 _isReadyToSave = true;
-                // 视觉树稳定后再挂载列表冒泡监听，避免初始化/布局阶段触发保存
+                // 视觉树稳定后再挂载列表冒泡监听，避免初始�?布局阶段触发保存
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     AttachImmediateSaveForChannelLists();
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             };
             ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
-            // OpenAI多节点配置 - 温度设置事件处理已移至多节点管理界面
+            // OpenAI多节点配�?- 温度设置事件处理已移至多节点管理界面
             if (this.FindName("Slider_Gemini_Temperature") is Slider sliderGemTemp)
                 sliderGemTemp.ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_Free_Temperature")).ValueChanged += Control_ValueChanged;
@@ -294,7 +294,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_Role")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_OllamaUrl")).TextChanged += Control_TextChanged;
             ((ComboBox)this.FindName("ComboBox_OllamaModel")).SelectionChanged += Control_SelectionChanged;
-            // OpenAI多节点配置 - 事件处理已移至多节点管理界面
+            // OpenAI多节点配�?- 事件处理已移至多节点管理界面
             if (this.FindName("TextBox_GeminiApiKey") is TextBox tbGeminiApiKey)
                 tbGeminiApiKey.TextChanged += Control_TextChanged;
 
@@ -322,7 +322,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).TextChanged += Control_TextChanged;
-            // OpenAI多节点配置 - 高级设置事件处理已移至多节点管理界面
+            // OpenAI多节点配�?- 高级设置事件处理已移至多节点管理界面
             if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdvBind)
                 cbGemAdvBind.Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).Click += Control_Click;
@@ -366,6 +366,18 @@ namespace VPetLLM.UI.Windows
 
             // DIY TTS 按钮事件绑定 - 已在 XAML 中绑定，无需重复绑定
 
+            // GPT-SoVITS TTS settings
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_ReferWavPath")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptText")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_PromptLanguage")).SelectionChanged += Control_SelectionChanged;
+            ((ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextLanguage")).SelectionChanged += Control_SelectionChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopK")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopP")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Temperature")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Speed")).TextChanged += Control_TextChanged;
+
             // ASR settings
             ((CheckBox)this.FindName("CheckBox_ASR_IsEnabled")).Click += Control_Click;
             ((ComboBox)this.FindName("ComboBox_ASR_Provider")).SelectionChanged += Control_SelectionChanged;
@@ -393,13 +405,13 @@ namespace VPetLLM.UI.Windows
 
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
 
-            // 绑定 OpenAI 节点详情控件事件，确保编辑即时回写
+            // 绑定 OpenAI 节点详情控件事件，确保编辑即时回�?
             EnsureOpenAINodeDetailHandlers();
             // 初始化自动保存定时器
             InitializeAutoSaveTimer();
             // 初始化密钥输入去抖保存定时器
             InitializeSecretSaveTimer();
-            // 初始化 Gemini 列表刷新去抖定时器
+            // 初始�?Gemini 列表刷新去抖定时�?
             InitializeGeminiRefreshTimer();
 
             // 负载均衡开关点击即保存
@@ -409,7 +421,7 @@ namespace VPetLLM.UI.Windows
 
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            // 实时更新温度值显示
+            // 实时更新温度值显�?
             if (sender is Slider slider)
             {
                 if (slider.Name == "Slider_Ollama_Temperature")
@@ -433,7 +445,7 @@ namespace VPetLLM.UI.Windows
                 {
                     ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = slider.Value.ToString("F2");
 
-                    // 立即更新所有TTS服务实例的音量设置
+                    // 立即更新所有TTS服务实例的音量设�?
                     var volumeGainSlider = (Slider)this.FindName("Slider_TTS_VolumeGain");
                     _ttsService?.UpdateVolumeSettings(slider.Value, volumeGainSlider.Value);
                     _plugin.TTSService?.UpdateVolumeSettings(slider.Value, volumeGainSlider.Value);
@@ -442,7 +454,7 @@ namespace VPetLLM.UI.Windows
                 {
                     ((TextBlock)this.FindName("TextBlock_TTS_VolumeGainValue")).Text = slider.Value.ToString("F1");
 
-                    // 立即更新所有TTS服务实例的音量设置
+                    // 立即更新所有TTS服务实例的音量设�?
                     var volumeSlider = (Slider)this.FindName("Slider_TTS_Volume");
                     _ttsService?.UpdateVolumeSettings(volumeSlider.Value, slider.Value);
                     _plugin.TTSService?.UpdateVolumeSettings(volumeSlider.Value, slider.Value);
@@ -462,12 +474,12 @@ namespace VPetLLM.UI.Windows
             // 先处理特殊逻辑
             if (sender == FindName("ComboBox_Language"))
             {
-                // 保存到设置（更新 _plugin.Settings.Language）
+                // 保存到设置（更新 _plugin.Settings.Language�?
                 SaveSettings();
                 // 重新加载语言资源
                 LanguageHelper.ReloadLanguages();
 
-                // 立刻广播一次，XAML 中 {utils:Localize} 立即更新
+                // 立刻广播一次，XAML �?{utils:Localize} 立即更新
                 LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
                 // 同时刷新代码后台赋值的控件
                 UpdateUIForLanguage();
@@ -479,9 +491,9 @@ namespace VPetLLM.UI.Windows
                     UpdateUIForLanguage();
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
-                // 重新初始化部分非绑定或复杂逻辑的控件
+                // 重新初始化部分非绑定或复杂逻辑的控�?
                 InitializeTouchFeedbackSettings();
-                // 刷新插件列表以更新动态生成的描述等文本
+                // 刷新插件列表以更新动态生成的描述等文�?
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
             }
             if (sender == FindName("ComboBox_PromptLanguage"))
@@ -499,7 +511,7 @@ namespace VPetLLM.UI.Windows
 
                 if (isImportantConfig)
                 {
-                    // 使用Dispatcher.BeginInvoke确保在UI更新完成后保存
+                    // 使用Dispatcher.BeginInvoke确保在UI更新完成后保�?
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         SaveSettings();
@@ -518,7 +530,7 @@ namespace VPetLLM.UI.Windows
 
         private void Control_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // 对于关键配置字段，立即保存
+            // 对于关键配置字段，立即保�?
             if (sender is TextBox textBox)
             {
                 string[] criticalFields = {
@@ -528,7 +540,7 @@ namespace VPetLLM.UI.Windows
 
                 if (criticalFields.Contains(textBox.Name))
                 {
-                    // 关键字段使用Dispatcher确保UI更新完成后保存
+                    // 关键字段使用Dispatcher确保UI更新完成后保�?
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         SaveSettings();
@@ -557,7 +569,7 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 初始化触摸反馈设置控件
+        /// 初始化触摸反馈设置控�?
         /// </summary>
         private void InitializeTouchFeedbackSettings()
         {
@@ -581,8 +593,8 @@ namespace VPetLLM.UI.Windows
             languageComboBox.ItemsSource = LanguageHelper.LanguageDisplayMap.Values;
             languageComboBox.SelectedItem = LanguageHelper.LanguageDisplayMap.FirstOrDefault(x => x.Key == _plugin.Settings.Language).Value;
             var promptlanguageComboBox = (ComboBox)this.FindName("ComboBox_PromptLanguage");
-            promptlanguageComboBox.ItemsSource = new List<string> { "English", "简体中文" };
-            promptlanguageComboBox.SelectedItem = _plugin.Settings.PromptLanguage == "en" ? "English" : "简体中文";
+            promptlanguageComboBox.ItemsSource = new List<string> { "English", "简体中�? };
+            promptlanguageComboBox.SelectedItem = _plugin.Settings.PromptLanguage == "en" ? "English" : "简体中�?;
             ((TextBox)this.FindName("TextBox_AiName")).Text = _plugin.Settings.AiName;
             ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
@@ -601,8 +613,8 @@ namespace VPetLLM.UI.Windows
             }
             ((TextBox)this.FindName("TextBox_OllamaUrl")).Text = _plugin.Settings.Ollama.Url;
             ((ComboBox)this.FindName("ComboBox_OllamaModel")).Text = _plugin.Settings.Ollama.Model;
-            // OpenAI多节点配置 - 不再使用单一配置
-            // 这些控件现在用于多节点管理界面
+            // OpenAI多节点配�?- 不再使用单一配置
+            // 这些控件现在用于多节点管理界�?
             //((TextBox)this.FindName("TextBox_OpenAIApiKey")).Text = "";
             //((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text = "";
             //((TextBox)this.FindName("TextBox_OpenAIUrl")).Text = "";
@@ -610,17 +622,17 @@ namespace VPetLLM.UI.Windows
             {
                 _plugin.Settings.Gemini = new Setting.GeminiSetting();
             }
-            // 负载均衡开关
+            // 负载均衡开�?
             if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLB)
                 cbGemLB.IsChecked = _plugin.Settings.Gemini.EnableLoadBalancing;
-            // OpenAI 负载均衡开关
+            // OpenAI 负载均衡开�?
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLB)
                 cbOpenLB.IsChecked = _plugin.Settings.OpenAI.EnableLoadBalancing;
 
-            // 刷新Gemini多渠道列表
+            // 刷新Gemini多渠道列�?
             RefreshGeminiNodesList();
 
-            // 兼容旧表单（保留显示）
+            // 兼容旧表单（保留显示�?
             if (this.FindName("TextBox_GeminiApiKey") is TextBox tbGeminiApiKey2)
                 tbGeminiApiKey2.Text = _plugin.Settings.Gemini.ApiKey;
             if (this.FindName("ComboBox_GeminiModel") is ComboBox cbGeminiModel)
@@ -735,7 +747,7 @@ namespace VPetLLM.UI.Windows
             ((Slider)this.FindName("Slider_TTS_Speed")).Value = _plugin.Settings.TTS.Speed;
             ((TextBlock)this.FindName("TextBlock_TTS_SpeedValue")).Text = _plugin.Settings.TTS.Speed.ToString("F2");
 
-            // TTS提供商设置
+            // TTS提供商设�?
             var providerComboBox = (ComboBox)this.FindName("ComboBox_TTS_Provider");
             foreach (ComboBoxItem item in providerComboBox.Items)
             {
@@ -788,12 +800,46 @@ namespace VPetLLM.UI.Windows
 
             // DIY TTS 配置通过 JSON 文件管理，无需在此加载
 
-            // 触发提供商切换事件来显示正确的面板
+            // GPT-SoVITS TTS 设置
+            if (_plugin.Settings.TTS.GPTSoVITS == null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS = new Setting.GPTSoVITSTTSSetting();
+            }
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl")).Text = _plugin.Settings.TTS.GPTSoVITS.BaseUrl;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_ReferWavPath")).Text = _plugin.Settings.TTS.GPTSoVITS.ReferWavPath;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptText")).Text = _plugin.Settings.TTS.GPTSoVITS.PromptText;
+
+            var promptLangComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_PromptLanguage");
+            foreach (ComboBoxItem item in promptLangComboBox.Items)
+            {
+                if (item.Tag?.ToString() == _plugin.Settings.TTS.GPTSoVITS.PromptLanguage)
+                {
+                    promptLangComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
+            var textLangComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextLanguage");
+            foreach (ComboBoxItem item in textLangComboBox.Items)
+            {
+                if (item.Tag?.ToString() == _plugin.Settings.TTS.GPTSoVITS.TextLanguage)
+                {
+                    textLangComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc")).Text = _plugin.Settings.TTS.GPTSoVITS.CutPunc;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopK")).Text = _plugin.Settings.TTS.GPTSoVITS.TopK.ToString();
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopP")).Text = _plugin.Settings.TTS.GPTSoVITS.TopP.ToString();
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Temperature")).Text = _plugin.Settings.TTS.GPTSoVITS.Temperature.ToString();
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Speed")).Text = _plugin.Settings.TTS.GPTSoVITS.Speed.ToString();
+
+            // 触发提供商切换事件来显示正确的面�?
             ComboBox_TTS_Provider_SelectionChanged(providerComboBox, null);
 
-            // 加载 GPT-SoVITS 设置
+            // ���� GPT-SoVITS ����
             LoadGPTSoVITSSettings();
-
             // 初始化TTS服务
             _ttsService = new TTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
 
@@ -804,7 +850,7 @@ namespace VPetLLM.UI.Windows
             }
 
             ((CheckBox)this.FindName("CheckBox_ASR_IsEnabled")).IsChecked = _plugin.Settings.ASR.IsEnabled;
-            // 显示当前快捷键
+            // 显示当前快捷�?
             UpdateHotkeyDisplay();
             ((CheckBox)this.FindName("CheckBox_ASR_AutoSend")).IsChecked = _plugin.Settings.ASR.AutoSend;
             ((CheckBox)this.FindName("CheckBox_ASR_ShowTranscriptionWindow")).IsChecked = _plugin.Settings.ASR.ShowTranscriptionWindow;
@@ -833,7 +879,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_ASR_Soniox_BaseUrl")).Text = _plugin.Settings.ASR.Soniox.BaseUrl;
             ((ComboBox)this.FindName("ComboBox_ASR_Soniox_Model")).Text = _plugin.Settings.ASR.Soniox.Model;
             
-            // 初始化 Soniox 语言列表（如果有 API Key，尝试自动加载）
+            // 初始�?Soniox 语言列表（如果有 API Key，尝试自动加载）
             InitializeSonioxLanguages();
             
             ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnablePunctuation")).IsChecked = _plugin.Settings.ASR.Soniox.EnablePunctuation;
@@ -909,9 +955,9 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Role = roleTextBox.Text;
             _plugin.Settings.Ollama.Url = ollamaUrlTextBox.Text;
             _plugin.Settings.Ollama.Model = ollamaModelComboBox.Text;
-            // OpenAI多节点配置 - 不再使用单一配置
-            // 这些控件现在用于多节点管理界面
-            // OpenAI配置通过多节点列表管理
+            // OpenAI多节点配�?- 不再使用单一配置
+            // 这些控件现在用于多节点管理界�?
+            // OpenAI配置通过多节点列表管�?
             if (geminiApiKeyTextBox != null)
                 _plugin.Settings.Gemini.ApiKey = geminiApiKeyTextBox.Text;
             if (geminiModelComboBox != null)
@@ -955,8 +1001,8 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Ollama.Temperature = ollamaTemperatureSlider.Value;
             if (int.TryParse(ollamaMaxTokensTextBox.Text, out int ollamaMaxTokens))
                 _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
-            // OpenAI多节点配置 - 高级设置通过多节点管理界面处理
-            // 温度和最大令牌数现在由各个节点独立配置
+            // OpenAI多节点配�?- 高级设置通过多节点管理界面处�?
+            // 温度和最大令牌数现在由各个节点独立配�?
             if (geminiEnableAdvancedCheckBox != null)
                 _plugin.Settings.Gemini.EnableAdvanced = geminiEnableAdvancedCheckBox.IsChecked ?? false;
             if (geminiTemperatureSlider != null)
@@ -964,10 +1010,10 @@ namespace VPetLLM.UI.Windows
             if (geminiMaxTokensTextBox != null && int.TryParse(geminiMaxTokensTextBox.Text, out int geminiMaxTokens))
                 _plugin.Settings.Gemini.MaxTokens = geminiMaxTokens;
 
-            // 保存 Gemini 负载均衡开关
+            // 保存 Gemini 负载均衡开�?
             if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLB2)
                 _plugin.Settings.Gemini.EnableLoadBalancing = cbGemLB2.IsChecked ?? false;
-            // 保存 OpenAI 负载均衡开关
+            // 保存 OpenAI 负载均衡开�?
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLB2)
                 _plugin.Settings.OpenAI.EnableLoadBalancing = cbOpenLB2.IsChecked ?? false;
             
@@ -1016,7 +1062,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.TTS.VolumeGain = ((Slider)this.FindName("Slider_TTS_VolumeGain")).Value;
             _plugin.Settings.TTS.Speed = ((Slider)this.FindName("Slider_TTS_Speed")).Value;
 
-            // TTS提供商设置
+            // TTS提供商设�?
             var selectedProviderItem = ((ComboBox)this.FindName("ComboBox_TTS_Provider")).SelectedItem as ComboBoxItem;
             if (selectedProviderItem != null)
             {
@@ -1053,9 +1099,39 @@ namespace VPetLLM.UI.Windows
 
             // DIY TTS 配置通过 JSON 文件管理，无需在此保存
 
-            // 保存 GPT-SoVITS 设置
-            SaveGPTSoVITSSettings();
+            // GPT-SoVITS TTS 设置
+            _plugin.Settings.TTS.GPTSoVITS.BaseUrl = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl")).Text;
+            _plugin.Settings.TTS.GPTSoVITS.ReferWavPath = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_ReferWavPath")).Text;
+            _plugin.Settings.TTS.GPTSoVITS.PromptText = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptText")).Text;
 
+            var selectedPromptLangItem = ((ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_PromptLanguage")).SelectedItem as ComboBoxItem;
+            if (selectedPromptLangItem != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.PromptLanguage = selectedPromptLangItem.Tag?.ToString() ?? "zh";
+            }
+
+            var selectedTextLangItem = ((ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextLanguage")).SelectedItem as ComboBoxItem;
+            if (selectedTextLangItem != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.TextLanguage = selectedTextLangItem.Tag?.ToString() ?? "zh";
+            }
+
+            _plugin.Settings.TTS.GPTSoVITS.CutPunc = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc")).Text;
+
+            if (int.TryParse(((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopK")).Text, out int topK))
+                _plugin.Settings.TTS.GPTSoVITS.TopK = topK;
+
+            if (double.TryParse(((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopP")).Text, out double topP))
+                _plugin.Settings.TTS.GPTSoVITS.TopP = topP;
+
+            if (double.TryParse(((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Temperature")).Text, out double temperature))
+                _plugin.Settings.TTS.GPTSoVITS.Temperature = temperature;
+
+            if (double.TryParse(((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Speed")).Text, out double speed))
+                _plugin.Settings.TTS.GPTSoVITS.Speed = speed;
+
+            // ���� GPT-SoVITS �汾��ģ�ͺ��������
+            SaveGPTSoVITSSettings();
             // 更新TTS服务设置
             _ttsService?.UpdateSettings(_plugin.Settings.TTS, _plugin.Settings.Proxy);
             _plugin.UpdateTTSService();
@@ -1114,7 +1190,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.ASR.Soniox.EnablePunctuation = ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnablePunctuation")).IsChecked ?? true;
             _plugin.Settings.ASR.Soniox.EnableProfanityFilter = ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnableProfanityFilter")).IsChecked ?? false;
 
-            // 更新语音输入快捷键
+            // 更新语音输入快捷�?
             _plugin.UpdateVoiceInputHotkey();
 
             _plugin.Settings.Save();
@@ -1138,7 +1214,7 @@ namespace VPetLLM.UI.Windows
             }
             else
             {
-                // 如果提供商没变，也需要重新创建ChatCore以应用新的设置
+                // 如果提供商没变，也需要重新创建ChatCore以应用新的设�?
                 var currentHistory = _plugin.ChatCore.GetChatHistory();
                 IChatCore updatedChatCore = newProvider switch
                 {
@@ -1156,7 +1232,7 @@ namespace VPetLLM.UI.Windows
             }
             _plugin.UpdateActionProcessor();
 
-            // 重置未保存更改标志
+            // 重置未保存更改标�?
             lock (_saveLock)
             {
                 _hasUnsavedChanges = false;
@@ -1184,7 +1260,7 @@ namespace VPetLLM.UI.Windows
             }
             finally
             {
-                // 确保在UI线程上停止动画和重置按钮状态（使用异步避免潜在阻塞）
+                // 确保在UI线程上停止动画和重置按钮状态（使用异步避免潜在阻塞�?
                 await Dispatcher.InvokeAsync(() =>
                 {
                     StopButtonLoadingAnimation(button);
@@ -1249,7 +1325,7 @@ namespace VPetLLM.UI.Windows
                 
                 if (selectedNode != null)
                 {
-                    // 如果选中了节点，使用选中节点的配置
+                    // 如果选中了节点，使用选中节点的配�?
                     geminiSetting = new Setting.GeminiSetting
                     {
                         ApiKey = selectedNode.ApiKey,
@@ -1264,14 +1340,14 @@ namespace VPetLLM.UI.Windows
                 }
                 else
                 {
-                    // 如果没有选中节点，使用当前设置
+                    // 如果没有选中节点，使用当前设�?
                     geminiSetting = _plugin.Settings.Gemini;
                 }
 
                 var geminiCore = new GeminiChatCore(geminiSetting, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = await Task.Run(() => geminiCore.RefreshModels());
 
-                // 记录刷新前两个下拉框的文本，避免刷新后丢失用户输入
+                // 记录刷新前两个下拉框的文本，避免刷新后丢失用户输�?
                 string oldMainText = (this.FindName("ComboBox_GeminiModel") as ComboBox)?.Text ?? string.Empty;
                 string oldNodeText = (this.FindName("ComboBox_GeminiNodeModel") as ComboBox)?.Text ?? string.Empty;
 
@@ -1279,14 +1355,14 @@ namespace VPetLLM.UI.Windows
                 if (this.FindName("ComboBox_GeminiModel") is ComboBox cbMain)
                 {
                     cbMain.ItemsSource = models;
-                    // 若原文本为空，默认选第一项
+                    // 若原文本为空，默认选第一�?
                     if (models.Count > 0 && string.IsNullOrEmpty(oldMainText))
                         cbMain.SelectedIndex = 0;
                     else
                         cbMain.Text = oldMainText;
                 }
 
-                // 刷新节点详情下拉框
+                // 刷新节点详情下拉�?
                 if (this.FindName("ComboBox_GeminiNodeModel") is ComboBox cbNode)
                 {
                     cbNode.ItemsSource = models;
@@ -1404,7 +1480,7 @@ namespace VPetLLM.UI.Windows
         private void DataGrid_Plugins_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             // 插件选择变化时的处理逻辑
-            // 这里可以添加需要的逻辑，目前保持空实现以避免编译错误
+            // 这里可以添加需要的逻辑，目前保持空实现以避免编译错�?
         }
 
         private async void Button_ImportPlugin_Click(object sender, RoutedEventArgs e)
@@ -1467,12 +1543,12 @@ namespace VPetLLM.UI.Windows
                         }
                         catch (Exception ex)
                         {
-                            // 如果初始化失败，回滚状态
+                            // 如果初始化失败，回滚状�?
                             item.IsEnabled = false;
                             item.LocalPlugin.Enabled = false;
                             checkBox.IsChecked = false;
 
-                            var errorMsg = $"{LanguageHelper.Get("Plugin.InitializeFailed", langCode) ?? "插件初始化失败"}: {ex.Message}";
+                            var errorMsg = $"{LanguageHelper.Get("Plugin.InitializeFailed", langCode) ?? "插件初始化失�?}: {ex.Message}";
                             MessageBox.Show(errorMsg, LanguageHelper.Get("Error", langCode) ?? "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                             Logger.Log($"Plugin '{item.LocalPlugin.Name}' initialization failed: {ex.Message}");
                             return;
@@ -1493,12 +1569,12 @@ namespace VPetLLM.UI.Windows
                         }
                     }
 
-                    // 更新状态文本
+                    // 更新状态文�?
                     item.StatusText = isEnabled ?
-                        LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行中" :
-                        LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用";
+                        LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行�? :
+                        LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁�?;
 
-                    // 更新描述（因为启用/禁用状态可能影响多语言描述的获取）
+                    // 更新描述（因为启�?禁用状态可能影响多语言描述的获取）
                     try
                     {
                         item.Description = GetPluginDescription(item.LocalPlugin, langCode);
@@ -1522,7 +1598,7 @@ namespace VPetLLM.UI.Windows
                         Logger.Log($"Warning: Failed to refresh plugin grid: {ex.Message}");
                     }
 
-                    // 保存插件状态
+                    // 保存插件状�?
                     try
                     {
                         _plugin.SavePluginStates();
@@ -1539,7 +1615,7 @@ namespace VPetLLM.UI.Windows
                     MessageBox.Show(errorMsg, LanguageHelper.Get("Error", langCode) ?? "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                     Logger.Log($"Plugin operation failed for '{item.LocalPlugin?.Name}': {ex}");
 
-                    // 尝试重置复选框状态
+                    // 尝试重置复选框状�?
                     try
                     {
                         checkBox.IsChecked = item.LocalPlugin?.Enabled ?? false;
@@ -1579,7 +1655,7 @@ namespace VPetLLM.UI.Windows
             _autoSaveTimer.Tick += AutoSaveTimer_Tick;
         }
 
-        // 密钥输入去抖保存（避免每次按键均触发保存）
+        // 密钥输入去抖保存（避免每次按键均触发保存�?
         private void InitializeSecretSaveTimer()
         {
             _secretSaveTimer = new DispatcherTimer
@@ -1599,7 +1675,7 @@ namespace VPetLLM.UI.Windows
         private void ScheduleSecretSave()
         {
             if (!_isReadyToSave) return;
-            // 标记有未保存变更，但不立即保存，延迟到用户停止输入片刻
+            // 标记有未保存变更，但不立即保存，延迟到用户停止输入片�?
             _hasUnsavedChanges = true;
             _secretSaveTimer?.Stop();
             _secretSaveTimer?.Start();
@@ -1626,9 +1702,9 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 调度自动保存（异步合并，避免UI线程阻塞/重入）
+        /// 调度自动保存（异步合并，避免UI线程阻塞/重入�?
         /// </summary>
-        /// <param name="immediate">保留参数，维持兼容</param>
+        /// <param name="immediate">保留参数，维持兼�?/param>
         private void ScheduleAutoSave(bool immediate = false)
         {
             // 初始化阶段不保存，避免未构造完成的控件/服务导致 NRE
@@ -1641,7 +1717,7 @@ namespace VPetLLM.UI.Windows
                 _isSaveScheduled = true;
             }
 
-            // 异步合并到一次保存，使用后台优先级，不阻塞事件回调/布局周期
+            // 异步合并到一次保存，使用后台优先级，不阻塞事件回�?布局周期
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 bool doSave = false;
@@ -1662,7 +1738,7 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 自动保存定时器事件
+        /// 自动保存定时器事�?
         /// </summary>
         private void AutoSaveTimer_Tick(object sender, EventArgs e)
         {
@@ -1687,7 +1763,7 @@ namespace VPetLLM.UI.Windows
             // 创建旋转图标
             var rotateIcon = new TextBlock
             {
-                Text = "⟳",
+                Text = "�?,
                 FontSize = 14,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -1707,11 +1783,11 @@ namespace VPetLLM.UI.Windows
                 RepeatBehavior = RepeatBehavior.Forever
             };
 
-            // 设置按钮内容为旋转图标
+            // 设置按钮内容为旋转图�?
             button.Content = rotateIcon;
             button.IsEnabled = false;
 
-            // 开始动画
+            // 开始动�?
             rotateTransform.BeginAnimation(RotateTransform.AngleProperty, rotateAnimation);
         }
 
@@ -1735,7 +1811,7 @@ namespace VPetLLM.UI.Windows
             // 确保按钮重新启用
             button.IsEnabled = true;
 
-            // 强制更新按钮状态
+            // 强制更新按钮状�?
             button.UpdateLayout();
         }
 
@@ -1809,12 +1885,12 @@ namespace VPetLLM.UI.Windows
                 }
             }
             
-            // 消息数量阈值
+            // 消息数量阈�?
             if (FindName("TextBlock_HistoryCompressionThreshold") is TextBlock textBlockHistoryCompressionThreshold) textBlockHistoryCompressionThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionThreshold", langCode);
             if (FindName("TextBlock_CurrentContextLengthLabel") is TextBlock textBlockCurrentContextLengthLabel) textBlockCurrentContextLengthLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentContextLength", langCode);
             if (FindName("TextBlock_CurrentContextLength") is TextBlock textBlockCurrentContextLength) textBlockCurrentContextLength.Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
             
-            // Token数量阈值
+            // Token数量阈�?
             if (FindName("TextBlock_HistoryCompressionTokenThreshold") is TextBlock textBlockHistoryCompressionTokenThreshold) textBlockHistoryCompressionTokenThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionTokenThreshold", langCode);
             if (FindName("TextBlock_CurrentTokenCountLabel") is TextBlock textBlockCurrentTokenCountLabel) textBlockCurrentTokenCountLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentTokenCount", langCode);
             if (FindName("TextBlock_CurrentTokenCount") is TextBlock textBlockCurrentTokenCount) textBlockCurrentTokenCount.Text = _plugin.ChatCore.GetCurrentTokenCount().ToString();
@@ -1890,17 +1966,17 @@ namespace VPetLLM.UI.Windows
 
             // DIY TTS 多语言支持
             if (FindName("TextBlock_TTS_DIY_Config") is TextBlock textBlockTTSDIYConfig) textBlockTTSDIYConfig.Text = LanguageHelper.Get("TTS.DIYTTSConfig", langCode) ?? "DIY TTS 配置";
-            if (FindName("TextBlock_TTS_DIY_Description") is TextBlock textBlockTTSDIYDescription) textBlockTTSDIYDescription.Text = LanguageHelper.Get("TTS.DIYTTSDescription", langCode) ?? "DIY TTS 使用 JSON 配置文件进行配置，支持强大的自定义功能。";
-            if (FindName("Button_TTS_DIY_OpenConfig") is Button buttonTTSDIYOpenConfig) buttonTTSDIYOpenConfig.Content = LanguageHelper.Get("TTS.OpenConfigFolder", langCode) ?? "打开配置文件夹";
+            if (FindName("TextBlock_TTS_DIY_Description") is TextBlock textBlockTTSDIYDescription) textBlockTTSDIYDescription.Text = LanguageHelper.Get("TTS.DIYTTSDescription", langCode) ?? "DIY TTS 使用 JSON 配置文件进行配置，支持强大的自定义功能�?;
+            if (FindName("Button_TTS_DIY_OpenConfig") is Button buttonTTSDIYOpenConfig) buttonTTSDIYOpenConfig.Content = LanguageHelper.Get("TTS.OpenConfigFolder", langCode) ?? "打开配置文件�?;
             if (FindName("TextBlock_TTS_DIY_ConfigLocation") is TextBlock textBlockTTSDIYConfigLocation) textBlockTTSDIYConfigLocation.Text = LanguageHelper.Get("TTS.ConfigFileLocation", langCode) ?? "配置文件位置: 文档\\VPetLLM\\DiyTTS\\Config.json";
-            if (FindName("TextBlock_TTS_DIY_Features") is TextBlock textBlockTTSDIYFeatures) textBlockTTSDIYFeatures.Text = LanguageHelper.Get("TTS.DIYTTSFeatures", langCode) ?? "支持自定义请求头、请求体、请求方法等参数。User-Agent 将自动限制为 VPetLLM。";
+            if (FindName("TextBlock_TTS_DIY_Features") is TextBlock textBlockTTSDIYFeatures) textBlockTTSDIYFeatures.Text = LanguageHelper.Get("TTS.DIYTTSFeatures", langCode) ?? "支持自定义请求头、请求体、请求方法等参数。User-Agent 将自动限制为 VPetLLM�?;
             // 更新插件 DataGrid 的列标题
             if (FindName("DataGrid_Plugins") is DataGrid dataGridPlugins)
             {
                 if (dataGridPlugins.Columns.Count > 0)
                     dataGridPlugins.Columns[0].Header = LanguageHelper.Get("Plugin.Enabled", langCode) ?? "启用";
                 if (dataGridPlugins.Columns.Count > 1)
-                    dataGridPlugins.Columns[1].Header = LanguageHelper.Get("Plugin.Status", langCode) ?? "状态";
+                    dataGridPlugins.Columns[1].Header = LanguageHelper.Get("Plugin.Status", langCode) ?? "状�?;
                 if (dataGridPlugins.Columns.Count > 2)
                     dataGridPlugins.Columns[2].Header = LanguageHelper.Get("Plugin.Name", langCode) ?? "插件信息";
                 if (dataGridPlugins.Columns.Count > 3)
@@ -1910,7 +1986,7 @@ namespace VPetLLM.UI.Windows
                 dataGridPlugins.Items.Refresh();
             }
 
-            // OpenAI 多节点 ListView 列头（GridViewColumn.Header 非依赖属性，需手动刷新）
+            // OpenAI 多节�?ListView 列头（GridViewColumn.Header 非依赖属性，需手动刷新�?
             if (FindName("ListView_OpenAINodes") is ListView lvOpenAI && lvOpenAI.View is GridView gvOpenAI)
             {
                 if (gvOpenAI.Columns.Count > 0) gvOpenAI.Columns[0].Header = LanguageHelper.Get("OpenAI.Enabled", langCode) ?? "启用";
@@ -1920,7 +1996,7 @@ namespace VPetLLM.UI.Windows
                 if (gvOpenAI.Columns.Count > 4) gvOpenAI.Columns[4].Header = LanguageHelper.Get("OpenAI.ApiAddress", langCode) ?? "API 地址";
             }
 
-            // Gemini 多节点 ListView 列头
+            // Gemini 多节�?ListView 列头
             if (FindName("ListView_GeminiNodes") is ListView lvGem && lvGem.View is GridView gvGem)
             {
                 if (gvGem.Columns.Count > 0) gvGem.Columns[0].Header = LanguageHelper.Get("Gemini.Enabled", langCode) ?? "启用";
@@ -2050,10 +2126,10 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 var langCode = _plugin.Settings.Language;
                 var pluginItems = new Dictionary<string, UnifiedPluginItem>(StringComparer.OrdinalIgnoreCase);
 
-                // 第一步：获取当前已加载的插件信息（不重新加载）
-                Logger.Log($"开始刷新插件列表 - 当前本地插件数量: {_plugin.Plugins.Count}");
+                // 第一步：获取当前已加载的插件信息（不重新加载�?
+                Logger.Log($"开始刷新插件列�?- 当前本地插件数量: {_plugin.Plugins.Count}");
                 System.Diagnostics.Debug.WriteLine($"[PluginStore] 当前插件数量: {_plugin.Plugins.Count}");
-                System.Diagnostics.Debug.WriteLine($"[PluginStore] 失败的插件数量: {_plugin.FailedPlugins.Count}");
+                System.Diagnostics.Debug.WriteLine($"[PluginStore] 失败的插件数�? {_plugin.FailedPlugins.Count}");
 
                 // 添加本地成功插件
                 foreach (var localPlugin in _plugin.Plugins)
@@ -2077,8 +2153,8 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         Version = sha,
                         LocalFilePath = localPlugin.FilePath,
                         StatusText = localPlugin.Enabled ?
-                            LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行中" :
-                            LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用",
+                            LanguageHelper.Get("Plugin.StatusRunning", langCode) ?? "运行�? :
+                            LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁�?,
                         UninstallActionText = LanguageHelper.Get("Plugin.Uninstall", langCode) ?? "卸载"
                     };
 
@@ -2111,7 +2187,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         UninstallActionText = LanguageHelper.Get("Plugin.Uninstall", langCode) ?? "卸载",
                         Version = LanguageHelper.Get("Plugin.UnknownVersion", langCode),
                         LocalFilePath = failedPlugin.FilePath,
-                        StatusText = LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用"
+                        StatusText = LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁�?
                     };
                 }
 
@@ -2125,7 +2201,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                 Logger.Log($"正在连接云端插件商店进行版本对比...");
 
-                // 第二步：异步加载在线插件（不阻塞UI）
+                // 第二步：异步加载在线插件（不阻塞UI�?
 #pragma warning disable CS4014
                 _ = Task.Run(async () =>
                 {
@@ -2140,10 +2216,10 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                             remotePlugins = JsonConvert.DeserializeObject<Dictionary<string, JObject>>(json);
                         }
 
-                        Logger.Log($"云端插件商店连接成功，发现 {remotePlugins.Count} 个在线插件");
-                        System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载成功，数量: {remotePlugins.Count}");
+                        Logger.Log($"云端插件商店连接成功，发�?{remotePlugins.Count} 个在线插�?);
+                        System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载成功，数�? {remotePlugins.Count}");
 
-                        // 更新本地插件的远程信息
+                        // 更新本地插件的远程信�?
                         foreach (var item in remotePlugins)
                         {
                             var id = item.Key;
@@ -2151,14 +2227,14 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                             var remoteSha256 = remoteInfo["SHA256"]?.ToString() ?? string.Empty;
                             var pluginName = remoteInfo["Name"]?.ToString() ?? string.Empty;
 
-                            // 查找对应的本地插件 - 支持多种匹配方式
+                            // 查找对应的本地插�?- 支持多种匹配方式
                             var localItem = pluginItems.Values.FirstOrDefault(p =>
                                 p.OriginalName == pluginName ||
                                 p.Name == pluginName ||
                                 p.Id == id ||
                                 (p.LocalPlugin != null && p.LocalPlugin.Name == pluginName));
 
-                            // 如果通过名称没有找到，尝试通过文件路径匹配（处理插件名称变更的情况）
+                            // 如果通过名称没有找到，尝试通过文件路径匹配（处理插件名称变更的情况�?
                             if (localItem == null)
                             {
                                 var expectedFilePath = Path.Combine(PluginManager.PluginPath, $"{id}.dll");
@@ -2168,7 +2244,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                                 if (localItem != null)
                                 {
-                                    System.Diagnostics.Debug.WriteLine($"[PluginStore] 通过文件路径匹配到插件: {localItem.Name} -> {pluginName}");
+                                    System.Diagnostics.Debug.WriteLine($"[PluginStore] 通过文件路径匹配到插�? {localItem.Name} -> {pluginName}");
                                 }
                             }
 
@@ -2177,9 +2253,9 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                             if (localItem != null)
                             {
-                                System.Diagnostics.Debug.WriteLine($"[PluginStore] 找到匹配的本地插件: {localItem.Name}");
+                                System.Diagnostics.Debug.WriteLine($"[PluginStore] 找到匹配的本地插�? {localItem.Name}");
 
-                                // 更新本地插件的远程信息
+                                // 更新本地插件的远程信�?
                                 localItem.RemoteVersion = remoteSha256;
                                 localItem.FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty;
                                 localItem.SHA256 = remoteSha256;
@@ -2188,7 +2264,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                                                    !string.IsNullOrEmpty(remoteSha256) &&
                                                    !localItem.Version.Equals(remoteSha256, StringComparison.OrdinalIgnoreCase);
 
-                                System.Diagnostics.Debug.WriteLine($"[PluginStore] 版本比较 - 本地: '{localItem.Version}', 远程: '{remoteSha256}', 可更新: {isUpdatable}");
+                                System.Diagnostics.Debug.WriteLine($"[PluginStore] 版本比较 - 本地: '{localItem.Version}', 远程: '{remoteSha256}', 可更�? {isUpdatable}");
 
                                 if (isUpdatable)
                                 {
@@ -2199,7 +2275,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                                 }
                                 else
                                 {
-                                    // 确保已更新的插件显示正确的状态
+                                    // 确保已更新的插件显示正确的状�?
                                     localItem.IsUpdatable = false;
                                     localItem.UpdateAvailableText = null;
                                     localItem.ActionText = LanguageHelper.Get("Plugin.UnloadPlugin", langCode);
@@ -2217,7 +2293,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                             }
                             else
                             {
-                                // 添加纯在线插件
+                                // 添加纯在线插�?
                                 var des = remoteInfo["Description"]?.ToObject<Dictionary<string, string>>();
                                 var description = des != null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
 
@@ -2235,7 +2311,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                                     FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty,
                                     SHA256 = remoteSha256,
                                     RemoteVersion = remoteSha256,
-                                    StatusText = LanguageHelper.Get("Plugin.StatusNotDownloaded", langCode) ?? "未下载"
+                                    StatusText = LanguageHelper.Get("Plugin.StatusNotDownloaded", langCode) ?? "未下�?
                                 };
                             }
                         }
@@ -2245,7 +2321,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         {
                             var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
                             dataGrid.ItemsSource = pluginItems.Values.ToList();
-                            System.Diagnostics.Debug.WriteLine($"[PluginStore] 更新后总插件数量: {pluginItems.Count}");
+                            System.Diagnostics.Debug.WriteLine($"[PluginStore] 更新后总插件数�? {pluginItems.Count}");
                         });
 #pragma warning restore CS4014
 
@@ -2254,13 +2330,13 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"无法连接云端插件商店，使用离线模式: {ex.Message}");
-                        System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载失败，继续使用离线模式: {ex.Message}");
+                        Logger.Log($"无法连接云端插件商店，使用离线模�? {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载失败，继续使用离线模�? {ex.Message}");
 
                         Dispatcher.Invoke(() =>
                         {
-                            // 可以在这里显示离线状态提示
-                            System.Diagnostics.Debug.WriteLine("[PluginStore] 当前为离线模式，仅显示本地插件");
+                            // 可以在这里显示离线状态提�?
+                            System.Diagnostics.Debug.WriteLine("[PluginStore] 当前为离线模式，仅显示本地插�?);
                         });
                     }
                 });
@@ -2372,7 +2448,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 }
                 else
                 {
-                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.FindPluginFail", _plugin.Settings.Language, "找不到本地插件实例"),
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.FindPluginFail", _plugin.Settings.Language, "找不到本地插件实�?),
                                     ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -2461,7 +2537,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                                          $"2. 服务器文件已更新但哈希值未同步\n" +
                                          $"3. 文件在传输过程中损坏\n\n" +
                                          $"是否要强制安装此插件？\n" +
-                                         $"(仅在确信文件来源安全时选择'是')";
+                                         $"(仅在确信文件来源安全时选择'�?)";
 
                         var result = MessageBox.Show(errorMessage, "文件校验失败", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
@@ -2472,10 +2548,10 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         else
                         {
                             Logger.Log($"User chose to force install plugin despite validation failure");
-                            // 继续安装，但使用实际下载的文件哈希值作为新的期望值
+                            // 继续安装，但使用实际下载的文件哈希值作为新的期望�?
                             downloadedFileHash = downloadedFileHash ?? "unknown";
 
-                            // 额外的安全检查：验证文件是否为有效的.NET程序集
+                            // 额外的安全检查：验证文件是否为有效的.NET程序�?
                             try
                             {
                                 using (var ms = new MemoryStream(data))
@@ -2487,7 +2563,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                             catch (Exception ex)
                             {
                                 Logger.Log($"Assembly validation failed: {ex.Message}");
-                                MessageBox.Show($"下载的文件不是有效的.NET程序集！\n错误: {ex.Message}\n\n为了安全起见，安装已取消。",
+                                MessageBox.Show($"下载的文件不是有效的.NET程序集！\n错误: {ex.Message}\n\n为了安全起见，安装已取消�?,
                                     "文件格式错误", MessageBoxButton.OK, MessageBoxImage.Error);
                                 return;
                             }
@@ -2510,16 +2586,16 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     }
                     else
                     {
-                        // 新安装的插件，使用 plugin.Id 作为文件名
+                        // 新安装的插件，使�?plugin.Id 作为文件�?
                         filePath = Path.Combine(pluginDir, $"{plugin.Id}.dll");
                         Logger.Log($"Installing new plugin file: {filePath}");
                     }
 
-                    // 写入新文件
+                    // 写入新文�?
                     File.WriteAllBytes(filePath, data);
                     Logger.Log($"Plugin file written to: {filePath}");
 
-                    // 确保文件写入完成并释放文件句柄
+                    // 确保文件写入完成并释放文件句�?
                     await Task.Delay(200);
 
                     // 验证文件确实已更新（在加载插件之前）
@@ -2545,7 +2621,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         return;
                     }
 
-                    // 如果是更新操作，使用专门的更新方法
+                    // 如果是更新操作，使用专门的更新方�?
                     if (plugin.IsLocal && plugin.LocalPlugin != null)
                     {
                         Logger.Log($"Updating existing plugin: {plugin.LocalPlugin.Name}");
@@ -2562,7 +2638,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     }
                     else
                     {
-                        // 新安装的插件，使用常规加载方法
+                        // 新安装的插件，使用常规加载方�?
                         Logger.Log($"Installing new plugin: {plugin.Name}");
                         _plugin.LoadPlugins();
                     }
@@ -2571,18 +2647,18 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     // 等待插件加载完成
                     await Task.Delay(800);
 
-                    // 再次验证加载后的状态
+                    // 再次验证加载后的状�?
                     var reloadedHash = PluginManager.GetFileSha256(filePath);
                     Logger.Log($"Post-reload verification - Expected: {downloadedFileHash}, Actual: {reloadedHash}");
 
-                    // 强制刷新UI显示 - 让系统重新计算所有版本信息
+                    // 强制刷新UI显示 - 让系统重新计算所有版本信�?
                     Logger.Log($"Refreshing UI to update plugin status...");
                     Button_RefreshPlugins_Click(this, new RoutedEventArgs());
 
-                    // 等待UI刷新完成后再次检查
+                    // 等待UI刷新完成后再次检�?
                     await Task.Delay(1000);
 
-                    // 查找更新后的插件项并验证状态
+                    // 查找更新后的插件项并验证状�?
                     var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
                     if (dataGrid?.ItemsSource is IEnumerable<UnifiedPluginItem> currentItems)
                     {
@@ -2623,7 +2699,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         Logger.Log($"Warning: Could not access DataGrid ItemsSource for verification");
                     }
 
-                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", _plugin.Settings.Language, "插件安装/更新成功！"),
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", _plugin.Settings.Language, "插件安装/更新成功�?),
                         ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
@@ -2648,13 +2724,13 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     {
                         var langCode = _plugin.Settings.Language;
 
-                        // 针对不同类型的错误提供更具体的提示
+                        // 针对不同类型的错误提供更具体的提�?
                         string errorMessage;
-                        if (ex.Message.Contains("不具有由 URI") || ex.Message.Contains("识别的资源"))
+                        if (ex.Message.Contains("不具有由 URI") || ex.Message.Contains("识别的资�?))
                         {
-                            errorMessage = $"{LanguageHelper.Get("Plugin.ResourceError", langCode) ?? "插件资源文件缺失或损坏"}\n\n" +
+                            errorMessage = $"{LanguageHelper.Get("Plugin.ResourceError", langCode) ?? "插件资源文件缺失或损�?}\n\n" +
                                          $"插件: {plugin.Name}\n" +
-                                         $"建议: 尝试重新安装此插件或联系插件开发者";
+                                         $"建议: 尝试重新安装此插件或联系插件开发�?;
                         }
                         else
                         {
@@ -2665,7 +2741,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                         MessageBox.Show(errorMessage, errorTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
 
-                        // 记录详细错误信息到调试日志
+                        // 记录详细错误信息到调试日�?
                         System.Diagnostics.Debug.WriteLine($"[PluginSetting] 插件 {plugin.Name} 设置打开失败: {ex}");
                     }
                 }
@@ -2681,7 +2757,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     var provider = selectedItem.Tag?.ToString();
                     System.Diagnostics.Debug.WriteLine($"[TTS Provider] 切换到提供商: {provider}");
 
-                    // 先隐藏所有面板
+                    // 先隐藏所有面�?
                     var urlPanel = FindName("Panel_TTS_URL") as StackPanel;
                     var openAIPanel = FindName("Panel_TTS_OpenAI") as StackPanel;
                     var diyPanel = FindName("Panel_TTS_DIY") as StackPanel;
@@ -2692,7 +2768,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     if (diyPanel != null) diyPanel.Visibility = Visibility.Collapsed;
                     if (gptSoVITSPanel != null) gptSoVITSPanel.Visibility = Visibility.Collapsed;
 
-                    // 显示对应的面板
+                    // 显示对应的面�?
                     switch (provider)
                     {
                         case "URL":
@@ -2732,7 +2808,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                             }
                             break;
                         default:
-                            System.Diagnostics.Debug.WriteLine($"[TTS Provider] 未知提供商: {provider}");
+                            System.Diagnostics.Debug.WriteLine($"[TTS Provider] 未知提供�? {provider}");
                             break;
                     }
                 }
@@ -2755,7 +2831,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 var configPath = Utils.DIYTTSConfig.GetConfigFilePath();
                 var configDir = System.IO.Path.GetDirectoryName(configPath);
 
-                // 打开配置文件夹
+                // 打开配置文件�?
                 if (System.IO.Directory.Exists(configDir))
                 {
                     System.Diagnostics.Process.Start("explorer.exe", configDir);
@@ -2783,7 +2859,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 // 保存当前设置到TTS服务
                 SaveSettings();
 
-                // 重新创建TTS服务实例以使用最新设置
+                // 重新创建TTS服务实例以使用最新设�?
                 _ttsService?.Dispose();
                 _ttsService = new TTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
 
@@ -2792,12 +2868,12 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     var success = await _ttsService.TestTTSAsync();
                     if (success)
                     {
-                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.TestSuccess", _plugin.Settings.Language, "TTS测试成功！"),
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.TestSuccess", _plugin.Settings.Language, "TTS测试成功�?),
                             ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
-                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.TestFail", _plugin.Settings.Language, "TTS测试失败，请检查设置。"),
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.TestFail", _plugin.Settings.Language, "TTS测试失败，请检查设置�?),
                             ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
@@ -2825,7 +2901,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                 // 移除原URL中的协议部分，然后拼接代理地址
                 var uri = new Uri(originalUrl);
-                var pathAndQuery = originalUrl.Substring(uri.Scheme.Length + 3); // 移除 "https://" 或 "http://"
+                var pathAndQuery = originalUrl.Substring(uri.Scheme.Length + 3); // 移除 "https://" �?"http://"
                 return $"{proxyUrl.TrimEnd('/')}/{pathAndQuery}";
             }
 
@@ -2889,15 +2965,15 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                             }
                         }
 
-                        // 恢复之前选择的值
+                        // 恢复之前选择的�?
                         comboBox.Text = currentValue;
 
-                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.ModelsRefreshed", _plugin.Settings.Language, "模型列表已刷新"),
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.ModelsRefreshed", _plugin.Settings.Language, "模型列表已刷�?),
                             ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
-                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.RefreshModelsFail", _plugin.Settings.Language, "获取模型列表失败，请检查API Key和网络连接。"),
+                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.RefreshModelsFail", _plugin.Settings.Language, "获取模型列表失败，请检查API Key和网络连接�?),
                             ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
@@ -2918,7 +2994,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         /// </summary>
         private (bool useUrlRewrite, System.Net.IWebProxy proxy) GetPluginStoreProxyInfo()
         {
-            // 优先检查插件商店专用代理设置
+            // 优先检查插件商店专用代理设�?
             var pluginStoreSettings = _plugin.Settings.PluginStore;
             if (pluginStoreSettings != null && pluginStoreSettings.UseProxy && !string.IsNullOrEmpty(pluginStoreSettings.ProxyUrl))
             {
@@ -2927,18 +3003,18 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 // 如果是URL拼接类型的代理（如ghfast.top），使用URL重写方式
                 if (proxyUrl.StartsWith("http://") || proxyUrl.StartsWith("https://"))
                 {
-                    // 检查是否是GitHub加速服务（URL拼接类型）
+                    // 检查是否是GitHub加速服务（URL拼接类型�?
                     if (proxyUrl.Contains("ghfast.top") || proxyUrl.Contains("github") || proxyUrl.Contains("raw.githubusercontent"))
                     {
                         return (true, null); // 使用URL拼接方式，不使用HttpClient代理
                     }
 
-                    // 其他HTTP/HTTPS代理，使用传统代理方式
+                    // 其他HTTP/HTTPS代理，使用传统代理方�?
                     return (false, new System.Net.WebProxy(proxyUrl));
                 }
                 else
                 {
-                    // 假设是 IP:Port 格式的代理
+                    // 假设�?IP:Port 格式的代�?
                     return (false, new System.Net.WebProxy($"http://{proxyUrl}"));
                 }
             }
@@ -2946,7 +3022,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             // 如果插件商店专用代理未设置，则检查通用代理设置
             var proxySettings = _plugin.Settings.Proxy;
 
-            // 如果通用代理未启用，不使用代理
+            // 如果通用代理未启用，不使用代�?
             if (proxySettings == null || !proxySettings.IsEnabled)
             {
                 return (false, null);
@@ -3006,7 +3082,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
             else
             {
-                // 明确禁用代理，防止使用系统默认代理
+                // 明确禁用代理，防止使用系统默认代�?
                 handler.UseProxy = false;
                 handler.Proxy = null;
             }
@@ -3066,11 +3142,11 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
         private void MarkUnsavedChanges()
         {
-            // 标记变更后立即保存
+            // 标记变更后立即保�?
             ScheduleAutoSave(true);
         }
 
-        // ========== Gemini 多渠道管理 ==========
+        // ========== Gemini 多渠道管�?==========
         private void RefreshGeminiNodesList()
         {
             var list = this.FindName("ListView_GeminiNodes") as ListView;
@@ -3120,7 +3196,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
         }
 
-        // ========== OpenAI 节点选择与详情回显 ==========
+        // ========== OpenAI 节点选择与详情回�?==========
         private Setting.OpenAINodeSetting GetSelectedOpenAINode()
         {
             if (this.FindName("ListView_OpenAINodes") is ListView list && list.SelectedItem is Setting.OpenAINodeSetting node)
@@ -3245,7 +3321,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
         }
 
-        // 绑定 OpenAI 节点详情控件事件（在窗口构造后调用一次也可，当前通过 XAML 绑定列表选择事件触发）
+        // 绑定 OpenAI 节点详情控件事件（在窗口构造后调用一次也可，当前通过 XAML 绑定列表选择事件触发�?
         private void EnsureOpenAINodeDetailHandlers()
         {
             if (this.FindName("TextBox_OpenAINodeName") is TextBox tbName) tbName.TextChanged += OpenAINodeDetail_TextChanged;
@@ -3285,7 +3361,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     else if (cb.Name == "CheckBox_OpenAI_EnableLoadBalancing")
                     {
                         _plugin.Settings.OpenAI.EnableLoadBalancing = cb.IsChecked ?? false;
-                        // 重置OpenAI轮换索引，从头开始轮询
+                        // 重置OpenAI轮换索引，从头开始轮�?
                         _plugin.Settings.OpenAI.CurrentNodeIndex = -1;
                     }
                     SaveSettings();
@@ -3297,7 +3373,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
         }
 
-        // ========== Gemini 渠道选择与详情回显 ==========
+        // ========== Gemini 渠道选择与详情回�?==========
         private Setting.GeminiNodeSetting GetSelectedGeminiNode()
         {
             if (this.FindName("ListView_GeminiNodes") is ListView list && list.SelectedItem is Setting.GeminiNodeSetting node)
@@ -3443,7 +3519,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
         }
 
-        // 小眼睛：OpenAI API Key 显示/隐藏切换（供 XAML Click 使用）
+        // 小眼睛：OpenAI API Key 显示/隐藏切换（供 XAML Click 使用�?
         private void Button_Toggle_OpenAIApiKey_Click(object sender, RoutedEventArgs e)
         {
             // 抑制节点详情事件与自动保存，避免在切换可见性时触发重型保存导致卡顿
@@ -3473,7 +3549,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
         }
 
-        // 小眼睛：Gemini API Key 显示/隐藏切换（供 XAML Click 使用）
+        // 小眼睛：Gemini API Key 显示/隐藏切换（供 XAML Click 使用�?
         private void Button_Toggle_GeminiApiKey_Click(object sender, RoutedEventArgs e)
         {
             // 抑制节点详情事件与自动保存，避免在切换可见性时触发重型保存导致卡顿
@@ -3517,7 +3593,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         }
 
         /// <summary>
-        /// 让渠道列表内的控件（复选框/文本框/下拉/滑条）任何变更都触发立即保存
+        /// 让渠道列表内的控件（复选框/文本�?下拉/滑条）任何变更都触发立即保存
         /// </summary>
         private void AttachImmediateSaveForChannelLists()
         {
@@ -3541,21 +3617,21 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
         }
 
-        // 统一转发为保存：OpenAI/Gemini 列表中的 TextBox 使用去抖，体验一致
+        // 统一转发为保存：OpenAI/Gemini 列表中的 TextBox 使用去抖，体验一�?
         private void ChannelList_TextChanged(object sender, TextChangedEventArgs e)
         {
             ScheduleSecretSave();
         }
         private void ChannelList_PasswordChanged(object sender, RoutedEventArgs e)
         {
-            // 统一去抖保存：OpenAI/Gemini 列表密码输入，体验一致
+            // 统一去抖保存：OpenAI/Gemini 列表密码输入，体验一�?
             ScheduleSecretSave();
         }
         private void ChannelList_SelectionChanged(object sender, SelectionChangedEventArgs e) => ScheduleAutoSave(true);
         private void ChannelList_Click(object sender, RoutedEventArgs e) => ScheduleAutoSave(true);
         private void ChannelList_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => ScheduleAutoSave(true);
 
-        // 处理可编辑 OpenAI 模型下拉框的文本提交（失焦/关闭下拉/回车）
+        // 处理可编�?OpenAI 模型下拉框的文本提交（失�?关闭下拉/回车�?
         private void OpenAIModel_LostFocus(object sender, RoutedEventArgs e)
         {
             if (_isUpdatingNodeDetails) return;
@@ -3598,14 +3674,14 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     var provider = selectedItem.Tag?.ToString();
                     System.Diagnostics.Debug.WriteLine($"[ASR Provider] 切换到提供商: {provider}");
 
-                    // 先隐藏所有面板
+                    // 先隐藏所有面�?
                     var openAIPanel = FindName("Panel_ASR_OpenAI") as StackPanel;
                     var sonioxPanel = FindName("Panel_ASR_Soniox") as StackPanel;
 
                     if (openAIPanel != null) openAIPanel.Visibility = Visibility.Collapsed;
                     if (sonioxPanel != null) sonioxPanel.Visibility = Visibility.Collapsed;
 
-                    // 显示对应的面板
+                    // 显示对应的面�?
                     switch (provider)
                     {
                         case "OpenAI":
@@ -3635,7 +3711,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // 先保存当前设置
+                // 先保存当前设�?
                 SaveSettings();
                 
                 // 显示语音输入窗口
@@ -3658,23 +3734,23 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             try
             {
                 button.IsEnabled = false;
-                button.Content = "刷新中...";
+                button.Content = "刷新�?..";
 
-                // 先保存当前设置以获取最新的 API Key 和 BaseUrl
+                // 先保存当前设置以获取最新的 API Key �?BaseUrl
                 SaveSettings();
 
-                // 创建临时 ASR 服务来获取模型列表
+                // 创建临时 ASR 服务来获取模型列�?
                 var asrService = new Utils.ASRService(_plugin.Settings);
                 _sonioxModels = await asrService.FetchSonioxModels();
                 asrService.Dispose();
 
                 if (_sonioxModels.Count == 0)
                 {
-                    MessageBox.Show("未能获取模型列表，请检查 API Key 和网络连接", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("未能获取模型列表，请检�?API Key 和网络连�?, "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                // 更新模型下拉框
+                // 更新模型下拉�?
                 var comboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Model");
                 var currentModel = comboBox.Text;
                 comboBox.Items.Clear();
@@ -3689,7 +3765,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     comboBox.Items.Add(item);
                 }
 
-                // 恢复之前选择的模型
+                // 恢复之前选择的模�?
                 bool found = false;
                 foreach (ComboBoxItem item in comboBox.Items)
                 {
@@ -3706,7 +3782,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     comboBox.SelectedIndex = 0;
                 }
 
-                MessageBox.Show($"成功获取 {_sonioxModels.Count} 个模型", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"成功获取 {_sonioxModels.Count} 个模�?, "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -3739,11 +3815,11 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                 if (string.IsNullOrEmpty(selectedModelId)) return;
 
-                // 查找对应的模型信息
+                // 查找对应的模型信�?
                 var modelInfo = _sonioxModels.FirstOrDefault(m => m.Id == selectedModelId);
                 if (modelInfo == null || modelInfo.Languages.Count == 0) return;
 
-                // 更新语言下拉框
+                // 更新语言下拉�?
                 var languageComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Language");
                 if (languageComboBox == null) return;
 
@@ -3777,7 +3853,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     }
                 }
 
-                // 如果没找到，尝试选择英语或中文
+                // 如果没找到，尝试选择英语或中�?
                 if (!found)
                 {
                     foreach (ComboBoxItem langItem in languageComboBox.Items)
@@ -3792,7 +3868,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     }
                 }
 
-                // 如果还是没找到，选择第一个
+                // 如果还是没找到，选择第一�?
                 if (!found && languageComboBox.Items.Count > 0)
                 {
                     languageComboBox.SelectedIndex = 0;
@@ -3814,7 +3890,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 var languageComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Language");
                 if (languageComboBox == null) return;
 
-                // 如果已经有 API Key，尝试自动加载模型列表
+                // 如果已经�?API Key，尝试自动加载模型列�?
                 if (!string.IsNullOrWhiteSpace(_plugin.Settings.ASR.Soniox.ApiKey))
                 {
                     var asrService = new Utils.ASRService(_plugin.Settings);
@@ -3823,7 +3899,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                     if (_sonioxModels.Count > 0)
                     {
-                        // 更新模型下拉框
+                        // 更新模型下拉�?
                         var modelComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Model");
                         if (modelComboBox != null)
                         {
@@ -3840,7 +3916,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                                 modelComboBox.Items.Add(item);
                             }
 
-                            // 恢复之前选择的模型
+                            // 恢复之前选择的模�?
                             bool found = false;
                             foreach (ComboBoxItem item in modelComboBox.Items)
                             {
@@ -3890,7 +3966,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                                     }
                                 }
 
-                                // 如果没找到，尝试选择英语或中文
+                                // 如果没找到，尝试选择英语或中�?
                                 if (!found)
                                 {
                                     foreach (ComboBoxItem item in languageComboBox.Items)
@@ -3905,7 +3981,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                                     }
                                 }
 
-                                // 如果还是没找到，选择第一个
+                                // 如果还是没找到，选择第一�?
                                 if (!found && languageComboBox.Items.Count > 0)
                                 {
                                     languageComboBox.SelectedIndex = 0;
@@ -3918,11 +3994,11 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 }
                 else
                 {
-                    // 没有 API Key，显示提示信息
+                    // 没有 API Key，显示提示信�?
                     languageComboBox.Items.Clear();
                     var placeholderItem = new ComboBoxItem
                     {
-                        Content = "请先配置 API Key 并刷新模型列表",
+                        Content = "请先配置 API Key 并刷新模型列�?,
                         IsEnabled = false
                     };
                     languageComboBox.Items.Add(placeholderItem);
@@ -3932,7 +4008,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             catch (Exception ex)
             {
                 Logger.Log($"Error initializing Soniox languages: {ex.Message}");
-                // 静默失败，用户可以手动点击刷新按钮
+                // 静默失败，用户可以手动点击刷新按�?
             }
         }
 
@@ -3951,7 +4027,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 {
                     var item = new ComboBoxItem
                     {
-                        Content = "未找到录音设备",
+                        Content = "未找到录音设�?,
                         Tag = 0,
                         IsEnabled = false
                     };
@@ -3994,7 +4070,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             try
             {
                 LoadRecordingDevices();
-                MessageBox.Show("设备列表已刷新", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("设备列表已刷�?, "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -4009,7 +4085,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 Logger.Log("ASR: Opening hotkey capture window...");
                 
-                // 创建并显示捕获窗口
+                // 创建并显示捕获窗�?
                 var captureWindow = new HotkeyCapture
                 {
                     Owner = this
@@ -4041,7 +4117,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             catch (Exception ex)
             {
                 Logger.Log($"ASR: Error capturing hotkey: {ex.Message}");
-                MessageBox.Show($"捕获快捷键失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"捕获快捷键失�? {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -4064,7 +4140,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 Logger.Log("ASR: Hotkey reset to default (Win+Alt+V)");
                 
                 MessageBox.Show(
-                    LanguageHelper.Get("ASR.HotkeyResetSuccess", _plugin.Settings.Language) ?? "快捷键已还原为默认值: Win + Alt + V",
+                    LanguageHelper.Get("ASR.HotkeyResetSuccess", _plugin.Settings.Language) ?? "快捷键已还原为默认�? Win + Alt + V",
                     LanguageHelper.Get("Success", _plugin.Settings.Language) ?? "成功",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -4072,7 +4148,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             catch (Exception ex)
             {
                 Logger.Log($"ASR: Error resetting hotkey: {ex.Message}");
-                MessageBox.Show($"还原快捷键失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"还原快捷键失�? {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -4086,7 +4162,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 
                 if (string.IsNullOrEmpty(modifiers) && string.IsNullOrEmpty(key))
                 {
-                    textBox.Text = LanguageHelper.Get("ASR.NoHotkey", _plugin.Settings.Language) ?? "未设置";
+                    textBox.Text = LanguageHelper.Get("ASR.NoHotkey", _plugin.Settings.Language) ?? "未设�?;
                 }
                 else if (string.IsNullOrEmpty(modifiers))
                 {

@@ -437,6 +437,9 @@ namespace VPetLLM
 
             // DIY TTS 设置
             public DIYTTSSetting DIY { get; set; } = new DIYTTSSetting();
+
+            // GPT-SoVITS TTS 设置
+            public GPTSoVITSTTSSetting GPTSoVITS { get; set; } = new GPTSoVITSTTSSetting();
         }
 
         public class URLTTSSetting
@@ -474,6 +477,24 @@ namespace VPetLLM
             public string Key { get; set; } = "";
             public string Value { get; set; } = "";
             public bool IsEnabled { get; set; } = true;
+        }
+
+        public class GPTSoVITSTTSSetting
+        {
+            public string BaseUrl { get; set; } = "http://127.0.0.1:9880";
+            public string Version { get; set; } = "v4"; // API版本
+            public string ModelName { get; set; } = ""; // 模型名称
+            public string Emotion { get; set; } = "默认"; // 情感
+            public string ReferWavPath { get; set; } = "";
+            public string PromptText { get; set; } = "";
+            public string PromptLanguage { get; set; } = "中文"; // 固定为中文（向后兼容保留字段）
+            public string TextLanguage { get; set; } = "中文"; // 使用完整语言名称
+            public string TextSplitMethod { get; set; } = "按标点符号切"; // 文本切分方法
+            public string CutPunc { get; set; } = "";
+            public int TopK { get; set; } = 15;
+            public double TopP { get; set; } = 1.0;
+            public double Temperature { get; set; } = 1.0;
+            public double Speed { get; set; } = 1.0;
         }
 
         public class RateLimiterSetting
