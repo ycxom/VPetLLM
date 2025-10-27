@@ -97,34 +97,12 @@ namespace VPetLLM.Handlers
                     // 显示气泡
                     mainWindow.Main.Say(text, null, false);
                     
-                    // 仅在TTS关闭时使用Visibility检查
+                    // TTS启用时不需要等待气泡消失，TTS关闭时才等待
                     if (!VPetLLM.Instance.Settings.TTS.IsEnabled)
                     {
                         await WaitForBubbleCloseByVisibility(mainWindow, text, "body animation模式");
                     }
-                    else
-                    {
-                        // TTS启用时使用原有的事件机制
-                        var bubbleCompletionSource = new TaskCompletionSource<bool>();
-                        
-                        Action onBubbleEnd = null;
-                        onBubbleEnd = () =>
-                        {
-                            mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
-                            bubbleCompletionSource.TrySetResult(true);
-                            Logger.Log($"SayHandler: 气泡显示完成（body animation模式，TTS启用）");
-                        };
-                        mainWindow.Main.MsgBar.EndAction += onBubbleEnd;
-                        
-                        var timeoutTask = Task.Delay(Math.Max(text.Length * VPetLLM.Instance.Settings.SayTimeMultiplier * 2, VPetLLM.Instance.Settings.SayTimeMin * 2));
-                        var completedTask = await Task.WhenAny(bubbleCompletionSource.Task, timeoutTask);
-                        
-                        if (completedTask == timeoutTask)
-                        {
-                            Logger.Log($"SayHandler: 等待气泡超时（body animation模式，TTS启用）");
-                            mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
-                        }
-                    }
+                    // TTS启用时不等待气泡，让下一个动作可以立即执行
                 }
                 else
                 {
@@ -143,34 +121,12 @@ namespace VPetLLM.Handlers
                         mainWindow.Main.Say(text, null, false);
                         Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: none (blocked)");
                         
-                        // 仅在TTS关闭时使用Visibility检查
+                        // TTS启用时不需要等待气泡消失，TTS关闭时才等待
                         if (!VPetLLM.Instance.Settings.TTS.IsEnabled)
                         {
                             await WaitForBubbleCloseByVisibility(mainWindow, text, "无动画模式");
                         }
-                        else
-                        {
-                            // TTS启用时使用原有的事件机制
-                            var bubbleCompletionSource = new TaskCompletionSource<bool>();
-                            
-                            Action onBubbleEnd = null;
-                            onBubbleEnd = () =>
-                            {
-                                mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
-                                bubbleCompletionSource.TrySetResult(true);
-                                Logger.Log($"SayHandler: 气泡显示完成（无动画模式，TTS启用）");
-                            };
-                            mainWindow.Main.MsgBar.EndAction += onBubbleEnd;
-                            
-                            var timeoutTask = Task.Delay(Math.Max(text.Length * VPetLLM.Instance.Settings.SayTimeMultiplier * 2, VPetLLM.Instance.Settings.SayTimeMin * 2));
-                            var completedTask = await Task.WhenAny(bubbleCompletionSource.Task, timeoutTask);
-                            
-                            if (completedTask == timeoutTask)
-                            {
-                                Logger.Log($"SayHandler: 等待气泡超时（无动画模式，TTS启用）");
-                                mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
-                            }
-                        }
+                        // TTS启用时不等待气泡，让下一个动作可以立即执行
                     }
                     else
                     {
@@ -189,34 +145,12 @@ namespace VPetLLM.Handlers
                         mainWindow.Main.Say(text, sayAnimation, true);
                         Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: {sayAnimation}");
 
-                        // 仅在TTS关闭时使用Visibility检查
+                        // TTS启用时不需要等待气泡消失，TTS关闭时才等待
                         if (!VPetLLM.Instance.Settings.TTS.IsEnabled)
                         {
                             await WaitForBubbleCloseByVisibility(mainWindow, text, "正常Say动画模式");
                         }
-                        else
-                        {
-                            // TTS启用时使用原有的事件机制
-                            var bubbleCompletionSource = new TaskCompletionSource<bool>();
-                            
-                            Action onBubbleEnd = null;
-                            onBubbleEnd = () =>
-                            {
-                                mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
-                                bubbleCompletionSource.TrySetResult(true);
-                                Logger.Log($"SayHandler: 气泡显示完成（TTS启用）");
-                            };
-                            mainWindow.Main.MsgBar.EndAction += onBubbleEnd;
-                            
-                            var timeoutTask = Task.Delay(Math.Max(text.Length * VPetLLM.Instance.Settings.SayTimeMultiplier * 2, VPetLLM.Instance.Settings.SayTimeMin * 2));
-                            var completedTask = await Task.WhenAny(bubbleCompletionSource.Task, timeoutTask);
-                            
-                            if (completedTask == timeoutTask)
-                            {
-                                Logger.Log($"SayHandler: 等待气泡超时（TTS启用）");
-                                mainWindow.Main.MsgBar.EndAction -= onBubbleEnd;
-                            }
-                        }
+                        // TTS启用时不等待气泡，让下一个动作可以立即执行
                         
                         mainWindow.Main.DisplayToNomal();
                     }
