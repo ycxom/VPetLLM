@@ -1017,6 +1017,12 @@
                                             IsChecked="True"
                                             Style="{StaticResource ModernCheckBox}"/>
 
+                                    <CheckBox x:Name="CheckBox_TTS_UseQueueDownload"
+                                            Content="{utils:Localize KeyPath=TTS.UseQueueDownload}"
+                                            Margin="0,0,0,16"
+                                            IsChecked="False"
+                                            Style="{StaticResource ModernCheckBox}"/>
+
                                     <StackPanel Orientation="Horizontal"
                                             Margin="0,0,0,12">
                                         <TextBlock Text="{utils:Localize KeyPath=TTS.Volume, Suffix=:}"

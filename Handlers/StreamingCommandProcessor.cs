@@ -127,7 +127,7 @@ namespace VPetLLM.Handlers
                         // 构造完整的命令字符串
                         var fullCommand = match.Value;
                         
-                        // 检查是否是say/talk命令，如果是且TTS启用，则立即开始下载音频
+                        // 检查是否是say/talk命令，如果是且TTS启用，则根据模式决定是否立即下载音频
                         Task<string> ttsDownloadTask = null;
                         var plugin = _plugin ?? VPetLLM.Instance;
                         if (plugin?.Settings?.TTS?.IsEnabled == true && plugin.TTSService != null)
@@ -135,8 +135,33 @@ namespace VPetLLM.Handlers
                             var talkText = ExtractTalkText(fullCommand);
                             if (!string.IsNullOrEmpty(talkText))
                             {
-                                Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，立即开始下载TTS音频: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
-                                ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
+                                bool useQueueDownload = plugin.Settings.TTS.UseQueueDownload;
+                                
+                                if (!useQueueDownload)
+                                {
+                                    // 并发模式：立即下载所有音频
+                                    Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，立即开始下载TTS音频（并发模式）: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
+                                    ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
+                                }
+                                else
+                                {
+                                    // 队列模式：只为第一个命令启动下载
+                                    bool isFirstCommand;
+                                    lock (_lock)
+                                    {
+                                        isFirstCommand = _commandQueue.Count == 0;
+                                    }
+                                    
+                                    if (isFirstCommand)
+                                    {
+                                        Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，队列模式 - 启动第一个下载: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
+                                        ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
+                                    }
+                                    else
+                                    {
+                                        Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，队列模式 - 等待前一个下载完成: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
+                                    }
+                                }
                             }
                         }
                         
@@ -203,9 +228,15 @@ namespace VPetLLM.Handlers
 
             try
             {
+                // 获取插件实例
+                var pluginInstance = _plugin ?? VPetLLM.Instance;
+                bool useQueueDownload = pluginInstance?.Settings?.TTS?.UseQueueDownload ?? false;
+                
                 while (true)
                 {
                     CommandTask commandTask;
+                    CommandTask nextCommandTask = null;
+                    
                     lock (_lock)
                     {
                         if (_commandQueue.Count == 0)
@@ -214,6 +245,12 @@ namespace VPetLLM.Handlers
                             break;
                         }
                         commandTask = _commandQueue.Dequeue();
+                        
+                        // 队列模式：预览下一个命令，准备启动下载
+                        if (useQueueDownload && _commandQueue.Count > 0)
+                        {
+                            nextCommandTask = _commandQueue.Peek();
+                        }
                     }
 
                     var command = commandTask.Command;
@@ -229,6 +266,17 @@ namespace VPetLLM.Handlers
                             if (!string.IsNullOrEmpty(audioFile))
                             {
                                 Utils.Logger.Log($"StreamingCommandProcessor: TTS音频下载完成: {audioFile}");
+                                
+                                // 队列模式：下载完成后立即启动下一个下载
+                                if (useQueueDownload && nextCommandTask != null && nextCommandTask.TTSDownloadTask == null)
+                                {
+                                    var nextTalkText = ExtractTalkText(nextCommandTask.Command);
+                                    if (!string.IsNullOrEmpty(nextTalkText) && pluginInstance?.TTSService != null)
+                                    {
+                                        Utils.Logger.Log($"StreamingCommandProcessor: 队列模式 - 启动下一个音频下载: {nextTalkText.Substring(0, Math.Min(nextTalkText.Length, 20))}...");
+                                        nextCommandTask.TTSDownloadTask = pluginInstance.TTSService.DownloadTTSAudioAsync(nextTalkText);
+                                    }
+                                }
                             }
                             else
                             {
@@ -243,9 +291,6 @@ namespace VPetLLM.Handlers
 
                     // 执行命令（同步调用，等待完成）
                     Utils.Logger.Log($"StreamingCommandProcessor: 开始处理命令: {command}");
-                    
-                    // 获取插件实例（用于后续操作）
-                    var pluginInstance = _plugin ?? VPetLLM.Instance;
                     
                     // 如果有预下载的音频文件，通过特殊方式传递给处理器
                     if (!string.IsNullOrEmpty(audioFile))

@@ -428,6 +428,7 @@ namespace VPetLLM
             public double Volume { get; set; } = 1.0; // 基础音量，范围0到10
             public double Speed { get; set; } = 1.0;
             public double VolumeGain { get; set; } = 0.0; // 音量增益，单位dB，范围-20到+40
+            public bool UseQueueDownload { get; set; } = false; // 是否使用队列下载模式（适用于无法并发请求的接口）
 
             // URL TTS 设置
             public URLTTSSetting URL { get; set; } = new URLTTSSetting();

@@ -67,11 +67,20 @@ namespace VPetLLM.Handlers
 
                 Logger.Log($"SmartMessageProcessor: 解析出 {messageSegments.Count} 个消息片段");
 
-                // 启动并行下载所有TTS音频（不等待完成）
+                // 根据设置选择并行或队列下载模式
                 List<TTSDownloadTask> downloadTasks = null;
                 if (_plugin.Settings.TTS.IsEnabled)
                 {
-                    downloadTasks = StartParallelTTSDownload(messageSegments);
+                    if (_plugin.Settings.TTS.UseQueueDownload)
+                    {
+                        // 队列下载模式：不预先启动下载任务
+                        downloadTasks = PrepareQueueTTSDownload(messageSegments);
+                    }
+                    else
+                    {
+                        // 并发下载模式：启动所有下载任务
+                        downloadTasks = StartParallelTTSDownload(messageSegments);
+                    }
                 }
 
                 // 按顺序处理每个片段，使用智能等待机制（优化：不阻塞UI线程）
@@ -287,8 +296,44 @@ namespace VPetLLM.Handlers
         }
 
         /// <summary>
+        /// 准备队列下载所有TTS音频（不立即启动下载，依赖StreamingCommandProcessor的预下载）
+        /// </summary>
+        private List<TTSDownloadTask> PrepareQueueTTSDownload(List<MessageSegment> segments)
+        {
+            Logger.Log($"SmartMessageProcessor: 准备队列下载TTS音频");
+
+            var downloadTasks = new List<TTSDownloadTask>();
+            int index = 0;
+
+            foreach (var segment in segments)
+            {
+                if (segment.Type == SegmentType.Talk)
+                {
+                    var talkText = ExtractTalkText(segment.ActionValue);
+                    if (!string.IsNullOrEmpty(talkText))
+                    {
+                        var downloadTask = new TTSDownloadTask
+                        {
+                            Index = index++,
+                            Text = talkText,
+                            DownloadTask = null, // 队列模式下不立即创建任务，依赖StreamingCommandProcessor预下载
+                            IsCompleted = false
+                        };
+
+                        downloadTasks.Add(downloadTask);
+                        Logger.Log($"SmartMessageProcessor: 准备下载任务 #{downloadTask.Index}: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
+                    }
+                }
+            }
+
+            Logger.Log($"SmartMessageProcessor: 已准备 {downloadTasks.Count} 个队列下载任务（队列模式，依赖StreamingCommandProcessor预下载）");
+            return downloadTasks;
+        }
+
+        /// <summary>
         /// 等待指定索引的音频下载完成
         /// 优化：使用ConfigureAwait(false)避免UI线程阻塞
+        /// 支持队列下载模式：按需启动下载，下载完成后立即启动下一个下载任务
         /// </summary>
         private async Task<string> WaitForTTSDownloadAsync(List<TTSDownloadTask> downloadTasks, int targetIndex)
         {
@@ -307,12 +352,35 @@ namespace VPetLLM.Handlers
 
             try
             {
+                // 如果任务尚未启动，现在启动它
+                if (targetTask.DownloadTask == null)
+                {
+                    Logger.Log($"SmartMessageProcessor: 按需启动任务 #{targetIndex} 下载...");
+                    targetTask.DownloadTask = _plugin.TTSService.DownloadTTSAudioAsync(targetTask.Text);
+                }
+
                 Logger.Log($"SmartMessageProcessor: 等待任务 #{targetIndex} 下载完成...");
                 var audioFile = await targetTask.DownloadTask.ConfigureAwait(false);
                 targetTask.AudioFile = audioFile;
                 targetTask.IsCompleted = true;
 
                 Logger.Log($"SmartMessageProcessor: 任务 #{targetIndex} 下载完成: {audioFile}");
+
+                // 队列模式：下载完成后，立即启动下一个任务的下载
+                if (_plugin.Settings.TTS.UseQueueDownload)
+                {
+                    int nextIndex = targetIndex + 1;
+                    if (nextIndex < downloadTasks.Count)
+                    {
+                        var nextTask = downloadTasks[nextIndex];
+                        if (nextTask.DownloadTask == null && !nextTask.IsCompleted)
+                        {
+                            Logger.Log($"SmartMessageProcessor: 队列模式 - 启动下一个任务 #{nextIndex} 下载...");
+                            nextTask.DownloadTask = _plugin.TTSService.DownloadTTSAudioAsync(nextTask.Text);
+                        }
+                    }
+                }
+
                 return audioFile;
             }
             catch (Exception ex)
@@ -320,6 +388,22 @@ namespace VPetLLM.Handlers
                 Logger.Log($"SmartMessageProcessor: 任务 #{targetIndex} 下载失败: {ex.Message}");
                 targetTask.IsCompleted = true;
                 targetTask.AudioFile = null;
+
+                // 即使失败，也尝试启动下一个任务
+                if (_plugin.Settings.TTS.UseQueueDownload)
+                {
+                    int nextIndex = targetIndex + 1;
+                    if (nextIndex < downloadTasks.Count)
+                    {
+                        var nextTask = downloadTasks[nextIndex];
+                        if (nextTask.DownloadTask == null && !nextTask.IsCompleted)
+                        {
+                            Logger.Log($"SmartMessageProcessor: 队列模式 - 启动下一个任务 #{nextIndex} 下载（前一个失败）...");
+                            nextTask.DownloadTask = _plugin.TTSService.DownloadTTSAudioAsync(nextTask.Text);
+                        }
+                    }
+                }
+
                 return null;
             }
         }
@@ -339,10 +423,10 @@ namespace VPetLLM.Handlers
             {
                 try
                 {
-                    // 首先检查是否有流式处理预下载的音频
-                    var predownloadedAudio = StreamingCommandProcessor.GetAndRemovePredownloadedAudio(segment.Content);
                     string audioFile = null;
 
+                    // 首先检查是否有流式处理预下载的音频
+                    var predownloadedAudio = StreamingCommandProcessor.GetAndRemovePredownloadedAudio(segment.Content);
                     if (!string.IsNullOrEmpty(predownloadedAudio))
                     {
                         Logger.Log($"SmartMessageProcessor: 使用流式预下载的音频: {predownloadedAudio}");
@@ -350,7 +434,7 @@ namespace VPetLLM.Handlers
                     }
                     else if (downloadTasks != null)
                     {
-                        // 等待当前索引的音频下载完成（不阻塞UI线程）
+                        // 没有预下载音频，等待当前索引的音频下载完成（不阻塞UI线程）
                         Logger.Log($"SmartMessageProcessor: 等待音频 #{talkIndex} 下载完成...");
                         audioFile = await WaitForTTSDownloadAsync(downloadTasks, talkIndex).ConfigureAwait(false);
                     }

@@ -355,6 +355,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).Click += Control_Click;
             ((ComboBox)this.FindName("ComboBox_TTS_Provider")).SelectionChanged += Control_SelectionChanged;
             ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_TTS_UseQueueDownload")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_TTS_URL_BaseUrl")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_TTS_URL_Voice")).TextChanged += Control_TextChanged;
             ((ComboBox)this.FindName("ComboBox_TTS_URL_RequestMethod")).SelectionChanged += Control_SelectionChanged;
@@ -365,6 +366,18 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Format")).SelectionChanged += Control_SelectionChanged;
 
             // DIY TTS 按钮事件绑定 - 已在 XAML 中绑定，无需重复绑定
+
+            // GPT-SoVITS TTS settings
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_ReferWavPath")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptText")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextLanguage")).SelectionChanged += Control_SelectionChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopK")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopP")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Temperature")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Speed")).TextChanged += Control_TextChanged;
+            ((ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_SplitMethod")).SelectionChanged += Control_SelectionChanged;
 
             // ASR settings
             ((CheckBox)this.FindName("CheckBox_ASR_IsEnabled")).Click += Control_Click;
@@ -728,6 +741,7 @@ namespace VPetLLM.UI.Windows
             // 基本TTS设置
             ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).IsChecked = _plugin.Settings.TTS.IsEnabled;
             ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked = _plugin.Settings.TTS.OnlyPlayAIResponse;
+            ((CheckBox)this.FindName("CheckBox_TTS_UseQueueDownload")).IsChecked = _plugin.Settings.TTS.UseQueueDownload;
             ((Slider)this.FindName("Slider_TTS_Volume")).Value = _plugin.Settings.TTS.Volume;
             ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = _plugin.Settings.TTS.Volume.ToString("F2");
             ((Slider)this.FindName("Slider_TTS_VolumeGain")).Value = _plugin.Settings.TTS.VolumeGain;
@@ -1012,6 +1026,7 @@ namespace VPetLLM.UI.Windows
             // TTS settings
             _plugin.Settings.TTS.IsEnabled = ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).IsChecked ?? false;
             _plugin.Settings.TTS.OnlyPlayAIResponse = ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked ?? true;
+            _plugin.Settings.TTS.UseQueueDownload = ((CheckBox)this.FindName("CheckBox_TTS_UseQueueDownload")).IsChecked ?? false;
             _plugin.Settings.TTS.Volume = ((Slider)this.FindName("Slider_TTS_Volume")).Value;
             _plugin.Settings.TTS.VolumeGain = ((Slider)this.FindName("Slider_TTS_VolumeGain")).Value;
             _plugin.Settings.TTS.Speed = ((Slider)this.FindName("Slider_TTS_Speed")).Value;

@@ -1104,6 +1104,12 @@
             "zh-hant": "僅播放AI回復",
             "jp": "AI応答のみ再生"
         },
+        "UseQueueDownload": {
+            "en": "Use Queue Download Mode (for APIs that don't support concurrent requests)",
+            "zh-hans": "使用队列下载模式（适用于无法并发请求的接口）",
+            "zh-hant": "使用隊列下載模式（適用於無法並發請求的接口）",
+            "jp": "キューダウンロードモードを使用（同時リクエストをサポートしないAPIに適用）"
+        },
         "Voice": {
             "en": "Voice",
             "zh-hans": "语音",

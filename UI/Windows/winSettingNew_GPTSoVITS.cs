@@ -354,6 +354,55 @@ namespace VPetLLM.UI.Windows
 
             var settings = _plugin.Settings.TTS.GPTSoVITS;
 
+            // 加载基本设置
+            var baseUrlTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl");
+            if (baseUrlTextBox != null)
+            {
+                baseUrlTextBox.Text = settings.BaseUrl;
+            }
+
+            var referWavPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_ReferWavPath");
+            if (referWavPathTextBox != null)
+            {
+                referWavPathTextBox.Text = settings.ReferWavPath;
+            }
+
+            var promptTextTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptText");
+            if (promptTextTextBox != null)
+            {
+                promptTextTextBox.Text = settings.PromptText;
+            }
+
+            var cutPuncTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc");
+            if (cutPuncTextBox != null)
+            {
+                cutPuncTextBox.Text = settings.CutPunc;
+            }
+
+            var topKTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopK");
+            if (topKTextBox != null)
+            {
+                topKTextBox.Text = settings.TopK.ToString();
+            }
+
+            var topPTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopP");
+            if (topPTextBox != null)
+            {
+                topPTextBox.Text = settings.TopP.ToString();
+            }
+
+            var temperatureTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Temperature");
+            if (temperatureTextBox != null)
+            {
+                temperatureTextBox.Text = settings.Temperature.ToString();
+            }
+
+            var speedTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Speed");
+            if (speedTextBox != null)
+            {
+                speedTextBox.Text = settings.Speed.ToString();
+            }
+
             // 加载版本
             var versionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Version");
             if (versionComboBox != null)
@@ -452,6 +501,55 @@ namespace VPetLLM.UI.Windows
         /// </summary>
         private void SaveGPTSoVITSSettings()
         {
+            // 保存基本设置
+            var baseUrlTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl");
+            if (baseUrlTextBox != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.BaseUrl = baseUrlTextBox.Text;
+            }
+
+            var referWavPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_ReferWavPath");
+            if (referWavPathTextBox != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.ReferWavPath = referWavPathTextBox.Text;
+            }
+
+            var promptTextTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptText");
+            if (promptTextTextBox != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.PromptText = promptTextTextBox.Text;
+            }
+
+            var cutPuncTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc");
+            if (cutPuncTextBox != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.CutPunc = cutPuncTextBox.Text;
+            }
+
+            var topKTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopK");
+            if (topKTextBox != null && int.TryParse(topKTextBox.Text, out int topK))
+            {
+                _plugin.Settings.TTS.GPTSoVITS.TopK = topK;
+            }
+
+            var topPTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopP");
+            if (topPTextBox != null && double.TryParse(topPTextBox.Text, out double topP))
+            {
+                _plugin.Settings.TTS.GPTSoVITS.TopP = topP;
+            }
+
+            var temperatureTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Temperature");
+            if (temperatureTextBox != null && double.TryParse(temperatureTextBox.Text, out double temperature))
+            {
+                _plugin.Settings.TTS.GPTSoVITS.Temperature = temperature;
+            }
+
+            var speedTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Speed");
+            if (speedTextBox != null && double.TryParse(speedTextBox.Text, out double speed))
+            {
+                _plugin.Settings.TTS.GPTSoVITS.Speed = speed;
+            }
+
             // 版本
             var versionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Version");
             if (versionComboBox?.SelectedItem is ComboBoxItem versionItem)
