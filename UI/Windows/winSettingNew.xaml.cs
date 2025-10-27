@@ -369,8 +369,6 @@ namespace VPetLLM.UI.Windows
 
             // GPT-SoVITS TTS settings
             ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl")).TextChanged += Control_TextChanged;
-            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_ReferWavPath")).TextChanged += Control_TextChanged;
-            ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptText")).TextChanged += Control_TextChanged;
             ((ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextLanguage")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopK")).TextChanged += Control_TextChanged;

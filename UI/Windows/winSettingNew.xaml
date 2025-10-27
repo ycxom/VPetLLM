@@ -1257,15 +1257,15 @@
                                 <!-- GPT-SoVITS TTS 配置 -->
                                 <StackPanel x:Name="Panel_TTS_GPTSoVITS"
                                         Visibility="Collapsed">
-                                    <TextBlock Text="GPT-SoVITS TTS 配置"
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.Config}"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,8"/>
                                     
-                                    <TextBlock Text="支持 GPT-SoVITS v2-v4 版本接口。系统会自动检测服务器支持的版本和可用模型。"
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.Description}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="API 地址"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.BaseUrl}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <Grid Margin="0,0,0,16">
                                         <Grid.ColumnDefinitions>
@@ -1278,13 +1278,13 @@
                                                 Style="{StaticResource ModernTextBox}"/>
                                         <Button x:Name="Button_TTS_GPTSoVITS_DetectVersion"
                                                 Grid.Column="1"
-                                                Content="检测版本"
+                                                Content="{utils:Localize KeyPath=TTS.GPTSoVITS.DetectVersion}"
                                                 Click="Button_TTS_GPTSoVITS_DetectVersion_Click"
                                                 Padding="12,6"
                                                 Style="{StaticResource ModernButton}"/>
                                     </Grid>
 
-                                    <Label Content="API 版本"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Version}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Version"
                                             Margin="0,0,0,8"
@@ -1296,11 +1296,11 @@
                                         <ComboBoxItem Content="v3" Tag="v3"/>
                                         <ComboBoxItem Content="v4" Tag="v4" IsSelected="True"/>
                                     </ComboBox>
-                                    <TextBlock Text="选择版本后将自动加载该版本支持的模型列表"
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.VersionTip}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="模型"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Model}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
@@ -1315,32 +1315,32 @@
                                                 Style="{StaticResource ModernComboBox}"/>
                                         <Button x:Name="Button_TTS_GPTSoVITS_RefreshModels"
                                                 Grid.Column="1"
-                                                Content="刷新模型"
+                                                Content="{utils:Localize KeyPath=TTS.GPTSoVITS.RefreshModels}"
                                                 Click="Button_TTS_GPTSoVITS_RefreshModels_Click"
                                                 Padding="12,6"
                                                 Style="{StaticResource SecondaryButton}"/>
                                     </Grid>
-                                    <TextBlock Text="从服务器加载可用的模型列表"
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.ModelTip}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="语言"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Language}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Language"
                                             Margin="0,0,0,8"
                                             SelectionChanged="ComboBox_TTS_GPTSoVITS_Language_SelectionChanged"
                                             Style="{StaticResource ModernComboBox}"/>
-                                    <TextBlock Text="根据所选模型自动显示支持的语言，该语言将作为 prompt_text_lang"
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.LanguageTip}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="情感"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Emotion}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Emotion"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernComboBox}"/>
 
-                                    <Label Content="目标文本语言"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.TextLanguage}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_TextLanguage"
                                             Margin="0,0,0,16"
@@ -1358,32 +1358,12 @@
                                         <ComboBoxItem Content="多语种混合(粤语)" Tag="多语种混合(粤语)"/>
                                     </ComboBox>
 
-                                    <TextBlock Text="可选配置（如已在服务端配置好模型，以下可留空）"
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.AdvancedSettings}"
                                             Style="{StaticResource SectionHeader}"
                                             FontSize="14"
                                             Margin="0,8,0,8"/>
 
-                                    <Label Content="参考音频路径（可选）"
-                                          Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_GPTSoVITS_ReferWavPath"
-                                            Margin="0,0,0,16"
-                                            Style="{StaticResource ModernTextBox}"/>
-
-                                    <Label Content="参考文本（可选）"
-                                          Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_GPTSoVITS_PromptText"
-                                            Margin="0,0,0,8"
-                                            Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="参考文本语言固定为中文"
-                                            Style="{StaticResource DescriptionText}"
-                                            Margin="0,0,0,16"/>
-
-                                    <TextBlock Text="高级设置"
-                                            Style="{StaticResource SectionHeader}"
-                                            FontSize="14"
-                                            Margin="0,8,0,8"/>
-
-                                    <Label Content="文本切分方法"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.SplitMethod}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_SplitMethod"
                                             Margin="0,0,0,8"
@@ -1395,35 +1375,35 @@
                                         <ComboBoxItem Content="按英文句号.切" Tag="按英文句号.切"/>
                                         <ComboBoxItem Content="按标点符号切" Tag="按标点符号切" IsSelected="True"/>
                                     </ComboBox>
-                                    <TextBlock Text="选择文本切分方式，影响语音合成的流畅度"
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.SplitMethodTip}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="切分符号（可选，如：,.;?!）"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.CutPunc}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_TTS_GPTSoVITS_CutPunc"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="Top K（默认：15）"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.TopK}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_TTS_GPTSoVITS_TopK"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="Top P（默认：1.0）"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.TopP}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_TTS_GPTSoVITS_TopP"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="Temperature（默认：1.0）"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Temperature}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_TTS_GPTSoVITS_Temperature"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="Speed（默认：1.0）"
+                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Speed}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <TextBox x:Name="TextBox_TTS_GPTSoVITS_Speed"
                                             Margin="0,0,0,16"

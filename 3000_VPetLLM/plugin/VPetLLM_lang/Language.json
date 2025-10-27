@@ -1293,6 +1293,134 @@
                 "zh-hant": "獲取模型列表出錯",
                 "jp": "モデルリスト取得エラー"
             }
+        },
+        "GPTSoVITS": {
+            "Config": {
+                "en": "GPT-SoVITS Configuration",
+                "zh-hans": "GPT-SoVITS 配置",
+                "zh-hant": "GPT-SoVITS 配置",
+                "jp": "GPT-SoVITS 設定"
+            },
+            "Description": {
+                "en": "Supports GPT-SoVITS v2-v4 API versions. The system will automatically detect supported versions and available models from the server.",
+                "zh-hans": "支持 GPT-SoVITS v2-v4 版本接口。系统会自动检测服务器支持的版本和可用模型。",
+                "zh-hant": "支持 GPT-SoVITS v2-v4 版本接口。系統會自動檢測服務器支持的版本和可用模型。",
+                "jp": "GPT-SoVITS v2-v4 APIバージョンをサポートします。システムはサーバーからサポートされているバージョンと利用可能なモデルを自動的に検出します。"
+            },
+            "BaseUrl": {
+                "en": "Service URL",
+                "zh-hans": "服务地址",
+                "zh-hant": "服務地址",
+                "jp": "サービスURL"
+            },
+            "DetectVersion": {
+                "en": "Detect Version",
+                "zh-hans": "检测版本",
+                "zh-hant": "檢測版本",
+                "jp": "バージョン検出"
+            },
+            "Version": {
+                "en": "API Version",
+                "zh-hans": "API 版本",
+                "zh-hant": "API 版本",
+                "jp": "APIバージョン"
+            },
+            "VersionTip": {
+                "en": "After selecting a version, the model list for that version will be automatically loaded",
+                "zh-hans": "选择版本后将自动加载该版本支持的模型列表",
+                "zh-hant": "選擇版本後將自動加載該版本支持的模型列表",
+                "jp": "バージョンを選択すると、そのバージョンでサポートされているモデルリストが自動的に読み込まれます"
+            },
+            "Model": {
+                "en": "Model",
+                "zh-hans": "模型",
+                "zh-hant": "模型",
+                "jp": "モデル"
+            },
+            "RefreshModels": {
+                "en": "Refresh Models",
+                "zh-hans": "刷新模型",
+                "zh-hant": "刷新模型",
+                "jp": "モデルを更新"
+            },
+            "ModelTip": {
+                "en": "Load available model list from server",
+                "zh-hans": "从服务器加载可用的模型列表",
+                "zh-hant": "從服務器加載可用的模型列表",
+                "jp": "サーバーから利用可能なモデルリストを読み込む"
+            },
+            "Language": {
+                "en": "Language",
+                "zh-hans": "语言",
+                "zh-hant": "語言",
+                "jp": "言語"
+            },
+            "LanguageTip": {
+                "en": "Automatically displays supported languages based on the selected model, this language will be used as prompt_text_lang",
+                "zh-hans": "根据所选模型自动显示支持的语言，该语言将作为 prompt_text_lang",
+                "zh-hant": "根據所選模型自動顯示支持的語言，該語言將作為 prompt_text_lang",
+                "jp": "選択したモデルに基づいてサポートされている言語を自動的に表示し、この言語はprompt_text_langとして使用されます"
+            },
+            "Emotion": {
+                "en": "Emotion",
+                "zh-hans": "情感",
+                "zh-hant": "情感",
+                "jp": "感情"
+            },
+            "TextLanguage": {
+                "en": "Target Text Language",
+                "zh-hans": "目标文本语言",
+                "zh-hant": "目標文本語言",
+                "jp": "ターゲットテキスト言語"
+            },
+            "AdvancedSettings": {
+                "en": "Advanced Settings",
+                "zh-hans": "高级设置",
+                "zh-hant": "高級設置",
+                "jp": "詳細設定"
+            },
+            "SplitMethod": {
+                "en": "Text Split Method",
+                "zh-hans": "文本切分方法",
+                "zh-hant": "文本切分方法",
+                "jp": "テキスト分割方法"
+            },
+            "SplitMethodTip": {
+                "en": "Select text splitting method, affects speech synthesis fluency",
+                "zh-hans": "选择文本切分方式，影响语音合成的流畅度",
+                "zh-hant": "選擇文本切分方式，影響語音合成的流暢度",
+                "jp": "テキスト分割方法を選択し、音声合成の流暢さに影響します"
+            },
+            "CutPunc": {
+                "en": "Split Symbols (optional, e.g.: ,.;?!)",
+                "zh-hans": "切分符号（可选，如：,.;?!）",
+                "zh-hant": "切分符號（可選，如：,.;?!）",
+                "jp": "分割記号（オプション、例：,.;?!）"
+            },
+            "TopK": {
+                "en": "Top K (default: 15)",
+                "zh-hans": "Top K（默认：15）",
+                "zh-hant": "Top K（默認：15）",
+                "jp": "Top K（デフォルト：15）"
+            },
+            "TopP": {
+                "en": "Top P (default: 1.0)",
+                "zh-hans": "Top P（默认：1.0）",
+                "zh-hant": "Top P（默認：1.0）",
+                "jp": "Top P（デフォルト：1.0）"
+            },
+            "Temperature": {
+                "en": "Temperature (default: 1.0)",
+                "zh-hans": "Temperature（默认：1.0）",
+                "zh-hant": "Temperature（默認：1.0）",
+                "jp": "Temperature（デフォルト：1.0）"
+            },
+            "Speed": {
+                "en": "Speed (default: 1.0)",
+                "zh-hans": "语速（默认：1.0）",
+                "zh-hant": "語速（默認：1.0）",
+                "jp": "速度（デフォルト：1.0）"
+            }
         }
     },
     "ASR": {

@@ -361,18 +361,6 @@ namespace VPetLLM.UI.Windows
                 baseUrlTextBox.Text = settings.BaseUrl;
             }
 
-            var referWavPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_ReferWavPath");
-            if (referWavPathTextBox != null)
-            {
-                referWavPathTextBox.Text = settings.ReferWavPath;
-            }
-
-            var promptTextTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptText");
-            if (promptTextTextBox != null)
-            {
-                promptTextTextBox.Text = settings.PromptText;
-            }
-
             var cutPuncTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc");
             if (cutPuncTextBox != null)
             {
@@ -506,18 +494,6 @@ namespace VPetLLM.UI.Windows
             if (baseUrlTextBox != null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.BaseUrl = baseUrlTextBox.Text;
-            }
-
-            var referWavPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_ReferWavPath");
-            if (referWavPathTextBox != null)
-            {
-                _plugin.Settings.TTS.GPTSoVITS.ReferWavPath = referWavPathTextBox.Text;
-            }
-
-            var promptTextTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptText");
-            if (promptTextTextBox != null)
-            {
-                _plugin.Settings.TTS.GPTSoVITS.PromptText = promptTextTextBox.Text;
             }
 
             var cutPuncTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc");
