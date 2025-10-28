@@ -2345,23 +2345,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
         private async Task HandleUninstallPlugin(UnifiedPluginItem plugin)
         {
-            if (_plugin.Settings.ShowUninstallWarning)
-            {
-                var confirmDialog = new winUninstallConfirm();
-                if (confirmDialog.ShowDialog() == true)
-                {
-                    if (confirmDialog.DoNotShowAgain)
-                    {
-                        _plugin.Settings.ShowUninstallWarning = false;
-                        _plugin.Settings.Save();
-                    }
-                }
-                else
-                {
-                    return;
-                }
-            }
-
+            // 直接执行卸载，不再显示确认弹窗
             bool uninstalled = false;
             var pluginNameToFind = plugin.OriginalName ?? plugin.Name;
             var localPlugin = _plugin.Plugins.FirstOrDefault(p => p.FilePath == plugin.LocalFilePath);
