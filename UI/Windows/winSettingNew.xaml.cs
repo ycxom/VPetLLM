@@ -313,6 +313,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableMove")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableTime")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).Click += Control_Click;
             ((ComboBox)this.FindName("ComboBox_CompressionMode")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).TextChanged += Control_TextChanged;
@@ -649,6 +650,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableTime")).IsChecked = _plugin.Settings.EnableTime;
             ((CheckBox)this.FindName("CheckBox_EnableBuyFeedback")).IsChecked = _plugin.Settings.EnableBuyFeedback;
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).IsChecked = _plugin.Settings.EnableLiveMode;
+            ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).IsChecked = _plugin.Settings.LimitStateChanges;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked = _plugin.Settings.EnableHistoryCompression;
             
             // 加载压缩模式
@@ -943,6 +945,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableTime = enableTimeCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableBuyFeedback = enableBuyFeedbackCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableLiveMode = enableLiveModeCheckBox.IsChecked ?? false;
+            _plugin.Settings.LimitStateChanges = ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).IsChecked ?? false;
             _plugin.Settings.EnableHistoryCompression = ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked ?? false;
             
             // 保存压缩模式

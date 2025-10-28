@@ -11,6 +11,13 @@ namespace VPetLLM.Handlers
 
       public Task Execute(int value, IMainWindow mainWindow)
       {
+          // 如果启用了状态限制，应用限制逻辑
+          if (VPetLLM.Instance.Settings.LimitStateChanges)
+          {
+              double currentValue = mainWindow.Core.Save.Feeling;
+              value = StateChangeLimiter.LimitStateChange(value, currentValue);
+          }
+          
           mainWindow.Core.Save.FeelingChange(value);
           mainWindow.Main.LabelDisplayShowChangeNumber("心情 ".Translate() + (value > 0 ? "+" : "") + "{0:f0}", value);
           return Task.CompletedTask;

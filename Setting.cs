@@ -42,6 +42,7 @@ namespace VPetLLM
         public Handlers.TouchFeedbackSettings TouchFeedback { get; set; } = new Handlers.TouchFeedbackSettings();
         public bool EnableBuyFeedback { get; set; } = true;
         public bool EnableLiveMode { get; set; } = false;
+        public bool LimitStateChanges { get; set; } = true;
         public RateLimiterSetting RateLimiter { get; set; } = new RateLimiterSetting();
         public ASRSetting ASR { get; set; } = new ASRSetting();
         private readonly string _path;

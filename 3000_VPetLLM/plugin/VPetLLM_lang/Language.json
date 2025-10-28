@@ -534,6 +534,18 @@
             "zh-hant": "啟用後，工具和插件返回結果時會直接返回，不等待上一個動作完成。禁用時（默認），結果會進入隊列模式，配合聚合等待順序執行。",
             "jp": "有効にすると、ツールやプラグインの結果が前のアクションの完了を待たずに即座に返されます。無効（デフォルト）の場合、結果はキューに入り、集約と共に順次処理されます。"
         },
+        "LimitStateChanges": {
+            "en": "Limit Excessive Pet State Changes",
+            "zh-hans": "限制宠物过高修改状态",
+            "zh-hant": "限制寵物過高修改狀態",
+            "jp": "ペットの過度な状態変更を制限する"
+        },
+        "LimitStateChangesToolTip": {
+            "en": "When enabled, limits all individual state changes from LLM to a maximum of 20% and prevents negative values.",
+            "zh-hans": "启用后，限制LLM返回的所有独立状态修改不超过当前值的20%，且不到达负数值。",
+            "zh-hant": "啟用後，限制LLM返回的所有獨立狀態修改不超過當前值的20%，且不到達負數值。",
+            "jp": "有効にすると、LLMからのすべての個別状態変更を最大20%に制限し、負の値を防ぎます。"
+        },
         "EnableHistoryCompression": {
             "en": "Enable Chat History Compression",
             "zh-hans": "启用聊天记录压缩",
