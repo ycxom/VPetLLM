@@ -851,6 +851,8 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnablePunctuation")).IsChecked = _plugin.Settings.ASR.Soniox.EnablePunctuation;
             ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnableProfanityFilter")).IsChecked = _plugin.Settings.ASR.Soniox.EnableProfanityFilter;
 
+            // Free ASR 无需配置
+
             // 更新 ASR Provider 面板显示
             UpdateASRProviderPanel();
         }
@@ -1126,6 +1128,8 @@ namespace VPetLLM.UI.Windows
             
             _plugin.Settings.ASR.Soniox.EnablePunctuation = ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnablePunctuation")).IsChecked ?? true;
             _plugin.Settings.ASR.Soniox.EnableProfanityFilter = ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnableProfanityFilter")).IsChecked ?? false;
+
+            // Free ASR 无需保存配置
 
             // 更新语音输入快捷键
             _plugin.UpdateVoiceInputHotkey();
@@ -3614,9 +3618,11 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     // 先隐藏所有面板
                     var openAIPanel = FindName("Panel_ASR_OpenAI") as StackPanel;
                     var sonioxPanel = FindName("Panel_ASR_Soniox") as StackPanel;
+                    var freePanel = FindName("Panel_ASR_Free") as StackPanel;
 
                     if (openAIPanel != null) openAIPanel.Visibility = Visibility.Collapsed;
                     if (sonioxPanel != null) sonioxPanel.Visibility = Visibility.Collapsed;
+                    if (freePanel != null) freePanel.Visibility = Visibility.Collapsed;
 
                     // 显示对应的面板
                     switch (provider)
@@ -3633,6 +3639,13 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                             {
                                 sonioxPanel.Visibility = Visibility.Visible;
                                 System.Diagnostics.Debug.WriteLine("[ASR Provider] 显示Soniox面板");
+                            }
+                            break;
+                        case "Free":
+                            if (freePanel != null)
+                            {
+                                freePanel.Visibility = Visibility.Visible;
+                                System.Diagnostics.Debug.WriteLine("[ASR Provider] 显示Free面板");
                             }
                             break;
                     }

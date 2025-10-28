@@ -49,6 +49,9 @@ namespace VPetLLM.Utils
                 case "Soniox":
                     _asrCore = new SonioxASRCore(_settings);
                     break;
+                case "Free":
+                    _asrCore = new FreeASRCore(_settings);
+                    break;
                 default:
                     Logger.Log($"ASR: 未知的提供商: {_asrSettings.Provider}");
                     break;

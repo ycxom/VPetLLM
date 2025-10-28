@@ -1644,6 +1644,26 @@
                 "jp": "Soniox は複数の言語をサポートする高精度の音声認識サービスを提供します"
             }
         },
+        "FreeSettings": {
+            "en": "Free ASR Settings",
+            "zh-hans": "Free ASR 配置",
+            "zh-hant": "Free ASR 配置",
+            "jp": "Free ASR 設定"
+        },
+        "Free": {
+            "Description": {
+                "en": "Free ASR uses built-in free speech recognition service, no API Key configuration required.",
+                "zh-hans": "Free ASR 使用内置的免费语音识别服务，无需配置 API Key。",
+                "zh-hant": "Free ASR 使用內置的免費語音識別服務，無需配置 API Key。",
+                "jp": "Free ASR は組み込みの無料音声認識サービスを使用し、API Key の設定は不要です。"
+            },
+            "Provider": {
+                "en": "Thanks to @LBGAME",
+                "zh-hans": "感谢提供者@虚拟桌宠模拟器制作组",
+                "zh-hant": "感謝提供者@虛擬桌寵模擬器製作組",
+                "jp": "@LBGAMEに感謝します"
+            }
+        },
         "TestButton": {
             "en": "Test Voice Input",
             "zh-hans": "测试语音输入",

@@ -1450,6 +1450,7 @@
                                             Style="{StaticResource ModernComboBox}">
                                         <ComboBoxItem Content="OpenAI Whisper" Tag="OpenAI" IsSelected="True"/>
                                         <ComboBoxItem Content="Soniox" Tag="Soniox"/>
+                                        <ComboBoxItem Content="Free" Tag="Free"/>
                                     </ComboBox>
 
                                     <Label Content="{utils:Localize KeyPath=ASR.RecordingDevice, Default=输入设备}"
@@ -1693,6 +1694,25 @@
 
                                     <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.Description, Default=Soniox 提供高精度的语音识别服务，支持多种语言}"
                                             x:Name="TextBlock_ASR_Soniox_Description"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+                                </StackPanel>
+
+                                <!-- Free 配置 -->
+                                <StackPanel x:Name="Panel_ASR_Free"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="TextBlock_ASR_Free_Config"
+                                            Text="{utils:Localize KeyPath=ASR.FreeSettings, Default=Free ASR 配置}"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Free.Description, Default=Free ASR 使用内置的免费语音识别服务，无需配置 API Key。}"
+                                            x:Name="TextBlock_ASR_Free_Description"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Free.Provider, Default=感谢提供者@虚拟桌宠模拟器制作组}"
+                                            x:Name="TextBlock_ASR_Free_Provider"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
                                 </StackPanel>

@@ -527,6 +527,9 @@ namespace VPetLLM
             
             // Soniox 设置
             public SonioxASRSetting Soniox { get; set; } = new SonioxASRSetting();
+            
+            // Free 设置
+            public FreeASRSetting Free { get; set; } = new FreeASRSetting();
         }
 
         public class OpenAIASRSetting
@@ -543,6 +546,11 @@ namespace VPetLLM
             public string Model { get; set; } = "stt-rt-v3";
             public bool EnablePunctuation { get; set; } = true;
             public bool EnableProfanityFilter { get; set; } = false;
+        }
+
+        public class FreeASRSetting
+        {
+            // Free ASR 使用固定配置，不需要用户输入
         }
 
         public class SonioxModelInfo
