@@ -178,25 +178,34 @@ namespace VPetLLM.Utils
             if (_shadowCopyDirectories.TryGetValue(filePath, out var shadowDir) && Directory.Exists(shadowDir))
             {
                 bool shadowDeleted = false;
+                bool loggedError = false;
                 for (int i = 0; i < 5; i++)
                 {
                     try
                     {
                         Directory.Delete(shadowDir, true);
                         _shadowCopyDirectories.Remove(filePath);
-                        Logger.Log($"Successfully deleted shadow copy directory for {plugin.Name}: {shadowDir}");
+                        if (loggedError)
+                        {
+                            Logger.Log($"Successfully deleted shadow copy directory for {plugin.Name} after {i + 1} attempts");
+                        }
                         shadowDeleted = true;
                         break;
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"Attempt {i + 1} to delete shadow copy directory {shadowDir} failed: {ex.Message}. Retrying...");
+                        // 只记录第一次和最后一次失败
+                        if (i == 0 || i == 4)
+                        {
+                            Logger.Log($"Attempt {i + 1}/5 to delete shadow copy for {plugin.Name} failed: {ex.Message}");
+                            loggedError = true;
+                        }
                         await Task.Delay(200);
                     }
                 }
                 if (!shadowDeleted)
                 {
-                    Logger.Log($"Failed to delete shadow copy directory after multiple attempts: {shadowDir}");
+                    Logger.Log($"Failed to delete shadow copy directory for {plugin.Name}, will retry on next startup");
                 }
             }
 
@@ -276,6 +285,7 @@ namespace VPetLLM.Utils
                 return false;
             }
 
+            bool loggedRetry = false;
             for (int i = 0; i < 5; i++)
             {
                 try
@@ -286,23 +296,265 @@ namespace VPetLLM.Utils
                     {
                         File.Delete(pdbPath);
                     }
-                    Logger.Log($"Successfully deleted plugin files: {Path.GetFileName(filePath)}");
+                    
+                    // 只在重试后成功时记录日志
+                    if (loggedRetry)
+                    {
+                        Logger.Log($"Successfully deleted plugin files after {i + 1} attempts: {Path.GetFileName(filePath)}");
+                    }
+                    else
+                    {
+                        Logger.Log($"Successfully deleted plugin files: {Path.GetFileName(filePath)}");
+                    }
                     return true;
                 }
                 catch (IOException)
                 {
-                    Logger.Log($"Attempt {i + 1} to delete {Path.GetFileName(filePath)} failed, retrying...");
+                    // 只记录第一次和最后一次失败
+                    if (i == 0 || i == 4)
+                    {
+                        Logger.Log($"Attempt {i + 1}/5 to delete {Path.GetFileName(filePath)} failed (file locked)");
+                        loggedRetry = true;
+                    }
                     await Task.Delay(500);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log($"An unexpected error occurred while deleting plugin {Path.GetFileName(filePath)}: {ex.Message}");
+                    Logger.Log($"Error deleting plugin {Path.GetFileName(filePath)}: {ex.Message}");
                     return false;
                 }
             }
 
-            Logger.Log($"Failed to delete plugin after multiple attempts: {Path.GetFileName(filePath)}");
+            Logger.Log($"Failed to delete plugin after 5 attempts: {Path.GetFileName(filePath)}");
             return false;
+        }
+
+        public static async Task<bool> DeletePluginByName(string pluginName)
+        {
+            if (string.IsNullOrEmpty(pluginName))
+            {
+                Logger.Log($"DeletePluginByName: Plugin name is null or empty");
+                return false;
+            }
+
+            Logger.Log($"DeletePluginByName: Attempting to locate and delete plugin: {pluginName}");
+
+            try
+            {
+                var pluginDir = PluginPath;
+                if (!Directory.Exists(pluginDir))
+                {
+                    Logger.Log($"DeletePluginByName: Plugin directory does not exist: {pluginDir}");
+                    return false;
+                }
+
+                // 查找所有可能的插件文件
+                var allPluginFiles = Directory.GetFiles(pluginDir, "*.dll");
+                var candidateFiles = new List<string>();
+
+                // 方法1: 文件名匹配（最常见的情况）
+                var exactMatch = allPluginFiles.FirstOrDefault(f => 
+                    Path.GetFileNameWithoutExtension(f).Equals(pluginName, StringComparison.OrdinalIgnoreCase));
+                if (exactMatch != null)
+                {
+                    candidateFiles.Add(exactMatch);
+                    Logger.Log($"DeletePluginByName: Found exact filename match: {exactMatch}");
+                }
+
+                // 方法2: 部分匹配（处理带版本号或后缀的情况）
+                var partialMatches = allPluginFiles.Where(f =>
+                    Path.GetFileNameWithoutExtension(f).Contains(pluginName, StringComparison.OrdinalIgnoreCase) &&
+                    !candidateFiles.Contains(f)).ToList();
+                
+                if (partialMatches.Any())
+                {
+                    candidateFiles.AddRange(partialMatches);
+                    Logger.Log($"DeletePluginByName: Found {partialMatches.Count} partial filename matches");
+                }
+
+                // 方法3: 检查已加载的插件列表
+                var loadedPlugin = Plugins.FirstOrDefault(p => p.Name.Equals(pluginName, StringComparison.OrdinalIgnoreCase));
+                if (loadedPlugin != null && !string.IsNullOrEmpty(loadedPlugin.FilePath))
+                {
+                    // 验证FilePath是否是有效的文件路径（而不是目录）
+                    string validFilePath = loadedPlugin.FilePath;
+                    if (Directory.Exists(validFilePath))
+                    {
+                        // FilePath是目录，尝试在该目录中根据插件名称查找匹配的dll文件
+                        Logger.Log($"DeletePluginByName: Plugin FilePath is a directory, searching for matching dll: {validFilePath}");
+                        var filesInDir = Directory.GetFiles(validFilePath, "*.dll");
+                        
+                        // 尝试精确匹配插件名称
+                        var matchedFile = filesInDir.FirstOrDefault(f => 
+                            Path.GetFileNameWithoutExtension(f).Equals(pluginName, StringComparison.OrdinalIgnoreCase));
+                        
+                        // 如果没有精确匹配，尝试部分匹配
+                        if (matchedFile == null)
+                        {
+                            matchedFile = filesInDir.FirstOrDefault(f => 
+                                Path.GetFileNameWithoutExtension(f).Contains(pluginName, StringComparison.OrdinalIgnoreCase));
+                        }
+                        
+                        if (matchedFile != null)
+                        {
+                            validFilePath = matchedFile;
+                            Logger.Log($"DeletePluginByName: Found matching dll in directory: {validFilePath}");
+                        }
+                        else
+                        {
+                            Logger.Log($"DeletePluginByName: No matching dll found in directory for plugin: {pluginName}");
+                            validFilePath = null;
+                        }
+                    }
+                    else if (!File.Exists(validFilePath))
+                    {
+                        // FilePath既不是目录也不是文件，可能是无效路径
+                        Logger.Log($"DeletePluginByName: Plugin FilePath is invalid: {validFilePath}");
+                        validFilePath = null;
+                    }
+
+                    if (!string.IsNullOrEmpty(validFilePath) && !candidateFiles.Contains(validFilePath))
+                    {
+                        candidateFiles.Add(validFilePath);
+                        Logger.Log($"DeletePluginByName: Found plugin in loaded plugins list: {validFilePath}");
+                    }
+                }
+
+                // 方法4: 检查失败的插件列表
+                var failedPlugin = FailedPlugins.FirstOrDefault(p => p.Name.Equals(pluginName, StringComparison.OrdinalIgnoreCase));
+                if (failedPlugin != null && !string.IsNullOrEmpty(failedPlugin.FilePath))
+                {
+                    // 验证FilePath是否是有效的文件路径（而不是目录）
+                    string validFilePath = failedPlugin.FilePath;
+                    if (Directory.Exists(validFilePath))
+                    {
+                        // FilePath是目录，尝试在该目录中根据插件名称查找匹配的dll文件
+                        Logger.Log($"DeletePluginByName: Failed plugin FilePath is a directory, searching for matching dll: {validFilePath}");
+                        var filesInDir = Directory.GetFiles(validFilePath, "*.dll");
+                        
+                        // 尝试精确匹配插件名称
+                        var matchedFile = filesInDir.FirstOrDefault(f => 
+                            Path.GetFileNameWithoutExtension(f).Equals(pluginName, StringComparison.OrdinalIgnoreCase));
+                        
+                        // 如果没有精确匹配，尝试部分匹配
+                        if (matchedFile == null)
+                        {
+                            matchedFile = filesInDir.FirstOrDefault(f => 
+                                Path.GetFileNameWithoutExtension(f).Contains(pluginName, StringComparison.OrdinalIgnoreCase));
+                        }
+                        
+                        if (matchedFile != null)
+                        {
+                            validFilePath = matchedFile;
+                            Logger.Log($"DeletePluginByName: Found matching dll in failed plugin directory: {validFilePath}");
+                        }
+                        else
+                        {
+                            Logger.Log($"DeletePluginByName: No matching dll found in directory for failed plugin: {pluginName}");
+                            validFilePath = null;
+                        }
+                    }
+                    else if (!File.Exists(validFilePath))
+                    {
+                        Logger.Log($"DeletePluginByName: Failed plugin FilePath is invalid: {validFilePath}");
+                        validFilePath = null;
+                    }
+
+                    if (!string.IsNullOrEmpty(validFilePath) && !candidateFiles.Contains(validFilePath))
+                    {
+                        candidateFiles.Add(validFilePath);
+                        Logger.Log($"DeletePluginByName: Found plugin in failed plugins list: {validFilePath}");
+                    }
+                }
+
+                // 方法5: 读取plugins.json配置文件查找可能的文件名
+                var configFile = Path.Combine(pluginDir, "plugins.json");
+                if (File.Exists(configFile))
+                {
+                    try
+                    {
+                        var pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
+                        if (pluginStates != null && pluginStates.ContainsKey(pluginName))
+                        {
+                            // 插件在配置中存在，尝试常见的文件名模式
+                            var possibleNames = new[]
+                            {
+                                $"{pluginName}.dll",
+                                $"VPetLLM.{pluginName}.dll",
+                                $"{pluginName}.Plugin.dll"
+                            };
+
+                            foreach (var possibleName in possibleNames)
+                            {
+                                var possiblePath = Path.Combine(pluginDir, possibleName);
+                                if (File.Exists(possiblePath) && !candidateFiles.Contains(possiblePath))
+                                {
+                                    candidateFiles.Add(possiblePath);
+                                    Logger.Log($"DeletePluginByName: Found plugin via config-based name pattern: {possiblePath}");
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"DeletePluginByName: Error reading plugins.json: {ex.Message}");
+                    }
+                }
+
+                // 尝试删除找到的所有候选文件
+                bool anyDeleted = false;
+                foreach (var filePath in candidateFiles.Distinct())
+                {
+                    if (File.Exists(filePath))
+                    {
+                        Logger.Log($"DeletePluginByName: Attempting to delete: {filePath}");
+                        bool deleted = await DeletePluginFile(filePath);
+                        if (deleted)
+                        {
+                            anyDeleted = true;
+                            Logger.Log($"DeletePluginByName: Successfully deleted: {filePath}");
+                            
+                            // 从配置文件中移除
+                            if (File.Exists(configFile))
+                            {
+                                try
+                                {
+                                    var pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
+                                    if (pluginStates != null && pluginStates.Remove(pluginName))
+                                    {
+                                        File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
+                                        Logger.Log($"DeletePluginByName: Removed plugin from config: {pluginName}");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Log($"DeletePluginByName: Error updating plugins.json: {ex.Message}");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Logger.Log($"DeletePluginByName: Failed to delete: {filePath}");
+                        }
+                    }
+                }
+
+                if (anyDeleted)
+                {
+                    Logger.Log($"DeletePluginByName: Successfully deleted plugin: {pluginName}");
+                    return true;
+                }
+                else
+                {
+                    Logger.Log($"DeletePluginByName: Could not find or delete any files for plugin: {pluginName}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"DeletePluginByName: Unexpected error: {ex.Message}");
+                return false;
+            }
         }
         public static async Task<bool> UpdatePlugin(string pluginFilePath, IChatCore chatCore)
         {
@@ -537,37 +789,56 @@ namespace VPetLLM.Utils
                 return;
 
             // 重试删除影子拷贝目录，最多尝试5次
+            bool loggedFirstAttempt = false;
             for (int attempt = 1; attempt <= 5; attempt++)
             {
                 try
                 {
                     Directory.Delete(shadowDir, true);
-                    Logger.Log($"Successfully deleted shadow copy directory: {shadowDir}");
+                    // 只在第一次尝试失败后才记录成功日志
+                    if (loggedFirstAttempt)
+                    {
+                        Logger.Log($"Successfully deleted shadow copy directory after {attempt} attempts: {Path.GetFileName(shadowDir)}");
+                    }
                     return;
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    Logger.Log($"Attempt {attempt}/5: Access denied when deleting {shadowDir}. Waiting...");
+                    // 只记录第一次和最后一次尝试
+                    if (attempt == 1 || attempt == 5)
+                    {
+                        Logger.Log($"Attempt {attempt}/5: Access denied when deleting shadow directory {Path.GetFileName(shadowDir)}");
+                        loggedFirstAttempt = true;
+                    }
                     await Task.Delay(2000 * attempt); // 递增等待时间
                 }
                 catch (DirectoryNotFoundException)
                 {
-                    // 目录已经不存在，认为清理成功
-                    Logger.Log($"Shadow copy directory already deleted: {shadowDir}");
+                    // 目录已经不存在，静默返回
                     return;
                 }
                 catch (IOException ex)
                 {
-                    Logger.Log($"Attempt {attempt}/5: IO error when deleting {shadowDir}: {ex.Message}. Waiting...");
+                    // 只记录第一次和最后一次尝试
+                    if (attempt == 1 || attempt == 5)
+                    {
+                        Logger.Log($"Attempt {attempt}/5: IO error when deleting shadow directory {Path.GetFileName(shadowDir)}: {ex.Message}");
+                        loggedFirstAttempt = true;
+                    }
                     await Task.Delay(1000 * attempt);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log($"Attempt {attempt}/5: Unexpected error when deleting {shadowDir}: {ex.Message}");
+                    // 只记录第一次和最后一次尝试
+                    if (attempt == 1 || attempt == 5)
+                    {
+                        Logger.Log($"Attempt {attempt}/5: Error deleting shadow directory {Path.GetFileName(shadowDir)}: {ex.Message}");
+                        loggedFirstAttempt = true;
+                    }
+                    
                     if (attempt == 5)
                     {
-                        Logger.Log($"Failed to delete shadow copy directory after 5 attempts: {shadowDir}");
-                        // 记录到失败列表，可以考虑在应用程序启动时清理
+                        Logger.Log($"Failed to delete shadow copy directory after 5 attempts, will retry on next startup");
                         RecordFailedCleanup(shadowDir);
                     }
                     else

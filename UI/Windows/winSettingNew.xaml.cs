@@ -2362,46 +2362,94 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 }
             }
 
+            bool uninstalled = false;
             var pluginNameToFind = plugin.OriginalName ?? plugin.Name;
             var localPlugin = _plugin.Plugins.FirstOrDefault(p => p.FilePath == plugin.LocalFilePath);
+            var failedPlugin = _plugin.FailedPlugins.FirstOrDefault(p => p.Name == pluginNameToFind);
 
+            // 尝试1: 通过Plugin实例卸载
             if (localPlugin != null)
             {
-                bool uninstalled = await _plugin.UnloadAndTryDeletePlugin(localPlugin);
-                if (!uninstalled)
-                {
-                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(plugin.LocalFilePath)}"),
-                                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                uninstalled = await _plugin.UnloadAndTryDeletePlugin(localPlugin);
             }
-            else
+            // 尝试2: 通过FailedPlugin卸载
+            else if (failedPlugin != null && !string.IsNullOrEmpty(failedPlugin.FilePath))
             {
-                var failedPlugin = _plugin.FailedPlugins.FirstOrDefault(p => p.Name == pluginNameToFind);
-                if (failedPlugin != null)
+                uninstalled = await _plugin.DeletePluginFile(failedPlugin.FilePath);
+            }
+
+            // 尝试3: 备用文件定位删除 - 如果前面的方法都失败，尝试直接通过文件路径删除
+            if (!uninstalled && !string.IsNullOrEmpty(plugin.LocalFilePath))
+            {
+                string validFilePath = plugin.LocalFilePath;
+                
+                // 检查是否是目录路径
+                if (Directory.Exists(validFilePath))
                 {
-                    string pluginFilePath = failedPlugin.FilePath;
-                    bool deleted = await _plugin.DeletePluginFile(pluginFilePath);
-                    if (!deleted)
-                    {
-                        MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),
-                                        ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                    Logger.Log($"Fallback: LocalFilePath is a directory, will use DeletePluginByName instead: {validFilePath}");
+                    // 如果是目录路径，不要随便删除文件，而是跳到方法4使用插件名称定位
+                    validFilePath = null;
                 }
-                else
+                
+                if (!string.IsNullOrEmpty(validFilePath) && File.Exists(validFilePath))
                 {
-                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.FindPluginFail", _plugin.Settings.Language, "找不到本地插件实例"),
-                                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    Logger.Log($"Fallback: Attempting to delete plugin file directly: {validFilePath}");
+                    uninstalled = await _plugin.DeletePluginFile(validFilePath);
                 }
             }
 
+            // 尝试4: 最后的备用方案 - 通过插件名称在插件目录中查找并删除
+            if (!uninstalled)
+            {
+                Logger.Log($"Fallback: Attempting to locate and delete plugin by name: {pluginNameToFind}");
+                uninstalled = await _plugin.DeletePluginByName(pluginNameToFind);
+            }
+
+            // 如果卸载成功，立即从内存中移除插件引用
+            if (uninstalled)
+            {
+                // 从失败插件列表中移除
+                if (failedPlugin != null)
+                {
+                    _plugin.FailedPlugins.Remove(failedPlugin);
+                    Logger.Log($"Removed failed plugin from memory: {pluginNameToFind}");
+                }
+                
+                // 从已加载插件列表中移除（如果还在的话）
+                if (localPlugin != null && _plugin.Plugins.Contains(localPlugin))
+                {
+                    _plugin.Plugins.Remove(localPlugin);
+                    Logger.Log($"Removed loaded plugin from memory: {pluginNameToFind}");
+                }
+            }
+
+            // 刷新UI显示
             Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+
+            if (!uninstalled)
+            {
+                string fileName = !string.IsNullOrEmpty(plugin.LocalFilePath) 
+                    ? Path.GetFileName(plugin.LocalFilePath) 
+                    : pluginNameToFind;
+                MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {fileName}"),
+                                ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async Task HandleDeletePlugin(UnifiedPluginItem plugin)
         {
             string pluginFilePath = plugin.FailedPlugin.FilePath;
             bool deleted = await _plugin.DeletePluginFile(pluginFilePath);
+            
+            // 如果删除成功，立即从失败插件列表中移除
+            if (deleted && plugin.FailedPlugin != null)
+            {
+                _plugin.FailedPlugins.Remove(plugin.FailedPlugin);
+                Logger.Log($"Removed failed plugin from memory: {plugin.FailedPlugin.Name}");
+            }
+            
             Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+            
             if (!deleted)
             {
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),

@@ -833,6 +833,11 @@ namespace VPetLLM
             return await PluginManager.DeletePluginFile(pluginFilePath);
         }
 
+        public async Task<bool> DeletePluginByName(string pluginName)
+        {
+            return await PluginManager.DeletePluginByName(pluginName);
+        }
+
         public void Log(string message)
         {
             Logger.Log(message);
