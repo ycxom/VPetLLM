@@ -52,8 +52,32 @@ namespace VPetLLM
             _path = Path.Combine(path, "VPetLLM.json");
             if (File.Exists(_path))
             {
-                var json = File.ReadAllText(_path);
-                JsonConvert.PopulateObject(json, this);
+                try
+                {
+                    var json = File.ReadAllText(_path);
+                    // 检查JSON内容是否为空或只包含空白字符
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        JsonConvert.PopulateObject(json, this);
+                    }
+                    else
+                    {
+                        Utils.Logger.Log($"Settings file {_path} is empty, using default settings.");
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    // JSON解析失败时记录错误，但已经加载的部分配置会保留
+                    // 缺失的字段会在后面的初始化代码中补全为默认值
+                    Utils.Logger.Log($"Warning: Failed to fully parse settings from {_path}: {ex.Message}");
+                    Utils.Logger.Log("Partially loaded settings will be used, missing values will use defaults.");
+                }
+                catch (Exception ex)
+                {
+                    // 其他错误也记录但不中断加载
+                    Utils.Logger.Log($"Warning: Error reading settings file {_path}: {ex.Message}");
+                    Utils.Logger.Log("Using default settings for all values.");
+                }
             }
             
             // 确保所有属性都有默认值
@@ -466,11 +490,7 @@ namespace VPetLLM
             public string Method { get; set; } = "POST"; // GET 或 POST
             public string ContentType { get; set; } = "application/json";
             public string RequestBody { get; set; } = "{\n  \"text\": \"{text}\",\n  \"voice\": \"default\",\n  \"format\": \"mp3\"\n}";
-            public List<CustomHeader> CustomHeaders { get; set; } = new List<CustomHeader>
-    {
-        new CustomHeader { Key = "User-Agent", Value = "VPetLLM", IsEnabled = true },
-        new CustomHeader { Key = "Accept", Value = "audio/mpeg", IsEnabled = true }
-    };
+            public List<CustomHeader> CustomHeaders { get; set; } = new List<CustomHeader>();
             public string ResponseFormat { get; set; } = "mp3"; // 响应音频格式
         }
 

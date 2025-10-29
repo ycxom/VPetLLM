@@ -25,6 +25,7 @@ namespace VPetLLM
         public string PluginPath => PluginManager.PluginPath;
         public winSettingNew? SettingWindow;
         public TTSService? TTSService;
+        private ConfigurationOptimizer? _configurationOptimizer;
         private GlobalHotkey? _voiceInputHotkey;
         private const int VOICE_INPUT_HOTKEY_ID = 9001;
         private winVoiceInput? _currentVoiceInputWindow;
@@ -88,6 +89,12 @@ namespace VPetLLM
 
             // 初始化TTS服务
             TTSService = new TTSService(Settings.TTS, Settings.Proxy);
+
+            // 初始化配置优化管理器
+            _configurationOptimizer = new ConfigurationOptimizer(Settings);
+            
+            // 执行配置优化
+            _configurationOptimizer.PerformFullOptimization();
 
             LoadPlugins();
         }
@@ -754,6 +761,33 @@ namespace VPetLLM
         public void RefreshPluginList()
         {
             SettingWindow?.RefreshPluginList();
+        }
+
+        /// <summary>
+        /// 执行配置优化
+        /// </summary>
+        public void PerformConfigurationOptimization()
+        {
+            if (_configurationOptimizer == null)
+            {
+                _configurationOptimizer = new ConfigurationOptimizer(Settings);
+            }
+
+            _configurationOptimizer.PerformFullOptimization();
+            Settings.Save(); // 确保优化结果被保存
+        }
+
+        /// <summary>
+        /// 获取配置健康报告
+        /// </summary>
+        public string GetConfigurationHealthReport()
+        {
+            if (_configurationOptimizer == null)
+            {
+                _configurationOptimizer = new ConfigurationOptimizer(Settings);
+            }
+
+            return _configurationOptimizer.GetConfigurationHealthReport();
         }
 
         public void ResetSettings()

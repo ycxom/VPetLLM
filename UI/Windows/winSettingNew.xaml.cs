@@ -1134,10 +1134,19 @@ namespace VPetLLM.UI.Windows
 
             // Free ASR 无需保存配置
 
-            // 更新语音输入快捷键
+// 更新语音输入快捷键
             _plugin.UpdateVoiceInputHotkey();
 
-            _plugin.Settings.Save();
+            // 只在没有发生实际更改时才保存设置，避免循环保存
+            lock (_saveLock)
+            {
+                if (_hasUnsavedChanges)
+                {
+                    _plugin.Settings.Save();
+                    _hasUnsavedChanges = false;
+                    Utils.Logger.Log("设置已保存到文件");
+                }
+            }
 
             if (oldProvider != newProvider)
             {
@@ -2802,25 +2811,24 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // 确保配置文件存在
-                var config = Utils.DIYTTSConfig.LoadConfig();
-                var configPath = Utils.DIYTTSConfig.GetConfigFilePath();
-                var configDir = System.IO.Path.GetDirectoryName(configPath);
+                // DIY TTS 配置已集成到主配置系统中，无需独立配置文件
+                // 显示说明信息
+                var message = "DIY TTS 配置已集成到 VPetLLM 主设置中。\n\n" +
+                             "配置位置：VPetLLM 设置 -> TTS 标签页 -> DIY 提供商\n\n" +
+                             "您可以在主设置界面中直接配置 DIY TTS 的所有参数，包括：\n" +
+                             "• BaseUrl - API 基础地址\n" +
+                             "• Method - 请求方法 (GET/POST)\n" +
+                             "• RequestBody - 请求体模板\n" +
+                             "• CustomHeaders - 自定义请求头\n" +
+                             "• ResponseFormat - 响应格式\n\n" +
+                             "详细配置说明请参考文档。";
 
-                // 打开配置文件夹
-                if (System.IO.Directory.Exists(configDir))
-                {
-                    System.Diagnostics.Process.Start("explorer.exe", configDir);
-                }
-                else
-                {
-                    MessageBox.Show($"配置文件夹不存在：{configDir}",
-                        "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                MessageBox.Show(message, "DIY TTS 配置说明",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"打开配置文件夹失败：{ex.Message}",
+                MessageBox.Show($"显示配置说明失败：{ex.Message}",
                     "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
