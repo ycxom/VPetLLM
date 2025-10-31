@@ -25,7 +25,7 @@ namespace VPetLLM
         public string PluginPath => PluginManager.PluginPath;
         public winSettingNew? SettingWindow;
         public TTSService? TTSService;
-        private ConfigurationOptimizer? _configurationOptimizer;
+        private IntelligentConfigurationOptimizer? _configurationOptimizer;
         private GlobalHotkey? _voiceInputHotkey;
         private const int VOICE_INPUT_HOTKEY_ID = 9001;
         private winVoiceInput? _currentVoiceInputWindow;
@@ -91,10 +91,10 @@ namespace VPetLLM
             TTSService = new TTSService(Settings.TTS, Settings.Proxy);
 
             // 初始化配置优化管理器
-            _configurationOptimizer = new ConfigurationOptimizer(Settings);
+            _configurationOptimizer = new IntelligentConfigurationOptimizer(Settings);
             
             // 执行配置优化
-            _configurationOptimizer.PerformFullOptimization();
+            _configurationOptimizer.PerformIntelligentOptimization();
 
             LoadPlugins();
         }
@@ -764,16 +764,16 @@ namespace VPetLLM
         }
 
         /// <summary>
-        /// 执行配置优化
+        /// 执行智能配置优化
         /// </summary>
         public void PerformConfigurationOptimization()
         {
             if (_configurationOptimizer == null)
             {
-                _configurationOptimizer = new ConfigurationOptimizer(Settings);
+                _configurationOptimizer = new IntelligentConfigurationOptimizer(Settings);
             }
 
-            _configurationOptimizer.PerformFullOptimization();
+            _configurationOptimizer.PerformIntelligentOptimization();
             Settings.Save(); // 确保优化结果被保存
         }
 
@@ -784,10 +784,10 @@ namespace VPetLLM
         {
             if (_configurationOptimizer == null)
             {
-                _configurationOptimizer = new ConfigurationOptimizer(Settings);
+                _configurationOptimizer = new IntelligentConfigurationOptimizer(Settings);
             }
 
-            return _configurationOptimizer.GetConfigurationHealthReport();
+            return _configurationOptimizer.GetIntelligentHealthReport();
         }
 
         public void ResetSettings()
