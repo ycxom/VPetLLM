@@ -39,14 +39,18 @@ namespace VPetLLM.Handlers
                         actionTriggered = true;
                         break;
                     case "move":
-                        actionTriggered = mainWindow.Main.DisplayMove();
+                        // 直接调用Display方法显示移动动画，绕过可能失效的委托属性
+                        mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                        actionTriggered = true;
                         break;
                     case "sleep":
                         mainWindow.Main.DisplaySleep();
                         actionTriggered = true;
                         break;
                     case "idel":
-                        actionTriggered = mainWindow.Main.DisplayIdel();
+                        // 使用DisplayToNomal()作为待机状态的替代方法
+                        mainWindow.Main.DisplayToNomal();
+                        actionTriggered = true;
                         break;
                     case "sideleft":
                         // TODO: 贴墙状态（左边）- 需要 VPet >= 11057 (提交 8acf02c0)
@@ -54,7 +58,8 @@ namespace VPetLLM.Handlers
                         // mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.SideLeft, AnimatType.Single, mainWindow.Main.DisplayToNomal);
                         // actionTriggered = true;
                         Logger.Log("ActionHandler: 'sideleft' action requires VPet >= 11057, falling back to idel");
-                        actionTriggered = mainWindow.Main.DisplayIdel();
+                        mainWindow.Main.DisplayToNomal();
+                        actionTriggered = true;
                         break;
                     case "sideright":
                         // TODO: 贴墙状态（右边）- 需要 VPet >= 11057 (提交 8acf02c0)
@@ -62,7 +67,8 @@ namespace VPetLLM.Handlers
                         // mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.SideRight, AnimatType.Single, mainWindow.Main.DisplayToNomal);
                         // actionTriggered = true;
                         Logger.Log("ActionHandler: 'sideright' action requires VPet >= 11057, falling back to idel");
-                        actionTriggered = mainWindow.Main.DisplayIdel();
+                        mainWindow.Main.DisplayToNomal();
+                        actionTriggered = true;
                         break;
                     default:
                         mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);

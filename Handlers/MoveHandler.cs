@@ -1,6 +1,7 @@
 using System.Windows;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Utils;
+using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers
 {
@@ -15,10 +16,15 @@ namespace VPetLLM.Handlers
             Utils.Logger.Log($"MoveHandler executed with value: {value}");
             if (string.IsNullOrWhiteSpace(value))
             {
-                bool moved = mainWindow.Main.DisplayMove();
-                if (!moved)
+                // 直接调用Display方法显示移动动画，绕过可能失效的委托属性
+                try
                 {
-                    Logger.Log("MoveHandler: Failed to trigger move animation");
+                    mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                    Logger.Log("MoveHandler: Move animation triggered successfully");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"MoveHandler: Failed to trigger move animation: {ex.Message}");
                 }
                 return Task.CompletedTask;
             }
@@ -40,14 +46,15 @@ namespace VPetLLM.Handlers
                 }
                 else
                 {
-                    bool moved = mainWindow.Main.DisplayMove();
-                    if (moved)
+                    try
                     {
+                        mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
                         mainWindow.Core.Controller.MoveWindows(x, y);
+                        Logger.Log("MoveHandler: Move animation and position change successful");
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Logger.Log("MoveHandler: Failed to trigger move animation, moving directly");
+                        Logger.Log($"MoveHandler: Failed to trigger move animation: {ex.Message}, moving directly");
                         mainWindow.Core.Controller.MoveWindows(x, y);
                     }
                 }
@@ -60,24 +67,29 @@ namespace VPetLLM.Handlers
                 }
                 else
                 {
-                    bool moved = mainWindow.Main.DisplayMove();
-                    if (moved)
+                    try
                     {
+                        mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
                         mainWindow.Core.Controller.MoveWindows(x, y);
+                        Logger.Log("MoveHandler: Move animation and position change successful");
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Logger.Log("MoveHandler: Failed to trigger move animation, moving directly");
+                        Logger.Log($"MoveHandler: Failed to trigger move animation: {ex.Message}, moving directly");
                         mainWindow.Core.Controller.MoveWindows(x, y);
                     }
                 }
             }
             else
             {
-                bool moved = mainWindow.Main.DisplayMove();
-                if (!moved)
+                try
                 {
-                    Logger.Log("MoveHandler: Failed to trigger move animation");
+                    mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                    Logger.Log("MoveHandler: Move animation triggered successfully");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"MoveHandler: Failed to trigger move animation: {ex.Message}");
                 }
             }
             return Task.CompletedTask;
@@ -90,10 +102,14 @@ namespace VPetLLM.Handlers
         }
         public Task Execute(IMainWindow mainWindow)
         {
-            bool moved = mainWindow.Main.DisplayMove();
-            if (!moved)
+            try
             {
-                Logger.Log("MoveHandler: Failed to trigger move animation");
+                mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                Logger.Log("MoveHandler: Move animation triggered successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MoveHandler: Failed to trigger move animation: {ex.Message}");
             }
             return Task.CompletedTask;
         }

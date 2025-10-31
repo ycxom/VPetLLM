@@ -463,11 +463,11 @@ namespace VPetLLM
                 }
 
                 // 检测购买来源：区分用户购买和VPet自动购物
-                bool isAutoBuy = Utils.PurchaseSourceDetector.IsAutoBuy(MW);
-                string source = Utils.PurchaseSourceDetector.GetPurchaseSourceDescription(isAutoBuy);
+                var purchaseSource = Utils.PurchaseSourceDetector.DetectPurchaseSource(MW);
+                string source = Utils.PurchaseSourceDetector.GetPurchaseSourceDescription(purchaseSource);
                 Utils.Logger.Log($"Purchase source: {source}");
 
-                if (isAutoBuy)
+                if (purchaseSource == Utils.PurchaseSourceDetector.PurchaseSource.VPetAuto)
                 {
                     Utils.Logger.Log("Purchase event: 检测到VPet自动购物，跳过AI反馈");
                     return;
