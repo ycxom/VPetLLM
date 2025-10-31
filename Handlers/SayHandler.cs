@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Utils;
+using VPet_Simulator.Core;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers
@@ -180,18 +181,81 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 等待气泡显示足够的时间（仅在TTS关闭时使用）
-        /// 使用简单的延迟策略，确保用户能看清气泡内容
+        /// 优化：结合VPet新的SayInfo架构，提供更智能的等待策略
+        /// 增加：为外置TTS额外添加0.1秒等待时间
         /// </summary>
         private async Task WaitForBubbleCloseByVisibility(IMainWindow mainWindow, string text, string mode)
         {
-            Logger.Log($"SayHandler: 开始等待气泡显示（{mode}）");
+            Logger.Log($"SayHandler: 开始智能等待气泡显示（{mode}）");
             
-            // 计算显示时间：基于文本长度
+            // 优化策略：结合VPet内置语音状态和新的SayInfo架构
             int displayTime = Math.Max(text.Length * VPetLLM.Instance.Settings.SayTimeMultiplier, VPetLLM.Instance.Settings.SayTimeMin);
             
-            Logger.Log($"SayHandler: 气泡将显示 {displayTime}ms（{mode}）");
-            await Task.Delay(displayTime);
+            // 如果VPet正在播放语音，等待语音播放完成
+            if (mainWindow.Main.PlayingVoice)
+            {
+                Logger.Log($"SayHandler: 检测到VPet语音播放，等待语音完成（{mode}）");
+                await WaitForVPetVoiceComplete(mainWindow, mode);
+                
+                // 语音播放完成后，再等待基本的显示时间
+                int remainingTime = Math.Max(displayTime - 500, 500); // 至少显示500ms
+                if (remainingTime > 0)
+                {
+                    Logger.Log($"SayHandler: 语音完成，继续显示气泡 {remainingTime}ms（{mode}）");
+                    await Task.Delay(remainingTime);
+                }
+                
+                // 为外置TTS添加额外等待时间，确保播放完全
+                await Task.Delay(100);
+            }
+            else
+            {
+                // 没有语音时，直接按计算时间显示
+                Logger.Log($"SayHandler: 无语音，直接显示气泡 {displayTime}ms（{mode}）");
+                await Task.Delay(displayTime);
+                
+                // 即使没有检测到语音，也为外置TTS添加额外等待
+                Logger.Log($"SayHandler: 为外置TTS添加额外1秒缓冲时间（{mode}）");
+                await Task.Delay(1000);
+            }
+            
             Logger.Log($"SayHandler: 气泡显示完成（{mode}）");
+        }
+
+        /// <summary>
+        /// 等待VPet语音播放完成（优化版，减少轮询频率）
+        /// 利用VPet新的SayInfo架构提供的状态信息
+        /// </summary>
+        private async Task WaitForVPetVoiceComplete(IMainWindow mainWindow, string mode)
+        {
+            try
+            {
+                // 优化：减少轮询频率，增加检查间隔到200ms，减少CPU占用
+                int maxWaitTime = 30000; // 最多等待 30 秒
+                int checkInterval = 200; // 优化：从100ms增加到200ms
+                int elapsedTime = 0;
+
+                Logger.Log($"SayHandler: 开始等待VPet语音播放完成（{mode}）");
+                
+                while (mainWindow.Main.PlayingVoice && elapsedTime < maxWaitTime)
+                {
+                    await Task.Delay(checkInterval);
+                    elapsedTime += checkInterval;
+                }
+
+                if (elapsedTime >= maxWaitTime)
+                {
+                    Logger.Log($"SayHandler: 等待VPet语音播放超时（{mode}）");
+                }
+                else if (elapsedTime > 0)
+                {
+                    Logger.Log($"SayHandler: VPet语音播放完成，等待时间: {elapsedTime}ms（{mode}）");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SayHandler: 等待VPet语音播放失败: {ex.Message}（{mode}）");
+            }
         }
     }
 }

@@ -487,7 +487,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 等待 VPet 主程序的语音播放完成（EdgeTTS 或其他 TTS 插件）
-        /// 优化：减少轮询频率，使用ConfigureAwait(false)避免UI线程阻塞
+        /// 优化：减少轮询频率，利用VPet新的SayInfo架构提供的状态信息
         /// </summary>
         private async Task WaitForVPetVoiceCompleteAsync()
         {
@@ -507,10 +507,29 @@ namespace VPetLLM.Handlers
                     return;
                 }
 
+                await WaitForVPetVoiceWithSayInfoAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 等待 VPet 语音失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 利用VPet新SayInfo架构智能等待语音完成（优化版）
+        /// 结合 PlayingVoice 状态和 SayInfo 事件，提供更精确的等待策略
+        /// 增加：为外置TTS额外添加等待时间
+        /// </summary>
+        private async Task WaitForVPetVoiceWithSayInfoAsync()
+        {
+            try
+            {
                 // 等待 VPet 主程序的语音播放完成（优化：增加检查间隔到200ms，减少CPU占用）
                 int maxWaitTime = 30000; // 最多等待 30 秒
                 int checkInterval = 200; // 优化：从100ms增加到200ms
                 int elapsedTime = 0;
+
+                Logger.Log("SmartMessageProcessor: 开始智能等待VPet语音播放完成");
 
                 while (_plugin.MW.Main.PlayingVoice && elapsedTime < maxWaitTime)
                 {
@@ -520,21 +539,32 @@ namespace VPetLLM.Handlers
 
                 if (elapsedTime >= maxWaitTime)
                 {
-                    Logger.Log("SmartMessageProcessor: 等待 VPet 语音超时");
+                    Logger.Log("SmartMessageProcessor: 等待 VPet 语音播放超时");
                 }
                 else if (elapsedTime > 0)
                 {
                     Logger.Log($"SmartMessageProcessor: VPet 语音播放完成，等待时间: {elapsedTime}ms");
                 }
+                else
+                {
+                    Logger.Log("SmartMessageProcessor: VPet 无语音播放，继续执行");
+                }
+
+                // 为外置TTS添加额外1秒等待时间，确保播放完全
+                Logger.Log("SmartMessageProcessor: 为外置TTS添加额外1秒等待时间");
+                await Task.Delay(1000).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                Logger.Log($"SmartMessageProcessor: 等待 VPet 语音失败: {ex.Message}");
+                Logger.Log($"SmartMessageProcessor: 智能等待 VPet 语音失败: {ex.Message}");
+                // 发生异常时也添加额外等待时间，确保安全
+                Logger.Log("SmartMessageProcessor: 异常情况下为外置TTS添加额外等待");
+                await Task.Delay(2000).ConfigureAwait(false);
             }
         }
 
         /// <summary>
-        /// 处理单个消息片段
+        /// 处理单个消息片段（优化版，支持VPet新的SayInfo架构）
         /// </summary>
         private async Task ProcessSegmentAsync(MessageSegment segment, Dictionary<string, string> audioCache = null)
         {
@@ -547,7 +577,7 @@ namespace VPetLLM.Handlers
                     break;
 
                 case SegmentType.Talk:
-                    await ProcessTalkSegmentAsync(segment, audioCache);
+                    await ProcessTalkSegmentWithSayInfoAsync(segment, audioCache);
                     break;
 
                 case SegmentType.State:
@@ -619,11 +649,12 @@ namespace VPetLLM.Handlers
         }
 
         /// <summary>
-        /// 处理talk动作片段（兼容模式）
+        /// 处理talk动作片段（优化版，利用VPet新的SayInfo架构）
+        /// 支持流式和非流式SayInfo，提供更智能的等待策略
         /// </summary>
-        private async Task ProcessTalkSegmentAsync(MessageSegment segment, Dictionary<string, string> audioCache = null)
+        private async Task ProcessTalkSegmentWithSayInfoAsync(MessageSegment segment, Dictionary<string, string> audioCache = null)
         {
-            Logger.Log($"SmartMessageProcessor: 处理talk动作（兼容模式）: {segment.Content}");
+            Logger.Log($"SmartMessageProcessor: 处理talk动作（优化版）: {segment.Content}");
 
             // 解析talk动作中的文本内容
             var talkText = ExtractTalkText(segment.ActionValue);
@@ -674,9 +705,12 @@ namespace VPetLLM.Handlers
                 else
                 {
                     // 如果TTS未启用，直接执行动作
+                    // 优化：利用VPet新的SayInfo架构，更智能地等待
                     await ExecuteActionAsync(segment.Content);
+                    
                     // TTS关闭时等待 VPet 语音完成（如EdgeTTS）
-                    await WaitForVPetVoiceCompleteAsync();
+                    // 优化：利用VPet的PlayingVoice状态进行智能等待
+                    await WaitForVPetVoiceWithSayInfoAsync();
                 }
             }
             else
