@@ -21,6 +21,13 @@ namespace VPetLLM.Handlers
 
         public async Task Execute(string itemName, IMainWindow mainWindow)
         {
+            // 检查是否为默认插件
+            if (VPetLLM.Instance?.IsVPetLLMDefaultPlugin() != true)
+            {
+                Logger.Log("BuyHandler: VPetLLM不是默认插件，忽略购买请求");
+                return;
+            }
+
             Logger.Log($"BuyHandler: 开始处理购买请求 - 物品: {itemName}");
 
             try

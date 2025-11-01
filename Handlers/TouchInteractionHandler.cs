@@ -140,6 +140,12 @@ namespace VPetLLM.Handlers
             {
                 var now = DateTime.Now;
                 
+                // 检查是否为默认插件
+                if (!_plugin.IsVPetLLMDefaultPlugin())
+                {
+                    return;
+                }
+                
                 // 检查是否启用触摸反馈
                 if (!_plugin.Settings.TouchFeedback.EnableTouchFeedback)
                 {

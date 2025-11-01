@@ -14,6 +14,13 @@ namespace VPetLLM.Handlers
 
         public async Task Execute(string value, IMainWindow mainWindow)
         {
+            // 检查是否为默认插件
+            if (VPetLLM.Instance?.IsVPetLLMDefaultPlugin() != true)
+            {
+                Utils.Logger.Log("SayHandler: VPetLLM不是默认插件，忽略Say请求");
+                return;
+            }
+
             Utils.Logger.Log($"SayHandler executed with value: {value}");
             
             // Say动作只是显示气泡，不影响动画，所以在所有情况下都允许执行

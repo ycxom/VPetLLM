@@ -48,6 +48,38 @@ namespace VPetLLM.UI.Windows
 
     public partial class winSettingNew : Window
     {
+        /// <summary>
+        /// 动态窗口标题支持
+        /// 根据VPetLLM是否为默认插件显示不同的标题
+        /// </summary>
+        public string WindowTitle
+        {
+            get
+            {
+                // 如果 DefaultPluginChecker 存在且插件已初始化，检查是否需要添加横幅
+                try
+                {
+                    if (_plugin != null)
+                    {
+                        bool isDefaultPlugin = _plugin.IsVPetLLMDefaultPlugin();
+                        if (!isDefaultPlugin)
+                        {
+                            // 返回带横幅的标题
+                            return WindowTitleConstants.GetNonDefaultModeTitle();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // 如果检查默认插件状态时出错，使用默认标题
+                    Logger.Log($"获取窗口标题时出错: {ex.Message}");
+                }
+                
+                // 返回默认标题
+                return WindowTitleConstants.GetDefaultModeTitle();
+            }
+        }
+
         private Setting.OpenAINodeSetting GetCurrentOpenAISetting()
         {
             // 获取当前活跃的OpenAI节点设置
@@ -248,16 +280,25 @@ namespace VPetLLM.UI.Windows
             InitializeComponent();
             _plugin = plugin;
             
+            // 设置窗口标题
+            this.Title = WindowTitle;
+            
             // 初始化触摸反馈设置控件
             InitializeTouchFeedbackSettings();
             _plugin.SettingWindow = this;
             LoadSettings();
             Closed += Window_Closed;
+            
+            // 移除窗口激活事件监听，避免不必要的弹窗
+            // this.Activated += WinSettingNew_Activated;
+            
             Loaded += (s, e) =>
             {
                 UpdateUIForLanguage();
                 // 同步本地化服务的语言，确保 XAML 中 {utils:Localize} 初次加载和后续切换都正确刷新
                 LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
+                // 更新窗口标题（在语言设置加载后）
+                this.Title = WindowTitle;
                 // 监听全局本地化变更，自动刷新手动赋值的 UI（如列头）
                 LocalizationService.Instance.PropertyChanged += (sender2, e2) =>
                 {
@@ -419,6 +460,9 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLBBind) cbOpenLBBind.Click += LoadBalancing_CheckBox_Click;
         }
 
+        // 移除所有弹窗相关方法，避免不必要的弹窗干扰用户体验
+        // 提示功能已转移到DefaultPluginChecker的窗口标题横幅显示
+
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             // 实时更新温度值显示
@@ -483,12 +527,17 @@ namespace VPetLLM.UI.Windows
                 LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
                 // 同时刷新代码后台赋值的控件
                 UpdateUIForLanguage();
+                
+                // 更新窗口标题（根据新语言）
+                this.Title = WindowTitle;
 
                 // 在下一帧（空闲时）再强制刷新一次，确保语言资源完全就位后所有文本都更新
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     LocalizationService.Instance.Refresh();
                     UpdateUIForLanguage();
+                    // 再次更新窗口标题，确保语言资源完全加载后标题正确
+                    this.Title = WindowTitle;
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
                 // 重新初始化部分非绑定或复杂逻辑的控件

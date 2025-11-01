@@ -36,6 +36,7 @@ namespace VPetLLM
             Editing         // 编辑状态（识别完成但未自动发送）
         }
         private VoiceInputState _voiceInputState = VoiceInputState.Idle;
+        private DefaultPluginChecker? _defaultPluginChecker;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -97,6 +98,9 @@ namespace VPetLLM
             _configurationOptimizer.PerformIntelligentOptimization();
 
             LoadPlugins();
+            
+            // 初始化默认插件检查器
+            _defaultPluginChecker = new DefaultPluginChecker(this);
         }
 
         private void InitializeVoiceInputHotkey()
@@ -379,6 +383,12 @@ namespace VPetLLM
                 // 初始化语音输入快捷键
                 InitializeVoiceInputHotkey();
                 
+                // 初始化默认插件状态检查器
+                if (_defaultPluginChecker != null)
+                {
+                    _defaultPluginChecker.IsVPetLLMDefaultPlugin();
+                }
+                
                 Utils.Logger.Log("Dispatcher.Invoke finished.");
             });
             Utils.Logger.Log("LoadPlugin finished.");
@@ -442,6 +452,13 @@ namespace VPetLLM
         {
             try
             {
+                // 检查是否为默认插件
+                if (!IsVPetLLMDefaultPlugin())
+                {
+                    Utils.Logger.Log("Purchase event: VPetLLM不是默认插件，忽略购买事件");
+                    return;
+                }
+
                 Utils.Logger.Log($"Purchase event detected: {food?.Name ?? "Unknown"}");
                 
                 if (food == null)
@@ -987,6 +1004,15 @@ namespace VPetLLM
                 return gl;
             }
             return new List<string>();
+        }
+
+        /// <summary>
+        /// 检查VPetLLM是否为默认插件
+        /// </summary>
+        /// <returns>如果VPetLLM是默认插件返回true，否则返回false</returns>
+        public bool IsVPetLLMDefaultPlugin()
+        {
+            return _defaultPluginChecker?.IsVPetLLMDefaultPlugin() ?? false;
         }
     }
 }

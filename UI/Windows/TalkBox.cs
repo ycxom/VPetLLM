@@ -56,10 +56,15 @@ namespace VPetLLM.UI.Windows
         }
         public override async void Responded(string text)
         {
+            // 检查是否为默认插件，如果不是则不处理
+            if (!_plugin.IsVPetLLMDefaultPlugin())
+            {
+                Logger.Log("VPetLLM不是默认插件，忽略消息处理");
+                return;
+            }
+
             OnSendMessage?.Invoke(text);
             Logger.Log($"Responded called with text: {text}");
-
-
 
             try
             {

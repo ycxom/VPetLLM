@@ -12,6 +12,13 @@ namespace VPetLLM.Handlers
 
         public async Task Execute(string actionName, IMainWindow mainWindow)
         {
+            // 检查是否为默认插件
+            if (VPetLLM.Instance?.IsVPetLLMDefaultPlugin() != true)
+            {
+                Logger.Log("ActionHandler: VPetLLM不是默认插件，忽略动作请求");
+                return;
+            }
+
             Utils.Logger.Log($"ActionHandler executed with value: {actionName}");
             
             // 检查VPet是否正在执行重要动画

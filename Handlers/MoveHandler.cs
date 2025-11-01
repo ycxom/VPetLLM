@@ -13,6 +13,13 @@ namespace VPetLLM.Handlers
 
         public Task Execute(string value, IMainWindow mainWindow)
         {
+            // 检查是否为默认插件
+            if (VPetLLM.Instance?.IsVPetLLMDefaultPlugin() != true)
+            {
+                Logger.Log("MoveHandler: VPetLLM不是默认插件，忽略移动请求");
+                return Task.CompletedTask;
+            }
+
             Utils.Logger.Log($"MoveHandler executed with value: {value}");
             if (string.IsNullOrWhiteSpace(value))
             {

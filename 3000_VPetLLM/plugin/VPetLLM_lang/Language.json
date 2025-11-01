@@ -1,4 +1,24 @@
 {
+    "WindowTitle": {
+        "BaseTitle": {
+            "en": "VPetLLM",
+            "zh-hans": "VPetLLM",
+            "zh-hant": "VPetLLM",
+            "jp": "VPetLLM"
+        },
+        "SettingsSuffix": {
+            "en": " Settings",
+            "zh-hans": " 设置",
+            "zh-hant": " 設定",
+            "jp": " 設定"
+        },
+        "NonDefaultPluginBanner": {
+            "en": " (VPetLLM is not set as default chat interface, features disabled)",
+            "zh-hans": "（当前没有将VPetLLM设置为默认聊天接口，功能已停用）",
+            "zh-hant": "（當前沒有將VPetLLM設置為默認聊天接口，功能已停用）",
+            "jp": "（VPetLLMがデフォルトのチャットインターフェースとして設定されていません、機能が無効になっています）"
+        }
+    },
     "Language": {
         "Tab": {
             "en": "Language",

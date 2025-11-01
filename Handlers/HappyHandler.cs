@@ -11,6 +11,12 @@ namespace VPetLLM.Handlers
 
       public Task Execute(int value, IMainWindow mainWindow)
       {
+          // 检查是否为默认插件
+          if (VPetLLM.Instance?.IsVPetLLMDefaultPlugin() != true)
+          {
+              return Task.CompletedTask;
+          }
+
           // 如果启用了状态限制，应用限制逻辑
           if (VPetLLM.Instance.Settings.LimitStateChanges)
           {
