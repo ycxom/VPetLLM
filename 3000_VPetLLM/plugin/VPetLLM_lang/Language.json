@@ -2100,5 +2100,13 @@
             "zh-hant": "很不開心",
             "jp": "とても不幸"
         }
+    },
+    "Thinking": {
+        "Text": {
+            "en": "{PetName} thinking",
+            "zh-hans": "{PetName} 思考中",
+            "zh-hant": "{PetName} 思考中",
+            "jp": "{PetName} 考え中"
+        }
     }
 }
