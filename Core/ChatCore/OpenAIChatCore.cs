@@ -243,7 +243,7 @@ namespace VPetLLM.Core.ChatCore
                         }
                     }
                     message = fullMessage.ToString();
-                    Utils.Logger.Log("OpenAI流式: 流式传输完成，总消息长度: {0},总Token用量：{1}".Translate(message.Length,TotalUsage);
+                    Utils.Logger.Log("OpenAI流式: 流式传输完成，总消息长度: {0},总Token用量：{1}".Translate(message.Length,TotalUsage));
                     // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                 }
                 else

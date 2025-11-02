@@ -1,12 +1,15 @@
 VPetLLM#VPetLLM:|
 VPetLLM_Description#The virtual table carries the LLM aggregation interface and the architecture of OpenAI/com Gemini/com and Ollama protocols:|
-ASR (Free): 发送请求，音频大小: {0} bytes#ASR(Free): Send request, audio size: {0} bytes:|
-ASR (Free): 响应接收完成，耗时 {0: F2} 秒, 状态: {1}#ASR(Free): Response received, time taken {0: F2} seconds, status: {1}:|
-ASR (Free): API 错误: {0} - {1}#ASR(Free): API Error: {0} - {1}:|
+
+{1}: 发送请求，音频大小: {0} bytes#{1}: Send request, audio size: {0} bytes:|
+{2}: 响应接收完成，耗时 {0: F2} 秒, 状态: {1}#{2}: Response received, time taken {0: F2} seconds, status: {1}:|
+{2}: API 错误: {0} - {1}#{2}: API Error: {0} - {1}:|
+{1}: 响应内容: {0}#{1}: Response content: {0}:|
+{1}: 请求超时: {0}#{1}: Request timed out: {0}:|
+{1}: 网络错误: {0}#{1}: Network error: {0}:|
+{1}: 转录错误: {0}#{1}: Transcription error: {0}:|
+
 Free ASR 服务暂时不可用: {0}#Free ASR service is temporarily unavailable: {0}:|
-ASR (Free): 响应内容: {0}#ASR(Free): Response content: {0}:|
-ASR (Free): 请求超时: {0}#ASR(Free): Request timed out: {0}:|
 请求超时，请检查网络连接或尝试录制更短的音频#Request timed out, please check your network connection or try recording a shorter audio:|
-ASR (Free): 网络错误: {0}#ASR(Free): Network error: {0}:|
 网络错误: {0}#Network error: {0}:|
-ASR (Free): 转录错误: {0}#ASR(Free): Transcription error: {0}:|
+OpenAI API 错误: {0}#OpenAI API Error: {0}:|
