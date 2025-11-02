@@ -232,9 +232,9 @@ namespace VPetLLM.Core.ChatCore
                                     streamProcessor.AddChunk(delta);
                                     // 通知流式文本更新（用于显示）
                                     StreamingChunkHandler?.Invoke(delta);
+                                    var usage = chunk["usage"]?["total_tokens"]?.ToObject<int>() ?? 0;
+                                    TotalUsage += usage;
                                 }
-                                var usage = chunk["usage"]?["total_tokens"]?.ToObject<int>() ?? 0;
-                                TotalUsage += usage;
                             }
                             catch
                             {

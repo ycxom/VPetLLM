@@ -36,6 +36,13 @@
           }
         }
       },
+      "Microsoft.NETCore.Platforms/3.1.0": {},
+      "Microsoft.Win32.Registry/4.7.0": {
+        "dependencies": {
+          "System.Security.AccessControl": "4.7.0",
+          "System.Security.Principal.Windows": "4.7.0"
+        }
+      },
       "NAudio/2.2.1": {
         "dependencies": {
           "NAudio.Asio": "2.2.1",
@@ -54,6 +61,7 @@
       },
       "NAudio.Asio/2.2.1": {
         "dependencies": {
+          "Microsoft.Win32.Registry": "4.7.0",
           "NAudio.Core": "2.2.1"
         },
         "runtime": {
@@ -106,6 +114,7 @@
       },
       "NAudio.WinMM/2.2.1": {
         "dependencies": {
+          "Microsoft.Win32.Registry": "4.7.0",
           "NAudio.Core": "2.2.1"
         },
         "runtime": {
@@ -182,6 +191,13 @@
           }
         }
       },
+      "System.Security.AccessControl/4.7.0": {
+        "dependencies": {
+          "Microsoft.NETCore.Platforms": "3.1.0",
+          "System.Security.Principal.Windows": "4.7.0"
+        }
+      },
+      "System.Security.Principal.Windows/4.7.0": {},
       "VPet-Simulator.Core/1.1.0.50": {
         "dependencies": {
           "LinePutScript": "1.11.9",
@@ -228,6 +244,20 @@
       "sha512": "sha512-n9Hh57jE8pNwzFypx2RUu6hYFMotZ+RDQYvpHwtHojLrFnZ35zJRgTXK3WKtYZHn7Ldm17+Q7NKQnXG1hkSrnQ==",
       "path": "lineputscript.localization.wpf/1.0.7",
       "hashPath": "lineputscript.localization.wpf.1.0.7.nupkg.sha512"
+    },
+    "Microsoft.NETCore.Platforms/3.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-z7aeg8oHln2CuNulfhiLYxCVMPEwBl3rzicjvIX+4sUuCwvXw5oXQEtbiU2c0z4qYL5L3Kmx0mMA/+t/SbY67w==",
+      "path": "microsoft.netcore.platforms/3.1.0",
+      "hashPath": "microsoft.netcore.platforms.3.1.0.nupkg.sha512"
+    },
+    "Microsoft.Win32.Registry/4.7.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-KSrRMb5vNi0CWSGG1++id2ZOs/1QhRqROt+qgbEAdQuGjGrFcl4AOl4/exGPUYz2wUnU42nvJqon1T3U0kPXLA==",
+      "path": "microsoft.win32.registry/4.7.0",
+      "hashPath": "microsoft.win32.registry.4.7.0.nupkg.sha512"
     },
     "NAudio/2.2.1": {
       "type": "package",
@@ -319,6 +349,20 @@
       "sha512": "sha512-dRQ75MCI8oz6zAs2Y1w6pq6ARs4MhdNG+gf3doOxOxdnueDXffQLGQIxON54GDoxc0WjKOoHMKBR4DhaduwwQw==",
       "path": "skiasharp.nativeassets.win32/3.116.1",
       "hashPath": "skiasharp.nativeassets.win32.3.116.1.nupkg.sha512"
+    },
+    "System.Security.AccessControl/4.7.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-JECvTt5aFF3WT3gHpfofL2MNNP6v84sxtXxpqhLBCcDRzqsPBmHhQ6shv4DwwN2tRlzsUxtb3G9M3763rbXKDg==",
+      "path": "system.security.accesscontrol/4.7.0",
+      "hashPath": "system.security.accesscontrol.4.7.0.nupkg.sha512"
+    },
+    "System.Security.Principal.Windows/4.7.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ojD0PX0XhneCsUbAZVKdb7h/70vyYMDYs85lwEI+LngEONe/17A0cFaRFqZU+sOEidcVswYWikYOQ9PPfjlbtQ==",
+      "path": "system.security.principal.windows/4.7.0",
+      "hashPath": "system.security.principal.windows.4.7.0.nupkg.sha512"
     },
     "VPet-Simulator.Core/1.1.0.50": {
       "type": "package",
