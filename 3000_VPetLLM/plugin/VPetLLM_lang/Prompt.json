@@ -83,6 +83,10 @@
         "en": "The user is gently touching your body.",
         "zh": "用户正在轻抚你的身体。"
     },
+    "TouchFeedback_Pinch": {
+        "en": "The user is pinching your face.",
+        "zh": "用户正在捏你的脸"
+    },
     "BuyFeedback_General": {
         "en": "The user just bought {ItemName} ({ItemType}) for ${ItemPrice}. You are feeling {EmotionState}. Current status: Health({CurrentHealth}), Mood({CurrentMood}), Money(${CurrentMoney}). ",
         "zh": "用户刚刚给你买了{ItemName}（{ItemType}），花费了${ItemPrice}。你现在感到{EmotionState}。当前状态：健康({CurrentHealth})，心情({CurrentMood})，金钱(${CurrentMoney})。"

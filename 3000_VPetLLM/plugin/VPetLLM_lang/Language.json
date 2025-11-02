@@ -2023,6 +2023,12 @@
             "zh-hans": "身体",
             "zh-hant": "身體",
             "jp": "体"
+        },
+        "TouchArea_Pinch": {
+            "en": "face",
+            "zh-hans": "脸部",
+            "zh-hant": "臉部",
+            "jp": "顔"
         }
     },
     "ItemType": {

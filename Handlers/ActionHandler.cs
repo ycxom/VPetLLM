@@ -45,6 +45,28 @@ namespace VPetLLM.Handlers
                         mainWindow.Main.DisplayTouchBody();
                         actionTriggered = true;
                         break;
+                    case "pinch":
+                    case "pinch_face":
+                    case "touchpinch":
+                        // 调用VPet的DisplayPinch方法（如果可用）
+                        try
+                        {
+                            var displayPinchMethod = mainWindow.GetType().GetMethod("DisplayPinch");
+                            if (displayPinchMethod != null)
+                            {
+                                displayPinchMethod.Invoke(mainWindow, null);
+                                actionTriggered = true;
+                            }
+                            else
+                            {
+                                Logger.Log("ActionHandler: DisplayPinch method not found, pinch animation not available");
+                            }
+                        }
+                        catch (System.Exception ex)
+                        {
+                            Logger.Log($"ActionHandler: Failed to execute pinch action: {ex.Message}");
+                        }
+                        break;
                     case "move":
                         // 直接调用Display方法显示移动动画，绕过可能失效的委托属性
                         mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
@@ -60,22 +82,58 @@ namespace VPetLLM.Handlers
                         actionTriggered = true;
                         break;
                     case "sideleft":
-                        // TODO: 贴墙状态（左边）- 需要 VPet >= 11057 (提交 8acf02c0)
-                        // 当前版本暂不支持，等待 VPet 更新后取消注释以下代码：
-                        // mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.SideLeft, AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                        // actionTriggered = true;
-                        Logger.Log("ActionHandler: 'sideleft' action requires VPet >= 11057, falling back to idel");
-                        mainWindow.Main.DisplayToNomal();
-                        actionTriggered = true;
+                        // 贴墙状态（左边）- VPet 11057+ 通过设置 State 实现
+                        try
+                        {
+                            var stateProperty = mainWindow.Main.GetType().GetProperty("State");
+                            if (stateProperty != null)
+                            {
+                                var workingStateType = stateProperty.PropertyType;
+                                var sideLeftValue = System.Enum.Parse(workingStateType, "SideLeft");
+                                stateProperty.SetValue(mainWindow.Main, sideLeftValue);
+                                Logger.Log("ActionHandler: Set state to SideLeft");
+                                actionTriggered = true;
+                            }
+                            else
+                            {
+                                Logger.Log("ActionHandler: State property not found, falling back to idel");
+                                mainWindow.Main.DisplayToNomal();
+                                actionTriggered = true;
+                            }
+                        }
+                        catch (System.Exception ex)
+                        {
+                            Logger.Log($"ActionHandler: Failed to set SideLeft state: {ex.Message}, falling back to idel");
+                            mainWindow.Main.DisplayToNomal();
+                            actionTriggered = true;
+                        }
                         break;
                     case "sideright":
-                        // TODO: 贴墙状态（右边）- 需要 VPet >= 11057 (提交 8acf02c0)
-                        // 当前版本暂不支持，等待 VPet 更新后取消注释以下代码：
-                        // mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.SideRight, AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                        // actionTriggered = true;
-                        Logger.Log("ActionHandler: 'sideright' action requires VPet >= 11057, falling back to idel");
-                        mainWindow.Main.DisplayToNomal();
-                        actionTriggered = true;
+                        // 贴墙状态（右边）- VPet 11057+ 通过设置 State 实现
+                        try
+                        {
+                            var stateProperty = mainWindow.Main.GetType().GetProperty("State");
+                            if (stateProperty != null)
+                            {
+                                var workingStateType = stateProperty.PropertyType;
+                                var sideRightValue = System.Enum.Parse(workingStateType, "SideRight");
+                                stateProperty.SetValue(mainWindow.Main, sideRightValue);
+                                Logger.Log("ActionHandler: Set state to SideRight");
+                                actionTriggered = true;
+                            }
+                            else
+                            {
+                                Logger.Log("ActionHandler: State property not found, falling back to idel");
+                                mainWindow.Main.DisplayToNomal();
+                                actionTriggered = true;
+                            }
+                        }
+                        catch (System.Exception ex)
+                        {
+                            Logger.Log($"ActionHandler: Failed to set SideRight state: {ex.Message}, falling back to idel");
+                            mainWindow.Main.DisplayToNomal();
+                            actionTriggered = true;
+                        }
                         break;
                     default:
                         mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);

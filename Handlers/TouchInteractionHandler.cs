@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Utils;
+using LinePutScript;
+using static VPet_Simulator.Core.GraphHelper;
 
 namespace VPetLLM.Handlers
 {
@@ -107,6 +109,9 @@ namespace VPetLLM.Handlers
                 // 监听摸身体事件  
                 _plugin.MW.Main.Event_TouchBody += OnTouchBody;
                 
+                // 监听捏脸事件（通过Hook DisplayPinch方法）
+                HookDisplayPinch();
+                
                 Logger.Log("Touch events registered successfully.");
             }
             catch (Exception ex)
@@ -129,6 +134,74 @@ namespace VPetLLM.Handlers
         private async void OnTouchBody()
         {
             await HandleTouchInteraction(TouchType.Body);
+        }
+
+        /// <summary>
+        /// 捏脸事件处理
+        /// </summary>
+        private async void OnTouchPinch()
+        {
+            await HandleTouchInteraction(TouchType.Pinch);
+        }
+
+        // 用于跟踪捏脸调用的时间戳，避免重复触发
+        private DateTime _lastPinchCallTime = DateTime.MinValue;
+        
+        /// <summary>
+        /// Hook DisplayPinch方法来监听捏脸事件
+        /// 这是最简单可靠的方法，因为无论如何触发捏脸，都会调用DisplayPinch
+        /// </summary>
+        private void HookDisplayPinch()
+        {
+            try
+            {
+                // 检查是否有捏脸动画配置
+                if (_plugin?.MW?.Main?.Core?.Graph?.GraphConfig?.Data?.ContainsLine("pinch") != true)
+                {
+                    Logger.Log("Pinch animation not available in current pet model.");
+                    return;
+                }
+                
+                // 使用定时器定期检查Main.DisplayType来检测捏脸动画
+                var checkTimer = new System.Timers.Timer(100); // 每100ms检查一次
+                checkTimer.Elapsed += (s, e) =>
+                {
+                    try
+                    {
+                        if (_plugin?.MW?.Main?.DisplayType == null)
+                            return;
+                        
+                        var displayType = _plugin.MW.Main.DisplayType;
+                        
+                        // 检查是否正在播放捏脸动画
+                        if (displayType.Name == "pinch" && 
+                            displayType.Animat == VPet_Simulator.Core.GraphInfo.AnimatType.A_Start)
+                        {
+                            var now = DateTime.Now;
+                            // 避免短时间内重复触发（500ms内只触发一次）
+                            if ((now - _lastPinchCallTime).TotalMilliseconds > 500)
+                            {
+                                _lastPinchCallTime = now;
+                                Logger.Log("Detected pinch animation start, triggering VPetLLM feedback.");
+                                
+                                // 异步触发捏脸反馈
+                                System.Threading.Tasks.Task.Run(() => OnTouchPinch());
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error in pinch detection timer: {ex.Message}");
+                    }
+                };
+                checkTimer.Start();
+                
+                Logger.Log("Pinch detection timer started successfully.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error hooking DisplayPinch: {ex.Message}\nStackTrace: {ex.StackTrace}");
+            }
         }
 
         /// <summary>
@@ -263,7 +336,22 @@ namespace VPetLLM.Handlers
         private string BuildTouchPrompt(TouchInteraction interaction)
         {
             // 从JSON文件读取触摸提示词模板
-            var templateKey = interaction.Type == TouchType.Head ? "TouchFeedback_Head" : "TouchFeedback_Body";
+            string templateKey;
+            switch (interaction.Type)
+            {
+                case TouchType.Head:
+                    templateKey = "TouchFeedback_Head";
+                    break;
+                case TouchType.Body:
+                    templateKey = "TouchFeedback_Body";
+                    break;
+                case TouchType.Pinch:
+                    templateKey = "TouchFeedback_Pinch";
+                    break;
+                default:
+                    templateKey = "TouchFeedback_General";
+                    break;
+            }
             var template = PromptHelper.Get(templateKey, _plugin.Settings.PromptLanguage);
             
             // 如果没有找到特定模板，使用通用触摸模板
@@ -306,13 +394,33 @@ namespace VPetLLM.Handlers
         /// </summary>
         private string GetLocalizedTouchArea(TouchType touchType, string language)
         {
-            var key = touchType == TouchType.Head ? "TouchArea_Head" : "TouchArea_Body";
+            string key;
+            string defaultValue;
+            
+            switch (touchType)
+            {
+                case TouchType.Head:
+                    key = "TouchArea_Head";
+                    defaultValue = "head";
+                    break;
+                case TouchType.Body:
+                    key = "TouchArea_Body";
+                    defaultValue = "body";
+                    break;
+                case TouchType.Pinch:
+                    key = "TouchArea_Pinch";
+                    defaultValue = "face";
+                    break;
+                default:
+                    return "unknown";
+            }
+            
             var localizedArea = LanguageHelper.Get(key, language);
             
             // 如果没有找到本地化文本，返回英文默认值
             if (string.IsNullOrEmpty(localizedArea))
             {
-                return touchType == TouchType.Head ? "head" : "body";
+                return defaultValue;
             }
             
             return localizedArea;
@@ -477,6 +585,7 @@ namespace VPetLLM.Handlers
     public enum TouchType
     {
         Head,   // 摸头
-        Body    // 摸身体
+        Body,   // 摸身体
+        Pinch   // 捏脸
     }
 }
