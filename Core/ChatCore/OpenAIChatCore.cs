@@ -6,6 +6,7 @@ using System.Linq;
 using System.Collections.Generic;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
+using LinePutScript.Localization.WPF;
 
 namespace VPetLLM.Core.ChatCore
 {
@@ -206,7 +207,7 @@ namespace VPetLLM.Core.ChatCore
                         Utils.Logger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
                         ResponseHandler?.Invoke(cmd);
                     });
-                    
+                    var TotalUsage = 0;
                     using (var stream = await response.Content.ReadAsStreamAsync())
                     using (var reader = new System.IO.StreamReader(stream))
                     {
@@ -231,6 +232,8 @@ namespace VPetLLM.Core.ChatCore
                                     streamProcessor.AddChunk(delta);
                                     // 通知流式文本更新（用于显示）
                                     StreamingChunkHandler?.Invoke(delta);
+                                    var usage = chunk["usage"]?["total_tokens"]?.ToObject<int>() ?? 0;
+                                    TotalUsage += usage;
                                 }
                             }
                             catch
@@ -240,7 +243,7 @@ namespace VPetLLM.Core.ChatCore
                         }
                     }
                     message = fullMessage.ToString();
-                    Utils.Logger.Log($"OpenAI流式: 流式传输完成，总消息长度: {message.Length}");
+                    Utils.Logger.Log("OpenAI流式: 流式传输完成，总消息长度: {0},总Token用量：{1}".Translate(message.Length,TotalUsage));
                     // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                 }
                 else
@@ -252,7 +255,8 @@ namespace VPetLLM.Core.ChatCore
                     var responseString = await response.Content.ReadAsStringAsync();
                     var responseObject = JObject.Parse(responseString);
                     message = responseObject["choices"][0]["message"]["content"].ToString();
-                    Utils.Logger.Log($"OpenAI非流式: 收到完整消息，长度: {message.Length}");
+                    var tokenUsage = responseObject["usage"]["total_tokens"].ToString();
+                    Utils.Logger.Log("OpenAI非流式: 收到完整消息，长度: {0}，Token用量：{1}".Translate(message.Length,tokenUsage));
                     // 非流式模式下，一次性处理完整消息
                     ResponseHandler?.Invoke(message);
                 }
