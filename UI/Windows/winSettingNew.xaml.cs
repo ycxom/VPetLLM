@@ -350,6 +350,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableAction")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableBuy")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableState")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_ReduceInputTokenUsage")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableMove")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableTime")).Click += Control_Click;
@@ -694,6 +695,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableAction")).IsChecked = _plugin.Settings.EnableAction;
             ((CheckBox)this.FindName("CheckBox_EnableBuy")).IsChecked = _plugin.Settings.EnableBuy;
             ((CheckBox)this.FindName("CheckBox_EnableState")).IsChecked = _plugin.Settings.EnableState;
+            ((CheckBox)this.FindName("CheckBox_ReduceInputTokenUsage")).IsChecked = _plugin.Settings.ReduceInputTokenUsage;
             ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).IsChecked = _plugin.Settings.EnableActionExecution;
             ((CheckBox)this.FindName("CheckBox_EnableMove")).IsChecked = _plugin.Settings.EnableMove;
             ((CheckBox)this.FindName("CheckBox_EnableTime")).IsChecked = _plugin.Settings.EnableTime;
@@ -989,6 +991,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableAction = enableActionCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableBuy = enableBuyCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableState = enableStateCheckBox.IsChecked ?? true;
+            _plugin.Settings.ReduceInputTokenUsage = ((CheckBox)this.FindName("CheckBox_ReduceInputTokenUsage")).IsChecked ?? false;
             _plugin.Settings.EnableActionExecution = enableActionExecutionCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableMove = enableMoveCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableTime = enableTimeCheckBox.IsChecked ?? true;

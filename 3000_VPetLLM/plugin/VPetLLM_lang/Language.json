@@ -524,6 +524,18 @@
             "zh-hant": "允许获取宠物状态",
             "jp": "ペットの状態を取得できるようにする"
         },
+        "ReduceInputTokenUsage": {
+            "en": "Reduce input token usage",
+            "zh-hans": "尝试减少输入token消耗",
+            "zh-hant": "嘗試減少輸入token消耗",
+            "jp": "入力トークン消費を削減する"
+        },
+        "ReduceInputTokenUsageToolTip": {
+            "en": "When enabled, pet status will be moved from system role to user role in format [Time;Status], which helps hit cache and reduce token usage. Compatible with context editor.",
+            "zh-hans": "启用后，宠物状态将从 system role 移动到 user role，格式为 [Time;状态]，有助于命中缓存节省 token。兼容上下文编辑器。",
+            "zh-hant": "啟用後，寵物狀態將從 system role 移動到 user role，格式為 [Time;狀態]，有助於命中緩存節省 token。兼容上下文編輯器。",
+            "jp": "有効にすると、ペットの状態がsystemロールからuserロールに移動され、[Time;状態]の形式で表示されます。これによりキャッシュヒット率が向上し、トークン使用量が削減されます。コンテキストエディタと互換性があります。"
+        },
         "EnableActionExecution": {
             "en": "Allow pet to perform actions",
             "zh-hans": "允许宠物执行动作",

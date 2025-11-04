@@ -33,6 +33,7 @@ namespace VPetLLM.Core
             ActionProcessor = actionProcessor;
             HistoryManager = new HistoryManager(settings, Name, this);
             SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
+            HistoryManager.SetSystemMessageProvider(SystemMessageProvider);
         }
 
         public virtual List<string> GetModels()
@@ -266,6 +267,12 @@ namespace VPetLLM.Core
         [JsonProperty(Order = 4)]
         public long? UnixTime { get; set; }
 
+        /// <summary>
+        /// 状态信息字符串（仅在启用ReduceInputTokenUsage时使用）
+        /// </summary>
+        [JsonProperty(Order = 5)]
+        public string? StatusInfo { get; set; }
+
         [JsonIgnore]
         public string DisplayContent
         {
@@ -284,18 +291,41 @@ namespace VPetLLM.Core
                 }
 
                 // 时间前缀：若存在UnixTime则动态渲染为 [yyyy/MM/dd HH:mm:ss]
-                string prefix = "";
+                string timePrefix = "";
                 if (UnixTime.HasValue)
                 {
                     try
                     {
                         var dt = DateTimeOffset.FromUnixTimeSeconds(UnixTime.Value).ToLocalTime().DateTime;
-                        prefix = $"[{dt:yyyy/MM/dd HH:mm:ss}] ";
+                        timePrefix = $"[{dt:yyyy/MM/dd HH:mm:ss}]";
                     }
                     catch
                     {
                         // 忽略解析异常，保持无前缀
                     }
+                }
+
+                // 状态信息前缀：若存在StatusInfo则动态添加
+                string statusPrefix = "";
+                if (!string.IsNullOrEmpty(StatusInfo))
+                {
+                    statusPrefix = $"[{StatusInfo}]";
+                }
+
+                // 组合前缀：时间和状态信息
+                string prefix = "";
+                if (!string.IsNullOrEmpty(timePrefix) && !string.IsNullOrEmpty(statusPrefix))
+                {
+                    // 如果同时有时间和状态，合并为一个方括号：[Time;Status]
+                    prefix = $"[{timePrefix.Trim('[', ']')};{statusPrefix.Trim('[', ']')}] ";
+                }
+                else if (!string.IsNullOrEmpty(timePrefix))
+                {
+                    prefix = timePrefix + " ";
+                }
+                else if (!string.IsNullOrEmpty(statusPrefix))
+                {
+                    prefix = statusPrefix + " ";
                 }
 
                 return prefix + baseText;

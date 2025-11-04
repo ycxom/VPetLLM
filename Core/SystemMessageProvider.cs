@@ -106,8 +106,8 @@ namespace VPetLLM.Core
             {
                 parts.Add(PromptHelper.Get("Character_Setting", lang));
 
-                // 只有在EnableState开启时才添加状态信息
-                if (_settings.EnableState)
+                // 只有在EnableState开启且未启用减少输入token消耗时才添加状态信息到system role
+                if (_settings.EnableState && !_settings.ReduceInputTokenUsage)
                 {
                     var core = _mainWindow.Core;
                     
@@ -146,13 +146,6 @@ namespace VPetLLM.Core
                     parts.Add(status);
                 }
                 
-                // 只有在EnableTime开启时才添加时间信息（独立于EnableState）
-                if (_settings.EnableTime)
-                {
-                    var timeInfo = PromptHelper.Get("Time_Prefix", lang)
-                                .Replace("{CurrentTime:yyyy-MM-dd HH:mm:ss}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    parts.Add(timeInfo);
-                }
 
                 // 只有在EnablePlugin开启时才添加插件动态信息
                 if (_settings.EnablePlugin)
@@ -239,6 +232,49 @@ namespace VPetLLM.Core
         public void RemovePlugin(IVPetLLMPlugin plugin)
         {
             // No action needed here for now, as GetSystemMessage dynamically fetches the list
+        }
+
+        /// <summary>
+        /// 获取状态信息字符串（用于添加到用户消息中）
+        /// </summary>
+        public string GetStatusString()
+        {
+            if (_settings == null || _mainWindow == null || !_settings.EnableState || !_settings.ReduceInputTokenUsage)
+                return "";
+
+            var lang = _settings.PromptLanguage;
+            var core = _mainWindow.Core;
+            
+            // 计算各项百分比
+            var staminaPercent = core.Save.Strength / core.Save.StrengthMax * 100;
+            var healthPercent = core.Save.Health;
+            var moodPercent = core.Save.Feeling / core.Save.FeelingMax * 100;
+            var likabilityPercent = core.Save.Likability / core.Save.LikabilityMax * 100;
+            var hungerPercent = core.Save.StrengthFood / core.Save.StrengthMax * 100;
+            var thirstPercent = core.Save.StrengthDrink / core.Save.StrengthMax * 100;
+            
+            // 获取状态描述
+            var staminaDesc = GetStatusDescription(staminaPercent, "stamina");
+            var healthDesc = GetStatusDescription(healthPercent, "health");
+            var moodDesc = GetStatusDescription(moodPercent, "mood");
+            var likabilityDesc = GetStatusDescription(likabilityPercent, "likability");
+            var hungerDesc = GetStatusDescription(hungerPercent, "hunger");
+            var thirstDesc = GetStatusDescription(thirstPercent, "thirst");
+            
+            // 构建简洁的状态字符串
+            var statusParts = new List<string>
+            {
+                $"Lv{core.Save.Level}",
+                $"${core.Save.Money:F2}",
+                $"{lang switch { "zh" => "体力", _ => "Stamina" }}:{staminaPercent:F0}%({staminaDesc})",
+                $"{lang switch { "zh" => "健康", _ => "Health" }}:{healthPercent:F0}%({healthDesc})",
+                $"{lang switch { "zh" => "心情", _ => "Mood" }}:{moodPercent:F0}%({moodDesc})",
+                $"{lang switch { "zh" => "好感", _ => "Likability" }}:{likabilityPercent:F0}%({likabilityDesc})",
+                $"{lang switch { "zh" => "饱食", _ => "Hunger" }}:{hungerPercent:F0}%({hungerDesc})",
+                $"{lang switch { "zh" => "口渴", _ => "Thirst" }}:{thirstPercent:F0}%({thirstDesc})"
+            };
+            
+            return string.Join(";", statusParts);
         }
     }
 }

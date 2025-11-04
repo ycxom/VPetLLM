@@ -1782,6 +1782,18 @@
                                         IsChecked="True"
                                         Margin="0,0,0,8"
                                         Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_ReduceInputTokenUsage"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.ReduceInputTokenUsage}"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableState}"
+                                        IsChecked="False"
+                                        Margin="20,0,0,8"
+                                        Style="{StaticResource ModernCheckBox}">
+                                    <CheckBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ReduceInputTokenUsageToolTip}"/>
+                                        </ToolTip>
+                                    </CheckBox.ToolTip>
+                                </CheckBox>
                                 <CheckBox x:Name="CheckBox_EnableActionExecution"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableActionExecution}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"

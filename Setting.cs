@@ -24,6 +24,7 @@ namespace VPetLLM
         public bool EnableAction { get; set; } = true;
         public bool EnableBuy { get; set; } = true;
         public bool EnableState { get; set; } = true;
+        public bool ReduceInputTokenUsage { get; set; } = false;
         public bool EnableActionExecution { get; set; } = true;
         public int SayTimeMultiplier { get; set; } = 200;
         public int SayTimeMin { get; set; } = 2000;

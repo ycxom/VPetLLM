@@ -10,6 +10,7 @@ namespace VPetLLM.Core
         private readonly Setting _settings;
         private readonly string _historyFilePath;
         private readonly ChatCoreBase _chatCore;
+        private SystemMessageProvider _systemMessageProvider;
 
         public HistoryManager(Setting settings, string name, ChatCoreBase chatCore)
         {
@@ -17,6 +18,11 @@ namespace VPetLLM.Core
             _historyFilePath = GetHistoryFilePath(name);
             _chatCore = chatCore;
             LoadHistory();
+        }
+
+        public void SetSystemMessageProvider(SystemMessageProvider provider)
+        {
+            _systemMessageProvider = provider;
         }
 
         public List<Message> GetHistory() => _history;
@@ -50,6 +56,17 @@ namespace VPetLLM.Core
             if (_settings.EnableTime)
             {
                 message.UnixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
+            }
+
+            // 如果启用了减少输入token消耗且是用户消息，设置状态信息字段（不修改Content）
+            if (_settings.ReduceInputTokenUsage && message.Role == "user" && _systemMessageProvider != null)
+            {
+                var statusString = _systemMessageProvider.GetStatusString();
+                if (!string.IsNullOrEmpty(statusString))
+                {
+                    // 设置StatusInfo字段，DisplayContent会动态组合
+                    message.StatusInfo = statusString;
+                }
             }
 
             _history.Add(message);
