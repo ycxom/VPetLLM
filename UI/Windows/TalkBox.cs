@@ -72,22 +72,27 @@ namespace VPetLLM.UI.Windows
 
             try
             {
-                // 显示思考动作和动态气泡（如果VPet不在重要状态）
-                await Application.Current.Dispatcher.InvokeAsync(() =>
+                // 输出当前动画状态用于调试
+                var currentAnimDesc = AnimationStateChecker.GetCurrentAnimationDescription(_plugin.MW);
+                Logger.Log($"TalkBox.Responded: 当前动画状态 = {currentAnimDesc}");
+                
+                // 检查VPet是否正在执行重要动画（包括用户交互动画如捏脸）
+                bool isPlayingImportantAnimation = AnimationStateChecker.IsPlayingImportantAnimation(_plugin.MW);
+                
+                // 显示思考动作和动态气泡（仅当VPet不在重要状态时）
+                if (!isPlayingImportantAnimation)
                 {
-                    if (!AnimationStateChecker.IsPlayingImportantAnimation(_plugin.MW))
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
                     {
                         Logger.Log("显示思考动作和动态气泡");
                         DisplayThink();
                         StartThinkingAnimation();
-                    }
-                    else
-                    {
-                        Logger.Log($"VPet正在执行重要动画 ({AnimationStateChecker.GetCurrentAnimationDescription(_plugin.MW)})，跳过思考动作");
-                        // 即使跳过动作，也显示思考气泡
-                        StartThinkingAnimation();
-                    }
-                });
+                    });
+                }
+                else
+                {
+                    Logger.Log($"VPet正在执行重要动画 ({currentAnimDesc})，完全跳过思考动画和气泡");
+                }
 
                 Logger.Log("Calling ChatCore.Chat...");
                 await Task.Run(() => _plugin.ChatCore.Chat(text));
@@ -103,7 +108,7 @@ namespace VPetLLM.UI.Windows
             }
             finally
             {
-                // 停止思考动画
+                // 停止思考动画（如果有的话）
                 StopThinkingAnimation();
             }
         }

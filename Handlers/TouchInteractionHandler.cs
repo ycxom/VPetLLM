@@ -232,13 +232,6 @@ namespace VPetLLM.Handlers
                     return;
                 }
 
-                // 检查是否是VPet自身动作触发的事件（避免误识别）
-                if (IsVPetActionInProgress())
-                {
-                    Logger.Log($"VPet action in progress, ignoring {touchType} touch to avoid false interaction.");
-                    return;
-                }
-
                 // 检查冷却时间
                 if ((now - _lastInteractionTime).TotalMilliseconds < _plugin.Settings.TouchFeedback.TouchCooldown)
                 {

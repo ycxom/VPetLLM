@@ -63,6 +63,14 @@ namespace VPetLLM.Utils
             var displayType = mainWindow.Main.DisplayType;
             if (displayType != null)
             {
+                // 首先检查是否是触摸类型的动画（Touch类型）
+                if (displayType.Type == GraphType.Touch_Head || 
+                    displayType.Type == GraphType.Touch_Body)
+                {
+                    Logger.Log($"AnimationStateChecker: VPet正在被触摸 ({displayType.Type})，阻止VPetLLM思考动画和气泡");
+                    return true;
+                }
+
                 switch (displayType.Type)
                 {
                     case GraphType.StartUP:
@@ -88,6 +96,41 @@ namespace VPetLLM.Utils
                         // 状态切换动画 - 不应该被打断
                         Logger.Log($"AnimationStateChecker: VPet正在切换状态 ({displayType.Type})，阻止VPetLLM动作执行");
                         return true;
+                }
+
+                // 方法3：检查用户交互动画（捏脸、摸头、摸身体等）
+                // 这些动画名称通常包含特定关键字
+                if (displayType.Name != null)
+                {
+                    var animName = displayType.Name.ToLower();
+                    
+                    // 捏脸动画
+                    if (animName.Contains("pinch"))
+                    {
+                        Logger.Log($"AnimationStateChecker: VPet正在被捏脸 (pinch)，阻止VPetLLM思考动画和气泡");
+                        return true;
+                    }
+                    
+                    // 摸头动画 - 扩展检测关键字
+                    if (animName.Contains("touch") && animName.Contains("head"))
+                    {
+                        Logger.Log($"AnimationStateChecker: VPet正在被摸头 ({animName})，阻止VPetLLM思考动画和气泡");
+                        return true;
+                    }
+                    
+                    // 摸身体动画 - 扩展检测关键字
+                    if (animName.Contains("touch") && animName.Contains("body"))
+                    {
+                        Logger.Log($"AnimationStateChecker: VPet正在被摸身体 ({animName})，阻止VPetLLM思考动画和气泡");
+                        return true;
+                    }
+                    
+                    // 通用触摸检测 - 任何包含"touch"的动画都视为用户交互
+                    if (animName.Contains("touch"))
+                    {
+                        Logger.Log($"AnimationStateChecker: VPet正在被触摸 ({animName})，阻止VPetLLM思考动画和气泡");
+                        return true;
+                    }
                 }
             }
 
