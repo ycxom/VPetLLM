@@ -40,6 +40,7 @@ namespace VPetLLM.Utils
                 "OpenAI" => new OpenAITTSCore(tempSettings),
                 "DIY" => new DIYTTSCore(tempSettings),
                 "GPT-SoVITS" => new GPTSoVITSTTSCore(tempSettings),
+                "Free" => new FreeTTSCore(tempSettings),
                 "URL" => new URLTTSCore(tempSettings),
                 _ => new URLTTSCore(tempSettings)
             };

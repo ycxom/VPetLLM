@@ -970,6 +970,7 @@
                                         <ComboBoxItem Content="OpenAI" Tag="OpenAI"/>
                                         <ComboBoxItem Content="DIY" Tag="DIY"/>
                                         <ComboBoxItem Content="GPT-SoVITS" Tag="GPT-SoVITS"/>
+                                        <ComboBoxItem Content="Free" Tag="Free"/>
                                         <ComboBox.ItemContainerStyle>
                                             <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
                                                 <Setter Property="Padding" Value="12,8"/>
@@ -1408,6 +1409,22 @@
                                     <TextBox x:Name="TextBox_TTS_GPTSoVITS_Speed"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+
+                                <!-- Free TTS 配置 -->
+                                <StackPanel x:Name="Panel_TTS_Free"
+                                        Visibility="Collapsed">
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Config}"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+                                    
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Description}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Provider}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

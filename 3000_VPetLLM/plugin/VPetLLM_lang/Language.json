@@ -1465,6 +1465,26 @@
                 "zh-hant": "語速（默認：1.0）",
                 "jp": "速度（デフォルト：1.0）"
             }
+        },
+        "Free": {
+            "Config": {
+                "en": "Free TTS Configuration",
+                "zh-hans": "Free TTS 配置",
+                "zh-hant": "Free TTS 配置",
+                "jp": "Free TTS 設定"
+            },
+            "Description": {
+                "en": "Free TTS uses a built-in free voice synthesis service with no API Key configuration required.",
+                "zh-hans": "Free TTS 使用内置的免费语音合成服务，无需配置 API Key。",
+                "zh-hant": "Free TTS 使用內置的免費語音合成服務，無需配置 API Key。",
+                "jp": "Free TTS は内蔵の無料音声合成サービスを使用し、API Keyの設定は不要です。"
+            },
+            "Provider": {
+                "en": "Thanks to provider @ycxom",
+                "zh-hans": "感谢提供者 @ycxom",
+                "zh-hant": "感謝提供者 @ycxom",
+                "jp": "提供者 @ycxom に感謝します"
+            }
         }
     },
     "ASR": {

@@ -2799,11 +2799,13 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     var openAIPanel = FindName("Panel_TTS_OpenAI") as StackPanel;
                     var diyPanel = FindName("Panel_TTS_DIY") as StackPanel;
                     var gptSoVITSPanel = FindName("Panel_TTS_GPTSoVITS") as StackPanel;
+                    var freePanel = FindName("Panel_TTS_Free") as StackPanel;
 
                     if (urlPanel != null) urlPanel.Visibility = Visibility.Collapsed;
                     if (openAIPanel != null) openAIPanel.Visibility = Visibility.Collapsed;
                     if (diyPanel != null) diyPanel.Visibility = Visibility.Collapsed;
                     if (gptSoVITSPanel != null) gptSoVITSPanel.Visibility = Visibility.Collapsed;
+                    if (freePanel != null) freePanel.Visibility = Visibility.Collapsed;
 
                     // 显示对应的面板
                     switch (provider)
@@ -2842,6 +2844,17 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                             else
                             {
                                 System.Diagnostics.Debug.WriteLine("[TTS Provider] 错误: 找不到GPT-SoVITS面板!");
+                            }
+                            break;
+                        case "Free":
+                            if (freePanel != null)
+                            {
+                                freePanel.Visibility = Visibility.Visible;
+                                System.Diagnostics.Debug.WriteLine("[TTS Provider] 显示Free面板");
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine("[TTS Provider] 错误: 找不到Free面板!");
                             }
                             break;
                         default:
