@@ -84,6 +84,47 @@ foreach ($dll in $outputDlls) {
     }
 }
 
+# 处理 SQLite 本地库 - 移动到 runtimes 子目录
+$nativeLibs = @("e_sqlite3.dll")
+$runtimesDir = Join-Path $OutputDir "runtimes\win-x64\native"
+
+foreach ($nativeLib in $nativeLibs) {
+    $sourcePath = Join-Path $OutputDir $nativeLib
+    if (Test-Path $sourcePath) {
+        # 创建目标目录
+        if (-not (Test-Path $runtimesDir)) {
+            New-Item -ItemType Directory -Path $runtimesDir -Force | Out-Null
+        }
+        
+        $destPath = Join-Path $runtimesDir $nativeLib
+        Write-Host "移动本地库: $nativeLib -> runtimes\win-x64\native\" -ForegroundColor Cyan
+        Move-Item -Path $sourcePath -Destination $destPath -Force
+    }
+}
+
+# 清理不需要的运行时目录（只保留 win-x64 和 win-x86）
+Write-Host "`n清理不需要的运行时目录..." -ForegroundColor Yellow
+$runtimesPath = Join-Path $OutputDir "runtimes"
+if (Test-Path $runtimesPath) {
+    $allowedRuntimes = @("win-x64", "win-x86")
+    $allRuntimes = Get-ChildItem -Path $runtimesPath -Directory
+    
+    $removedRuntimes = 0
+    foreach ($runtime in $allRuntimes) {
+        if ($allowedRuntimes -notcontains $runtime.Name) {
+            Write-Host "  删除运行时: $($runtime.Name)" -ForegroundColor Yellow
+            Remove-Item -Path $runtime.FullName -Recurse -Force
+            $removedRuntimes++
+        }
+    }
+    
+    if ($removedRuntimes -gt 0) {
+        Write-Host "已删除 $removedRuntimes 个不需要的运行时目录" -ForegroundColor Green
+    } else {
+        Write-Host "没有需要删除的运行时目录" -ForegroundColor Green
+    }
+}
+
 Write-Host "`n过滤完成!" -ForegroundColor Green
 Write-Host "保留 DLL: $keptCount 个" -ForegroundColor Green
 Write-Host "删除重复 DLL: $removedCount 个" -ForegroundColor Green

@@ -9,11 +9,16 @@
 		<UseWPF>true</UseWPF>
 		<ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<!-- 只包含 Windows x64 和 x86 运行时 -->
+		<RuntimeIdentifiers>win-x64;win-x86</RuntimeIdentifiers>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="NAudio" Version="2.2.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.0" />
+		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
 		<PackageReference Include="VPet-Simulator.Windows.Interface" Version="1.1.0.50" />
 		<PackageReference Include="VPet-Simulator.Core" Version="1.1.0.50" />
 	</ItemGroup>
@@ -36,13 +41,35 @@
 
 	<Target Name="CopyResources" AfterTargets="Build">
 		<ItemGroup>
-			<FilesToCopy Include="$(OutDir)**\*" />
+			<!-- 只复制 Windows x64/x86 运行时，排除其他平台和 e_sqlite3.dll -->
+			<FilesToCopy Include="$(OutDir)**\*" 
+				Exclude="$(OutDir)**\e_sqlite3.dll;
+				$(OutDir)runtimes\linux-**\**;
+				$(OutDir)runtimes\osx-**\**;
+				$(OutDir)runtimes\alpine-**\**;
+				$(OutDir)runtimes\browser-**\**;
+				$(OutDir)runtimes\win-arm**\**" />
 		</ItemGroup>
 		<Copy
 				SourceFiles="@(FilesToCopy)"
 				DestinationFiles="@(FilesToCopy->'$(ProjectDir)3000_VPetLLM\plugin\%(RecursiveDir)%(Filename)%(Extension)')"
 				SkipUnchangedFiles="true" />
+		
+		<!-- 单独复制 SQLite 本地库到正确位置（仅 x64） -->
+		<ItemGroup>
+			<SQLiteNative Include="$(OutDir)runtimes\win-x64\native\e_sqlite3.dll" />
+		</ItemGroup>
+		<Copy
+			SourceFiles="@(SQLiteNative)"
+			DestinationFolder="$(ProjectDir)3000_VPetLLM\plugin\runtimes\win-x64\native"
+			SkipUnchangedFiles="true"
+			Condition="Exists('$(OutDir)runtimes\win-x64\native\e_sqlite3.dll')" />
+		
 		<!-- 过滤重复的 DLL 文件 -->
 		<Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(ProjectDir)FilterDuplicateDlls.ps1&quot; -OutputDir &quot;$(ProjectDir)3000_VPetLLM\plugin&quot;" />
+		
+		<!-- 验证 e_sqlite3.dll 位置 -->
+		<Message Text="✓ SQLite 本地库已复制到正确位置" Importance="high" Condition="Exists('$(ProjectDir)3000_VPetLLM\plugin\runtimes\win-x64\native\e_sqlite3.dll')" />
+		<Warning Text="警告: 未找到 SQLite 本地库" Condition="!Exists('$(ProjectDir)3000_VPetLLM\plugin\runtimes\win-x64\native\e_sqlite3.dll')" />
 	</Target>
 </Project>

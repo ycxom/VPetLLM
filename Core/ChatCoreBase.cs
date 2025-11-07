@@ -77,7 +77,29 @@ namespace VPetLLM.Core
         {
             HistoryManager.GetHistory().Clear();
             HistoryManager.GetHistory().AddRange(editedHistory);
-            HistoryManager.SaveHistory();
+            
+            // 更新到数据库
+            try
+            {
+                var dbPath = GetDatabasePath();
+                using var database = new ChatHistoryDatabase(dbPath);
+                database.UpdateHistory(Name, editedHistory);
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"更新历史记录到数据库失败: {ex.Message}");
+            }
+        }
+
+        private string GetDatabasePath()
+        {
+            var docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var dataPath = Path.Combine(docPath, "VPetLLM", "Chat");
+            if (!Directory.Exists(dataPath))
+            {
+                Directory.CreateDirectory(dataPath);
+            }
+            return Path.Combine(dataPath, "chat_history.db");
         }
 
 
