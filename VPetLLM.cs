@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using VPet_Simulator.Windows.Interface;
@@ -376,8 +377,9 @@ namespace VPetLLM
                 // 在LoadPlugin阶段初始化TouchInteractionHandler，确保Main窗口已经完全加载
                 InitializeTouchInteractionHandler();
                 
-                // 监听购买事件
-                MW.Event_TakeItem += OnTakeItem;
+                // 监听购买事件 - 使用TakeItemHandle以获取购买来源信息
+                // 注意：Event_TakeItemHandle在MainWindow类中，不在IMainWindow接口中，需要使用反射
+                RegisterTakeItemHandleEvent();
                 Utils.Logger.Log("Purchase event listener registered.");
                 
                 // 初始化语音输入快捷键
@@ -406,7 +408,7 @@ namespace VPetLLM
             // 取消事件监听
             if (MW != null)
             {
-                MW.Event_TakeItem -= OnTakeItem;
+                UnregisterTakeItemHandleEvent();
             }
             
             // 清理购买计时器
@@ -446,9 +448,9 @@ namespace VPetLLM
         }
 
         /// <summary>
-        /// 处理购买事件
+        /// 处理购买事件（带来源信息）
         /// </summary>
-        private void OnTakeItem(Food food)
+        private void OnTakeItemHandle(Food food, int count, string from)
         {
             try
             {
@@ -459,7 +461,7 @@ namespace VPetLLM
                     return;
                 }
 
-                Utils.Logger.Log($"Purchase event detected: {food?.Name ?? "Unknown"}");
+                Utils.Logger.Log($"Purchase event detected: {food?.Name ?? "Unknown"}, count: {count}, from: {from}");
                 
                 if (food == null)
                 {
@@ -479,14 +481,15 @@ namespace VPetLLM
                     return;
                 }
 
-                // 检测购买来源：区分用户购买和VPet自动购物
-                var purchaseSource = Utils.PurchaseSourceDetector.DetectPurchaseSource(MW);
-                string source = Utils.PurchaseSourceDetector.GetPurchaseSourceDescription(purchaseSource);
-                Utils.Logger.Log($"Purchase source: {source}");
+                // 使用PurchaseSourceDetector模块检测购买来源
+                var purchaseSource = Utils.PurchaseSourceDetector.DetectPurchaseSource(from);
+                string sourceDescription = Utils.PurchaseSourceDetector.GetPurchaseSourceDescription(purchaseSource);
+                Utils.Logger.Log($"Purchase source detected: {sourceDescription} (from: {from})");
 
-                if (purchaseSource == Utils.PurchaseSourceDetector.PurchaseSource.VPetAuto)
+                // 判断是否应该触发AI反馈
+                if (!Utils.PurchaseSourceDetector.ShouldTriggerAIFeedback(from))
                 {
-                    Utils.Logger.Log("Purchase event: 检测到VPet自动购物，跳过AI反馈");
+                    Utils.Logger.Log($"Purchase event: {sourceDescription}，跳过AI反馈");
                     return;
                 }
 
@@ -496,8 +499,8 @@ namespace VPetLLM
                     return;
                 }
 
-                // 添加到批处理队列（仅用户购买）
-                AddToPurchaseBatch(food);
+                // 添加到批处理队列（仅触发AI反馈的购买）
+                AddToPurchaseBatch(food, count);
             }
             catch (Exception ex)
             {
@@ -507,9 +510,75 @@ namespace VPetLLM
         }
 
         /// <summary>
+        /// 使用反射注册Event_TakeItemHandle事件
+        /// </summary>
+        private void RegisterTakeItemHandleEvent()
+        {
+            try
+            {
+                // Event_TakeItemHandle在MainWindow类中，不在IMainWindow接口中
+                var eventInfo = MW.GetType().GetEvent("Event_TakeItemHandle");
+                if (eventInfo != null)
+                {
+                    var handler = new Action<Food, int, string>(OnTakeItemHandle);
+                    eventInfo.AddEventHandler(MW, handler);
+                    Utils.Logger.Log("Successfully registered Event_TakeItemHandle using reflection");
+                }
+                else
+                {
+                    Utils.Logger.Log("Warning: Event_TakeItemHandle not found in MainWindow, falling back to Event_TakeItem");
+                    // 降级方案：使用Event_TakeItem（不包含来源信息）
+                    MW.Event_TakeItem += OnTakeItemFallback;
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error registering Event_TakeItemHandle: {ex.Message}");
+                Utils.Logger.Log("Falling back to Event_TakeItem");
+                MW.Event_TakeItem += OnTakeItemFallback;
+            }
+        }
+
+        /// <summary>
+        /// 使用反射注销Event_TakeItemHandle事件
+        /// </summary>
+        private void UnregisterTakeItemHandleEvent()
+        {
+            try
+            {
+                var eventInfo = MW.GetType().GetEvent("Event_TakeItemHandle");
+                if (eventInfo != null)
+                {
+                    var handler = new Action<Food, int, string>(OnTakeItemHandle);
+                    eventInfo.RemoveEventHandler(MW, handler);
+                    Utils.Logger.Log("Successfully unregistered Event_TakeItemHandle");
+                }
+                else
+                {
+                    MW.Event_TakeItem -= OnTakeItemFallback;
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error unregistering Event_TakeItemHandle: {ex.Message}");
+                MW.Event_TakeItem -= OnTakeItemFallback;
+            }
+        }
+
+        /// <summary>
+        /// 降级方案：处理Event_TakeItem事件（不包含来源信息）
+        /// </summary>
+        private void OnTakeItemFallback(Food food)
+        {
+            // 没有来源信息，假设为用户手动购买
+            Utils.Logger.Log("Using fallback Event_TakeItem (no source information available)");
+            OnTakeItemHandle(food, 1, "unknown");
+        }
+
+        /// <summary>
         /// 添加购买物品到批处理队列
         /// </summary>
-        private void AddToPurchaseBatch(Food food)
+        private void AddToPurchaseBatch(Food food, int count = 1)
         {
             lock (_purchaseLock)
             {
@@ -518,7 +587,7 @@ namespace VPetLLM
                 if (existingItem != null)
                 {
                     // 增加数量
-                    existingItem.Quantity++;
+                    existingItem.Quantity += count;
                     existingItem.PurchaseTime = DateTime.Now; // 更新最后购买时间
                     Utils.Logger.Log($"Updated purchase quantity for {food.Name}: {existingItem.Quantity}");
                 }
@@ -531,9 +600,9 @@ namespace VPetLLM
                         Type = food.Type,
                         Price = food.Price,
                         PurchaseTime = DateTime.Now,
-                        Quantity = 1
+                        Quantity = count
                     });
-                    Utils.Logger.Log($"Added new purchase item: {food.Name}");
+                    Utils.Logger.Log($"Added new purchase item: {food.Name} x{count}");
                 }
 
                 // 重置或启动计时器
