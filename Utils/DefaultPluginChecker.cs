@@ -161,9 +161,10 @@ namespace VPetLLM.Utils
                     _plugin.SettingWindow.Dispatcher.Invoke(() =>
                     {
                         var window = _plugin.SettingWindow as Window;
-                        if (window != null)
+                        if (window != null && window.IsLoaded)
                         {
                             window.Title = _plugin.SettingWindow.WindowTitle;
+                            Logger.Log($"窗口标题已更新: {window.Title}");
                         }
                     });
                 }

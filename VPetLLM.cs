@@ -389,6 +389,8 @@ namespace VPetLLM
                 if (_defaultPluginChecker != null)
                 {
                     _defaultPluginChecker.IsVPetLLMDefaultPlugin();
+                    // 如果设置窗口已经打开，刷新窗口标题
+                    _defaultPluginChecker.RefreshWindowTitle();
                 }
                 
                 Utils.Logger.Log("Dispatcher.Invoke finished.");

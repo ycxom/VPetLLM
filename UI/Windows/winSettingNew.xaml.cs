@@ -56,9 +56,15 @@ namespace VPetLLM.UI.Windows
         {
             get
             {
-                // 如果 DefaultPluginChecker 存在且插件已初始化，检查是否需要添加横幅
                 try
                 {
+                    // 确保语言资源已加载
+                    if (string.IsNullOrEmpty(LocalizationService.Instance.LangCode))
+                    {
+                        LocalizationService.Instance.ChangeLanguage(_plugin?.Settings?.Language ?? "zh-hans");
+                    }
+                    
+                    // 如果 DefaultPluginChecker 存在且插件已初始化，检查是否需要添加横幅
                     if (_plugin != null)
                     {
                         bool isDefaultPlugin = _plugin.IsVPetLLMDefaultPlugin();
@@ -280,9 +286,6 @@ namespace VPetLLM.UI.Windows
             InitializeComponent();
             _plugin = plugin;
             
-            // 设置窗口标题
-            this.Title = WindowTitle;
-            
             // 初始化触摸反馈设置控件
             InitializeTouchFeedbackSettings();
             _plugin.SettingWindow = this;
@@ -294,17 +297,29 @@ namespace VPetLLM.UI.Windows
             
             Loaded += (s, e) =>
             {
-                UpdateUIForLanguage();
+                // 先确保语言资源已加载
+                LanguageHelper.ReloadLanguages();
+                
                 // 同步本地化服务的语言，确保 XAML 中 {utils:Localize} 初次加载和后续切换都正确刷新
                 LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
-                // 更新窗口标题（在语言设置加载后）
+                
+                // 更新UI语言
+                UpdateUIForLanguage();
+                
+                // 在语言资源完全加载后设置窗口标题
                 this.Title = WindowTitle;
+                
                 // 监听全局本地化变更，自动刷新手动赋值的 UI（如列头）
                 LocalizationService.Instance.PropertyChanged += (sender2, e2) =>
                 {
                     if (e2.PropertyName == "Item[]")
                     {
-                        Dispatcher.BeginInvoke(new Action(UpdateUIForLanguage), System.Windows.Threading.DispatcherPriority.Background);
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            UpdateUIForLanguage();
+                            // 语言变化时也更新窗口标题
+                            this.Title = WindowTitle;
+                        }), System.Windows.Threading.DispatcherPriority.Background);
                     }
                 };
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
