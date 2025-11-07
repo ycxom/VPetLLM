@@ -1231,28 +1231,116 @@
                                     <TextBlock x:Name="TextBlock_TTS_DIY_Config"
                                             Text="DIY TTS 配置"
                                             Style="{StaticResource SectionHeader}"
-                                            Margin="0,0,0,16"/>
-
-                                    <TextBlock x:Name="TextBlock_TTS_DIY_Description"
-                                            Text="DIY TTS 使用 JSON 配置文件进行配置，支持强大的自定义功能。"
-                                            Style="{StaticResource DescriptionText}"
-                                            Margin="0,0,0,16"/>
-
-                                    <Button x:Name="Button_TTS_DIY_OpenConfig"
-                                            Content="打开配置文件夹"
-                                            Click="Button_TTS_DIY_OpenConfig_Click"
-                                            Margin="0,0,0,16"
-                                            Style="{StaticResource ModernButton}"/>
-
-                                    <TextBlock x:Name="TextBlock_TTS_DIY_ConfigLocation"
-                                            Text="配置文件位置: 文档\VPetLLM\DiyTTS\Config.json"
-                                            Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,8"/>
 
-                                    <TextBlock x:Name="TextBlock_TTS_DIY_Features"
-                                            Text="支持自定义请求头、请求体、请求方法等参数。User-Agent 将自动限制为 VPetLLM。"
+                                    <TextBlock x:Name="TextBlock_TTS_DIY_Description"
+                                            Text="自定义 TTS API 配置，支持灵活的请求定制"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
+
+                                    <!-- 请求方法和 URL -->
+                                    <Label Content="请求配置" Style="{StaticResource SettingLabel}"/>
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="ComboBox_TTS_DIY_Method"
+                                                Grid.Column="0"
+                                                Margin="0,0,8,0"
+                                                Style="{StaticResource ModernComboBox}">
+                                            <ComboBoxItem Content="POST" IsSelected="True"/>
+                                            <ComboBoxItem Content="GET"/>
+                                        </ComboBox>
+                                        <TextBox x:Name="TextBox_TTS_DIY_BaseUrl"
+                                                Grid.Column="1"
+                                                Style="{StaticResource ModernTextBox}"
+                                                Text="https://api.example.com/tts"/>
+                                    </Grid>
+
+                                    <!-- Content-Type -->
+                                    <Label Content="Content-Type" Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_TTS_DIY_ContentType"
+                                            Style="{StaticResource ModernTextBox}"
+                                            Text="application/json"
+                                            Margin="0,0,0,16"/>
+
+                                    <!-- 自定义请求头 -->
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Label Content="自定义请求头 (Headers)" Style="{StaticResource SettingLabel}"/>
+                                        <Button x:Name="Button_TTS_DIY_AddHeader"
+                                                Grid.Column="1"
+                                                Content="+ 添加"
+                                                Click="Button_TTS_DIY_AddHeader_Click"
+                                                Style="{StaticResource ModernButton}"
+                                                Padding="12,4"/>
+                                    </Grid>
+                                    <DataGrid x:Name="DataGrid_TTS_DIY_Headers"
+                                            AutoGenerateColumns="False"
+                                            CanUserAddRows="False"
+                                            Height="150"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernDataGrid}">
+                                        <DataGrid.Columns>
+                                            <DataGridCheckBoxColumn Header="启用" Binding="{Binding IsEnabled}" Width="60"/>
+                                            <DataGridTextColumn Header="Key" Binding="{Binding Key}" Width="*"/>
+                                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
+                                            <DataGridTemplateColumn Header="操作" Width="80">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="删除"
+                                                                Click="Button_TTS_DIY_DeleteHeader_Click"
+                                                                Style="{StaticResource ModernButton}"
+                                                                Padding="8,2"
+                                                                FontSize="12"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+
+                                    <!-- 请求体 -->
+                                    <Label Content="请求体 (Body)" Style="{StaticResource SettingLabel}"/>
+                                    <TextBlock Text="使用 {text} 作为文本占位符"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,8"/>
+                                    <TextBox x:Name="TextBox_TTS_DIY_RequestBody"
+                                            Style="{StaticResource ModernTextBox}"
+                                            AcceptsReturn="True"
+                                            TextWrapping="Wrap"
+                                            VerticalScrollBarVisibility="Auto"
+                                            Height="120"
+                                            FontFamily="Consolas"
+                                            Margin="0,0,0,16">
+                                        <TextBox.Text><![CDATA[{
+  "text": "{text}",
+  "voice": "default",
+  "format": "mp3"
+}]]></TextBox.Text>
+                                    </TextBox>
+
+                                    <!-- 响应格式 -->
+                                    <Label Content="响应音频格式" Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_TTS_DIY_ResponseFormat"
+                                            Style="{StaticResource ModernComboBox}"
+                                            Margin="0,0,0,16">
+                                        <ComboBoxItem Content="mp3" IsSelected="True"/>
+                                        <ComboBoxItem Content="wav"/>
+                                        <ComboBoxItem Content="ogg"/>
+                                        <ComboBoxItem Content="flac"/>
+                                        <ComboBoxItem Content="aac"/>
+                                    </ComboBox>
+
+                                    <!-- 测试按钮 -->
+                                    <Button x:Name="Button_TTS_DIY_Test"
+                                            Content="🔊 测试 TTS"
+                                            Click="Button_TTS_DIY_Test_Click"
+                                            Style="{StaticResource ModernButton}"
+                                            Margin="0,8,0,0"/>
                                 </StackPanel>
 
                                 <!-- GPT-SoVITS TTS 配置 -->

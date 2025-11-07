@@ -851,7 +851,8 @@ namespace VPetLLM.UI.Windows
                 }
             }
 
-            // DIY TTS 配置通过 JSON 文件管理，无需在此加载
+            // 加载 DIY TTS 配置
+            LoadDIYTTSSettings();
 
             // 触发提供商切换事件来显示正确的面板
             ComboBox_TTS_Provider_SelectionChanged(providerComboBox, null);
@@ -1121,7 +1122,8 @@ namespace VPetLLM.UI.Windows
                 _plugin.Settings.TTS.OpenAI.Format = selectedFormatItem.Tag?.ToString() ?? "mp3";
             }
 
-            // DIY TTS 配置通过 JSON 文件管理，无需在此保存
+            // 保存 DIY TTS 配置
+            SaveDIYTTSSettings();
 
             // 保存 GPT-SoVITS 设置
             SaveGPTSoVITSSettings();
@@ -2872,29 +2874,184 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             ScheduleAutoSave();
         }
 
-        private void Button_TTS_DIY_OpenConfig_Click(object sender, RoutedEventArgs e)
+        // DIY TTS 配置加载
+        private void LoadDIYTTSSettings()
         {
+            var diySettings = _plugin.Settings.TTS.DIY;
+            
+            // 加载请求方法
+            var methodComboBox = FindName("ComboBox_TTS_DIY_Method") as ComboBox;
+            if (methodComboBox != null)
+            {
+                foreach (ComboBoxItem item in methodComboBox.Items)
+                {
+                    if (item.Content.ToString() == diySettings.Method)
+                    {
+                        methodComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+
+            // 加载 URL
+            var urlTextBox = FindName("TextBox_TTS_DIY_BaseUrl") as TextBox;
+            if (urlTextBox != null)
+            {
+                urlTextBox.Text = diySettings.BaseUrl;
+            }
+
+            // 加载 Content-Type
+            var contentTypeTextBox = FindName("TextBox_TTS_DIY_ContentType") as TextBox;
+            if (contentTypeTextBox != null)
+            {
+                contentTypeTextBox.Text = diySettings.ContentType;
+            }
+
+            // 加载请求头
+            var headersDataGrid = FindName("DataGrid_TTS_DIY_Headers") as DataGrid;
+            if (headersDataGrid != null)
+            {
+                headersDataGrid.ItemsSource = new System.Collections.ObjectModel.ObservableCollection<Setting.CustomHeader>(
+                    diySettings.CustomHeaders ?? new List<Setting.CustomHeader>()
+                );
+            }
+
+            // 加载请求体
+            var bodyTextBox = FindName("TextBox_TTS_DIY_RequestBody") as TextBox;
+            if (bodyTextBox != null)
+            {
+                bodyTextBox.Text = diySettings.RequestBody;
+            }
+
+            // 加载响应格式
+            var formatComboBox = FindName("ComboBox_TTS_DIY_ResponseFormat") as ComboBox;
+            if (formatComboBox != null)
+            {
+                foreach (ComboBoxItem item in formatComboBox.Items)
+                {
+                    if (item.Content.ToString() == diySettings.ResponseFormat)
+                    {
+                        formatComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // DIY TTS 配置保存
+        private void SaveDIYTTSSettings()
+        {
+            var diySettings = _plugin.Settings.TTS.DIY;
+
+            // 保存请求方法
+            var methodComboBox = FindName("ComboBox_TTS_DIY_Method") as ComboBox;
+            if (methodComboBox?.SelectedItem is ComboBoxItem methodItem)
+            {
+                diySettings.Method = methodItem.Content.ToString();
+            }
+
+            // 保存 URL
+            var urlTextBox = FindName("TextBox_TTS_DIY_BaseUrl") as TextBox;
+            if (urlTextBox != null)
+            {
+                diySettings.BaseUrl = urlTextBox.Text;
+            }
+
+            // 保存 Content-Type
+            var contentTypeTextBox = FindName("TextBox_TTS_DIY_ContentType") as TextBox;
+            if (contentTypeTextBox != null)
+            {
+                diySettings.ContentType = contentTypeTextBox.Text;
+            }
+
+            // 保存请求头
+            var headersDataGrid = FindName("DataGrid_TTS_DIY_Headers") as DataGrid;
+            if (headersDataGrid?.ItemsSource is System.Collections.ObjectModel.ObservableCollection<Setting.CustomHeader> headers)
+            {
+                diySettings.CustomHeaders = headers.ToList();
+            }
+
+            // 保存请求体
+            var bodyTextBox = FindName("TextBox_TTS_DIY_RequestBody") as TextBox;
+            if (bodyTextBox != null)
+            {
+                diySettings.RequestBody = bodyTextBox.Text;
+            }
+
+            // 保存响应格式
+            var formatComboBox = FindName("ComboBox_TTS_DIY_ResponseFormat") as ComboBox;
+            if (formatComboBox?.SelectedItem is ComboBoxItem formatItem)
+            {
+                diySettings.ResponseFormat = formatItem.Content.ToString();
+            }
+        }
+
+        // 添加请求头
+        private void Button_TTS_DIY_AddHeader_Click(object sender, RoutedEventArgs e)
+        {
+            var headersDataGrid = FindName("DataGrid_TTS_DIY_Headers") as DataGrid;
+            if (headersDataGrid?.ItemsSource is System.Collections.ObjectModel.ObservableCollection<Setting.CustomHeader> headers)
+            {
+                headers.Add(new Setting.CustomHeader
+                {
+                    Key = "Authorization",
+                    Value = "Bearer YOUR_API_KEY",
+                    IsEnabled = true
+                });
+            }
+        }
+
+        // 删除请求头
+        private void Button_TTS_DIY_DeleteHeader_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var header = button?.DataContext as Setting.CustomHeader;
+            
+            var headersDataGrid = FindName("DataGrid_TTS_DIY_Headers") as DataGrid;
+            if (headersDataGrid?.ItemsSource is System.Collections.ObjectModel.ObservableCollection<Setting.CustomHeader> headers && header != null)
+            {
+                headers.Remove(header);
+            }
+        }
+
+        // 测试 DIY TTS
+        private async void Button_TTS_DIY_Test_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
             try
             {
-                // DIY TTS 配置已集成到主配置系统中，无需独立配置文件
-                // 显示说明信息
-                var message = "DIY TTS 配置已集成到 VPetLLM 主设置中。\n\n" +
-                             "配置位置：VPetLLM 设置 -> TTS 标签页 -> DIY 提供商\n\n" +
-                             "您可以在主设置界面中直接配置 DIY TTS 的所有参数，包括：\n" +
-                             "• BaseUrl - API 基础地址\n" +
-                             "• Method - 请求方法 (GET/POST)\n" +
-                             "• RequestBody - 请求体模板\n" +
-                             "• CustomHeaders - 自定义请求头\n" +
-                             "• ResponseFormat - 响应格式\n\n" +
-                             "详细配置说明请参考文档。";
+                // 临时保存当前 DIY TTS 配置
+                SaveDIYTTSSettings();
 
-                MessageBox.Show(message, "DIY TTS 配置说明",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                // 重新创建TTS服务实例以使用最新设置
+                _ttsService?.Dispose();
+                _ttsService = new TTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
+
+                if (_ttsService != null)
+                {
+                    var success = await _ttsService.TestTTSAsync();
+                    if (success)
+                    {
+                        MessageBox.Show("DIY TTS 测试成功！音频已播放。",
+                            "测试成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("DIY TTS 测试失败，请检查配置和网络连接。",
+                            "测试失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"显示配置说明失败：{ex.Message}",
+                MessageBox.Show($"测试失败：{ex.Message}",
                     "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
             }
         }
 
