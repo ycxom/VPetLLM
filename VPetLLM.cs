@@ -813,9 +813,11 @@ namespace VPetLLM
             ChatCore = newChatCore;
             Utils.Logger.Log($"ChatCore updated to: {ChatCore?.GetType().Name}");
 
-            // 重新加载聊天历史记录
-            ChatCore?.LoadHistory();
-            Utils.Logger.Log("Chat history reloaded");
+            // 注意：不需要手动调用LoadHistory()，因为HistoryManager在构造时已经自动加载了历史
+            // 历史记录会根据SeparateChatByProvider设置自动加载：
+            // - false: 加载所有提供商的历史（聚合模式）
+            // - true: 只加载当前提供商的历史（分离模式）
+            Utils.Logger.Log($"Chat history already loaded by HistoryManager (SeparateChatByProvider={Settings.SeparateChatByProvider})");
 
             // 重新创建TalkBox以确保使用新的ChatCore实例
             // 使用InvokeAsync并等待完成，确保热重载生效

@@ -1204,7 +1204,13 @@ namespace VPetLLM.UI.Windows
 
             if (oldProvider != newProvider)
             {
-                var oldHistory = _plugin.ChatCore.GetChatHistory();
+                // 提供商切换时的历史记录处理
+                Utils.Logger.Log($"提供商从 {oldProvider} 切换到 {newProvider}");
+                
+                // 先保存当前历史到数据库（确保不丢失）
+                _plugin.ChatCore?.SaveHistory();
+                
+                // 创建新的ChatCore实例
                 IChatCore newChatCore = newProvider switch
                 {
                     Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
@@ -1213,16 +1219,23 @@ namespace VPetLLM.UI.Windows
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
-                if (_plugin.Settings.EnableChatHistory && oldHistory != null)
-                {
-                    newChatCore.SetChatHistory(oldHistory);
-                }
+                
+                // 新的ChatCore在构造时已经通过HistoryManager.LoadHistory()加载了历史
+                // 如果SeparateChatByProvider=false，会自动加载所有历史（包括旧提供商的）
+                // 如果SeparateChatByProvider=true，会加载新提供商的历史
+                // 因此不需要手动SetChatHistory，让HistoryManager自动处理即可
+                
+                Utils.Logger.Log($"新ChatCore已创建，历史记录已根据设置自动加载（SeparateChatByProvider={_plugin.Settings.SeparateChatByProvider}）");
                 _plugin.UpdateChatCore(newChatCore);
             }
             else
             {
                 // 如果提供商没变，也需要重新创建ChatCore以应用新的设置
-                var currentHistory = _plugin.ChatCore.GetChatHistory();
+                Utils.Logger.Log($"提供商未变化，重新创建ChatCore以应用新设置");
+                
+                // 先保存当前历史
+                _plugin.ChatCore?.SaveHistory();
+                
                 IChatCore updatedChatCore = newProvider switch
                 {
                     Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
@@ -1231,10 +1244,8 @@ namespace VPetLLM.UI.Windows
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
-                if (_plugin.Settings.EnableChatHistory && currentHistory != null)
-                {
-                    updatedChatCore.SetChatHistory(currentHistory);
-                }
+                
+                // 同样让HistoryManager自动加载历史
                 _plugin.UpdateChatCore(updatedChatCore);
             }
             _plugin.UpdateActionProcessor();
