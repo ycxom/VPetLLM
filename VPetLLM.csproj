@@ -42,5 +42,7 @@
 				SourceFiles="@(FilesToCopy)"
 				DestinationFiles="@(FilesToCopy->'$(ProjectDir)3000_VPetLLM\plugin\%(RecursiveDir)%(Filename)%(Extension)')"
 				SkipUnchangedFiles="true" />
+		<!-- 过滤重复的 DLL 文件 -->
+		<Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(ProjectDir)FilterDuplicateDlls.ps1&quot; -OutputDir &quot;$(ProjectDir)3000_VPetLLM\plugin&quot;" />
 	</Target>
 </Project>
