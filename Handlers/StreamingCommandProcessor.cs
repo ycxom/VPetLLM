@@ -108,84 +108,161 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 处理所有已完整接收的命令
+        /// 优化：使用更健壮的解析方法，支持嵌套括号和特殊字符
         /// </summary>
         private void ProcessCompleteCommands()
         {
             var text = _buffer.ToString();
-            var regex = new Regex(@"\[:([^\]]*)\]");
-            var matches = regex.Matches(text);
-
-            foreach (Match match in matches)
+            
+            // 使用手动解析代替正则表达式，更好地处理嵌套括号
+            int index = _lastProcessedIndex;
+            while (index < text.Length)
             {
-                // 只处理在上次处理位置之后的命令
-                if (match.Index >= _lastProcessedIndex)
+                // 查找下一个命令开始
+                int startIndex = text.IndexOf("[:", index);
+                if (startIndex == -1)
+                    break;
+
+                // 跳过已处理的命令
+                if (startIndex < _lastProcessedIndex)
                 {
-                    // 检查命令是否完整（包含闭合的括号）
-                    var commandContent = match.Groups[1].Value;
-                    if (IsCommandComplete(commandContent))
+                    index = startIndex + 2;
+                    continue;
+                }
+
+                // 提取命令类型
+                int typeStart = startIndex + 2;
+                // 跳过可能的空格
+                while (typeStart < text.Length && char.IsWhiteSpace(text[typeStart]))
+                    typeStart++;
+
+                int typeEnd = text.IndexOf('(', typeStart);
+                if (typeEnd == -1)
+                {
+                    index = startIndex + 2;
+                    continue;
+                }
+
+                // 使用括号计数找到匹配的结束位置
+                int parenCount = 1;
+                int contentStart = typeEnd + 1;
+                int contentEnd = contentStart;
+                bool inString = false;
+                char stringDelimiter = '\0';
+
+                while (contentEnd < text.Length && parenCount > 0)
+                {
+                    char c = text[contentEnd];
+                    
+                    // 处理字符串边界
+                    if ((c == '"' || c == '\'') && (contentEnd == contentStart || text[contentEnd - 1] != '\\'))
                     {
-                        // 构造完整的命令字符串
-                        var fullCommand = match.Value;
-                        
-                        // 检查是否是say/talk命令，如果是且TTS启用，则根据模式决定是否立即下载音频
-                        Task<string> ttsDownloadTask = null;
-                        var plugin = _plugin ?? VPetLLM.Instance;
-                        if (plugin?.Settings?.TTS?.IsEnabled == true && plugin.TTSService != null)
+                        if (!inString)
                         {
-                            var talkText = ExtractTalkText(fullCommand);
-                            if (!string.IsNullOrEmpty(talkText))
+                            inString = true;
+                            stringDelimiter = c;
+                        }
+                        else if (c == stringDelimiter)
+                        {
+                            inString = false;
+                        }
+                    }
+                    
+                    // 只在字符串外计数括号
+                    if (!inString)
+                    {
+                        if (c == '(')
+                            parenCount++;
+                        else if (c == ')')
+                            parenCount--;
+                    }
+
+                    if (parenCount > 0)
+                        contentEnd++;
+                }
+
+                // 检查括号是否匹配
+                if (parenCount != 0)
+                {
+                    // 括号不匹配，可能还没接收完整，等待更多数据
+                    break;
+                }
+
+                // 查找闭合的 ]
+                int closeBracketIndex = contentEnd + 1;
+                while (closeBracketIndex < text.Length && char.IsWhiteSpace(text[closeBracketIndex]))
+                    closeBracketIndex++;
+
+                if (closeBracketIndex >= text.Length || text[closeBracketIndex] != ']')
+                {
+                    // 缺少闭合括号，可能还没接收完整
+                    break;
+                }
+
+                // 构造完整的命令字符串
+                var fullCommand = text.Substring(startIndex, closeBracketIndex - startIndex + 1);
+                var commandContent = text.Substring(contentStart, contentEnd - contentStart).Trim();
+                
+                // 检查是否是say/talk命令，如果是且TTS启用，则根据模式决定是否立即下载音频
+                Task<string> ttsDownloadTask = null;
+                var plugin = _plugin ?? VPetLLM.Instance;
+                if (plugin?.Settings?.TTS?.IsEnabled == true && plugin.TTSService != null)
+                {
+                    var talkText = ExtractTalkText(fullCommand);
+                    if (!string.IsNullOrEmpty(talkText))
+                    {
+                        bool useQueueDownload = plugin.Settings.TTS.UseQueueDownload;
+                        
+                        if (!useQueueDownload)
+                        {
+                            // 并发模式：立即下载所有音频
+                            Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，立即开始下载TTS音频（并发模式）: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
+                            ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
+                        }
+                        else
+                        {
+                            // 队列模式：只为第一个命令启动下载
+                            bool isFirstCommand;
+                            lock (_lock)
                             {
-                                bool useQueueDownload = plugin.Settings.TTS.UseQueueDownload;
-                                
-                                if (!useQueueDownload)
-                                {
-                                    // 并发模式：立即下载所有音频
-                                    Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，立即开始下载TTS音频（并发模式）: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
-                                    ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
-                                }
-                                else
-                                {
-                                    // 队列模式：只为第一个命令启动下载
-                                    bool isFirstCommand;
-                                    lock (_lock)
-                                    {
-                                        isFirstCommand = _commandQueue.Count == 0;
-                                    }
-                                    
-                                    if (isFirstCommand)
-                                    {
-                                        Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，队列模式 - 启动第一个下载: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
-                                        ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
-                                    }
-                                    else
-                                    {
-                                        Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，队列模式 - 等待前一个下载完成: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
-                                    }
-                                }
+                                isFirstCommand = _commandQueue.Count == 0;
+                            }
+                            
+                            if (isFirstCommand)
+                            {
+                                Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，队列模式 - 启动第一个下载: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
+                                ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
+                            }
+                            else
+                            {
+                                Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，队列模式 - 等待前一个下载完成: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
                             }
                         }
-                        
-                        // 将命令和TTS下载任务加入队列
-                        lock (_lock)
-                        {
-                            _commandQueue.Enqueue(new CommandTask
-                            {
-                                Command = fullCommand,
-                                TTSDownloadTask = ttsDownloadTask
-                            });
-                        }
-                        
-                        // 更新已处理的位置
-                        _lastProcessedIndex = match.Index + match.Length;
-                        
-                        // 记录检测到的命令类型
-                        var commandType = GetCommandType(fullCommand);
-                        Utils.Logger.Log($"StreamingCommandProcessor: 检测到完整命令类型: {commandType}, 命令: {fullCommand.Substring(0, Math.Min(fullCommand.Length, 100))}...");
-                        
-                        // 启动队列处理（如果还没有在处理）
-                        _ = ProcessQueueAsync();
                     }
                 }
+                
+                // 将命令和TTS下载任务加入队列
+                lock (_lock)
+                {
+                    _commandQueue.Enqueue(new CommandTask
+                    {
+                        Command = fullCommand,
+                        TTSDownloadTask = ttsDownloadTask
+                    });
+                }
+                
+                // 更新已处理的位置
+                _lastProcessedIndex = closeBracketIndex + 1;
+                
+                // 记录检测到的命令类型
+                var commandType = GetCommandType(fullCommand);
+                Utils.Logger.Log($"StreamingCommandProcessor: 检测到完整命令类型: {commandType}, 命令: {fullCommand.Substring(0, Math.Min(fullCommand.Length, 100))}...");
+                
+                // 启动队列处理（如果还没有在处理）
+                _ = ProcessQueueAsync();
+                
+                // 移动到下一个位置
+                index = closeBracketIndex + 1;
             }
         }
         

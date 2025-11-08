@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Text.RegularExpressions;
 using VPetLLM.Utils;
 
@@ -124,6 +125,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 解析消息，将其分解为文本片段和动作指令
+        /// 优化：支持更灵活的格式，容忍空格、换行等特殊字符
         /// </summary>
         /// <param name="message">原始消息</param>
         /// <returns>消息片段列表</returns>
@@ -133,20 +135,27 @@ namespace VPetLLM.Handlers
 
             Logger.Log($"SmartMessageProcessor: 开始解析消息，长度: {message.Length}");
 
+            // 预处理：移除可能影响解析的多余空白字符（但保留引号内的内容）
+            message = NormalizeMessage(message);
+
             // 使用手动解析来处理复杂的嵌套括号（特别是 plugin 调用）
             int index = 0;
             while (index < message.Length)
             {
-                // 查找下一个动作指令的开始
-                int startIndex = message.IndexOf("[:", index);
+                // 查找下一个动作指令的开始（容忍空格）
+                int startIndex = FindCommandStart(message, index);
                 if (startIndex == -1)
                 {
                     // 没有更多动作指令
                     break;
                 }
 
-                // 提取动作类型
+                // 提取动作类型（跳过可能的空格）
                 int typeStart = startIndex + 2;
+                // 跳过 [: 后的空格
+                while (typeStart < message.Length && char.IsWhiteSpace(message[typeStart]))
+                    typeStart++;
+
                 int typeEnd = message.IndexOf('(', typeStart);
                 if (typeEnd == -1)
                 {
@@ -154,21 +163,42 @@ namespace VPetLLM.Handlers
                     continue;
                 }
 
-                string actionType = message.Substring(typeStart, typeEnd - typeStart).ToLower();
+                string actionType = message.Substring(typeStart, typeEnd - typeStart).Trim().ToLower();
                 Logger.Log($"SmartMessageProcessor: 检测到动作类型: {actionType}");
 
-                // 使用括号计数来找到匹配的结束位置
+                // 使用括号计数来找到匹配的结束位置（处理字符串内的括号）
                 int parenCount = 1;
                 int contentStart = typeEnd + 1;
                 int contentEnd = contentStart;
+                bool inString = false;
+                char stringDelimiter = '\0';
 
                 while (contentEnd < message.Length && parenCount > 0)
                 {
                     char c = message[contentEnd];
-                    if (c == '(')
-                        parenCount++;
-                    else if (c == ')')
-                        parenCount--;
+                    
+                    // 处理字符串边界
+                    if ((c == '"' || c == '\'') && (contentEnd == contentStart || message[contentEnd - 1] != '\\'))
+                    {
+                        if (!inString)
+                        {
+                            inString = true;
+                            stringDelimiter = c;
+                        }
+                        else if (c == stringDelimiter)
+                        {
+                            inString = false;
+                        }
+                    }
+                    
+                    // 只在字符串外计数括号
+                    if (!inString)
+                    {
+                        if (c == '(')
+                            parenCount++;
+                        else if (c == ')')
+                            parenCount--;
+                    }
 
                     if (parenCount > 0)
                         contentEnd++;
@@ -182,8 +212,12 @@ namespace VPetLLM.Handlers
                     continue;
                 }
 
-                // 检查是否有闭合的 ]
-                if (contentEnd + 1 >= message.Length || message[contentEnd + 1] != ']')
+                // 查找闭合的 ]（容忍空格）
+                int closeBracketIndex = contentEnd + 1;
+                while (closeBracketIndex < message.Length && char.IsWhiteSpace(message[closeBracketIndex]))
+                    closeBracketIndex++;
+
+                if (closeBracketIndex >= message.Length || message[closeBracketIndex] != ']')
                 {
                     Logger.Log($"SmartMessageProcessor: 缺少闭合的 ]，跳过");
                     index = startIndex + 2;
@@ -191,8 +225,8 @@ namespace VPetLLM.Handlers
                 }
 
                 // 提取动作值和完整匹配
-                string actionValue = message.Substring(contentStart, contentEnd - contentStart);
-                string fullMatch = message.Substring(startIndex, contentEnd - startIndex + 2);
+                string actionValue = message.Substring(contentStart, contentEnd - contentStart).Trim();
+                string fullMatch = message.Substring(startIndex, closeBracketIndex - startIndex + 1);
 
                 Logger.Log($"SmartMessageProcessor: 解析到动作指令 - 类型: {actionType}, 值长度: {actionValue.Length}");
 
@@ -205,7 +239,7 @@ namespace VPetLLM.Handlers
                 });
 
                 // 移动到下一个位置
-                index = contentEnd + 2;
+                index = closeBracketIndex + 1;
             }
 
             if (segments.Count == 0)
@@ -224,6 +258,58 @@ namespace VPetLLM.Handlers
             }
 
             return segments;
+        }
+
+        /// <summary>
+        /// 标准化消息格式，移除可能影响解析的多余空白（保留引号内的内容）
+        /// </summary>
+        private string NormalizeMessage(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+                return message;
+
+            // 移除命令标记周围的多余空格，但保留引号内的内容
+            var result = new StringBuilder();
+            bool inString = false;
+            char stringDelimiter = '\0';
+            
+            for (int i = 0; i < message.Length; i++)
+            {
+                char c = message[i];
+                
+                // 检测字符串边界
+                if ((c == '"' || c == '\'') && (i == 0 || message[i - 1] != '\\'))
+                {
+                    if (!inString)
+                    {
+                        inString = true;
+                        stringDelimiter = c;
+                    }
+                    else if (c == stringDelimiter)
+                    {
+                        inString = false;
+                    }
+                }
+                
+                result.Append(c);
+            }
+            
+            return result.ToString();
+        }
+
+        /// <summary>
+        /// 查找命令开始位置（容忍格式变化）
+        /// </summary>
+        private int FindCommandStart(string message, int startIndex)
+        {
+            for (int i = startIndex; i < message.Length - 1; i++)
+            {
+                if (message[i] == '[' && message[i + 1] == ':')
+                {
+                    return i;
+                }
+            }
+            return -1;
         }
 
         /// <summary>

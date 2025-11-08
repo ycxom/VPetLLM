@@ -74,18 +74,39 @@ namespace VPetLLM.Handlers
 
                 string actionType = response.Substring(typeStart, typeEnd - typeStart).ToLower();
 
-                // 使用括号计数来找到匹配的结束位置
+                // 使用括号计数来找到匹配的结束位置（处理字符串内的括号）
                 int parenCount = 1;
                 int contentStart = typeEnd + 1;
                 int contentEnd = contentStart;
+                bool inString = false;
+                char stringDelimiter = '\0';
 
                 while (contentEnd < response.Length && parenCount > 0)
                 {
                     char c = response[contentEnd];
-                    if (c == '(')
-                        parenCount++;
-                    else if (c == ')')
-                        parenCount--;
+                    
+                    // 处理字符串边界
+                    if ((c == '"' || c == '\'') && (contentEnd == contentStart || response[contentEnd - 1] != '\\'))
+                    {
+                        if (!inString)
+                        {
+                            inString = true;
+                            stringDelimiter = c;
+                        }
+                        else if (c == stringDelimiter)
+                        {
+                            inString = false;
+                        }
+                    }
+                    
+                    // 只在字符串外计数括号
+                    if (!inString)
+                    {
+                        if (c == '(')
+                            parenCount++;
+                        else if (c == ')')
+                            parenCount--;
+                    }
 
                     if (parenCount > 0)
                         contentEnd++;
@@ -98,8 +119,12 @@ namespace VPetLLM.Handlers
                     continue;
                 }
 
-                // 检查是否有闭合的 ]
-                if (contentEnd + 1 >= response.Length || response[contentEnd + 1] != ']')
+                // 查找闭合的 ]（容忍空格）
+                int closeBracketIndex = contentEnd + 1;
+                while (closeBracketIndex < response.Length && char.IsWhiteSpace(response[closeBracketIndex]))
+                    closeBracketIndex++;
+
+                if (closeBracketIndex >= response.Length || response[closeBracketIndex] != ']')
                 {
                     index = startIndex + 2;
                     continue;
@@ -151,7 +176,7 @@ namespace VPetLLM.Handlers
                 actions.Add(new HandlerAction(handler.ActionType, handler.Keyword, value, handler));
 
                 // 移动到下一个位置
-                index = contentEnd + 2;
+                index = closeBracketIndex + 1;
             }
 
             Logger.Log($"ActionProcessor: Found {matchCount} matches, {actions.Count} actions enabled");
