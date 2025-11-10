@@ -757,6 +757,12 @@
                                 <Border Style="{StaticResource CardContainer}">
                                     <StackPanel Style="{StaticResource SettingGroup}">
 
+                                        <TextBlock x:Name="TextBlock_Chat_Free_Config"
+                                                Text="{utils:Localize KeyPath=Free.FreeSettings, Default=Free Chat 配置}"
+                                                Style="{StaticResource SectionHeader}"
+                                                Margin="0,0,0,16"/>
+
+
                                         <CheckBox x:Name="CheckBox_Free_EnableStreaming"
                                                 Content="{utils:Localize KeyPath=Free.EnableStreaming}"
                                                 Margin="0,0,0,16"
@@ -802,8 +808,17 @@
                                                         VerticalAlignment="Center"
                                                         Style="{StaticResource ModernTextBox}"/>
                                             </StackPanel>
-                                            <TextBlock x:Name="TextBlock_ApiServiceNotice" Foreground="{StaticResource SecondaryTextBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                         </StackPanel>
+                                        <Separator Margin="0,16,0,16"/>
+                                        <TextBlock Text="{utils:Localize KeyPath=Chat.Free.Description, Default=Free Chat 使用内置的免费LLM服务，无需配置 API Key。}"
+                                                x:Name="TextBlock_Chat_Free_Description"
+                                                Style="{StaticResource DescriptionText}"
+                                                Margin="0,0,0,16"/>
+
+                                        <TextBlock Text="{utils:Localize KeyPath=Chat.Free.Provider, Default=感谢提供者 QQ：790132463}"
+                                                x:Name="TextBlock_Chat_Free_Provider"
+                                                Style="{StaticResource DescriptionText}"
+                                                Margin="0,0,0,16"/>
                                     </StackPanel>
                                 </Border>
                             </ScrollViewer>
@@ -1502,15 +1517,18 @@
                                 <!-- Free TTS 配置 -->
                                 <StackPanel x:Name="Panel_TTS_Free"
                                         Visibility="Collapsed">
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Config}"
+                                    <TextBlock x:Name="TextBlock_TTS_Free_Config"
+                                            Text="{utils:Localize KeyPath=TTS.FreeSettings, Default=Free TTS 配置}"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
                                     
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Description}"
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Description, Default=Free TTS 使用内置的免费语音合成服务，无需配置 API Key。}"
+                                            x:Name="TextBlock_TTS_Free_Description"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Provider}"
+                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Provider, Default=感谢提供者 @ycxom}"
+                                            x:Name="TextBlock_TTS_Free_Provider"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
                                 </StackPanel>

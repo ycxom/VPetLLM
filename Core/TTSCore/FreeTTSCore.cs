@@ -9,26 +9,60 @@ namespace VPetLLM.Core.TTSCore
 {
     /// <summary>
     /// Free TTS 实现 (POST API 格式)
-    /// 使用固定参数，减少服务器压力
+    /// 配置从服务器动态获取
     /// </summary>
     public class FreeTTSCore : TTSCoreBase
     {
         public override string Name => "Free";
 
-        // 编码的 API Key 和 URL（使用 Hex + Base64 双重编码，与 FreeChatCore 统一）
-        private const string ENCODED_API_KEY = "566c426c6445784d545639436556395a5131685054513d3d";
-        private const string ENCODED_API_URL = "6148523063484d364c793968615335355933687662533530623341364f5467344d43393064484d3d";
+        private string _apiKey;
+        private string _apiUrl;
+        private string _model;
 
         public FreeTTSCore(Setting settings) : base(settings)
         {
+            LoadConfig();
+        }
+
+        private void LoadConfig()
+        {
+            try
+            {
+                var config = Utils.FreeConfigManager.GetTTSConfig();
+                if (config != null)
+                {
+                    _apiKey = DecodeString(config["API_KEY"]?.ToString() ?? "");
+                    _apiUrl = DecodeString(config["API_URL"]?.ToString() ?? "");
+                    _model = config["Model"]?.ToString() ?? "";
+                    Utils.Logger.Log("FreeTTSCore: 配置加载成功");
+                }
+                else
+                {
+                    Utils.Logger.Log("FreeTTSCore: 配置文件不存在，请等待配置下载完成后重启程序");
+                    _apiKey = "";
+                    _apiUrl = "";
+                    _model = "";
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"FreeTTSCore: 加载配置失败: {ex.Message}");
+                _apiKey = "";
+                _apiUrl = "";
+                _model = "";
+            }
         }
 
         public override async Task<byte[]> GenerateAudioAsync(string text)
         {
             try
             {
-                var apiUrl = DecodeString(ENCODED_API_URL);
-                var apiKey = DecodeString(ENCODED_API_KEY);
+                if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
+                {
+                    Utils.Logger.Log("TTS (Free): 配置未加载，TTS功能不可用");
+                    OnAudioGenerationError("Free TTS 配置未加载，请等待配置下载完成后重启程序");
+                    return Array.Empty<byte>();
+                }
 
                 Utils.Logger.Log($"TTS (Free): 发送请求，文本长度: {text.Length}");
 
@@ -37,7 +71,7 @@ namespace VPetLLM.Core.TTSCore
                 {
                     text = text,
                     text_lang = "auto",
-                    api_key = apiKey,
+                    api_key = _apiKey,
                 };
 
                 var json = JsonConvert.SerializeObject(requestBody);
@@ -45,7 +79,7 @@ namespace VPetLLM.Core.TTSCore
 
                 var startTime = DateTime.Now;
                 using var client = CreateHttpClient();
-                var response = await client.PostAsync(apiUrl, content);
+                var response = await client.PostAsync(_apiUrl, content);
                 var elapsed = (DateTime.Now - startTime).TotalSeconds;
 
                 Utils.Logger.Log($"TTS (Free): 响应接收完成，耗时 {elapsed:F2} 秒, 状态: {response.StatusCode}");

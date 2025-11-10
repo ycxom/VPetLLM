@@ -13,15 +13,19 @@ namespace VPetLLM.Core.ChatCore
         private readonly Setting.FreeSetting _freeSetting;
         private readonly HttpClient _httpClient;
 
-        private const string ENCODED_API_KEY = "633273745233704955327875626b46775879314f64584e66513051744e3070714d544e49625855776331424d536b644d6344424254306c575545394a5954557956555a49";
-        private const string ENCODED_API_URL = "6148523063484d364c793932634756304c6e706c59574a31636935686348417663484a7665486b76646e426c644639766347567559576b76646a46695a5852684c324e6f59585176593239746347786c64476c76626e4d3d";
+        private string _apiKey;
+        private string _apiUrl;
+        private string _model;
+        
+        // 保留硬编码的User-Agent
         private const string ENCODED_UA = "566c426c6445784d54563947636d566c58304a3558304a5a54513d3d";
-        private const string Model = "bymbymbym";
 
         public FreeChatCore(Setting.FreeSetting freeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
         {
             _freeSetting = freeSetting;
+
+            LoadConfig();
 
             // 使用基类的代理设置逻辑
             var handler = CreateHttpClientHandler();
@@ -31,15 +35,43 @@ namespace VPetLLM.Core.ChatCore
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
 
             // 设置API密钥
-            var decodedApiKey = DecodeString(ENCODED_API_KEY);
             _httpClient.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", decodedApiKey);
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
 
             // 设置解码后的User-Agent头部
             var decodedUA = DecodeString(ENCODED_UA);
             if (!string.IsNullOrEmpty(decodedUA))
             {
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(decodedUA);
+            }
+        }
+
+        private void LoadConfig()
+        {
+            try
+            {
+                var config = Utils.FreeConfigManager.GetChatConfig();
+                if (config != null)
+                {
+                    _apiKey = DecodeString(config["API_KEY"]?.ToString() ?? "");
+                    _apiUrl = DecodeString(config["API_URL"]?.ToString() ?? "");
+                    _model = config["Model"]?.ToString() ?? "";
+                    Utils.Logger.Log("FreeChatCore: 配置加载成功");
+                }
+                else
+                {
+                    Utils.Logger.Log("FreeChatCore: 配置文件不存在，请等待配置下载完成后重启程序");
+                    _apiKey = "";
+                    _apiUrl = "";
+                    _model = "";
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"FreeChatCore: 加载配置失败: {ex.Message}");
+                _apiKey = "";
+                _apiUrl = "";
+                _model = "";
             }
         }
 
@@ -52,6 +84,14 @@ namespace VPetLLM.Core.ChatCore
         {
             try
             {
+                if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
+                {
+                    var errorMessage = "Free Chat 配置未加载，请等待配置下载完成后重启程序";
+                    Utils.Logger.Log(errorMessage);
+                    ResponseHandler?.Invoke(errorMessage);
+                    return "";
+                }
+
                 if (!Settings.KeepContext)
                 {
                     ClearContext();
@@ -67,7 +107,7 @@ namespace VPetLLM.Core.ChatCore
                 List<Message> history = GetCoreHistory();
                 var requestBody = new
                 {
-                    model = Model,
+                    model = _model,
                     messages = ShapeMessages(history),
                     temperature = _freeSetting.Temperature,
                     max_tokens = _freeSetting.MaxTokens,
@@ -76,15 +116,13 @@ namespace VPetLLM.Core.ChatCore
 
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var apiUrl = DecodeString(ENCODED_API_URL);
                 
                 string message;
                 if (_freeSetting.EnableStreaming)
                 {
                     // 流式传输模式
                     Utils.Logger.Log("Free: 使用流式传输模式");
-                    var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
+                    var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl)
                     {
                         Content = content
                     };
@@ -180,7 +218,7 @@ namespace VPetLLM.Core.ChatCore
                 {
                     // 非流式传输模式
                     Utils.Logger.Log("Free: 使用非流式传输模式");
-                    var response = await _httpClient.PostAsync(apiUrl, content);
+                    var response = await _httpClient.PostAsync(_apiUrl, content);
                     var responseContent = await response.Content.ReadAsStringAsync();
 
                     if (response.IsSuccessStatusCode)
@@ -278,6 +316,12 @@ namespace VPetLLM.Core.ChatCore
         {
             try
             {
+                if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
+                {
+                    Utils.Logger.Log("Free Chat 配置未加载，总结功能不可用");
+                    return "配置未加载，总结功能暂时不可用";
+                }
+
                 var messages = new[]
                 {
                     new { role = "system", content = systemPrompt },
@@ -286,7 +330,7 @@ namespace VPetLLM.Core.ChatCore
 
                 var requestBody = new
                 {
-                    model = Model,
+                    model = _model,
                     messages = messages,
                     temperature = _freeSetting.Temperature,
                     max_tokens = _freeSetting.MaxTokens
@@ -295,8 +339,7 @@ namespace VPetLLM.Core.ChatCore
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var apiUrl = DecodeString(ENCODED_API_URL);
-                var response = await _httpClient.PostAsync(apiUrl, content);
+                var response = await _httpClient.PostAsync(_apiUrl, content);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
@@ -360,7 +403,7 @@ namespace VPetLLM.Core.ChatCore
 
                 var requestBody = new
                 {
-                    model = Model,
+                    model = _model,
                     messages = messages,
                     max_tokens = 1
                 };
@@ -368,9 +411,8 @@ namespace VPetLLM.Core.ChatCore
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var apiUrl = DecodeString(ENCODED_API_URL);
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
-                var response = await _httpClient.PostAsync(apiUrl, content, cts.Token);
+                var response = await _httpClient.PostAsync(_apiUrl, content, cts.Token);
 
                 if (response.IsSuccessStatusCode)
                 {

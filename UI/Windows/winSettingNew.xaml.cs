@@ -761,6 +761,10 @@ namespace VPetLLM.UI.Windows
             ((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
             ((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
             ((TextBox)this.FindName("TextBox_Free_MaxTokens")).Text = _plugin.Settings.Free.MaxTokens.ToString();
+            
+            // 加载Free Chat配置的提供者信息
+            LoadFreeProviderInfo();
+            
             ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
             ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
 
@@ -2070,7 +2074,6 @@ namespace VPetLLM.UI.Windows
 
             if (FindName("TextBlock_GeminiApiEndpointNote") is TextBlock textBlockGeminiApiEndpointNote) textBlockGeminiApiEndpointNote.Text = LanguageHelper.Get("Gemini.ApiEndpointNote", langCode);
             if (FindName("TextBlock_FreeApiEndpointNote") is TextBlock textBlockFreeApiEndpointNote) textBlockFreeApiEndpointNote.Text = LanguageHelper.Get("Free.ApiEndpointNote", langCode);
-            if (FindName("TextBlock_ApiServiceNotice") is TextBlock textBlockApiServiceNotice) textBlockApiServiceNotice.Text = LanguageHelper.Get("Free.ApiServiceNotice", langCode);
             if (FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox checkBoxGeminiEnableAdvanced) checkBoxGeminiEnableAdvanced.Content = LanguageHelper.Get("Gemini.EnableAdvanced", langCode);
             if (FindName("CheckBox_Free_EnableAdvanced") is CheckBox checkBoxFreeEnableAdvanced) checkBoxFreeEnableAdvanced.Content = LanguageHelper.Get("Free.EnableAdvanced", langCode);
             if (FindName("TextBlock_Gemini_Temperature") is TextBlock textBlockGeminiTemperature) textBlockGeminiTemperature.Text = LanguageHelper.Get("Gemini.Temperature", langCode);
@@ -2141,6 +2144,9 @@ namespace VPetLLM.UI.Windows
                     touchFeedbackControl.RefreshLanguage();
                 }
             }
+            
+            // 重新加载Free提供者信息（根据新语言）
+            LoadFreeProviderInfo();
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CS4014", Justification = "异步刷新云端插件列表为有意的 fire-and-forget，不应阻塞UI")]
@@ -3945,6 +3951,72 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ASR Provider] 切换提供商时出错: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 加载Free服务的提供者信息到UI
+        /// </summary>
+        private void LoadFreeProviderInfo()
+        {
+            try
+            {
+                var language = _plugin.Settings.Language ?? "zh-hans";
+                
+                // 加载Chat配置
+                var chatConfig = Utils.FreeConfigManager.GetChatConfig();
+                if (chatConfig != null)
+                {
+                    var chatDescription = Utils.FreeConfigManager.GetDescription(chatConfig, language);
+                    var chatProvider = Utils.FreeConfigManager.GetProviderInfo(chatConfig, language);
+                    
+                    if (this.FindName("TextBlock_Chat_Free_Description") is TextBlock tbChatDesc && !string.IsNullOrEmpty(chatDescription))
+                    {
+                        tbChatDesc.Text = chatDescription;
+                    }
+                    if (this.FindName("TextBlock_Chat_Free_Provider") is TextBlock tbChatProv && !string.IsNullOrEmpty(chatProvider))
+                    {
+                        tbChatProv.Text = chatProvider;
+                    }
+                }
+                
+                // 加载ASR配置
+                var asrConfig = Utils.FreeConfigManager.GetASRConfig();
+                if (asrConfig != null)
+                {
+                    var asrDescription = Utils.FreeConfigManager.GetDescription(asrConfig, language);
+                    var asrProvider = Utils.FreeConfigManager.GetProviderInfo(asrConfig, language);
+                    
+                    if (this.FindName("TextBlock_ASR_Free_Description") is TextBlock tbAsrDesc && !string.IsNullOrEmpty(asrDescription))
+                    {
+                        tbAsrDesc.Text = asrDescription;
+                    }
+                    if (this.FindName("TextBlock_ASR_Free_Provider") is TextBlock tbAsrProv && !string.IsNullOrEmpty(asrProvider))
+                    {
+                        tbAsrProv.Text = asrProvider;
+                    }
+                }
+                
+                // 加载TTS配置
+                var ttsConfig = Utils.FreeConfigManager.GetTTSConfig();
+                if (ttsConfig != null)
+                {
+                    var ttsDescription = Utils.FreeConfigManager.GetDescription(ttsConfig, language);
+                    var ttsProvider = Utils.FreeConfigManager.GetProviderInfo(ttsConfig, language);
+                    
+                    if (this.FindName("TextBlock_TTS_Free_Description") is TextBlock tbTtsDesc && !string.IsNullOrEmpty(ttsDescription))
+                    {
+                        tbTtsDesc.Text = ttsDescription;
+                    }
+                    if (this.FindName("TextBlock_TTS_Free_Provider") is TextBlock tbTtsProv && !string.IsNullOrEmpty(ttsProvider))
+                    {
+                        tbTtsProv.Text = ttsProvider;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"加载Free提供者信息失败: {ex.Message}");
             }
         }
 

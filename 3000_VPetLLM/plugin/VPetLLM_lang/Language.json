@@ -444,6 +444,12 @@
         }
     },
     "Free": {
+        "FreeSettings": {
+            "en": "Free Interface Settings",
+            "zh-hans": "免费接口设置",
+            "zh-hant": "免費接口設定",
+            "jp": "無料インターフェース設定"
+        },
         "Header": {
             "en": "Free Interface",
             "zh-hans": "免费接口",
@@ -485,12 +491,6 @@
             "zh-hans": "最大Token:",
             "zh-hant": "最大Token:",
             "jp": "最大トークン:"
-        },
-        "ApiServiceNotice": {
-            "en": "API service provided by QQ: 790132463! We have limited keys available and cannot support large numbers of requests, which may result in unstable service. If you have your own key, please use it. Thank you!",
-            "zh-hans": "感谢API服务由 QQ：790132463 提供！我们可使用的Key有限，我们无法支持大量请求，可能导致服务不一定稳定，若您拥有属于自己的Key，还请您使用自己的Key，谢谢！",
-            "zh-hant": "感謝API服務由 QQ：790132463 提供！我們可使用的Key有限，我們無法支持大量請求，可能導致服務不一定穩定，若您擁有屬於自己的Key，還請您使用自己的Key，謝謝！",
-            "jp": "APIサービスはQQ: 790132463によって提供されています！利用可能なキーが限られており、大量のリクエストをサポートできず、サービスが不安定になる可能性があります。ご自身のキーをお持ちの場合は、そちらをご利用ください。ありがとうございます！"
         }
     },
     "Advanced_Options": {
@@ -1466,25 +1466,11 @@
                 "jp": "速度（デフォルト：1.0）"
             }
         },
-        "Free": {
-            "Config": {
-                "en": "Free TTS Configuration",
-                "zh-hans": "Free TTS 配置",
-                "zh-hant": "Free TTS 配置",
-                "jp": "Free TTS 設定"
-            },
-            "Description": {
-                "en": "Free TTS uses a built-in free voice synthesis service with no API Key configuration required.",
-                "zh-hans": "Free TTS 使用内置的免费语音合成服务，无需配置 API Key。",
-                "zh-hant": "Free TTS 使用內置的免費語音合成服務，無需配置 API Key。",
-                "jp": "Free TTS は内蔵の無料音声合成サービスを使用し、API Keyの設定は不要です。"
-            },
-            "Provider": {
-                "en": "Thanks to provider @ycxom",
-                "zh-hans": "感谢提供者 @ycxom",
-                "zh-hant": "感謝提供者 @ycxom",
-                "jp": "提供者 @ycxom に感謝します"
-            }
+        "FreeSettings": {
+            "en": "Free TTS Settings",
+            "zh-hans": "Free TTS 配置",
+            "zh-hant": "Free TTS 配置",
+            "jp": "Free TTS 設定"
         }
     },
     "ASR": {
@@ -1713,20 +1699,6 @@
             "zh-hans": "Free ASR 配置",
             "zh-hant": "Free ASR 配置",
             "jp": "Free ASR 設定"
-        },
-        "Free": {
-            "Description": {
-                "en": "Free ASR uses built-in free speech recognition service, no API Key configuration required.",
-                "zh-hans": "Free ASR 使用内置的免费语音识别服务，无需配置 API Key。",
-                "zh-hant": "Free ASR 使用內置的免費語音識別服務，無需配置 API Key。",
-                "jp": "Free ASR は組み込みの無料音声認識サービスを使用し、API Key の設定は不要です。"
-            },
-            "Provider": {
-                "en": "Thanks to @LBGAME",
-                "zh-hans": "感谢提供者@虚拟桌宠模拟器制作组",
-                "zh-hant": "感謝提供者@虛擬桌寵模擬器製作組",
-                "jp": "@LBGAMEに感謝します"
-            }
         },
         "TestButton": {
             "en": "Test Voice Input",

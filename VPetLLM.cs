@@ -62,6 +62,26 @@ namespace VPetLLM
                 }
             }
             ActionProcessor = new ActionProcessor(mainwin);
+            
+            // 如果使用Free服务，先初始化配置
+            if (Settings.Provider == global::VPetLLM.Setting.LLMType.Free)
+            {
+                try
+                {
+                    Utils.Logger.Log("检测到Free服务，开始初始化配置...");
+                    // 清理未加密的配置文件
+                    Utils.FreeConfigCleaner.CleanUnencryptedConfigs();
+                    // 同步等待配置初始化完成
+                    var configTask = Utils.FreeConfigManager.InitializeConfigsAsync();
+                    configTask.Wait(); // 同步等待
+                    Utils.Logger.Log($"Free配置初始化完成: {configTask.Result}");
+                }
+                catch (Exception ex)
+                {
+                    Utils.Logger.Log($"初始化Free配置失败: {ex.Message}");
+                }
+            }
+            
             switch (Settings.Provider)
             {
                 case global::VPetLLM.Setting.LLMType.Ollama:

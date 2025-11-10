@@ -10,28 +10,60 @@ namespace VPetLLM.Core.ASRCore
 {
     /// <summary>
     /// Free ASR 实现 (OpenAI 格式)
+    /// 配置从服务器动态获取
     /// </summary>
     public class FreeASRCore : ASRCoreBase
     {
         public override string Name => "Free";
 
-        // 编码的 API Key 和 URL
-        private const string ENCODED_API_KEY = "59534e45575370594c69394f515878495855686b4b43386e4932465a51537045666e5a7a55326c4e4e455a51596d3946504645304f4367384e566c615a4834344b5474744b793036546a5635533170555379597056673d3d";
-        private const string ENCODED_API_URL = "6148523063484d364c793968633349755a586873596935755a585176646a453d";
-        private const string Model = "LBGAME";
+        private string _apiKey;
+        private string _apiUrl;
+        private string _model;
 
         public FreeASRCore(Setting settings) : base(settings)
         {
+            LoadConfig();
+        }
+
+        private void LoadConfig()
+        {
+            try
+            {
+                var config = Utils.FreeConfigManager.GetASRConfig();
+                if (config != null)
+                {
+                    _apiKey = DecodeString(config["API_KEY"]?.ToString() ?? "");
+                    _apiUrl = DecodeString(config["API_URL"]?.ToString() ?? "");
+                    _model = config["Model"]?.ToString() ?? "";
+                    Utils.Logger.Log("FreeASRCore: 配置加载成功");
+                }
+                else
+                {
+                    Utils.Logger.Log("FreeASRCore: 配置文件不存在，请等待配置下载完成后重启程序");
+                    _apiKey = "";
+                    _apiUrl = "";
+                    _model = "";
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"FreeASRCore: 加载配置失败: {ex.Message}");
+                _apiKey = "";
+                _apiUrl = "";
+                _model = "";
+            }
         }
 
         public override async Task<string> TranscribeAsync(byte[] audioData)
         {
             try
             {
-                var apiUrl = DecodeString(ENCODED_API_URL);
-                var apiKey = DecodeString(ENCODED_API_KEY);
-                
-                var url = $"{apiUrl}/audio/transcriptions";
+                if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
+                {
+                    throw new Exception("Free ASR 配置未加载，请等待配置下载完成后重启程序".Translate());
+                }
+
+                var url = $"{_apiUrl}/audio/transcriptions";
                 Utils.Logger.Log("{1}: 发送请求，音频大小: {0} bytes".Translate(audioData.Length, "ASR (Free)"));
 
                 using var content = new MultipartFormDataContent();
@@ -40,7 +72,7 @@ namespace VPetLLM.Core.ASRCore
                 audioContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
                 content.Add(audioContent, "file", "audio.wav");
                 
-                content.Add(new StringContent(Model), "model");
+                content.Add(new StringContent(_model), "model");
                 
                 if (!string.IsNullOrWhiteSpace(Settings?.ASR?.Language))
                 {
@@ -51,7 +83,7 @@ namespace VPetLLM.Core.ASRCore
                 {
                     Content = content
                 };
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
                 var startTime = DateTime.Now;
                 using var client = CreateHttpClient();
