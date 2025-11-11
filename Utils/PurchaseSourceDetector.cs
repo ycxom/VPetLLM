@@ -60,8 +60,14 @@ namespace VPetLLM.Utils
                 return PurchaseSource.FriendBuy;
             }
 
-            // 其他来源视为用户手动购买
-            return PurchaseSource.UserManual;
+            // 用户手动购买（明确识别"betterbuy"）
+            if (source == "betterbuy")
+            {
+                return PurchaseSource.UserManual;
+            }
+
+            // 其他未知来源（保守策略：不触发AI反馈）
+            return PurchaseSource.Unknown;
         }
 
         /// <summary>
@@ -77,8 +83,21 @@ namespace VPetLLM.Utils
             }
 
             string source = from.ToLower();
+            
+            // 已知的自动购买来源
             var autoPurchaseSources = new[] { "autofood", "autodrink", "autofeel" };
-            return autoPurchaseSources.Contains(source);
+            if (autoPurchaseSources.Contains(source))
+            {
+                return true;
+            }
+            
+            // 兼容未来可能添加的自动购买来源（以"auto"开头的都视为自动购买）
+            if (source.StartsWith("auto"))
+            {
+                return true;
+            }
+            
+            return false;
         }
 
         /// <summary>
@@ -90,9 +109,10 @@ namespace VPetLLM.Utils
         {
             var source = DetectPurchaseSource(from);
             
-            // VPet自动购买和VPetLLM自己的购买不触发AI反馈
-            return source != PurchaseSource.VPetAuto && 
-                   source != PurchaseSource.VPetLLM;
+            // 明确列出应该触发AI反馈的来源
+            return source == PurchaseSource.UserManual ||
+                   source == PurchaseSource.FriendGift ||
+                   source == PurchaseSource.FriendBuy;
         }
 
         /// <summary>
