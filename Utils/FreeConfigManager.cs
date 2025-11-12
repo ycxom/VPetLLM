@@ -13,7 +13,7 @@ namespace VPetLLM.Utils
     /// </summary>
     public class FreeConfigManager
     {
-        private const string CONFIG_BASE_URL = "https://vpetllm.ycxom.top/api";
+        private const string CONFIG_BASE_URL = "https://vpetllm.ycxom.com/api";
         private const string VERSION_FILE = "vpetllm.json";
         private static readonly string ConfigDirectory;
         
