@@ -142,6 +142,9 @@ namespace VPetLLM.Core.ChatCore
         }
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
+            // Handle conversation turn for record weight decrement
+            OnConversationTurn();
+            
             if (!Settings.KeepContext)
             {
                 ClearContext();
@@ -329,6 +332,10 @@ namespace VPetLLM.Core.ChatCore
                 new Message { Role = "system", Content = GetSystemMessage() }
             };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
+            
+            // Inject important records into history
+            history = InjectRecordsIntoHistory(history);
+            
             return history;
         }
         public List<string> RefreshModels()

@@ -46,6 +46,7 @@ namespace VPetLLM
         public bool LimitStateChanges { get; set; } = true;
         public RateLimiterSetting RateLimiter { get; set; } = new RateLimiterSetting();
         public ASRSetting ASR { get; set; } = new ASRSetting();
+        public RecordSettings Records { get; set; } = new RecordSettings();
         private readonly string _path;
 
         public Setting(string path)
@@ -125,6 +126,10 @@ namespace VPetLLM
             if (ASR == null)
             {
                 ASR = new ASRSetting();
+            }
+            if (Records == null)
+            {
+                Records = new RecordSettings();
             }
 
             // 旧版OpenAI单节点配置迁移到多节点结构，避免用户配置丢失
@@ -595,6 +600,34 @@ namespace VPetLLM
         {
             public string Code { get; set; } = "";
             public string Name { get; set; } = "";
+        }
+
+        public class RecordSettings
+        {
+            /// <summary>
+            /// Enable/disable the important records system
+            /// </summary>
+            public bool EnableRecords { get; set; } = true;
+            
+            /// <summary>
+            /// Maximum number of records to inject into context
+            /// </summary>
+            public int MaxRecordsInContext { get; set; } = 20;
+            
+            /// <summary>
+            /// Whether to decrement weights on every conversation turn
+            /// </summary>
+            public bool AutoDecrementWeights { get; set; } = true;
+            
+            /// <summary>
+            /// Maximum content length for a single record
+            /// </summary>
+            public int MaxRecordContentLength { get; set; } = 500;
+            
+            /// <summary>
+            /// Whether to inject records into summary module context
+            /// </summary>
+            public bool InjectIntoSummary { get; set; } = false;
         }
 
     }

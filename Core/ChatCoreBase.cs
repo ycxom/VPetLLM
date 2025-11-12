@@ -11,6 +11,7 @@ namespace VPetLLM.Core
     {
         public abstract string Name { get; }
         public HistoryManager HistoryManager { get; }
+        public RecordManager RecordManager { get; }
         protected Setting? Settings { get; }
         protected IMainWindow? MainWindow { get; }
         protected ActionProcessor? ActionProcessor { get; }
@@ -26,6 +27,44 @@ namespace VPetLLM.Core
             return SystemMessageProvider.GetSystemMessage();
         }
 
+        /// <summary>
+        /// Called at the start of each conversation turn to handle record weight decrement
+        /// </summary>
+        protected void OnConversationTurn()
+        {
+            try
+            {
+                if (RecordManager != null && Settings?.Records?.AutoDecrementWeights == true)
+                {
+                    RecordManager.OnConversationTurn();
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error in OnConversationTurn: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Inject important records into message history before sending to LLM
+        /// </summary>
+        protected List<Message> InjectRecordsIntoHistory(List<Message> history)
+        {
+            try
+            {
+                if (RecordManager != null && Settings?.Records?.EnableRecords == true)
+                {
+                    return RecordManager.InjectRecordsIntoHistory(history);
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error injecting records into history: {ex.Message}");
+            }
+            
+            return history;
+        }
+
         protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
         {
             Settings = settings;
@@ -34,6 +73,25 @@ namespace VPetLLM.Core
             HistoryManager = new HistoryManager(settings, Name, this);
             SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
             HistoryManager.SetSystemMessageProvider(SystemMessageProvider);
+            
+            // Initialize RecordManager
+            try
+            {
+                RecordManager = new RecordManager(settings, Name);
+                Utils.Logger.Log($"RecordManager initialized for {Name}");
+                
+                // Register RecordManager with ActionProcessor
+                if (actionProcessor != null)
+                {
+                    actionProcessor.SetRecordManager(RecordManager);
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Failed to initialize RecordManager: {ex.Message}");
+                // Create a dummy RecordManager to prevent null reference errors
+                RecordManager = null;
+            }
         }
 
         public virtual List<string> GetModels()

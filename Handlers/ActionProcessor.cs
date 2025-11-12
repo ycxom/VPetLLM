@@ -8,10 +8,18 @@ namespace VPetLLM.Handlers
     {
         public List<IActionHandler> Handlers { get; } = new List<IActionHandler>();
         private readonly IMainWindow _mainWindow;
+        private Core.RecordManager _recordManager;
 
         public ActionProcessor(IMainWindow mainWindow)
         {
             _mainWindow = mainWindow;
+            RegisterHandlers();
+        }
+
+        public void SetRecordManager(Core.RecordManager recordManager)
+        {
+            _recordManager = recordManager;
+            // Re-register handlers to include RecordCommandHandler
             RegisterHandlers();
         }
 
@@ -26,6 +34,13 @@ namespace VPetLLM.Handlers
             Handlers.Add(new MoveHandler());
             Handlers.Add(new SayHandler());
             Handlers.Add(new PluginHandler());
+            
+            // Add RecordCommandHandler if RecordManager is available
+            if (_recordManager != null)
+            {
+                Handlers.Add(new RecordCommandHandler(_recordManager));
+                Handlers.Add(new RecordModifyCommandHandler(_recordManager));
+            }
         }
 
         public List<HandlerAction> Process(string response, Setting settings)
@@ -194,9 +209,17 @@ namespace VPetLLM.Handlers
                 ActionType.Body => (handler.Keyword.ToLower() == "move" && settings.EnableMove) || (handler.Keyword.ToLower() == "action" && settings.EnableActionExecution),
                 ActionType.Talk => true,
                 ActionType.Plugin => settings.EnablePlugin,
+                ActionType.Tool => true, // Tool handlers (including record) are always enabled
                 _ => false
             };
             if (handler.Keyword.ToLower() == "buy") isEnabled = settings.EnableBuy;
+            
+            // Special handling for record commands - check if Records system is enabled
+            if (handler.Keyword.ToLower() == "record" || handler.Keyword.ToLower() == "record_modify")
+            {
+                isEnabled = settings.Records?.EnableRecords ?? true;
+            }
+            
             return isEnabled;
         }
     }

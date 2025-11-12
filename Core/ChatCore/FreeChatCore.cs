@@ -84,6 +84,9 @@ namespace VPetLLM.Core.ChatCore
         {
             try
             {
+                // Handle conversation turn for record weight decrement
+                OnConversationTurn();
+                
                 if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
                 {
                     var errorMessage = "Free Chat 配置未加载，请等待配置下载完成后重启程序";
@@ -385,6 +388,10 @@ namespace VPetLLM.Core.ChatCore
                 new Message { Role = "system", Content = GetSystemMessage() }
             };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - Settings.HistoryCompressionThreshold)));
+            
+            // Inject important records into history
+            history = InjectRecordsIntoHistory(history);
+            
             return history;
         }
 

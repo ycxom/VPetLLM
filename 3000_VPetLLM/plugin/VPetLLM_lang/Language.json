@@ -106,6 +106,12 @@
             "zh-hant": "按供應商分離聊天記錄",
             "jp": "プロバイダー別にチャットを分離する"
         },
+        "EnableRecords": {
+            "en": "Enhanced Memory (Important Records)",
+            "zh-hans": "强化记忆（重要事情记录器）",
+            "zh-hant": "強化記憶（重要事情記錄器）",
+            "jp": "強化メモリ（重要な記録）"
+        },
         "ClearContext": {
             "en": "Clear Context",
             "zh-hans": "清除上下文",

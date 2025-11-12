@@ -105,6 +105,16 @@ namespace VPetLLM.Core
             if (_settings.EnableAction)
             {
                 parts.Add(PromptHelper.Get("Character_Setting", lang));
+                
+                // 只有在Records系统启用时才添加记忆系统规则
+                if (_settings.Records?.EnableRecords ?? true)
+                {
+                    var memoryRule = PromptHelper.Get("Character_Setting_Memory", lang);
+                    if (!string.IsNullOrEmpty(memoryRule))
+                    {
+                        parts.Add(memoryRule);
+                    }
+                }
 
                 // 只有在EnableState开启且未启用减少输入token消耗时才添加状态信息到system role
                 if (_settings.EnableState && !_settings.ReduceInputTokenUsage)
@@ -172,6 +182,7 @@ namespace VPetLLM.Core
                                           (handler.Keyword.ToLower() == "move" && _settings.EnableMove),
                         ActionType.Talk => true,
                         ActionType.Plugin => _settings.EnablePlugin,
+                        ActionType.Tool => true, // Tool handlers are enabled by default
                         _ => false
                     };
                     
@@ -179,6 +190,12 @@ namespace VPetLLM.Core
                     if (handler.Keyword.ToLower() == "buy")
                     {
                         isEnabled = _settings.EnableBuy;
+                    }
+                    
+                    // 特殊处理record指令 - 检查Records系统是否启用
+                    if (handler.Keyword.ToLower() == "record" || handler.Keyword.ToLower() == "record_modify")
+                    {
+                        isEnabled = _settings.Records?.EnableRecords ?? true;
                     }
 
                     if (isEnabled)
@@ -191,6 +208,16 @@ namespace VPetLLM.Core
                 {
                     parts.Add(PromptHelper.Get("Available_Commands_Prefix", lang)
                                 .Replace("{CommandList}", string.Join("\n", instructions)));
+                }
+                
+                // 只有在Records系统启用时才添加记录系统说明
+                if (_settings.Records?.EnableRecords ?? true)
+                {
+                    var recordInstructions = PromptHelper.Get("Record_System_Instructions", lang);
+                    if (!string.IsNullOrEmpty(recordInstructions))
+                    {
+                        parts.Add(recordInstructions);
+                    }
                 }
                 
                 // 只有在EnableActionExecution开启时才添加动画列表

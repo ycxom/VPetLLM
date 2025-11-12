@@ -246,6 +246,11 @@
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_SeparateChatByProvider"
                                         Content="{utils:Localize KeyPath=LLM_Settings.SeparateChatByProvider}"
+                                        Margin="0,0,0,8"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableRecords"
+                                        Content="{utils:Localize KeyPath=LLM_Settings.EnableRecords}"
                                         Margin="0,0,0,16"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
