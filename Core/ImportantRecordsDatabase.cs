@@ -60,7 +60,7 @@ namespace VPetLLM.Core
         /// <param name="content">The content to record</param>
         /// <param name="weight">Initial weight (0-10)</param>
         /// <returns>The ID of the created record, or -1 on failure</returns>
-        public int CreateRecord(string content, int weight)
+        public int CreateRecord(string content, double weight)
         {
             try
             {
@@ -130,7 +130,7 @@ namespace VPetLLM.Core
                     {
                         Id = reader.GetInt32(0),
                         Content = reader.GetString(1),
-                        Weight = reader.GetInt32(2),
+                        Weight = reader.GetDouble(2),
                         CreatedAt = reader.GetDateTime(3),
                         UpdatedAt = reader.GetDateTime(4)
                     };
@@ -173,7 +173,7 @@ namespace VPetLLM.Core
                     {
                         Id = reader.GetInt32(0),
                         Content = reader.GetString(1),
-                        Weight = reader.GetInt32(2),
+                        Weight = reader.GetDouble(2),
                         CreatedAt = reader.GetDateTime(3),
                         UpdatedAt = reader.GetDateTime(4)
                     });
@@ -195,7 +195,7 @@ namespace VPetLLM.Core
         /// <param name="id">The record ID</param>
         /// <param name="newWeight">The new weight value (0-10)</param>
         /// <returns>True if successful, false otherwise</returns>
-        public bool UpdateRecordWeight(int id, int newWeight)
+        public bool UpdateRecordWeight(int id, double newWeight)
         {
             try
             {
@@ -298,10 +298,11 @@ namespace VPetLLM.Core
         }
 
         /// <summary>
-        /// Decrement all active records by 1, delete those reaching 0
+        /// Decrement all active records by specified amount, delete those reaching 0
         /// </summary>
+        /// <param name="decrementAmount">Amount to decrease weight by (default 1.0)</param>
         /// <returns>Number of records decremented</returns>
-        public int DecrementAllRecords()
+        public int DecrementAllRecords(double decrementAmount = 1.0)
         {
             try
             {
@@ -314,20 +315,21 @@ namespace VPetLLM.Core
                 var decrementCommand = connection.CreateCommand();
                 decrementCommand.CommandText = @"
                     UPDATE important_records
-                    SET weight = weight - 1, updated_at = @updated_at
+                    SET weight = weight - @decrement, updated_at = @updated_at
                     WHERE weight > 0
                 ";
+                decrementCommand.Parameters.AddWithValue("@decrement", decrementAmount);
                 decrementCommand.Parameters.AddWithValue("@updated_at", DateTime.UtcNow);
                 var decremented = decrementCommand.ExecuteNonQuery();
 
-                // Delete records with weight 0
+                // Delete records with weight 0 or less
                 var deleteCommand = connection.CreateCommand();
                 deleteCommand.CommandText = "DELETE FROM important_records WHERE weight <= 0";
                 var deleted = deleteCommand.ExecuteNonQuery();
 
                 transaction.Commit();
 
-                Logger.Log($"Decremented {decremented} records, deleted {deleted} expired records");
+                Logger.Log($"Decremented {decremented} records by {decrementAmount}, deleted {deleted} expired records");
                 return decremented;
             }
             catch (Exception ex)
@@ -395,6 +397,130 @@ namespace VPetLLM.Core
             catch (Exception ex)
             {
                 Logger.Log($"Failed to delete expired records: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Delete all records (clear all memory)
+        /// </summary>
+        /// <returns>Number of records deleted</returns>
+        public int DeleteAllRecords()
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                var command = connection.CreateCommand();
+                command.CommandText = "DELETE FROM important_records";
+
+                var rowsAffected = command.ExecuteNonQuery();
+
+                Logger.Log($"Deleted all records, total: {rowsAffected}");
+                return rowsAffected;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to delete all records: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Get all records (including those with weight 0)
+        /// </summary>
+        /// <returns>List of all records</returns>
+        public List<ImportantRecord> GetAllRecords()
+        {
+            var records = new List<ImportantRecord>();
+
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                var command = connection.CreateCommand();
+                command.CommandText = @"
+                    SELECT id, content, weight, created_at, updated_at
+                    FROM important_records
+                    ORDER BY id DESC
+                ";
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    records.Add(new ImportantRecord
+                    {
+                        Id = reader.GetInt32(0),
+                        Content = reader.GetString(1),
+                        Weight = reader.GetDouble(2),
+                        CreatedAt = reader.GetDateTime(3),
+                        UpdatedAt = reader.GetDateTime(4)
+                    });
+                }
+
+                Logger.Log($"Retrieved {records.Count} total records");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to get all records: {ex.Message}");
+            }
+
+            return records;
+        }
+
+        /// <summary>
+        /// Enforce maximum records limit by removing records with lowest weight
+        /// If weights are equal, older records are removed first
+        /// </summary>
+        /// <param name="maxLimit">Maximum number of records to keep</param>
+        /// <returns>Number of records removed</returns>
+        public int EnforceRecordsLimit(int maxLimit)
+        {
+            try
+            {
+                if (maxLimit <= 0)
+                {
+                    Logger.Log("Invalid max limit for records");
+                    return 0;
+                }
+
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                // First, count total records
+                var countCommand = connection.CreateCommand();
+                countCommand.CommandText = "SELECT COUNT(*) FROM important_records";
+                var totalRecords = Convert.ToInt32(countCommand.ExecuteScalar());
+
+                if (totalRecords <= maxLimit)
+                {
+                    // No need to clean up
+                    return 0;
+                }
+
+                var recordsToRemove = totalRecords - maxLimit;
+
+                // Delete records with lowest weight, oldest first
+                var deleteCommand = connection.CreateCommand();
+                deleteCommand.CommandText = @"
+                    DELETE FROM important_records
+                    WHERE id IN (
+                        SELECT id FROM important_records
+                        ORDER BY weight ASC, created_at ASC
+                        LIMIT @limit
+                    )
+                ";
+                deleteCommand.Parameters.AddWithValue("@limit", recordsToRemove);
+                var deleted = deleteCommand.ExecuteNonQuery();
+
+                Logger.Log($"Enforced records limit: removed {deleted} records (limit: {maxLimit}, total was: {totalRecords})");
+                return deleted;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to enforce records limit: {ex.Message}");
                 return 0;
             }
         }

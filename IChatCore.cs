@@ -4,6 +4,7 @@ namespace VPetLLM
     {
         string Name { get; }
         Core.HistoryManager HistoryManager { get; }
+        Core.RecordManager RecordManager { get; }
         Task<string> Chat(string prompt);
         Task<string> Chat(string prompt, bool isFunctionCall);
         void SetResponseHandler(Action<string> handler);

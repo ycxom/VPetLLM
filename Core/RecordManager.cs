@@ -47,6 +47,16 @@ namespace VPetLLM.Core
                 if (recordId > 0)
                 {
                     Logger.Log($"RecordManager: Created record #{recordId} with weight {weight}");
+                    
+                    // Enforce records limit after creating new record
+                    if (_settings.Records != null && _settings.Records.MaxRecordsLimit > 0)
+                    {
+                        var removed = _database.EnforceRecordsLimit(_settings.Records.MaxRecordsLimit);
+                        if (removed > 0)
+                        {
+                            Logger.Log($"RecordManager: Enforced limit of {_settings.Records.MaxRecordsLimit} records, removed {removed} old records");
+                        }
+                    }
                 }
                 
                 return recordId;
@@ -102,11 +112,17 @@ namespace VPetLLM.Core
                     return;
                 }
 
-                var decremented = _database.DecrementAllRecords();
+                // Calculate decrement amount based on decay turns setting
+                // If WeightDecayTurns = 1, decrement by 1.0 (default behavior)
+                // If WeightDecayTurns = 3, decrement by 1/3 ≈ 0.333 (takes 3 turns to lose 1 weight)
+                var decayTurns = Math.Max(1, _settings.Records.WeightDecayTurns);
+                var decrementAmount = 1.0 / decayTurns;
+                
+                var decremented = _database.DecrementAllRecords(decrementAmount);
                 
                 if (decremented > 0)
                 {
-                    Logger.Log($"RecordManager: Decremented {decremented} records on conversation turn");
+                    Logger.Log($"RecordManager: Decremented {decremented} records by {decrementAmount:F3} on conversation turn (decay turns: {decayTurns})");
                 }
             }
             catch (Exception ex)
@@ -143,7 +159,7 @@ namespace VPetLLM.Core
 
                 foreach (var record in records)
                 {
-                    sb.AppendLine($"#{record.Id} (Weight: {record.Weight}): {record.Content}");
+                    sb.AppendLine($"#{record.Id} (Weight: {record.DisplayWeight}): {record.Content}");
                 }
 
                 sb.AppendLine();
@@ -214,6 +230,58 @@ namespace VPetLLM.Core
             {
                 Logger.Log($"RecordManager: Failed to inject records into history: {ex.Message}");
                 return history;
+            }
+        }
+
+        /// <summary>
+        /// Clear all records
+        /// </summary>
+        /// <returns>Number of records deleted</returns>
+        public int ClearAllRecords()
+        {
+            try
+            {
+                var deleted = _database.DeleteAllRecords();
+                Logger.Log($"RecordManager: Cleared all records, total: {deleted}");
+                return deleted;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"RecordManager: Failed to clear all records: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Get all records for editing
+        /// </summary>
+        /// <returns>List of all records</returns>
+        public List<ImportantRecord> GetAllRecordsForEditing()
+        {
+            try
+            {
+                return _database.GetAllRecords();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"RecordManager: Failed to get all records for editing: {ex.Message}");
+                return new List<ImportantRecord>();
+            }
+        }
+
+        /// <summary>
+        /// Update a record
+        /// </summary>
+        public bool UpdateRecord(ImportantRecord record)
+        {
+            try
+            {
+                return _database.UpdateRecordWeight(record.Id, record.Weight);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"RecordManager: Failed to update record: {ex.Message}");
+                return false;
             }
         }
 

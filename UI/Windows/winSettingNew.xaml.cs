@@ -363,6 +363,8 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableRecords")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_WeightDecayTurns")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_MaxRecordsLimit")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_EnableAction")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableBuy")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableState")).Click += Control_Click;
@@ -709,6 +711,11 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked = _plugin.Settings.SeparateChatByProvider;
             ((CheckBox)this.FindName("CheckBox_EnableRecords")).IsChecked = _plugin.Settings.Records?.EnableRecords ?? true;
+            
+            // 加载记录器高级设置
+            ((TextBox)this.FindName("TextBox_WeightDecayTurns")).Text = (_plugin.Settings.Records?.WeightDecayTurns ?? 1).ToString();
+            ((TextBox)this.FindName("TextBox_MaxRecordsLimit")).Text = (_plugin.Settings.Records?.MaxRecordsLimit ?? 10).ToString();
+            
             ((CheckBox)this.FindName("CheckBox_EnableAction")).IsChecked = _plugin.Settings.EnableAction;
             ((CheckBox)this.FindName("CheckBox_EnableBuy")).IsChecked = _plugin.Settings.EnableBuy;
             ((CheckBox)this.FindName("CheckBox_EnableState")).IsChecked = _plugin.Settings.EnableState;
@@ -1013,6 +1020,20 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.SeparateChatByProvider = separateChatByProviderCheckBox.IsChecked ?? true;
             if (_plugin.Settings.Records == null) _plugin.Settings.Records = new Setting.RecordSettings();
             _plugin.Settings.Records.EnableRecords = enableRecordsCheckBox.IsChecked ?? true;
+            
+            // 保存记录器高级设置
+            var weightDecayTurnsTextBox = (TextBox)this.FindName("TextBox_WeightDecayTurns");
+            var maxRecordsLimitTextBox = (TextBox)this.FindName("TextBox_MaxRecordsLimit");
+            
+            if (int.TryParse(weightDecayTurnsTextBox.Text, out int decayTurns))
+            {
+                _plugin.Settings.Records.WeightDecayTurns = Math.Max(1, Math.Min(10, decayTurns)); // 限制在1-10之间
+            }
+            if (int.TryParse(maxRecordsLimitTextBox.Text, out int maxLimit))
+            {
+                _plugin.Settings.Records.MaxRecordsLimit = Math.Max(1, Math.Min(100, maxLimit)); // 限制在1-100之间
+            }
+            
             _plugin.Settings.EnableAction = enableActionCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableBuy = enableBuyCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableState = enableStateCheckBox.IsChecked ?? true;
@@ -1434,6 +1455,31 @@ namespace VPetLLM.UI.Windows
         {
             var contextEditor = new winContextEditor(_plugin);
             contextEditor.Show();
+        }
+
+        private void Button_ClearRecords_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                LanguageHelper.Get("LLM_Settings.ClearRecordsConfirm", _plugin.Settings.Language),
+                LanguageHelper.Get("LLM_Settings.ClearRecords", _plugin.Settings.Language),
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                _plugin.ChatCore?.RecordManager?.ClearAllRecords();
+                MessageBox.Show(
+                    LanguageHelper.Get("LLM_Settings.ClearRecordsSuccess", _plugin.Settings.Language),
+                    LanguageHelper.Get("LLM_Settings.ClearRecords", _plugin.Settings.Language),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
+        private void Button_EditRecords_Click(object sender, RoutedEventArgs e)
+        {
+            var recordEditor = new winRecordEditor(_plugin);
+            recordEditor.Show();
         }
         private async void Button_CopyLog_Click(object sender, RoutedEventArgs e)
         {
@@ -1885,6 +1931,8 @@ namespace VPetLLM.UI.Windows
             if (FindName("CheckBox_EnableRecords") is CheckBox checkBoxEnableRecords) checkBoxEnableRecords.Content = LanguageHelper.Get("LLM_Settings.EnableRecords", langCode);
             if (FindName("Button_ClearContext") is Button buttonClearContext) buttonClearContext.Content = LanguageHelper.Get("LLM_Settings.ClearContext", langCode);
             if (FindName("Button_EditContext") is Button buttonEditContext) buttonEditContext.Content = LanguageHelper.Get("LLM_Settings.EditContext", langCode);
+            if (FindName("Button_ClearRecords") is Button buttonClearRecords) buttonClearRecords.Content = LanguageHelper.Get("LLM_Settings.ClearRecords", langCode);
+            if (FindName("Button_EditRecords") is Button buttonEditRecords) buttonEditRecords.Content = LanguageHelper.Get("LLM_Settings.EditRecords", langCode);
 
             if (FindName("CheckBox_EnableAction") is CheckBox checkBoxEnableAction)
             {
@@ -1937,6 +1985,11 @@ namespace VPetLLM.UI.Windows
             if (FindName("TextBlock_HistoryCompressionTokenThreshold") is TextBlock textBlockHistoryCompressionTokenThreshold) textBlockHistoryCompressionTokenThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionTokenThreshold", langCode);
             if (FindName("TextBlock_CurrentTokenCountLabel") is TextBlock textBlockCurrentTokenCountLabel) textBlockCurrentTokenCountLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentTokenCount", langCode);
             if (FindName("TextBlock_CurrentTokenCount") is TextBlock textBlockCurrentTokenCount) textBlockCurrentTokenCount.Text = _plugin.ChatCore.GetCurrentTokenCount().ToString();
+
+            // 记录器高级设置本地化
+            if (FindName("TextBlock_RecordsAdvancedTitle") is TextBlock textBlockRecordsAdvancedTitle) textBlockRecordsAdvancedTitle.Text = LanguageHelper.Get("Advanced_Options.RecordsAdvancedTitle", langCode);
+            if (FindName("TextBlock_WeightDecayTurns") is TextBlock textBlockWeightDecayTurns) textBlockWeightDecayTurns.Text = LanguageHelper.Get("Advanced_Options.WeightDecayTurns", langCode);
+            if (FindName("TextBlock_MaxRecordsLimit") is TextBlock textBlockMaxRecordsLimit) textBlockMaxRecordsLimit.Text = LanguageHelper.Get("Advanced_Options.MaxRecordsLimit", langCode);
 
             // 更新工具管理头部区域的多语言文本
             if (FindName("TextBlock_ToolsManagement") is TextBlock textBlockToolsManagement)

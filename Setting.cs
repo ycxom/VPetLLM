@@ -628,6 +628,21 @@ namespace VPetLLM
             /// Whether to inject records into summary module context
             /// </summary>
             public bool InjectIntoSummary { get; set; } = false;
+            
+            /// <summary>
+            /// Number of conversation turns required to decrease weight by 1
+            /// Default: 1 (weight decreases by 1 every conversation)
+            /// Example: 3 means weight decreases by 1/3 every conversation (takes 3 conversations to lose 1 weight)
+            /// </summary>
+            public int WeightDecayTurns { get; set; } = 1;
+            
+            /// <summary>
+            /// Maximum number of records to keep in database
+            /// When exceeded, records with lowest weight will be automatically removed
+            /// If weights are equal, older records are removed first
+            /// Default: 10, Range: 1-100
+            /// </summary>
+            public int MaxRecordsLimit { get; set; } = 10;
         }
 
     }

@@ -19,8 +19,14 @@ namespace VPetLLM.Core
         
         /// <summary>
         /// Weight value (0-10), decreases with each conversation turn
+        /// Stored as double for precise decay control, displayed as rounded integer
         /// </summary>
-        public int Weight { get; set; }
+        public double Weight { get; set; }
+        
+        /// <summary>
+        /// Display weight as rounded integer for user interface
+        /// </summary>
+        public int DisplayWeight => (int)Math.Round(Weight);
         
         /// <summary>
         /// Timestamp when the record was created

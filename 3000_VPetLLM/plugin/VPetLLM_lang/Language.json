@@ -123,6 +123,30 @@
             "zh-hans": "编辑上下文",
             "zh-hant": "編輯上下文",
             "jp": "コンテキストを編集する"
+        },
+        "ClearRecords": {
+            "en": "Clear Memory",
+            "zh-hans": "清空记忆",
+            "zh-hant": "清空記憶",
+            "jp": "メモリをクリア"
+        },
+        "EditRecords": {
+            "en": "Edit Memory",
+            "zh-hans": "编辑记忆",
+            "zh-hant": "編輯記憶",
+            "jp": "メモリを編集"
+        },
+        "ClearRecordsConfirm": {
+            "en": "Are you sure you want to clear all memory records? This action cannot be undone.",
+            "zh-hans": "确定要清空所有记忆记录吗？此操作无法撤销。",
+            "zh-hant": "確定要清空所有記憶記錄嗎？此操作無法撤銷。",
+            "jp": "すべてのメモリ記録をクリアしてもよろしいですか？この操作は元に戻せません。"
+        },
+        "ClearRecordsSuccess": {
+            "en": "All memory records have been cleared successfully.",
+            "zh-hans": "已成功清空所有记忆记录。",
+            "zh-hant": "已成功清空所有記憶記錄。",
+            "jp": "すべてのメモリ記録が正常にクリアされました。"
         }
     },
     "Ollama": {
@@ -637,6 +661,48 @@
             "zh-hans": "当前Token数:",
             "zh-hant": "當前Token數:",
             "jp": "現在のトークン数:"
+        },
+        "RecordsAdvancedTitle": {
+            "en": "Enhanced Memory Advanced Settings",
+            "zh-hans": "强化记忆高级设置",
+            "zh-hant": "強化記憶高級設置",
+            "jp": "強化メモリ詳細設定"
+        },
+        "WeightDecayTurns": {
+            "en": "Memory Decay Turns:",
+            "zh-hans": "记忆衰退轮数:",
+            "zh-hant": "記憶衰退輪數:",
+            "jp": "メモリ減衰ターン数:"
+        },
+        "WeightDecayTurnsToolTip": {
+            "en": "Number of conversation turns required to decrease weight by 1. Default: 1 (weight decreases by 1 every conversation). Example: 3 means it takes 3 conversations to lose 1 weight point.",
+            "zh-hans": "权重减少1所需的对话轮数。默认：1（每次对话权重减1）。例如：3表示需要3次对话才会减少1点权重。",
+            "zh-hant": "權重減少1所需的對話輪數。默認：1（每次對話權重減1）。例如：3表示需要3次對話才會減少1點權重。",
+            "jp": "重みを1減らすために必要な会話ターン数。デフォルト：1（会話ごとに重みが1減少）。例：3は1ポイントの重みを失うのに3回の会話が必要であることを意味します。"
+        },
+        "WeightDecayTurnsUnit": {
+            "en": "turns per weight point",
+            "zh-hans": "轮/权重点",
+            "zh-hant": "輪/權重點",
+            "jp": "ターン/重みポイント"
+        },
+        "MaxRecordsLimit": {
+            "en": "Max Records Limit:",
+            "zh-hans": "记忆条数上限:",
+            "zh-hant": "記憶條數上限:",
+            "jp": "メモリ記録上限:"
+        },
+        "MaxRecordsLimitToolTip": {
+            "en": "Maximum number of memory records to keep. When exceeded, records with lowest weight will be automatically removed. If weights are equal, older records are removed first. Default: 10. Range: 1-100.",
+            "zh-hans": "保留的最大记忆记录数量。超过时将自动清理权重最低的记录。若权重相同，优先清除添加时间较早的记录。默认：10。范围：1-100。",
+            "zh-hant": "保留的最大記憶記錄數量。超過時將自動清理權重最低的記錄。若權重相同，優先清除添加時間較早的記錄。默認：10。範圍：1-100。",
+            "jp": "保持するメモリ記録の最大数。超過すると、最も重みの低い記録が自動的に削除されます。重みが同じ場合は、古い記録が優先的に削除されます。デフォルト：10。範囲：1-100。"
+        },
+        "MaxRecordsLimitUnit": {
+            "en": "records",
+            "zh-hans": "条",
+            "zh-hant": "條",
+            "jp": "件"
         }
     },
     "Tools": {
@@ -1087,6 +1153,68 @@
             "zh-hans": "删除",
             "zh-hant": "刪除",
             "jp": "削除"
+        }
+    },
+    "RecordEditor": {
+        "Title": {
+            "en": "Memory Editor",
+            "zh-hans": "记忆编辑器",
+            "zh-hant": "記憶編輯器",
+            "jp": "メモリエディタ"
+        },
+        "Id": {
+            "en": "ID",
+            "zh-hans": "ID",
+            "zh-hant": "ID",
+            "jp": "ID"
+        },
+        "Content": {
+            "en": "Content",
+            "zh-hans": "内容",
+            "zh-hant": "內容",
+            "jp": "内容"
+        },
+        "Weight": {
+            "en": "Weight",
+            "zh-hans": "权重",
+            "zh-hant": "權重",
+            "jp": "重み"
+        },
+        "CreatedAt": {
+            "en": "Created",
+            "zh-hans": "创建时间",
+            "zh-hant": "創建時間",
+            "jp": "作成日時"
+        },
+        "Save": {
+            "en": "Save",
+            "zh-hans": "保存",
+            "zh-hant": "保存",
+            "jp": "保存"
+        },
+        "Cancel": {
+            "en": "Cancel",
+            "zh-hans": "取消",
+            "zh-hant": "取消",
+            "jp": "キャンセル"
+        },
+        "Delete": {
+            "en": "Delete",
+            "zh-hans": "删除",
+            "zh-hant": "刪除",
+            "jp": "削除"
+        },
+        "SaveSuccess": {
+            "en": "Records saved successfully!",
+            "zh-hans": "记录保存成功！",
+            "zh-hant": "記錄保存成功！",
+            "jp": "記録が正常に保存されました！"
+        },
+        "DeleteConfirm": {
+            "en": "Are you sure you want to delete this record?",
+            "zh-hans": "确定要删除这条记录吗？",
+            "zh-hant": "確定要刪除這條記錄嗎？",
+            "jp": "この記録を削除してもよろしいですか？"
         }
     },
     "UninstallConfirm": {

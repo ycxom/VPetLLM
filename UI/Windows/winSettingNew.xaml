@@ -255,7 +255,7 @@
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <WrapPanel HorizontalAlignment="Right"
-                                        Margin="0,0,0,0">
+                                        Margin="0,0,0,16">
                                     <Button x:Name="Button_ClearContext"
                                             Content="{utils:Localize KeyPath=LLM_Settings.ClearContext}"
                                             Click="Button_ClearContext_Click"
@@ -264,6 +264,18 @@
                                     <Button x:Name="Button_EditContext"
                                             Content="{utils:Localize KeyPath=LLM_Settings.EditContext}"
                                             Click="Button_EditContext_Click"
+                                            Style="{StaticResource ModernButton}"/>
+                                </WrapPanel>
+                                <WrapPanel HorizontalAlignment="Right"
+                                        Margin="0,0,0,0">
+                                    <Button x:Name="Button_ClearRecords"
+                                            Content="{utils:Localize KeyPath=LLM_Settings.ClearRecords}"
+                                            Click="Button_ClearRecords_Click"
+                                            Margin="0,0,10,0"
+                                            Style="{StaticResource SecondaryButton}"/>
+                                    <Button x:Name="Button_EditRecords"
+                                            Content="{utils:Localize KeyPath=LLM_Settings.EditRecords}"
+                                            Click="Button_EditRecords_Click"
                                             Style="{StaticResource ModernButton}"/>
                                 </WrapPanel>
                             </StackPanel>
@@ -2046,6 +2058,69 @@
                                             Foreground="{StaticResource SecondaryTextBrush}"
                                             FontSize="14"/>
                                 </StackPanel>
+                            </StackPanel>
+
+                            <!-- 强化记忆高级设置 -->
+                            <Separator Margin="0,20,0,20"
+                                     Background="{StaticResource BorderBrush}"
+                                     Height="1"/>
+                            <TextBlock Name="TextBlock_RecordsAdvancedTitle"
+                                     Text="{utils:Localize KeyPath=Advanced_Options.RecordsAdvancedTitle}"
+                                     FontSize="16"
+                                     FontWeight="SemiBold"
+                                     Margin="0,0,0,16"
+                                     Foreground="{StaticResource PrimaryTextBrush}"/>
+                            
+                            <!-- 记忆衰退轮数 -->
+                            <StackPanel Orientation="Horizontal"
+                                        Margin="0,0,0,12">
+                                <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.WeightDecayTurns}"
+                                        VerticalAlignment="Center"
+                                        x:Name="TextBlock_WeightDecayTurns"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"
+                                        Width="200"/>
+                                <TextBox x:Name="TextBox_WeightDecayTurns"
+                                        Width="110"
+                                        Margin="10,0"
+                                        Style="{StaticResource ModernTextBox}">
+                                    <TextBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.WeightDecayTurnsToolTip}"/>
+                                        </ToolTip>
+                                    </TextBox.ToolTip>
+                                </TextBox>
+                                <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.WeightDecayTurnsUnit}"
+                                        VerticalAlignment="Center"
+                                        Margin="10,0,0,0"
+                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                        FontSize="14"/>
+                            </StackPanel>
+
+                            <!-- 记忆条数上限 -->
+                            <StackPanel Orientation="Horizontal"
+                                        Margin="0,0,0,12">
+                                <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.MaxRecordsLimit}"
+                                        VerticalAlignment="Center"
+                                        x:Name="TextBlock_MaxRecordsLimit"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"
+                                        Width="200"/>
+                                <TextBox x:Name="TextBox_MaxRecordsLimit"
+                                        Width="110"
+                                        Margin="10,0"
+                                        Style="{StaticResource ModernTextBox}">
+                                    <TextBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.MaxRecordsLimitToolTip}"/>
+                                        </ToolTip>
+                                    </TextBox.ToolTip>
+                                </TextBox>
+                                <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.MaxRecordsLimitUnit}"
+                                        VerticalAlignment="Center"
+                                        Margin="10,0,0,0"
+                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                        FontSize="14"/>
                             </StackPanel>
 
                             <!-- 身体交互设置 -->
