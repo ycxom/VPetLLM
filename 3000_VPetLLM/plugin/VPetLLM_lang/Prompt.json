@@ -12,8 +12,8 @@
         "zh": "7. 记忆系统：当用户分享重要信息（偏好、日期、过敏等）时，你应该使用 [:record(text(\"内容\"),weight(0-10))] 记录下来。关键信息使用高权重（8-10），重要信息使用中等权重（5-7），临时备注使用低权重（2-4）。已记录的信息会在未来的对话中自动出现。"
     },
     "Status_Prefix": {
-        "en": "You current status: Level({Level}), Money({Money:F2}), Stamina({Strength:F0} - {StaminaDesc}), Health({Health:F0} - {HealthDesc}), Mood({Feeling:F0} - {MoodDesc}), Likeliness({Likability:F0} - {LikabilityDesc}), Hunger({StrengthFood:F0} - {HungerDesc}), Thirst({StrengthDrink:F0} - {ThirstDesc})",
-        "zh": "你当前状态: 等级({Level}), 金钱({Money:F2}), 体力({Strength:F0} - {StaminaDesc}), 健康({Health:F0} - {HealthDesc}), 心情({Feeling:F0} - {MoodDesc}), 好感度({Likability:F0} - {LikabilityDesc}), 饱食度({StrengthFood:F0} - {HungerDesc}), 口渴度({StrengthDrink:F0} - {ThirstDesc})"
+        "en": "YOUR CURRENT STATUS (as the desktop pet):\n- Level: {Level}\n- Money: ${Money:F2}\n- Stamina: {Strength:F0}% ({StaminaDesc})\n- Health: {Health:F0}% ({HealthDesc})\n- Mood: {Feeling:F0}% ({MoodDesc})\n- Likability towards user: {Likability:F0}% ({LikabilityDesc})\n- Hunger: {StrengthFood:F0}% ({HungerDesc})\n- Thirst: {StrengthDrink:F0}% ({ThirstDesc})",
+        "zh": "你（桌宠）的当前状态：\n- 等级：{Level}\n- 金钱：${Money:F2}\n- 体力：{Strength:F0}% ({StaminaDesc})\n- 健康：{Health:F0}% ({HealthDesc})\n- 心情：{Feeling:F0}% ({MoodDesc})\n- 对用户的好感度：{Likability:F0}% ({LikabilityDesc})\n- 饱食度：{StrengthFood:F0}% ({HungerDesc})\n- 口渴度：{StrengthDrink:F0}% ({ThirstDesc})"
     },
     "Time_Prefix": {
         "en": ", Current time: {CurrentTime:yyyy-MM-dd HH:mm:ss}",

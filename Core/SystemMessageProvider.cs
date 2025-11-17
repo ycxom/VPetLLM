@@ -288,7 +288,13 @@ namespace VPetLLM.Core
             var hungerDesc = GetStatusDescription(hungerPercent, "hunger");
             var thirstDesc = GetStatusDescription(thirstPercent, "thirst");
             
-            // 构建简洁的状态字符串
+            // 构建简洁的状态字符串 - 明确标识为宠物状态
+            var statusPrefix = lang switch 
+            { 
+                "zh" => "[桌宠状态]", 
+                _ => "[Pet Status]" 
+            };
+            
             var statusParts = new List<string>
             {
                 $"Lv{core.Save.Level}",
@@ -301,7 +307,109 @@ namespace VPetLLM.Core
                 $"{lang switch { "zh" => "口渴", _ => "Thirst" }}:{thirstPercent:F0}%({thirstDesc})"
             };
             
-            return string.Join(";", statusParts);
+            // 如果启用了拓展状态获取，添加工作状态信息
+            if (_settings.EnableExtendedState)
+            {
+                var activityState = GetActivityState();
+                if (!string.IsNullOrEmpty(activityState))
+                {
+                    statusParts.Add(activityState);
+                }
+            }
+            
+            return $"{statusPrefix} {string.Join(";", statusParts)}";
+        }
+        
+        /// <summary>
+        /// 获取宠物当前活动状态（睡觉、工作、学习、玩耍等）
+        /// </summary>
+        private string GetActivityState()
+        {
+            try
+            {
+                var lang = _settings.PromptLanguage;
+                var main = _mainWindow.Main;
+                
+                // 获取工作状态
+                var workingState = main.State;
+                
+                switch (workingState)
+                {
+                    case VPet_Simulator.Core.Main.WorkingState.Sleep:
+                        return lang switch 
+                        { 
+                            "zh" => "活动:睡觉中", 
+                            _ => "Activity:Sleeping" 
+                        };
+                        
+                    case VPet_Simulator.Core.Main.WorkingState.Work:
+                        // 进一步判断是工作还是学习
+                        if (main.NowWork != null)
+                        {
+                            var workType = main.NowWork.Type;
+                            if (workType == VPet_Simulator.Core.GraphHelper.Work.WorkType.Work)
+                            {
+                                return lang switch 
+                                { 
+                                    "zh" => $"活动:工作中({main.NowWork.NameTrans})", 
+                                    _ => $"Activity:Working({main.NowWork.NameTrans})" 
+                                };
+                            }
+                            else if (workType == VPet_Simulator.Core.GraphHelper.Work.WorkType.Study)
+                            {
+                                return lang switch 
+                                { 
+                                    "zh" => $"活动:学习中({main.NowWork.NameTrans})", 
+                                    _ => $"Activity:Studying({main.NowWork.NameTrans})" 
+                                };
+                            }
+                            else
+                            {
+                                return lang switch 
+                                { 
+                                    "zh" => $"活动:忙碌中({main.NowWork.NameTrans})", 
+                                    _ => $"Activity:Busy({main.NowWork.NameTrans})" 
+                                };
+                            }
+                        }
+                        return lang switch 
+                        { 
+                            "zh" => "活动:工作中", 
+                            _ => "Activity:Working" 
+                        };
+                        
+                    case VPet_Simulator.Core.Main.WorkingState.Travel:
+                        return lang switch 
+                        { 
+                            "zh" => "活动:旅游中", 
+                            _ => "Activity:Traveling" 
+                        };
+                        
+                    case VPet_Simulator.Core.Main.WorkingState.Nomal:
+                        // 正常状态，检查是否在播放音乐或其他特殊动画
+                        if (main.DisplayType.Name == "music")
+                        {
+                            return lang switch 
+                            { 
+                                "zh" => "活动:听音乐", 
+                                _ => "Activity:Listening to music" 
+                            };
+                        }
+                        return lang switch 
+                        { 
+                            "zh" => "活动:空闲", 
+                            _ => "Activity:Idle" 
+                        };
+                        
+                    default:
+                        return "";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"获取活动状态失败: {ex.Message}");
+                return "";
+            }
         }
     }
 }

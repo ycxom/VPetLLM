@@ -76,22 +76,36 @@ namespace VPetLLM.UI.Windows
                 var currentAnimDesc = AnimationStateChecker.GetCurrentAnimationDescription(_plugin.MW);
                 Logger.Log($"TalkBox.Responded: 当前动画状态 = {currentAnimDesc}");
                 
+                // 检查是否为身体交互触发（带有[System]标记）
+                bool isBodyInteraction = text.StartsWith("[System]");
+                
                 // 检查VPet是否正在执行重要动画（包括用户交互动画如捏脸）
                 bool isPlayingImportantAnimation = AnimationStateChecker.IsPlayingImportantAnimation(_plugin.MW);
                 
-                // 显示思考动作和动态气泡（仅当VPet不在重要状态时）
-                if (!isPlayingImportantAnimation)
+                if (isBodyInteraction)
                 {
-                    await Application.Current.Dispatcher.InvokeAsync(() =>
-                    {
-                        Logger.Log("显示思考动作和动态气泡");
-                        DisplayThink();
-                        StartThinkingAnimation();
-                    });
+                    // 身体交互触发：完全跳过思考动画和气泡
+                    Logger.Log("身体交互触发，完全跳过思考动画和气泡");
                 }
                 else
                 {
-                    Logger.Log($"VPet正在执行重要动画 ({currentAnimDesc})，完全跳过思考动画和气泡");
+                    // 输入触发：显示气泡，仅在非重要动画时显示思考动作
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        if (isPlayingImportantAnimation)
+                        {
+                            // 重要动画播放中：不显示思考动作，仅显示气泡
+                            Logger.Log($"输入触发且重要动画播放中 ({currentAnimDesc})，仅显示思考气泡");
+                        }
+                        else
+                        {
+                            // 非重要动画：显示思考动作和气泡
+                            Logger.Log("输入触发且无重要动画，显示思考动作和气泡");
+                            DisplayThink();
+                        }
+                        // 无论是否在重要动画中，都显示思考气泡
+                        StartThinkingAnimation();
+                    });
                 }
 
                 Logger.Log("Calling ChatCore.Chat...");

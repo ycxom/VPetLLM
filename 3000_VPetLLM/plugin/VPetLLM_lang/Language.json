@@ -554,6 +554,18 @@
             "zh-hant": "允许获取宠物状态",
             "jp": "ペットの状態を取得できるようにする"
         },
+        "EnableExtendedState": {
+            "en": "Extended State Detection",
+            "zh-hans": "拓展状态获取",
+            "zh-hant": "拓展狀態獲取",
+            "jp": "拡張状態取得"
+        },
+        "EnableExtendedStateToolTip": {
+            "en": "When enabled, AI can detect if the pet is sleeping, working, studying, or playing. This provides more context for better responses.",
+            "zh-hans": "启用后，AI可以识别宠物是否在睡觉、工作、学习或玩耍，提供更丰富的上下文信息以获得更好的回复。",
+            "zh-hant": "啟用後，AI可以識別寵物是否在睡覺、工作、學習或玩耍，提供更豐富的上下文信息以獲得更好的回覆。",
+            "jp": "有効にすると、AIはペットが寝ているか、働いているか、勉強しているか、遊んでいるかを検出できます。これにより、より良い応答のためのコンテキストが提供されます。"
+        },
         "ReduceInputTokenUsage": {
             "en": "Reduce input token usage",
             "zh-hans": "尝试减少输入token消耗",

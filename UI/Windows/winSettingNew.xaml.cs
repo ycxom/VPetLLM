@@ -368,6 +368,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableAction")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableBuy")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableState")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableExtendedState")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_ReduceInputTokenUsage")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableMove")).Click += Control_Click;
@@ -719,6 +720,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableAction")).IsChecked = _plugin.Settings.EnableAction;
             ((CheckBox)this.FindName("CheckBox_EnableBuy")).IsChecked = _plugin.Settings.EnableBuy;
             ((CheckBox)this.FindName("CheckBox_EnableState")).IsChecked = _plugin.Settings.EnableState;
+            ((CheckBox)this.FindName("CheckBox_EnableExtendedState")).IsChecked = _plugin.Settings.EnableExtendedState;
             ((CheckBox)this.FindName("CheckBox_ReduceInputTokenUsage")).IsChecked = _plugin.Settings.ReduceInputTokenUsage;
             ((CheckBox)this.FindName("CheckBox_EnableActionExecution")).IsChecked = _plugin.Settings.EnableActionExecution;
             ((CheckBox)this.FindName("CheckBox_EnableMove")).IsChecked = _plugin.Settings.EnableMove;
@@ -1037,6 +1039,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableAction = enableActionCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableBuy = enableBuyCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableState = enableStateCheckBox.IsChecked ?? true;
+            _plugin.Settings.EnableExtendedState = ((CheckBox)this.FindName("CheckBox_EnableExtendedState")).IsChecked ?? false;
             _plugin.Settings.ReduceInputTokenUsage = ((CheckBox)this.FindName("CheckBox_ReduceInputTokenUsage")).IsChecked ?? false;
             _plugin.Settings.EnableActionExecution = enableActionExecutionCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableMove = enableMoveCheckBox.IsChecked ?? true;
@@ -1944,6 +1947,14 @@ namespace VPetLLM.UI.Windows
             }
             if (FindName("CheckBox_EnableBuy") is CheckBox checkBoxEnableBuy) checkBoxEnableBuy.Content = LanguageHelper.Get("Advanced_Options.EnableBuy", langCode);
             if (FindName("CheckBox_EnableState") is CheckBox checkBoxEnableState) checkBoxEnableState.Content = LanguageHelper.Get("Advanced_Options.EnableState", langCode);
+            if (FindName("CheckBox_EnableExtendedState") is CheckBox checkBoxEnableExtendedState) 
+            {
+                checkBoxEnableExtendedState.Content = LanguageHelper.Get("Advanced_Options.EnableExtendedState", langCode);
+                if (checkBoxEnableExtendedState.ToolTip is ToolTip toolTipExtState)
+                {
+                    toolTipExtState.Content = LanguageHelper.Get("Advanced_Options.EnableExtendedStateToolTip", langCode);
+                }
+            }
             if (FindName("CheckBox_EnableActionExecution") is CheckBox checkBoxEnableActionExecution) checkBoxEnableActionExecution.Content = LanguageHelper.Get("Advanced_Options.EnableActionExecution", langCode);
             if (FindName("CheckBox_EnableMove") is CheckBox checkBoxEnableMove) checkBoxEnableMove.Content = LanguageHelper.Get("Advanced_Options.EnableMove", langCode);
             if (FindName("CheckBox_EnableTime") is CheckBox checkBoxEnableTime) checkBoxEnableTime.Content = LanguageHelper.Get("Advanced_Options.EnableTime", langCode);
