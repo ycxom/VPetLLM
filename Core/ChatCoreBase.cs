@@ -168,6 +168,18 @@ namespace VPetLLM.Core
         {
             HistoryManager.GetHistory().Clear();
             HistoryManager.GetHistory().AddRange(history);
+            
+            // 更新到数据库
+            try
+            {
+                var dbPath = GetDatabasePath();
+                using var database = new ChatHistoryDatabase(dbPath);
+                database.UpdateHistory(Name, history);
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"更新历史记录到数据库失败: {ex.Message}");
+            }
         }
 
 

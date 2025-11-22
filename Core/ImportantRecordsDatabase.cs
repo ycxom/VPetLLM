@@ -244,6 +244,68 @@ namespace VPetLLM.Core
         }
 
         /// <summary>
+        /// Update record content and weight by ID
+        /// </summary>
+        /// <param name="id">The record ID</param>
+        /// <param name="content">The new content</param>
+        /// <param name="weight">The new weight value (0-10)</param>
+        /// <returns>True if successful, false otherwise</returns>
+        public bool UpdateRecord(int id, string content, double weight)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    Logger.Log("Cannot update record with empty content");
+                    return false;
+                }
+
+                // Clamp weight to valid range
+                weight = Math.Clamp(weight, 0, 10);
+
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                var command = connection.CreateCommand();
+                command.CommandText = @"
+                    UPDATE important_records
+                    SET content = @content, weight = @weight, updated_at = @updated_at
+                    WHERE id = @id
+                ";
+
+                command.Parameters.AddWithValue("@id", id);
+                command.Parameters.AddWithValue("@content", content);
+                command.Parameters.AddWithValue("@weight", weight);
+                command.Parameters.AddWithValue("@updated_at", DateTime.UtcNow);
+
+                var rowsAffected = command.ExecuteNonQuery();
+
+                if (rowsAffected > 0)
+                {
+                    Logger.Log($"Updated record #{id} content and weight to {weight}");
+                    
+                    // Delete if weight is 0
+                    if (weight == 0)
+                    {
+                        DeleteRecord(id);
+                    }
+                    
+                    return true;
+                }
+                else
+                {
+                    Logger.Log($"Record #{id} not found for update");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to update record #{id}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Increment record weight by ID (max 10)
         /// </summary>
         /// <param name="id">The record ID</param>

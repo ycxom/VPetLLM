@@ -276,7 +276,7 @@ namespace VPetLLM.Core
         {
             try
             {
-                return _database.UpdateRecordWeight(record.Id, record.Weight);
+                return _database.UpdateRecord(record.Id, record.Content, record.Weight);
             }
             catch (Exception ex)
             {
