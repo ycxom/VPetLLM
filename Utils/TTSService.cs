@@ -8,7 +8,7 @@ namespace VPetLLM.Utils
 {
     public class TTSService
     {
-        private MediaPlayer? _mediaPlayer;
+        private IMediaPlayer? _mediaPlayer;
         private Setting.TTSSetting _ttsSettings;
         private Setting.ProxySetting? _proxySettings;
         private readonly object _playbackLock = new object();
@@ -19,8 +19,42 @@ namespace VPetLLM.Utils
         {
             _ttsSettings = settings;
             _proxySettings = proxySettings;
-            // MediaPlayer将在需要时在UI线程上创建
-            _mediaPlayer = null;
+            
+            // 初始化播放器（默认使用 mpv）
+            InitializePlayer();
+        }
+
+        private void InitializePlayer()
+        {
+            // 使用与 Language.json 相同的方式获取插件目录
+            var dllPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            // Logger.Log($"TTS: DLL 目录: {dllPath}");
+
+            var mpvDir = Path.Combine(dllPath, "mpv");
+
+            if (Directory.Exists(mpvDir))
+            {
+                var files = Directory.GetFiles(mpvDir);
+            }
+
+            var mpvExePath = Path.Combine(mpvDir, "mpv.exe");
+
+            if (!File.Exists(mpvExePath))
+            {
+                var errorMsg = $"mpv.exe 未找到！\n请将 mpv 文件夹放到插件目录: {dllPath}\n下载: https://mpv.io/installation/";
+                Logger.Log($"TTS: {errorMsg}");
+                throw new FileNotFoundException(errorMsg);
+            }
+
+            try
+            {
+                // 使用 mpv 播放器，指定 exe 路径
+                _mediaPlayer = new MpvPlayer(mpvExePath);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"无法初始化 mpv 播放器: {ex.Message}", ex);
+            }
         }
 
         /// <summary>
@@ -323,7 +357,6 @@ namespace VPetLLM.Utils
 
         /// <summary>
         /// 播放音频文件
-        /// 优化：使用BeginInvoke异步调度UI操作，减少阻塞
         /// </summary>
         /// <param name="filePath">音频文件路径</param>
         /// <returns></returns>
@@ -331,8 +364,6 @@ namespace VPetLLM.Utils
         {
             try
             {
-                // Logger.Log($"TTS: 开始播放音频文件: {filePath}");
-
                 TaskCompletionSource<bool> currentTask;
                 lock (_playbackLock)
                 {
@@ -341,114 +372,29 @@ namespace VPetLLM.Utils
                     currentTask = _currentPlaybackTask;
                 }
 
-                var tcs = new TaskCompletionSource<bool>();
+                // 设置音量（基础音量 + 增益转换为线性系数）
+                double baseVolume = _ttsSettings.Volume;
+                double gainLinear = Math.Pow(10.0, _ttsSettings.VolumeGain / 20.0);
+                double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
+                _mediaPlayer?.SetVolume(finalVolume);
 
-                // 优化：使用BeginInvoke异步调度，避免阻塞当前线程
-                _ = Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                Logger.Log($"TTS: 开始播放音频: {filePath}");
+
+                // 使用播放器播放
+                await _mediaPlayer.PlayAsync(filePath);
+
+                lock (_playbackLock)
                 {
-                    try
-                    {
-                        // 确保MediaPlayer已初始化
-                        if (_mediaPlayer == null)
-                        {
-                            _mediaPlayer = new MediaPlayer();
-                            // Logger.Log("TTS: MediaPlayer已在UI线程上创建");
-                        }
+                    _isPlaying = false;
+                    currentTask?.TrySetResult(true);
+                }
 
-                        // 停止当前播放
-                        _mediaPlayer.Stop();
+                Logger.Log($"TTS: 音频播放完成: {filePath}");
 
-                        // 设置音频文件
-                        _mediaPlayer.Open(new Uri(filePath, UriKind.Absolute));
-
-                        // 设置音量（基础音量 + 增益转换为线性系数）
-                        // MediaPlayer.Volume 可以设置超过1.0，最大到100
-                        double baseVolume = _ttsSettings.Volume;
-                        double gainLinear = Math.Pow(10.0, _ttsSettings.VolumeGain / 20.0);
-                        double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
-                        _mediaPlayer.Volume = finalVolume;
-
-                        // 设置播放结束事件
-                        EventHandler mediaEndedHandler = null;
-                        EventHandler<ExceptionEventArgs> mediaFailedHandler = null;
-
-                        mediaEndedHandler = (s, e) =>
-                        {
-                            try
-                            {
-                                _mediaPlayer.MediaEnded -= mediaEndedHandler;
-                                _mediaPlayer.MediaFailed -= mediaFailedHandler;
-                                // Logger.Log($"TTS: 音频播放完成: {filePath}");
-
-                                lock (_playbackLock)
-                                {
-                                    _isPlaying = false;
-                                    currentTask?.TrySetResult(true);
-                                }
-
-                                tcs.TrySetResult(true);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Log($"TTS: 播放完成事件处理异常: {ex.Message}");
-                                tcs.TrySetResult(true); // 即使异常也标记为完成
-                            }
-                        };
-
-                        mediaFailedHandler = (s, e) =>
-                        {
-                            try
-                            {
-                                _mediaPlayer.MediaEnded -= mediaEndedHandler;
-                                _mediaPlayer.MediaFailed -= mediaFailedHandler;
-                                Logger.Log($"TTS: 音频播放失败: {filePath}, 错误: {e.ErrorException?.Message}");
-
-                                lock (_playbackLock)
-                                {
-                                    _isPlaying = false;
-                                    currentTask?.TrySetResult(false);
-                                }
-
-                                tcs.TrySetResult(false);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Log($"TTS: 播放失败事件处理异常: {ex.Message}");
-                                tcs.TrySetResult(false); // 即使异常也标记为失败
-                            }
-                        };
-
-                        _mediaPlayer.MediaEnded += mediaEndedHandler;
-                        _mediaPlayer.MediaFailed += mediaFailedHandler;
-
-                        // 开始播放
-                        _mediaPlayer.Play();
-                        Logger.Log($"TTS: 开始播放音频: {filePath}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"TTS: UI线程播放设置失败: {ex.Message}");
-                        Logger.Log($"TTS: UI线程异常堆栈: {ex.StackTrace}");
-
-                        lock (_playbackLock)
-                        {
-                            _isPlaying = false;
-                            currentTask?.TrySetResult(false);
-                        }
-
-                        tcs.TrySetResult(false);
-                    }
-                }), System.Windows.Threading.DispatcherPriority.Normal);
-
-                // 等待播放完成（使用ConfigureAwait(false)避免UI线程阻塞）
-                Logger.Log($"TTS: 等待音频播放完成: {filePath}");
-                var playbackResult = await tcs.Task.ConfigureAwait(false);
-                Logger.Log($"TTS: 音频播放结果: {playbackResult}, 文件: {filePath}");
-
-                // 清理临时文件（延迟删除，优化：减少延迟到1秒）
+                // 清理临时文件
                 _ = Task.Run(async () =>
                 {
-                    await Task.Delay(1000).ConfigureAwait(false); // 优化：从2秒减少到1秒
+                    await Task.Delay(1000);
                     try
                     {
                         if (File.Exists(filePath) && filePath.Contains("VPetLLM_TTS_"))
@@ -461,18 +407,11 @@ namespace VPetLLM.Utils
                     {
                         Logger.Log($"TTS: 删除临时文件失败: {ex.Message}");
                     }
-                }).ContinueWith(t =>
-                {
-                    if (t.IsFaulted && t.Exception != null)
-                    {
-                        Logger.Log($"TTS: 清理临时文件任务异常: {t.Exception.GetBaseException().Message}");
-                    }
-                }, TaskScheduler.Default);
+                });
             }
             catch (Exception ex)
             {
                 Logger.Log($"TTS播放错误: {ex.Message}");
-                Logger.Log($"TTS播放异常堆栈: {ex.StackTrace}");
 
                 lock (_playbackLock)
                 {
@@ -489,12 +428,14 @@ namespace VPetLLM.Utils
         {
             try
             {
+                _mediaPlayer?.Stop();
+                
                 lock (_playbackLock)
                 {
-                    _mediaPlayer?.Stop();
                     _isPlaying = false;
                     _currentPlaybackTask?.TrySetResult(false);
                 }
+                
                 Logger.Log("TTS: 已停止播放");
             }
             catch (Exception ex)
@@ -510,10 +451,7 @@ namespace VPetLLM.Utils
         {
             get
             {
-                lock (_playbackLock)
-                {
-                    return _isPlaying;
-                }
+                return _mediaPlayer?.IsPlaying ?? false;
             }
         }
 
@@ -546,19 +484,12 @@ namespace VPetLLM.Utils
             {
                 try
                 {
-                    // 在UI线程上更新音量
-                    System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-                    {
-                        if (_mediaPlayer != null)
-                        {
-                            // 计算最终音量（基础音量 + 增益转换为线性系数）
-                            double baseVolume = _ttsSettings.Volume;
-                            double gainLinear = Math.Pow(10.0, _ttsSettings.VolumeGain / 20.0);
-                            double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
-                            
-                            _mediaPlayer.Volume = finalVolume;
-                        }
-                    });
+                    // 计算最终音量（基础音量 + 增益转换为线性系数）
+                    double baseVolume = _ttsSettings.Volume;
+                    double gainLinear = Math.Pow(10.0, _ttsSettings.VolumeGain / 20.0);
+                    double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
+                    
+                    _mediaPlayer.SetVolume(finalVolume);
                 }
                 catch (Exception ex)
                 {
@@ -597,8 +528,7 @@ namespace VPetLLM.Utils
         {
             try
             {
-                _mediaPlayer?.Stop();
-                _mediaPlayer?.Close();
+                _mediaPlayer?.Dispose();
                 _mediaPlayer = null;
                 Logger.Log("TTS: 资源已释放");
             }
