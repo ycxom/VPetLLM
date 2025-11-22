@@ -72,6 +72,21 @@ namespace VPetLLM.UI.Windows
 
             try
             {
+                // 检查是否为 Debug 模式
+                bool isDebugMode = _plugin.Settings.Role == "VPetLLM_DeBug";
+                
+                if (isDebugMode)
+                {
+                    Logger.Log("=== Debug 模式已激活 ===");
+                    Logger.Log($"用户输入将直接作为 LLM 输出处理: {text}");
+                    
+                    // 直接将用户输入作为 LLM 的输出处理
+                    HandleResponse(text);
+                    
+                    Logger.Log("Debug 模式处理完成");
+                    return;
+                }
+
                 // 输出当前动画状态用于调试
                 var currentAnimDesc = AnimationStateChecker.GetCurrentAnimationDescription(_plugin.MW);
                 Logger.Log($"TalkBox.Responded: 当前动画状态 = {currentAnimDesc}");
