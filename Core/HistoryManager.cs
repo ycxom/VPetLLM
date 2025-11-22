@@ -79,7 +79,7 @@ namespace VPetLLM.Core
             }
 
             // 如果允许获取当前时间，仅写入Unix时间戳，显示时再根据UnixTime动态补全时间前缀
-            if (_settings.EnableTime)
+            if (_settings.EnableTime && message.Role == "user")
             {
                 message.UnixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
             }

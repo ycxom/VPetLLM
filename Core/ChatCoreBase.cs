@@ -372,7 +372,7 @@ namespace VPetLLM.Core
 
                 // 时间前缀：若存在UnixTime则动态渲染为 [yyyy/MM/dd HH:mm:ss]
                 string timePrefix = "";
-                if (UnixTime.HasValue)
+                if (UnixTime.HasValue && Role == "user")
                 {
                     try
                     {
