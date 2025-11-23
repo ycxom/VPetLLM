@@ -9,12 +9,25 @@ namespace VPetLLM.Core
         private readonly Setting _settings;
         private readonly IMainWindow _mainWindow;
         private readonly ActionProcessor _actionProcessor;
+        private Utils.FoodSearchService _foodSearchService;
 
         public SystemMessageProvider(Setting settings, IMainWindow mainWindow, ActionProcessor actionProcessor)
         {
             _settings = settings;
             _mainWindow = mainWindow;
             _actionProcessor = actionProcessor;
+        }
+        
+        /// <summary>
+        /// 获取或创建食物搜索服务
+        /// </summary>
+        private Utils.FoodSearchService GetFoodSearchService()
+        {
+            if (_foodSearchService == null)
+            {
+                _foodSearchService = new Utils.FoodSearchService(_mainWindow);
+            }
+            return _foodSearchService;
         }
 
         /// <summary>
@@ -229,12 +242,20 @@ namespace VPetLLM.Core
                                 .Replace("{SayAnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableSayAnimations())));
                 }
 
-                // 只有在EnableBuy开启时才添加可购买物品列表
+                // 只有在EnableBuy开启时才添加可购买物品列表（使用简化版本减少token）
                 if (_settings.EnableBuy)
                 {
-                    var items = string.Join(",", _mainWindow.Foods.Select(f => f.Name));
+                    var searchService = GetFoodSearchService();
+                    var simplifiedList = searchService.GetSimplifiedFoodListPrompt(lang);
+                    var totalCount = searchService.GetTotalFoodCount();
+                    
+                    // 添加提示：AI可以使用任何物品名称，系统会自动进行模糊匹配
+                    var fuzzySearchHint = lang == "zh" 
+                        ? $"（共{totalCount}个物品，支持模糊搜索，你可以使用任何相近的名称）" 
+                        : $"({totalCount} items total, fuzzy search supported, you can use similar names)";
+                    
                     parts.Add(PromptHelper.Get("Available_Items_Prefix", lang)
-                                .Replace("{ItemList}", items));
+                                .Replace("{ItemList}", simplifiedList + fuzzySearchHint));
                 }
             }
 

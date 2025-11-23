@@ -8,7 +8,7 @@ using System.Reflection;
 namespace VPetLLM.Handlers
 {
     /// <summary>
-    /// 简化版购买处理器 - 直接使用VPet原生接口
+    /// 简化版购买处理器 - 使用向量检索和模糊搜索优化
     /// </summary>
     public class BuyHandler : IActionHandler
     {
@@ -18,6 +18,21 @@ namespace VPetLLM.Handlers
 
         private const string VPetLLMSource = "vpetllm";
         private const string FriendGiftSource = "friendgift";
+        
+        // 食物搜索服务（延迟初始化）
+        private static FoodSearchService _foodSearchService;
+
+        /// <summary>
+        /// 获取或创建食物搜索服务
+        /// </summary>
+        private FoodSearchService GetFoodSearchService(IMainWindow mainWindow)
+        {
+            if (_foodSearchService == null)
+            {
+                _foodSearchService = new FoodSearchService(mainWindow);
+            }
+            return _foodSearchService;
+        }
 
         public async Task Execute(string itemName, IMainWindow mainWindow)
         {
@@ -32,16 +47,18 @@ namespace VPetLLM.Handlers
 
             try
             {
-                // 查找物品
-                var food = mainWindow.Foods.FirstOrDefault(f =>
-                    string.Equals(f.Name, itemName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(f.TranslateName, itemName, StringComparison.OrdinalIgnoreCase));
+                // 使用智能搜索服务查找物品
+                var searchService = GetFoodSearchService(mainWindow);
+                var food = searchService.SearchFood(itemName);
 
                 if (food == null)
                 {
                     Logger.Log($"BuyHandler: 物品未找到: {itemName}");
                     return;
                 }
+
+                // 播放购买动画
+                await PlayBuyAnimationAsync(mainWindow, food);
 
                 // 执行购买并标记来源为VPetLLM
                 mainWindow.TakeItem(food);
@@ -64,16 +81,18 @@ namespace VPetLLM.Handlers
 
             try
             {
-                // 查找物品
-                var food = mainWindow.Foods.FirstOrDefault(f =>
-                    string.Equals(f.Name, itemName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(f.TranslateName, itemName, StringComparison.OrdinalIgnoreCase));
+                // 使用智能搜索服务查找物品
+                var searchService = GetFoodSearchService(mainWindow);
+                var food = searchService.SearchFood(itemName);
 
                 if (food == null)
                 {
                     Logger.Log($"BuyHandler: 朋友赠送物品未找到: {itemName}");
                     return;
                 }
+
+                // 播放购买动画（赠送也使用相同动画）
+                await PlayBuyAnimationAsync(mainWindow, food);
 
                 // 朋友赠送不扣钱，只添加物品并标记来源
                 TryInvokeTakeItemHandle(mainWindow, food, 1, FriendGiftSource);
@@ -95,16 +114,18 @@ namespace VPetLLM.Handlers
 
             try
             {
-                // 查找物品
-                var food = mainWindow.Foods.FirstOrDefault(f =>
-                    string.Equals(f.Name, itemName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(f.TranslateName, itemName, StringComparison.OrdinalIgnoreCase));
+                // 使用智能搜索服务查找物品
+                var searchService = GetFoodSearchService(mainWindow);
+                var food = searchService.SearchFood(itemName);
 
                 if (food == null)
                 {
                     Logger.Log($"BuyHandler: 朋友代购物品未找到: {itemName}");
                     return;
                 }
+
+                // 播放购买动画
+                await PlayBuyAnimationAsync(mainWindow, food);
 
                 // 朋友代为购买，扣朋友的钱，不扣当前用户的钱
                 // 这里模拟朋友支付，实际游戏中可能需要更复杂的逻辑
@@ -115,6 +136,41 @@ namespace VPetLLM.Handlers
             catch (Exception ex)
             {
                 Logger.Log($"BuyHandler: 朋友代购处理异常: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 播放购买物品动画（使用VPet原生的DisplayFoodAnimation方法）
+        /// </summary>
+        private async Task PlayBuyAnimationAsync(IMainWindow mainWindow, Food food)
+        {
+            try
+            {
+                Logger.Log($"BuyHandler: 开始播放购买动画 - 物品: {food.Name}, 类型: {food.Type}");
+
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        // 使用VPet原生的DisplayFoodAnimation方法
+                        // 这个方法会自动处理动画播放、状态切换等逻辑
+                        string graphName = food.GetGraph(); // 获取动画名称（eat/drink/gift）
+                        Logger.Log($"BuyHandler: 调用DisplayFoodAnimation - 动画: {graphName}");
+                        
+                        mainWindow.DisplayFoodAnimation(graphName, food.ImageSource);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"BuyHandler: 播放购买动画失败: {ex.Message}");
+                    }
+                });
+
+                // 短暂延迟，让动画开始播放
+                await Task.Delay(100);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"BuyHandler: 播放购买动画异常: {ex.Message}");
             }
         }
 

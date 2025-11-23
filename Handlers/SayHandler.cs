@@ -242,7 +242,6 @@ namespace VPetLLM.Handlers
                         Logger.Log($"SayHandler: 准备播放Say动画，先尝试结束上一个动画");
                         
                         // 使用DisplayStopForce确保上一个动画结束
-                        bool animationStopped = false;
                         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                         {
                             try
@@ -250,14 +249,12 @@ namespace VPetLLM.Handlers
                                 // DisplayStopForce会尝试播放C_End动画，如果没有则直接执行回调
                                 mainWindow.Main.DisplayStopForce(() =>
                                 {
-                                    animationStopped = true;
                                     Logger.Log("SayHandler: 上一个动画已结束");
                                 });
                             }
                             catch (Exception ex)
                             {
                                 Logger.Log($"SayHandler: 结束上一个动画失败: {ex.Message}");
-                                animationStopped = true;
                             }
                         });
                         
