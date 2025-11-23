@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using VPetLLM.Utils;
 
 namespace VPetLLM.Handlers
 {
@@ -53,12 +54,23 @@ namespace VPetLLM.Handlers
             {
                 var currentBuffer = _buffer.ToString();
                 
-                // 检查是否有 plugin 接管请求
-                var takeoverMatch = System.Text.RegularExpressions.Regex.Match(currentBuffer, @"\[:plugin\((\w+)");
-                if (takeoverMatch.Success)
+                // 检查是否有 plugin 接管请求 (只支持新格式)
+                // 新格式: <|plugin_begin|> pluginName(...) <|plugin_end|>
+                Match takeoverMatch = null;
+                string pluginName = null;
+                int pluginStartIndex = -1;
+                
+                // 尝试新格式
+                var newFormatMatch = System.Text.RegularExpressions.Regex.Match(currentBuffer, @"<\|\s*plugin\s*_begin\s*\|>\s*(\w+)");
+                if (newFormatMatch.Success)
                 {
-                    var pluginName = takeoverMatch.Groups[1].Value;
-                    
+                    takeoverMatch = newFormatMatch;
+                    pluginName = newFormatMatch.Groups[1].Value;
+                    pluginStartIndex = newFormatMatch.Index;
+                }
+                
+                if (takeoverMatch != null && !string.IsNullOrEmpty(pluginName))
+                {
                     // 查找支持接管的插件
                     var plugin = _plugin?.Plugins.Find(p => 
                         p.Name.Replace(" ", "_").Equals(pluginName, StringComparison.OrdinalIgnoreCase) &&
@@ -67,7 +79,6 @@ namespace VPetLLM.Handlers
                     if (plugin is global::VPetLLM.Core.IPluginTakeover)
                     {
                         // 提取从 plugin 开始到当前的内容
-                        var pluginStartIndex = takeoverMatch.Index;
                         var pluginContent = currentBuffer.Substring(pluginStartIndex);
                         
                         Utils.Logger.Log($"StreamingCommandProcessor: 检测到支持接管的插件 {pluginName}，准备启动接管");
@@ -108,102 +119,49 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 处理所有已完整接收的命令
-        /// 优化：使用更健壮的解析方法，支持嵌套括号和特殊字符
+        /// 只支持新格式: <|command_type_begin|> ... <|command_type_end|>
         /// </summary>
         private void ProcessCompleteCommands()
         {
             var text = _buffer.ToString();
-            
-            // 使用手动解析代替正则表达式，更好地处理嵌套括号
             int index = _lastProcessedIndex;
+            
+            // 检测并警告旧格式
+            if (text.Contains("[:"))
+            {
+                Utils.Logger.Log("StreamingCommandProcessor: 警告 - 检测到旧格式命令 [:，已弃用。请使用新格式: <|command_type_begin|> ... <|command_type_end|>");
+            }
+            
             while (index < text.Length)
             {
-                // 查找下一个命令开始
-                int startIndex = text.IndexOf("[:", index);
+                // 只查找新格式命令: <|xxx_begin|>
+                int startIndex = text.IndexOf("<|", index);
+                
                 if (startIndex == -1)
-                    break;
-
+                {
+                    break; // 没有更多命令
+                }
+                
                 // 跳过已处理的命令
                 if (startIndex < _lastProcessedIndex)
                 {
                     index = startIndex + 2;
                     continue;
                 }
-
-                // 提取命令类型
-                int typeStart = startIndex + 2;
-                // 跳过可能的空格
-                while (typeStart < text.Length && char.IsWhiteSpace(text[typeStart]))
-                    typeStart++;
-
-                int typeEnd = text.IndexOf('(', typeStart);
-                if (typeEnd == -1)
-                {
-                    index = startIndex + 2;
-                    continue;
-                }
-
-                // 使用括号计数找到匹配的结束位置
-                int parenCount = 1;
-                int contentStart = typeEnd + 1;
-                int contentEnd = contentStart;
-                bool inString = false;
-                char stringDelimiter = '\0';
-
-                while (contentEnd < text.Length && parenCount > 0)
-                {
-                    char c = text[contentEnd];
-                    
-                    // 处理字符串边界
-                    if ((c == '"' || c == '\'') && (contentEnd == contentStart || text[contentEnd - 1] != '\\'))
-                    {
-                        if (!inString)
-                        {
-                            inString = true;
-                            stringDelimiter = c;
-                        }
-                        else if (c == stringDelimiter)
-                        {
-                            inString = false;
-                        }
-                    }
-                    
-                    // 只在字符串外计数括号
-                    if (!inString)
-                    {
-                        if (c == '(')
-                            parenCount++;
-                        else if (c == ')')
-                            parenCount--;
-                    }
-
-                    if (parenCount > 0)
-                        contentEnd++;
-                }
-
-                // 检查括号是否匹配
-                if (parenCount != 0)
-                {
-                    // 括号不匹配，可能还没接收完整，等待更多数据
-                    break;
-                }
-
-                // 查找闭合的 ]
-                int closeBracketIndex = contentEnd + 1;
-                while (closeBracketIndex < text.Length && char.IsWhiteSpace(text[closeBracketIndex]))
-                    closeBracketIndex++;
-
-                if (closeBracketIndex >= text.Length || text[closeBracketIndex] != ']')
-                {
-                    // 缺少闭合括号，可能还没接收完整
-                    break;
-                }
-
-                // 构造完整的命令字符串
-                var fullCommand = text.Substring(startIndex, closeBracketIndex - startIndex + 1);
-                var commandContent = text.Substring(contentStart, contentEnd - contentStart).Trim();
                 
-                // 检查是否是say/talk命令，如果是且TTS启用，则根据模式决定是否立即下载音频
+                // 解析新格式: <|command_type_begin|> parameters <|command_type_end|>
+                var command = ParseNewFormatCommand(text, startIndex);
+                if (command == null)
+                {
+                    // 不完整的命令，等待更多数据
+                    break;
+                }
+                
+                string fullCommand = command.FullMatch;
+                string commandType = command.CommandType;
+                _lastProcessedIndex = command.EndIndex + 1;
+                
+                // Check if it's a say/talk command and TTS is enabled
                 Task<string> ttsDownloadTask = null;
                 var plugin = _plugin ?? VPetLLM.Instance;
                 if (plugin?.Settings?.TTS?.IsEnabled == true && plugin.TTSService != null)
@@ -215,13 +173,13 @@ namespace VPetLLM.Handlers
                         
                         if (!useQueueDownload)
                         {
-                            // 并发模式：立即下载所有音频
+                            // Concurrent mode: download all audio immediately
                             Utils.Logger.Log($"StreamingCommandProcessor: 检测到say命令，立即开始下载TTS音频（并发模式）: {talkText.Substring(0, Math.Min(talkText.Length, 20))}...");
                             ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
                         }
                         else
                         {
-                            // 队列模式：只为第一个命令启动下载
+                            // Queue mode: only start download for first command
                             bool isFirstCommand;
                             lock (_lock)
                             {
@@ -241,7 +199,7 @@ namespace VPetLLM.Handlers
                     }
                 }
                 
-                // 将命令和TTS下载任务加入队列
+                // Add command and TTS download task to queue
                 lock (_lock)
                 {
                     _commandQueue.Enqueue(new CommandTask
@@ -251,42 +209,84 @@ namespace VPetLLM.Handlers
                     });
                 }
                 
-                // 更新已处理的位置
-                _lastProcessedIndex = closeBracketIndex + 1;
+                // 记录检测到的命令
+                Utils.Logger.Log($"StreamingCommandProcessor: 检测到完整命令类型: {commandType}, 格式: 新格式, 命令: {fullCommand.Substring(0, Math.Min(fullCommand.Length, 100))}...");
                 
-                // 记录检测到的命令类型
-                var commandType = GetCommandType(fullCommand);
-                Utils.Logger.Log($"StreamingCommandProcessor: 检测到完整命令类型: {commandType}, 命令: {fullCommand.Substring(0, Math.Min(fullCommand.Length, 100))}...");
-                
-                // 启动队列处理（如果还没有在处理）
+                // 启动队列处理（如果尚未处理）
                 _ = ProcessQueueAsync();
                 
                 // 移动到下一个位置
-                index = closeBracketIndex + 1;
+                index = _lastProcessedIndex;
             }
         }
         
         /// <summary>
-        /// 获取命令类型
+        /// 解析新格式命令: <|command_type_begin|> ... <|command_type_end|>
+        /// </summary>
+        private CommandMatch ParseNewFormatCommand(string text, int startIndex)
+        {
+            // 提取命令类型: <|command_type_begin|>
+            int typeStart = startIndex + 2;
+            int typeEnd = text.IndexOf("_begin|>", typeStart);
+            
+            if (typeEnd == -1)
+                return null; // 不完整的开始标签
+                
+            string commandType = text.Substring(typeStart, typeEnd - typeStart).Trim();
+            
+            // 查找结束标签: <|command_type_end|>
+            string closingTag = $"<|{commandType}_end|>";
+            int closingIndex = text.IndexOf(closingTag, typeEnd + 8);
+            
+            if (closingIndex == -1)
+                return null; // 不完整的命令，等待更多数据
+                
+            // 提取参数
+            int paramsStart = typeEnd + 8; // "_begin|>" 的长度
+            string parameters = text.Substring(paramsStart, closingIndex - paramsStart).Trim();
+            
+            // 提取完整匹配
+            int endIndex = closingIndex + closingTag.Length - 1;
+            string fullMatch = text.Substring(startIndex, endIndex - startIndex + 1);
+            
+            return new CommandMatch
+            {
+                CommandType = commandType,
+                Parameters = parameters,
+                FullMatch = fullMatch,
+                StartIndex = startIndex,
+                EndIndex = endIndex,
+                Format = CommandFormat.New
+            };
+        }
+
+        
+        /// <summary>
+        /// 获取命令类型 (只支持新格式)
         /// </summary>
         private string GetCommandType(string command)
         {
-            var match = Regex.Match(command, @"\[:(\w+)");
-            return match.Success ? match.Groups[1].Value : "unknown";
+            // 新格式: <|command_type_begin|>
+            var newFormatMatch = Regex.Match(command, @"<\|\s*(\w+)\s*_begin\s*\|>");
+            if (newFormatMatch.Success)
+                return newFormatMatch.Groups[1].Value;
+            
+            return "unknown";
         }
 
         /// <summary>
-        /// 从命令中提取talk文本内容
+        /// 从命令中提取talk文本内容 (只支持新格式)
         /// </summary>
         private string ExtractTalkText(string command)
         {
-            // 匹配 [:say("文本", ...)] 或 [:talk(say("文本", ...))]
-            var sayPattern = @"\[:(?:say|talk)\((?:say\()?""([^""]+)""";
-            var match = Regex.Match(command, sayPattern);
-            if (match.Success && match.Groups.Count > 1)
+            // 新格式: <|say_begin|> "text", ... <|say_end|> or <|talk_begin|> say("text", ...) <|talk_end|>
+            var newFormatPattern = @"<\|\s*(?:say|talk)\s*_begin\s*\|>\s*(?:say\()?""([^""]+)""";
+            var newMatch = Regex.Match(command, newFormatPattern);
+            if (newMatch.Success && newMatch.Groups.Count > 1)
             {
-                return match.Groups[1].Value;
+                return newMatch.Groups[1].Value;
             }
+            
             return string.Empty;
         }
 

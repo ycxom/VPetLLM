@@ -48,114 +48,40 @@ namespace VPetLLM.Handlers
             var actions = new List<HandlerAction>();
             if (!settings.EnableAction) return actions;
 
-            // 使用手动解析来处理复杂的嵌套括号（与 SmartMessageProcessor 一致）
-            int index = 0;
-            int matchCount = 0;
-
-            while (index < response.Length)
+            // Detect and reject legacy format
+            var format = CommandFormatParser.DetectFormat(response);
+            if (format == CommandFormat.Legacy)
             {
-                // 查找下一个动作指令的开始
-                int startIndex = response.IndexOf("[:", index);
-                if (startIndex == -1)
-                    break;
+                Logger.Log($"ActionProcessor: REJECTED - Legacy format detected. Please use new format: <|command_type_begin|> parameters <|command_type_end|>");
+                // Legacy format is rejected, Parse() will log detailed warning
+            }
 
-                // 提取动作类型
-                int typeStart = startIndex + 2;
-                int typeEnd = response.IndexOf('(', typeStart);
-                
-                // 如果没有括号，尝试查找直接的 ]
-                if (typeEnd == -1)
+            // Parse commands (only new format will be parsed)
+            var commands = CommandFormatParser.Parse(response);
+            
+            Logger.Log($"ActionProcessor: Detected format: {format}, found {commands.Count} commands in new format");
+
+            foreach (var command in commands)
+            {
+                string actionType = command.CommandType.ToLower();
+                string value = command.Parameters;
+
+                // Check for new plugin format: plugin_PluginName
+                string pluginName = null;
+                if (actionType.StartsWith("plugin_"))
                 {
-                    typeEnd = response.IndexOf(']', typeStart);
-                    if (typeEnd != -1)
-                    {
-                        // 无参数的动作，如 [:happy]
-                        string command = response.Substring(typeStart, typeEnd - typeStart).ToLower();
-                        IActionHandler noParamHandler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == command);
-                        
-                        if (noParamHandler != null)
-                        {
-                            matchCount++;
-                            bool noParamEnabled = IsHandlerEnabled(noParamHandler, settings);
-                            if (noParamEnabled)
-                            {
-                                actions.Add(new HandlerAction(noParamHandler.ActionType, noParamHandler.Keyword, "", noParamHandler));
-                            }
-                        }
-                    }
-                    index = startIndex + 2;
-                    continue;
+                    pluginName = actionType.Substring(7); // Remove "plugin_" prefix
+                    actionType = "plugin"; // Use base keyword for handler lookup
+                    Logger.Log($"ActionProcessor: New plugin format detected - plugin name: {pluginName}");
                 }
 
-                string actionType = response.Substring(typeStart, typeEnd - typeStart).ToLower();
-
-                // 使用括号计数来找到匹配的结束位置（处理字符串内的括号）
-                int parenCount = 1;
-                int contentStart = typeEnd + 1;
-                int contentEnd = contentStart;
-                bool inString = false;
-                char stringDelimiter = '\0';
-
-                while (contentEnd < response.Length && parenCount > 0)
-                {
-                    char c = response[contentEnd];
-                    
-                    // 处理字符串边界
-                    if ((c == '"' || c == '\'') && (contentEnd == contentStart || response[contentEnd - 1] != '\\'))
-                    {
-                        if (!inString)
-                        {
-                            inString = true;
-                            stringDelimiter = c;
-                        }
-                        else if (c == stringDelimiter)
-                        {
-                            inString = false;
-                        }
-                    }
-                    
-                    // 只在字符串外计数括号
-                    if (!inString)
-                    {
-                        if (c == '(')
-                            parenCount++;
-                        else if (c == ')')
-                            parenCount--;
-                    }
-
-                    if (parenCount > 0)
-                        contentEnd++;
-                }
-
-                if (parenCount != 0)
-                {
-                    // 括号不匹配，跳过
-                    index = startIndex + 2;
-                    continue;
-                }
-
-                // 查找闭合的 ]（容忍空格）
-                int closeBracketIndex = contentEnd + 1;
-                while (closeBracketIndex < response.Length && char.IsWhiteSpace(response[closeBracketIndex]))
-                    closeBracketIndex++;
-
-                if (closeBracketIndex >= response.Length || response[closeBracketIndex] != ']')
-                {
-                    index = startIndex + 2;
-                    continue;
-                }
-
-                // 提取动作值
-                string value = response.Substring(contentStart, contentEnd - contentStart);
-                matchCount++;
-
-                // 查找对应的 handler
+                // Find corresponding handler
                 IActionHandler handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == actionType);
 
-                // 如果没找到 handler，尝试解析嵌套结构（如 talk(say(...))）
-                if (handler == null)
+                // If no handler found, try parsing nested structure (e.g., talk(say(...)))
+                if (handler == null && !string.IsNullOrEmpty(value))
                 {
-                    // 尝试提取嵌套的命令
+                    // Try to extract nested command
                     var nestedMatch = new Regex(@"^(\w+)\((.*)\)$", RegexOptions.Singleline).Match(value);
                     if (nestedMatch.Success)
                     {
@@ -165,7 +91,7 @@ namespace VPetLLM.Handlers
                         handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == nestedCommand);
                         if (handler != null)
                         {
-                            // 使用嵌套的值
+                            // Use nested value
                             value = nestedValue;
                             Logger.Log($"ActionProcessor: Found nested command: {nestedCommand}");
                         }
@@ -174,9 +100,14 @@ namespace VPetLLM.Handlers
 
                 if (handler == null)
                 {
-                    Logger.Log($"ActionProcessor: No handler found for command: {actionType}");
-                    index = contentEnd + 2;
+                    Logger.Log($"ActionProcessor: No handler found for command: {actionType} (format: {command.Format})");
                     continue;
+                }
+
+                // For new plugin format, set the plugin name before execution
+                if (!string.IsNullOrEmpty(pluginName) && handler is PluginHandler)
+                {
+                    PluginHandler.SetPluginName(pluginName);
                 }
 
                 bool isEnabled = IsHandlerEnabled(handler, settings);
@@ -184,17 +115,13 @@ namespace VPetLLM.Handlers
                 if (!isEnabled)
                 {
                     Logger.Log($"ActionProcessor: Handler '{handler.Keyword}' is disabled.");
-                    index = contentEnd + 2;
                     continue;
                 }
 
                 actions.Add(new HandlerAction(handler.ActionType, handler.Keyword, value, handler));
-
-                // 移动到下一个位置
-                index = closeBracketIndex + 1;
             }
 
-            Logger.Log($"ActionProcessor: Found {matchCount} matches, {actions.Count} actions enabled");
+            Logger.Log($"ActionProcessor: Processed {commands.Count} commands, {actions.Count} actions enabled");
             return actions;
         }
 

@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Text.RegularExpressions;
 using VPetLLM.Utils;
+using System.Linq;
 
 namespace VPetLLM.Handlers
 {
@@ -170,7 +171,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 解析消息，将其分解为文本片段和动作指令
-        /// 优化：支持更灵活的格式，容忍空格、换行等特殊字符
+        /// 优化：支持更灵活的格式，容忍空格、换行等特殊字符，支持新旧格式
         /// </summary>
         /// <param name="message">原始消息</param>
         /// <returns>消息片段列表</returns>
@@ -183,97 +184,19 @@ namespace VPetLLM.Handlers
             // 预处理：移除可能影响解析的多余空白字符（但保留引号内的内容）
             message = NormalizeMessage(message);
 
-            // 使用手动解析来处理复杂的嵌套括号（特别是 plugin 调用）
-            int index = 0;
-            while (index < message.Length)
+            // Use CommandFormatParser to parse both new and legacy formats
+            var commands = CommandFormatParser.Parse(message);
+            var format = CommandFormatParser.DetectFormat(message);
+            
+            Logger.Log($"SmartMessageProcessor: 检测到格式: {format}, 找到 {commands.Count} 个命令");
+
+            foreach (var command in commands)
             {
-                // 查找下一个动作指令的开始（容忍空格）
-                int startIndex = FindCommandStart(message, index);
-                if (startIndex == -1)
-                {
-                    // 没有更多动作指令
-                    break;
-                }
+                string actionType = command.CommandType.ToLower();
+                string actionValue = command.Parameters;
+                string fullMatch = command.FullMatch;
 
-                // 提取动作类型（跳过可能的空格）
-                int typeStart = startIndex + 2;
-                // 跳过 [: 后的空格
-                while (typeStart < message.Length && char.IsWhiteSpace(message[typeStart]))
-                    typeStart++;
-
-                int typeEnd = message.IndexOf('(', typeStart);
-                if (typeEnd == -1)
-                {
-                    index = startIndex + 2;
-                    continue;
-                }
-
-                string actionType = message.Substring(typeStart, typeEnd - typeStart).Trim().ToLower();
-                Logger.Log($"SmartMessageProcessor: 检测到动作类型: {actionType}");
-
-                // 使用括号计数来找到匹配的结束位置（处理字符串内的括号）
-                int parenCount = 1;
-                int contentStart = typeEnd + 1;
-                int contentEnd = contentStart;
-                bool inString = false;
-                char stringDelimiter = '\0';
-
-                while (contentEnd < message.Length && parenCount > 0)
-                {
-                    char c = message[contentEnd];
-                    
-                    // 处理字符串边界
-                    if ((c == '"' || c == '\'') && (contentEnd == contentStart || message[contentEnd - 1] != '\\'))
-                    {
-                        if (!inString)
-                        {
-                            inString = true;
-                            stringDelimiter = c;
-                        }
-                        else if (c == stringDelimiter)
-                        {
-                            inString = false;
-                        }
-                    }
-                    
-                    // 只在字符串外计数括号
-                    if (!inString)
-                    {
-                        if (c == '(')
-                            parenCount++;
-                        else if (c == ')')
-                            parenCount--;
-                    }
-
-                    if (parenCount > 0)
-                        contentEnd++;
-                }
-
-                if (parenCount != 0)
-                {
-                    // 括号不匹配，跳过
-                    Logger.Log($"SmartMessageProcessor: 括号不匹配，跳过");
-                    index = startIndex + 2;
-                    continue;
-                }
-
-                // 查找闭合的 ]（容忍空格）
-                int closeBracketIndex = contentEnd + 1;
-                while (closeBracketIndex < message.Length && char.IsWhiteSpace(message[closeBracketIndex]))
-                    closeBracketIndex++;
-
-                if (closeBracketIndex >= message.Length || message[closeBracketIndex] != ']')
-                {
-                    Logger.Log($"SmartMessageProcessor: 缺少闭合的 ]，跳过");
-                    index = startIndex + 2;
-                    continue;
-                }
-
-                // 提取动作值和完整匹配
-                string actionValue = message.Substring(contentStart, contentEnd - contentStart).Trim();
-                string fullMatch = message.Substring(startIndex, closeBracketIndex - startIndex + 1);
-
-                Logger.Log($"SmartMessageProcessor: 解析到动作指令 - 类型: {actionType}, 值长度: {actionValue.Length}");
+                Logger.Log($"SmartMessageProcessor: 解析到动作指令 - 类型: {actionType}, 格式: {command.Format}, 值长度: {actionValue.Length}");
 
                 segments.Add(new MessageSegment
                 {
@@ -282,9 +205,6 @@ namespace VPetLLM.Handlers
                     ActionType = actionType,
                     ActionValue = actionValue
                 });
-
-                // 移动到下一个位置
-                index = closeBracketIndex + 1;
             }
 
             if (segments.Count == 0)
@@ -343,17 +263,19 @@ namespace VPetLLM.Handlers
         }
 
         /// <summary>
-        /// 查找命令开始位置（容忍格式变化）
+        /// 查找命令开始位置（只支持新格式）
         /// </summary>
         private int FindCommandStart(string message, int startIndex)
         {
+            // 只搜索新格式: <|xxx_begin|>
             for (int i = startIndex; i < message.Length - 1; i++)
             {
-                if (message[i] == '[' && message[i + 1] == ':')
+                if (message[i] == '<' && message[i + 1] == '|')
                 {
                     return i;
                 }
             }
+            
             return -1;
         }
 
@@ -754,23 +676,21 @@ namespace VPetLLM.Handlers
         }
 
         /// <summary>
-        /// 从talk指令中提取文本内容
+        /// 从talk指令中提取文本内容 (只支持新格式)
         /// </summary>
         private string ExtractTextFromTalkCommand(string input)
         {
-            // 匹配 [:talk(say("文本内容", emotion))] 格式
-            var talkPattern = @"\[:talk\(say\(""([^""]+)"",\s*\w+\)\)\]";
-            var match = Regex.Match(input, talkPattern);
-
+            // 新格式: <|talk_begin|> say("text", emotion) <|talk_end|>
+            var newTalkPattern = @"<\|\s*talk\s*_begin\s*\|>\s*say\(""([^""]+)"",\s*\w+\)\s*<\|\s*talk\s*_end\s*\|>";
+            var match = Regex.Match(input, newTalkPattern);
             if (match.Success && match.Groups.Count > 1)
             {
                 return match.Groups[1].Value;
             }
 
-            // 匹配 [:say("文本内容", emotion)] 格式
-            var sayPattern = @"\[:say\(""([^""]+)"",\s*\w+\)\]";
-            match = Regex.Match(input, sayPattern);
-
+            // 新格式: <|say_begin|> "text", emotion <|say_end|>
+            var newSayPattern = @"<\|\s*say\s*_begin\s*\|>\s*""([^""]+)"",\s*\w+\s*<\|\s*say\s*_end\s*\|>";
+            match = Regex.Match(input, newSayPattern);
             if (match.Success && match.Groups.Count > 1)
             {
                 return match.Groups[1].Value;
@@ -942,18 +862,18 @@ namespace VPetLLM.Handlers
         }
 
         /// <summary>
-        /// 从talk动作中提取文本内容
+        /// 从talk动作中提取文本内容 (新格式)
         /// </summary>
         private string ExtractTalkText(string actionValue)
         {
-            // 解析 say("文本内容", 动画) 格式
+            // 解析 say("text", animation) 格式
             var match = Regex.Match(actionValue, @"say\s*\(\s*""([^""]*)""\s*(?:,\s*([^)]*))?\s*\)");
             if (match.Success)
             {
                 return match.Groups[1].Value;
             }
 
-            // 解析简单的 "文本内容" 格式
+            // 解析简单的 "text" 格式
             match = Regex.Match(actionValue, @"""([^""]*)""");
             if (match.Success)
             {

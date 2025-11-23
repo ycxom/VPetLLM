@@ -85,8 +85,8 @@ namespace VPetLLM.Handlers
                 return string.Empty; // 接管的内容不返回给主流程
             }
 
-            // 检测是否有插件接管请求
-            var takeoverMatch = Regex.Match(currentBuffer, @"\[:plugin\((\w+)");
+            // 检测是否有插件接管请求（只支持新格式）
+            var takeoverMatch = Regex.Match(currentBuffer, @"<\|\s*plugin\s*_begin\s*\|>\s*(\w+)");
             if (takeoverMatch.Success)
             {
                 var pluginName = takeoverMatch.Groups[1].Value;
@@ -101,7 +101,7 @@ namespace VPetLLM.Handlers
                 {
                     Logger.Log($"PluginTakeoverManager: 插件 {pluginName} 支持接管，开始接管流程");
                     
-                    // 提取初始内容（从 plugin( 之后的内容）
+                    // 提取初始内容（从插件名之后的内容）
                     var startIndex = takeoverMatch.Index + takeoverMatch.Length;
                     var initialContent = currentBuffer.Substring(startIndex);
 
@@ -122,6 +122,10 @@ namespace VPetLLM.Handlers
                     {
                         Logger.Log($"PluginTakeoverManager: 插件 {pluginName} 接管失败，回退到正常流程");
                     }
+                }
+                else
+                {
+                    Logger.Log($"PluginTakeoverManager: 插件 {pluginName} 不支持接管或未找到");
                 }
             }
 

@@ -9,9 +9,9 @@ namespace VPetLLM.Handlers
 {
     /// <summary>
     /// Handles parsing and execution of record commands
-    /// Supports formats:
-    /// - [:record(text("content"),weight(5))]
-    /// - [:record_modify(id(1),weight_delta(2))]
+    /// Supports new format:
+    /// - <|record_begin|> text("content"), weight(5) <|record_end|>
+    /// - <|record_modify_begin|> id(1), weight_delta(2) <|record_modify_end|>
     /// </summary>
     public class RecordCommandHandler : IActionHandler
     {
@@ -112,7 +112,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// Parse record creation command
-        /// Format: text("content"),weight(5)
+        /// Format: text("content"), weight(5)
         /// </summary>
         private (string content, int weight) ParseCreateCommand(string commandValue)
         {
@@ -142,7 +142,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// Parse record modification command
-        /// Format: id(1),weight_delta(2) or id(1),weight_delta(-1)
+        /// Format: id(1), weight_delta(2) or id(1), weight_delta(-1)
         /// </summary>
         private (int id, int delta) ParseModifyCommand(string commandValue)
         {
