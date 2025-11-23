@@ -1087,13 +1087,57 @@ namespace VPetLLM
         {
             return MW.Main.Core.Graph.GraphsList.Keys;
         }
+        
+        /// <summary>
+        /// 获取可用的说话动画列表（状态模式+动画名称组合）
+        /// 例如：happy_say, nomal_say, ill_shy等
+        /// </summary>
         public IEnumerable<string> GetAvailableSayAnimations()
         {
-            if (MW.Main.Core.Graph.GraphsName.TryGetValue(VPet_Simulator.Core.GraphInfo.GraphType.Say, out var gl))
+            var animations = new HashSet<string>();
+            
+            if (MW.Main.Core.Graph.GraphsName.TryGetValue(VPet_Simulator.Core.GraphInfo.GraphType.Say, out var sayAnimations))
             {
-                return gl;
+                // 获取所有状态模式
+                var modes = new[] { "happy", "nomal", "poorcondition", "ill" };
+                
+                foreach (var animName in sayAnimations)
+                {
+                    foreach (var mode in modes)
+                    {
+                        // 检查该状态模式下是否存在该动画
+                        VPet_Simulator.Core.IGameSave.ModeType modeType;
+                        switch (mode)
+                        {
+                            case "happy":
+                                modeType = VPet_Simulator.Core.IGameSave.ModeType.Happy;
+                                break;
+                            case "poorcondition":
+                                modeType = VPet_Simulator.Core.IGameSave.ModeType.PoorCondition;
+                                break;
+                            case "ill":
+                                modeType = VPet_Simulator.Core.IGameSave.ModeType.Ill;
+                                break;
+                            default:
+                                modeType = VPet_Simulator.Core.IGameSave.ModeType.Nomal;
+                                break;
+                        }
+                        
+                        // 检查该动画在该状态下是否存在
+                        var graph = MW.Main.Core.Graph.FindGraph(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, modeType);
+                        if (graph != null)
+                        {
+                            // 添加"状态_动画"组合
+                            animations.Add($"{mode}_{animName}");
+                        }
+                    }
+                    
+                    // 同时也添加不带状态前缀的动画名（使用当前状态）
+                    animations.Add(animName);
+                }
             }
-            return new List<string>();
+            
+            return animations.OrderBy(a => a);
         }
 
         /// <summary>

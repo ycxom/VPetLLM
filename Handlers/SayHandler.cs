@@ -50,6 +50,42 @@ namespace VPetLLM.Handlers
                     var action = bodyAnimation.ToLower();
                     Utils.Logger.Log($"SayHandler performing body animation: {action} while talking.");
 
+                    // 先结束上一个动画（如果不是重要动画）
+                    bool shouldBlockAnimation = AnimationStateChecker.IsPlayingImportantAnimation(mainWindow);
+                    if (!shouldBlockAnimation)
+                    {
+                        Logger.Log($"SayHandler: 准备播放Body动画，先尝试结束上一个动画");
+                        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                        {
+                            try
+                            {
+                                mainWindow.Main.DisplayStopForce(() =>
+                                {
+                                    Logger.Log("SayHandler: 上一个动画已结束（Body模式）");
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"SayHandler: 结束上一个动画失败（Body模式）: {ex.Message}");
+                            }
+                        });
+                        
+                        // 短暂延迟，确保动画结束完成
+                        await Task.Delay(50);
+                    }
+                    else
+                    {
+                        Logger.Log($"SayHandler: VPet正在执行重要动画，跳过Body动画");
+                        // 只显示气泡，不执行Body动画
+                        mainWindow.Main.Say(text, null, false);
+                        
+                        if (!VPetLLM.Instance.Settings.TTS.IsEnabled)
+                        {
+                            await WaitForBubbleCloseByVisibility(mainWindow, text, "重要动画阻止Body模式");
+                        }
+                        return;
+                    }
+
                     // 1. Start the body animation. It will manage its own lifecycle.
                     bool actionTriggered = false;
                     switch (action)
@@ -202,20 +238,64 @@ namespace VPetLLM.Handlers
                     }
                     else
                     {
-                        // VPet不在重要状态，正常执行Say动画
-                        var availableSayAnimations = VPetLLM.Instance.GetAvailableSayAnimations().Select(a => a.ToLower());
-                        if (string.IsNullOrEmpty(sayAnimation) || !availableSayAnimations.Contains(sayAnimation.ToLower()))
+                        // VPet不在重要状态，先结束上一个动画（如果有）
+                        Logger.Log($"SayHandler: 准备播放Say动画，先尝试结束上一个动画");
+                        
+                        // 使用DisplayStopForce确保上一个动画结束
+                        bool animationStopped = false;
+                        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                         {
-                            if (!string.IsNullOrEmpty(animation))
+                            try
                             {
-                                Logger.Log($"Say animation '{animation}' not found. Using default say animation.");
+                                // DisplayStopForce会尝试播放C_End动画，如果没有则直接执行回调
+                                mainWindow.Main.DisplayStopForce(() =>
+                                {
+                                    animationStopped = true;
+                                    Logger.Log("SayHandler: 上一个动画已结束");
+                                });
                             }
-                            sayAnimation = "say";
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"SayHandler: 结束上一个动画失败: {ex.Message}");
+                                animationStopped = true;
+                            }
+                        });
+                        
+                        // 短暂延迟，确保动画结束完成
+                        await Task.Delay(50);
+                        
+                        // 解析动画参数（支持"状态_动画"格式）
+                        var (animName, modeType) = ParseAnimationParameter(sayAnimation);
+                        
+                        // 如果指定了状态模式，临时切换到该状态
+                        VPet_Simulator.Core.IGameSave.ModeType? originalMode = null;
+                        if (modeType.HasValue)
+                        {
+                            originalMode = mainWindow.Main.Core.Save.Mode;
+                            mainWindow.Main.Core.Save.Mode = modeType.Value;
+                            Logger.Log($"SayHandler: 临时切换到状态模式 {modeType.Value}");
+                        }
+                        
+                        // 验证动画是否可用
+                        var currentMode = mainWindow.Main.Core.Save.Mode;
+                        var graph = mainWindow.Main.Core.Graph.FindGraph(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, currentMode);
+                        
+                        if (graph == null)
+                        {
+                            Logger.Log($"Say animation '{animName}' not found in mode '{currentMode}'. Using default say animation.");
+                            animName = "say";
                         }
 
-                        // Force the talk animation to loop.
-                        mainWindow.Main.Say(text, sayAnimation, true);
-                        Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: {sayAnimation}");
+                        // 播放说话动画
+                        mainWindow.Main.Say(text, animName, true);
+                        Utils.Logger.Log($"SayHandler called Say with text: \"{text}\", animation: {animName}, mode: {currentMode}");
+                        
+                        // 恢复原始状态模式
+                        if (originalMode.HasValue)
+                        {
+                            mainWindow.Main.Core.Save.Mode = originalMode.Value;
+                            Logger.Log($"SayHandler: 恢复到原始状态模式 {originalMode.Value}");
+                        }
 
                         // TTS启用时不需要等待气泡消失，TTS关闭时才等待
                         if (!VPetLLM.Instance.Settings.TTS.IsEnabled)
@@ -224,6 +304,7 @@ namespace VPetLLM.Handlers
                         }
                         // TTS启用时不等待气泡，让下一个动作可以立即执行
                         
+                        // 说话完成后恢复默认状态
                         mainWindow.Main.DisplayToNomal();
                     }
                 }
@@ -243,6 +324,64 @@ namespace VPetLLM.Handlers
             return Task.CompletedTask;
         }
         public int GetAnimationDuration(string animationName) => 0;
+
+        /// <summary>
+        /// 解析动画参数，支持"状态_动画"格式
+        /// 例如：happy_shy -> 在happy状态下播放shy动画
+        ///       shy -> 在当前状态下播放shy动画
+        ///       happy -> 在happy状态下播放默认say动画
+        /// </summary>
+        private (string animationName, VPet_Simulator.Core.IGameSave.ModeType? modeType) ParseAnimationParameter(string animation)
+        {
+            if (string.IsNullOrEmpty(animation))
+                return ("say", null);
+            
+            var animLower = animation.ToLower().Trim();
+            
+            // 检查是否为"状态_动画"格式
+            var parts = animLower.Split('_');
+            if (parts.Length >= 2)
+            {
+                var potentialMode = parts[0];
+                var animName = string.Join("_", parts.Skip(1));
+                
+                // 检查第一部分是否为有效的状态模式
+                VPet_Simulator.Core.IGameSave.ModeType? mode = potentialMode switch
+                {
+                    "happy" => VPet_Simulator.Core.IGameSave.ModeType.Happy,
+                    "nomal" => VPet_Simulator.Core.IGameSave.ModeType.Nomal,
+                    "poorcondition" => VPet_Simulator.Core.IGameSave.ModeType.PoorCondition,
+                    "ill" => VPet_Simulator.Core.IGameSave.ModeType.Ill,
+                    _ => null
+                };
+                
+                if (mode.HasValue)
+                {
+                    Logger.Log($"SayHandler: 解析为状态模式动画 - 状态: {potentialMode}, 动画: {animName}");
+                    return (animName, mode.Value);
+                }
+            }
+            
+            // 检查是否为纯状态名（如happy, nomal等），映射到该状态的默认say动画
+            var stateOnlyMode = animLower switch
+            {
+                "happy" => VPet_Simulator.Core.IGameSave.ModeType.Happy,
+                "nomal" => VPet_Simulator.Core.IGameSave.ModeType.Nomal,
+                "poorcondition" => VPet_Simulator.Core.IGameSave.ModeType.PoorCondition,
+                "ill" => VPet_Simulator.Core.IGameSave.ModeType.Ill,
+                _ => (VPet_Simulator.Core.IGameSave.ModeType?)null
+            };
+            
+            if (stateOnlyMode.HasValue)
+            {
+                Logger.Log($"SayHandler: 解析为纯状态名 '{animLower}'，使用该状态的say动画");
+                return ("say", stateOnlyMode.Value);
+            }
+            
+            // 不是状态_动画格式，直接返回动画名（使用当前状态）
+            Logger.Log($"SayHandler: 使用动画名称 '{animLower}'（当前状态）");
+            return (animLower, null);
+        }
 
         /// <summary>
         /// 等待气泡显示足够的时间（仅在TTS关闭时使用）

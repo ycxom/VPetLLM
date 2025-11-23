@@ -43,6 +43,12 @@ namespace VPetLLM.UI.Windows
         {
             Logger.Log($"HandleResponse: 收到AI回复: {response}");
 
+            // 先停止思考动画，确保气泡状态清理
+            StopThinkingAnimation();
+            
+            // 短暂延迟，确保思考动画完全停止
+            await Task.Delay(150);
+
             await Application.Current.Dispatcher.InvokeAsync(async () =>
             {
                 try
@@ -138,7 +144,12 @@ namespace VPetLLM.UI.Windows
             finally
             {
                 // 停止思考动画（如果有的话）
+                Logger.Log("Responded: 准备停止思考动画");
                 StopThinkingAnimation();
+                
+                // 额外延迟，确保气泡状态完全清理后再继续
+                await Task.Delay(100);
+                Logger.Log("Responded: 思考动画已停止，气泡状态已清理");
             }
         }
 
@@ -301,18 +312,26 @@ namespace VPetLLM.UI.Windows
                         // 在UI线程上更新气泡
                         await Application.Current.Dispatcher.InvokeAsync(() =>
                         {
-                            ShowThinkingBubbleInstantly(currentText);
+                            try
+                            {
+                                ShowThinkingBubbleInstantly(currentText);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"思考动画更新失败: {ex.Message}");
+                            }
                         });
 
                         dotCount++;
                         
-                        // 每100ms更新一次
-                        await Task.Delay(100, cancellationToken);
+                        // 增加更新间隔到500ms，减少频繁更新导致的状态冲突
+                        await Task.Delay(500, cancellationToken);
                     }
                 }
                 catch (System.Threading.Tasks.TaskCanceledException)
                 {
                     // 正常取消，不记录日志
+                    Logger.Log("思考动画已取消");
                 }
                 catch (Exception ex)
                 {
@@ -322,21 +341,71 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 停止思考动画
+        /// 停止思考动画并清理状态
         /// </summary>
         private void StopThinkingAnimation()
         {
             if (_isThinking && _thinkingCancellationTokenSource != null)
             {
-                _thinkingCancellationTokenSource.Cancel();
-                _thinkingCancellationTokenSource.Dispose();
-                _thinkingCancellationTokenSource = null;
-                _isThinking = false;
+                try
+                {
+                    _thinkingCancellationTokenSource.Cancel();
+                    _thinkingCancellationTokenSource.Dispose();
+                    _thinkingCancellationTokenSource = null;
+                    _isThinking = false;
+                    
+                    Logger.Log("StopThinkingAnimation: 思考动画已停止");
+                    
+                    // 清理MessageBar状态，但不关闭气泡（让新内容可以立即显示）
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        try
+                        {
+                            var msgBar = _plugin.MW.Main.MsgBar;
+                            if (msgBar == null) return;
+                            
+                            var msgBarType = msgBar.GetType();
+                            
+                            // 停止所有定时器
+                            var showTimerField = msgBarType.GetField("ShowTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            var endTimerField = msgBarType.GetField("EndTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            var closeTimerField = msgBarType.GetField("CloseTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            
+                            if (showTimerField != null && endTimerField != null && closeTimerField != null)
+                            {
+                                var showTimer = showTimerField.GetValue(msgBar) as System.Timers.Timer;
+                                var endTimer = endTimerField.GetValue(msgBar) as System.Timers.Timer;
+                                var closeTimer = closeTimerField.GetValue(msgBar) as System.Timers.Timer;
+                                
+                                showTimer?.Stop();
+                                endTimer?.Stop();
+                                closeTimer?.Stop();
+                            }
+                            
+                            // 清空流式传输状态
+                            var oldsaystreamField = msgBarType.GetField("oldsaystream", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                            if (oldsaystreamField != null)
+                            {
+                                oldsaystreamField.SetValue(msgBar, null);
+                            }
+                            
+                            Logger.Log("StopThinkingAnimation: MessageBar状态已清理");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"StopThinkingAnimation: 清理MessageBar状态失败: {ex.Message}");
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"StopThinkingAnimation: 停止思考动画失败: {ex.Message}");
+                }
             }
         }
 
         /// <summary>
-        /// 瞬时显示思考气泡（简化版 - 直接设置 UI）
+        /// 瞬时显示思考气泡（直接设置UI - 优化版）
         /// </summary>
         private void ShowThinkingBubbleInstantly(string text)
         {
@@ -347,7 +416,38 @@ namespace VPetLLM.UI.Windows
 
                 var msgBarType = msgBar.GetType();
                 
-                // 1. 直接设置 TText.Text（公共字段）
+                // 1. 停止所有定时器，防止状态冲突
+                var showTimerField = msgBarType.GetField("ShowTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                var endTimerField = msgBarType.GetField("EndTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                var closeTimerField = msgBarType.GetField("CloseTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                
+                if (showTimerField != null && endTimerField != null && closeTimerField != null)
+                {
+                    var showTimer = showTimerField.GetValue(msgBar) as System.Timers.Timer;
+                    var endTimer = endTimerField.GetValue(msgBar) as System.Timers.Timer;
+                    var closeTimer = closeTimerField.GetValue(msgBar) as System.Timers.Timer;
+                    
+                    showTimer?.Stop();
+                    endTimer?.Stop();
+                    closeTimer?.Stop();
+                }
+                
+                // 2. 清空 outputtext 和 outputtextsample（防止流式显示继续）
+                var outputtextField = msgBarType.GetField("outputtext", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (outputtextField != null)
+                {
+                    var outputtext = outputtextField.GetValue(msgBar) as System.Collections.Generic.List<char>;
+                    outputtext?.Clear();
+                }
+                
+                var outputtextsampleField = msgBarType.GetField("outputtextsample", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (outputtextsampleField != null)
+                {
+                    var outputtextsample = outputtextsampleField.GetValue(msgBar) as System.Text.StringBuilder;
+                    outputtextsample?.Clear();
+                }
+                
+                // 3. 直接设置 TText.Text
                 var tTextField = msgBarType.GetField("TText", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                 if (tTextField != null)
                 {
@@ -358,7 +458,7 @@ namespace VPetLLM.UI.Windows
                     }
                 }
                 
-                // 2. 设置 LName.Content
+                // 4. 设置 LName.Content
                 var lNameField = msgBarType.GetField("LName", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 if (lNameField != null)
                 {
@@ -369,18 +469,6 @@ namespace VPetLLM.UI.Windows
                     }
                 }
                 
-                // 3. 清空 outputtext（防止流式显示继续）
-                var outputtextField = msgBarType.GetField("outputtext", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (outputtextField != null)
-                {
-                    var outputtext = outputtextField.GetValue(msgBar) as System.Collections.Generic.List<char>;
-                    outputtext?.Clear();
-                }
-                
-                // 4. 设置可见性
-                ((System.Windows.UIElement)msgBar).Visibility = System.Windows.Visibility.Visible;
-                ((System.Windows.UIElement)msgBar).Opacity = 0.8;
-                
                 // 5. 清空 MessageBoxContent
                 var messageBoxContentField = msgBarType.GetField("MessageBoxContent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                 if (messageBoxContentField != null)
@@ -388,10 +476,21 @@ namespace VPetLLM.UI.Windows
                     var messageBoxContent = messageBoxContentField.GetValue(msgBar) as System.Windows.Controls.Grid;
                     messageBoxContent?.Children.Clear();
                 }
+                
+                // 6. 设置可见性和透明度
+                ((System.Windows.UIElement)msgBar).Visibility = System.Windows.Visibility.Visible;
+                ((System.Windows.UIElement)msgBar).Opacity = 0.8;
+                
+                // 7. 清空 oldsaystream，防止流式传输干扰
+                var oldsaystreamField = msgBarType.GetField("oldsaystream", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (oldsaystreamField != null)
+                {
+                    oldsaystreamField.SetValue(msgBar, null);
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // 静默失败，不记录日志
+                Logger.Log($"ShowThinkingBubbleInstantly: 显示思考气泡失败: {ex.Message}");
             }
         }
     }

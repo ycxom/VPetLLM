@@ -56,6 +56,51 @@ namespace VPetLLM.Handlers
             {
                 Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}");
                 
+                // 清理MessageBar状态，准备显示新内容
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        var msgBar = _plugin.MW.Main.MsgBar;
+                        if (msgBar != null)
+                        {
+                            var msgBarType = msgBar.GetType();
+                            
+                            // 停止所有定时器
+                            var showTimerField = msgBarType.GetField("ShowTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            var endTimerField = msgBarType.GetField("EndTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            var closeTimerField = msgBarType.GetField("CloseTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            
+                            if (showTimerField != null && endTimerField != null && closeTimerField != null)
+                            {
+                                var showTimer = showTimerField.GetValue(msgBar) as System.Timers.Timer;
+                                var endTimer = endTimerField.GetValue(msgBar) as System.Timers.Timer;
+                                var closeTimer = closeTimerField.GetValue(msgBar) as System.Timers.Timer;
+                                
+                                showTimer?.Stop();
+                                endTimer?.Stop();
+                                closeTimer?.Stop();
+                            }
+                            
+                            // 清空流式传输状态
+                            var oldsaystreamField = msgBarType.GetField("oldsaystream", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                            if (oldsaystreamField != null)
+                            {
+                                oldsaystreamField.SetValue(msgBar, null);
+                            }
+                            
+                            Logger.Log("SmartMessageProcessor: MessageBar状态已清理");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"SmartMessageProcessor: 清理MessageBar状态失败: {ex.Message}");
+                    }
+                });
+                
+                // 短暂延迟，确保状态完全清理
+                await Task.Delay(50);
+                
                 // 标记进入单条 AI 回复的处理会话，期间豁免插件/工具限流
                 var _sessionId = Guid.NewGuid();
                 global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value = _sessionId;
