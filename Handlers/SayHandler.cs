@@ -10,6 +10,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "say";
         public ActionType ActionType => ActionType.Talk;
+        public ActionCategory Category => ActionCategory.Interactive;
         public string Description => PromptHelper.Get("Handler_Say_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public async Task Execute(string value, IMainWindow mainWindow)

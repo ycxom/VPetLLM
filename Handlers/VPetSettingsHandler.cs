@@ -9,6 +9,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "vpet_settings";
         public ActionType ActionType => ActionType.Tool;
+        public ActionCategory Category => ActionCategory.Unknown;
         public string Description => "Control VPet settings";
         
         private readonly Setting _settings;

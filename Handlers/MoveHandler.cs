@@ -9,6 +9,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "move";
         public ActionType ActionType => ActionType.Body;
+        public ActionCategory Category => ActionCategory.Interactive;
         public string Description => PromptHelper.Get("Handler_Move_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public Task Execute(string value, IMainWindow mainWindow)

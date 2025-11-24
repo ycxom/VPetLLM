@@ -19,6 +19,7 @@ namespace VPetLLM.Handlers
 
         public string Keyword => "record";
         public ActionType ActionType => ActionType.Tool;
+        public ActionCategory Category => ActionCategory.Unknown;
         public string Description => "Record important information with weight-based lifecycle management";
 
         public RecordCommandHandler(RecordManager recordManager)
@@ -177,6 +178,7 @@ namespace VPetLLM.Handlers
 
         public string Keyword => "record_modify";
         public ActionType ActionType => ActionType.Tool;
+        public ActionCategory Category => ActionCategory.Unknown;
         public string Description => "Modify weight of existing important records";
 
         public RecordModifyCommandHandler(RecordManager recordManager)

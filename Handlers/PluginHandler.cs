@@ -8,6 +8,7 @@ namespace VPetLLM.Handlers
     public class PluginHandler : IActionHandler
     {
         public ActionType ActionType => ActionType.Plugin;
+        public ActionCategory Category => ActionCategory.Unknown;
         public string Keyword => "plugin";
         public string Description => Utils.PromptHelper.Get("Handler_Plugin_Description", VPetLLM.Instance.Settings.PromptLanguage);
         

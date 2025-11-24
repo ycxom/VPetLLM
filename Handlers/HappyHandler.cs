@@ -7,6 +7,7 @@ namespace VPetLLM.Handlers
    {
        public string Keyword => "happy";
        public ActionType ActionType => ActionType.State;
+       public ActionCategory Category => ActionCategory.StateBased;
        public string Description => Utils.PromptHelper.Get("Handler_Happy_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
       public Task Execute(int value, IMainWindow mainWindow)

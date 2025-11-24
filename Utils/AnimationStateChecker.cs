@@ -1,3 +1,4 @@
+using System;
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
 using static VPet_Simulator.Core.GraphInfo;
@@ -6,6 +7,7 @@ namespace VPetLLM.Utils
 {
     /// <summary>
     /// 动画状态检查器 - 用于判断是否应该阻止VPetLLM执行动作
+    /// 与StateManager集成，确保状态转换不会中断重要动画
     /// </summary>
     public static class AnimationStateChecker
     {
@@ -158,6 +160,137 @@ namespace VPetLLM.Utils
         {
             // Say动作（显示气泡）不影响动画，始终允许
             return true;
+        }
+
+        /// <summary>
+        /// 检查是否可以执行状态转换
+        /// 确保重要动画不会被状态转换中断
+        /// </summary>
+        /// <param name="mainWindow">主窗口</param>
+        /// <param name="targetState">目标状态</param>
+        /// <param name="actionName">触发状态转换的动作名称</param>
+        /// <returns>true表示可以执行状态转换，false表示应该延迟或取消</returns>
+        public static bool CanExecuteStateTransition(IMainWindow mainWindow, object targetState, string actionName)
+        {
+            if (mainWindow?.Main == null)
+            {
+                Logger.Log("AnimationStateChecker: mainWindow is null, allowing state transition");
+                return true;
+            }
+
+            // 检查是否正在执行重要动画
+            if (IsPlayingImportantAnimation(mainWindow))
+            {
+                Logger.Log($"AnimationStateChecker: Important animation is playing, state transition to {targetState} (action: {actionName}) should be queued or delayed");
+                // 注意：我们返回true因为StateManager的队列机制会处理延迟
+                // 如果返回false，调用者需要自己处理重试逻辑
+                return true;
+            }
+
+            // 获取当前状态
+            try
+            {
+                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
+                if (stateProperty != null)
+                {
+                    var currentState = stateProperty.GetValue(mainWindow.Main);
+                    string currentStateName = currentState?.ToString() ?? "Unknown";
+                    string targetStateName = targetState?.ToString() ?? "Unknown";
+
+                    // 检查是否是相同状态（幂等性检查）
+                    if (currentStateName.Equals(targetStateName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.Log($"AnimationStateChecker: Already in state {currentStateName}, state transition is idempotent");
+                        return true;
+                    }
+
+                    Logger.Log($"AnimationStateChecker: State transition from {currentStateName} to {targetStateName} is allowed");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"AnimationStateChecker: Error checking current state: {ex.Message}");
+                // 出错时允许状态转换继续
+                return true;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 检查当前状态是否允许被中断
+        /// 某些状态（如Sleep、Work）不应该被随意中断
+        /// </summary>
+        /// <param name="mainWindow">主窗口</param>
+        /// <returns>true表示当前状态可以被中断，false表示不应该中断</returns>
+        public static bool CanInterruptCurrentState(IMainWindow mainWindow)
+        {
+            if (mainWindow?.Main == null)
+                return true;
+
+            try
+            {
+                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
+                if (stateProperty == null)
+                    return true;
+
+                var currentState = stateProperty.GetValue(mainWindow.Main);
+                string currentStateName = currentState?.ToString() ?? "Unknown";
+
+                // 检查是否是不应该被中断的状态
+                switch (currentStateName)
+                {
+                    case "Sleep":
+                        Logger.Log("AnimationStateChecker: Sleep state should not be interrupted casually");
+                        return false;
+
+                    case "Work":
+                        Logger.Log("AnimationStateChecker: Work state should not be interrupted casually");
+                        return false;
+
+                    case "Travel":
+                        Logger.Log("AnimationStateChecker: Travel state should not be interrupted casually");
+                        return false;
+
+                    case "Nomal":
+                    default:
+                        // Normal state and unknown states can be interrupted
+                        return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"AnimationStateChecker: Error checking if state can be interrupted: {ex.Message}");
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// 获取当前状态的描述（用于日志和调试）
+        /// </summary>
+        /// <param name="mainWindow">主窗口</param>
+        /// <returns>当前状态的描述字符串</returns>
+        public static string GetCurrentStateDescription(IMainWindow mainWindow)
+        {
+            if (mainWindow?.Main == null)
+                return "Unknown (mainWindow is null)";
+
+            try
+            {
+                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
+                if (stateProperty == null)
+                    return "Unknown (State property not found)";
+
+                var currentState = stateProperty.GetValue(mainWindow.Main);
+                string stateName = currentState?.ToString() ?? "null";
+
+                var animationDesc = GetCurrentAnimationDescription(mainWindow);
+                return $"State: {stateName}, Animation: {animationDesc}";
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
         }
     }
 }

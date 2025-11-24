@@ -9,6 +9,7 @@ namespace VPetLLM.Handlers
     public class ToolHandler : IActionHandler
     {
         public ActionType ActionType => ActionType.Tool;
+        public ActionCategory Category => ActionCategory.Unknown;
         public string Keyword => "tool";
         public string Description => Utils.PromptHelper.Get("Handler_Tool_Description", VPetLLM.Instance.Settings.PromptLanguage);
 

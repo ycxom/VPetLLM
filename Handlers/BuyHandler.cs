@@ -14,6 +14,7 @@ namespace VPetLLM.Handlers
     {
         public string Keyword => "buy";
         public ActionType ActionType => ActionType.State;
+        public ActionCategory Category => ActionCategory.StateBased;
         public string Description => PromptHelper.Get("Handler_Buy_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         private const string VPetLLMSource = "vpetllm";
