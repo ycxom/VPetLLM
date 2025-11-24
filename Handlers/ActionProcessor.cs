@@ -9,10 +9,18 @@ namespace VPetLLM.Handlers
         public List<IActionHandler> Handlers { get; } = new List<IActionHandler>();
         private readonly IMainWindow _mainWindow;
         private Core.RecordManager _recordManager;
+        private Setting _settings;
 
         public ActionProcessor(IMainWindow mainWindow)
         {
             _mainWindow = mainWindow;
+            RegisterHandlers();
+        }
+        
+        public void SetSettings(Setting settings)
+        {
+            _settings = settings;
+            // Re-register handlers to include VPetSettingsHandler
             RegisterHandlers();
         }
 
@@ -40,6 +48,12 @@ namespace VPetLLM.Handlers
             {
                 Handlers.Add(new RecordCommandHandler(_recordManager));
                 Handlers.Add(new RecordModifyCommandHandler(_recordManager));
+            }
+            
+            // Add VPetSettingsHandler if Settings is available
+            if (_settings != null)
+            {
+                Handlers.Add(new VPetSettingsHandler(_settings));
             }
         }
 

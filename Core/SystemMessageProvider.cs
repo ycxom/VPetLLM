@@ -233,6 +233,16 @@ namespace VPetLLM.Core
                     }
                 }
                 
+                // 只有在EnableVPetSettingsControl启用时才添加VPet设置控制命令说明
+                if (_settings.EnableVPetSettingsControl)
+                {
+                    var vpetSettingsInstructions = PromptHelper.Get("VPetSettings_Commands_Description", lang);
+                    if (!string.IsNullOrEmpty(vpetSettingsInstructions))
+                    {
+                        parts.Add(vpetSettingsInstructions);
+                    }
+                }
+                
                 // 只有在EnableActionExecution开启时才添加动画列表
                 if (_settings.EnableActionExecution)
                 {

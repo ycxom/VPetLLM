@@ -45,6 +45,7 @@ namespace VPetLLM
         public bool EnableBuyFeedback { get; set; } = true;
         public bool EnableLiveMode { get; set; } = false;
         public bool LimitStateChanges { get; set; } = true;
+        public bool EnableVPetSettingsControl { get; set; } = false;
         public RateLimiterSetting RateLimiter { get; set; } = new RateLimiterSetting();
         public ASRSetting ASR { get; set; } = new ASRSetting();
         public RecordSettings Records { get; set; } = new RecordSettings();

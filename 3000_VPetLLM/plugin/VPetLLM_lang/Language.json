@@ -715,6 +715,12 @@
             "zh-hans": "条",
             "zh-hant": "條",
             "jp": "件"
+        },
+        "EnableVPetSettingsControl": {
+            "en": "Allow pet to control some VPet settings",
+            "zh-hans": "允许宠物控制部分主程序设置",
+            "zh-hant": "允許寵物控制部分主程序設置",
+            "jp": "ペットに一部のVPet設定の制御を許可する"
         }
     },
     "Tools": {

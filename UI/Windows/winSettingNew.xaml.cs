@@ -376,6 +376,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableVPetSettingsControl")).Click += Control_Click;
             ((ComboBox)this.FindName("ComboBox_CompressionMode")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).TextChanged += Control_TextChanged;
@@ -729,6 +730,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).IsChecked = _plugin.Settings.EnableLiveMode;
             ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).IsChecked = _plugin.Settings.LimitStateChanges;
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked = _plugin.Settings.EnableHistoryCompression;
+            ((CheckBox)this.FindName("CheckBox_EnableVPetSettingsControl")).IsChecked = _plugin.Settings.EnableVPetSettingsControl;
             
             // 加载压缩模式
             var compressionModeComboBox = (ComboBox)this.FindName("ComboBox_CompressionMode");
@@ -1048,6 +1050,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableLiveMode = enableLiveModeCheckBox.IsChecked ?? false;
             _plugin.Settings.LimitStateChanges = ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).IsChecked ?? false;
             _plugin.Settings.EnableHistoryCompression = ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked ?? false;
+            _plugin.Settings.EnableVPetSettingsControl = ((CheckBox)this.FindName("CheckBox_EnableVPetSettingsControl")).IsChecked ?? false;
             
             // 保存压缩模式
             var compressionModeComboBox = (ComboBox)this.FindName("ComboBox_CompressionMode");

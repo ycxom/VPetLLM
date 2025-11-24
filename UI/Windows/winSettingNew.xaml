@@ -1910,6 +1910,12 @@
                                 </CheckBox.ToolTip>
                             </CheckBox>
                             <StackPanel Margin="20,0,0,0">
+                                <CheckBox x:Name="CheckBox_EnableVPetSettingsControl"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableVPetSettingsControl}"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
+                                        IsChecked="False"
+                                        Margin="0,0,0,8"
+                                        Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableBuy"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableBuy}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"

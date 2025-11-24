@@ -130,5 +130,141 @@
     "BuyFeedback_Batch": {
         "en": "The user bought you {ItemCount} items at {PurchaseTime}: {ItemList}! Total cost: ${TotalPrice}. Item types: {TypeStats}. You are feeling {EmotionState}. Current status: Health({CurrentHealth}), Mood({CurrentMood}), Money(${CurrentMoney}), Hunger({CurrentHunger}), Thirst({CurrentThirst}).",
         "zh": "用户在{PurchaseTime}给你买了{ItemCount}样东西：{ItemList}！总花费：${TotalPrice}。物品类型：{TypeStats}。你现在感到{EmotionState}。当前状态：健康({CurrentHealth})，心情({CurrentMood})，金钱(${CurrentMoney})，饥饿度({CurrentHunger})，口渴度({CurrentThirst})。"
+    },
+    "VPetSettings_Commands_Description": {
+        "en": "VPET SETTINGS CONTROL:\nYou have been granted permission to control certain VPet main program settings. Use these commands carefully and only when appropriate based on user needs or context.\n\nAvailable VPet settings commands:\n\n1. Set window topmost: <|vpet_settings_begin|> set_topmost:true/false <|vpet_settings_end|>\n   - Parameter: true (always on top) or false (cancel topmost)\n   - Use when: User wants the pet to stay visible above other windows, or wants to allow other windows to cover the pet\n   - Example: <|vpet_settings_begin|> set_topmost:true <|vpet_settings_end|>\n\n2. Set window transparency: <|vpet_settings_begin|> set_transparency:0.8 <|vpet_settings_end|>\n   - Parameter: 0.0 (fully transparent) to 1.0 (fully opaque)\n   - Use when: User wants to adjust pet visibility, make it more subtle, or restore full opacity\n   - Example: <|vpet_settings_begin|> set_transparency:0.7 <|vpet_settings_end|>\n\n3. Set zoom level: <|vpet_settings_begin|> set_zoom:1.5 <|vpet_settings_end|>\n   - Parameter: 0.5 to 3.0 (1.0 is normal size)\n   - Use when: User wants to make the pet larger or smaller to fit their screen space\n   - Example: <|vpet_settings_begin|> set_zoom:2.0 <|vpet_settings_end|>\n\n4. Set pet name: <|vpet_settings_begin|> set_pet_name:Fluffy <|vpet_settings_end|>\n   - Parameter: non-empty string\n   - Use when: User wants to give you a new name or change your identity\n   - Example: <|vpet_settings_begin|> set_pet_name:Mochi <|vpet_settings_end|>\n\n5. Set owner name: <|vpet_settings_begin|> set_owner_name:Alex <|vpet_settings_end|>\n   - Parameter: non-empty string\n   - Use when: User introduces themselves or wants to change how you address them\n   - Example: <|vpet_settings_begin|> set_owner_name:Sarah <|vpet_settings_end|>\n\n6. Set owner birthday: <|vpet_settings_begin|> set_owner_birthday:1990-01-01 <|vpet_settings_end|>\n   - Parameter: date in YYYY-MM-DD format\n   - Use when: User shares their birthday so you can remember and celebrate it\n   - Example: <|vpet_settings_begin|> set_owner_birthday:1995-03-15 <|vpet_settings_end|>\n\nIMPORTANT NOTES:\n- These commands modify the main VPet program settings, not just your behavior\n- Use them thoughtfully based on user requests or contextual needs\n- Commands can be combined with other commands like say or action\n- Example combined usage: <|say_begin|> \"I'll make myself bigger for you!\", happy <|say_end|><|vpet_settings_begin|> set_zoom:2.0 <|vpet_settings_end|>",
+        "zh": "VPET 设置控制：\n你已被授权控制部分 VPet 主程序设置。请谨慎使用这些命令，仅在基于用户需求或上下文适当时使用。\n\n可用的 VPet 设置命令：\n\n1. 设置窗口置顶：<|vpet_settings_begin|> set_topmost:true/false <|vpet_settings_end|>\n   - 参数：true（始终置顶）或 false（取消置顶）\n   - 使用场景：用户希望宠物保持在其他窗口之上可见，或允许其他窗口覆盖宠物\n   - 示例：<|vpet_settings_begin|> set_topmost:true <|vpet_settings_end|>\n\n2. 设置窗口透明度：<|vpet_settings_begin|> set_transparency:0.8 <|vpet_settings_end|>\n   - 参数：0.0（完全透明）到 1.0（完全不透明）\n   - 使用场景：用户想调整宠物可见度，使其更低调，或恢复完全不透明\n   - 示例：<|vpet_settings_begin|> set_transparency:0.7 <|vpet_settings_end|>\n\n3. 设置缩放等级：<|vpet_settings_begin|> set_zoom:1.5 <|vpet_settings_end|>\n   - 参数：0.5 到 3.0（1.0 为正常大小）\n   - 使用场景：用户想让宠物变大或变小以适应屏幕空间\n   - 示例：<|vpet_settings_begin|> set_zoom:2.0 <|vpet_settings_end|>\n\n4. 设置宠物名字：<|vpet_settings_begin|> set_pet_name:小可爱 <|vpet_settings_end|>\n   - 参数：非空字符串\n   - 使用场景：用户想给你起新名字或改变你的身份\n   - 示例：<|vpet_settings_begin|> set_pet_name:小团子 <|vpet_settings_end|>\n\n5. 设置主人名字：<|vpet_settings_begin|> set_owner_name:小明 <|vpet_settings_end|>\n   - 参数：非空字符串\n   - 使用场景：用户自我介绍或想改变你对他们的称呼\n   - 示例：<|vpet_settings_begin|> set_owner_name:小红 <|vpet_settings_end|>\n\n6. 设置主人生日：<|vpet_settings_begin|> set_owner_birthday:1990-01-01 <|vpet_settings_end|>\n   - 参数：YYYY-MM-DD 格式的日期\n   - 使用场景：用户分享生日以便你记住并庆祝\n   - 示例：<|vpet_settings_begin|> set_owner_birthday:1995-03-15 <|vpet_settings_end|>\n\n重要提示：\n- 这些命令会修改 VPet 主程序设置，而不仅仅是你的行为\n- 请根据用户请求或上下文需求谨慎使用\n- 命令可以与其他命令（如 say 或 action）组合使用\n- 组合使用示例：<|say_begin|> \"我会把自己变大一点！\", happy <|say_end|><|vpet_settings_begin|> set_zoom:2.0 <|vpet_settings_end|>"
+    },
+    "VPetSettings_Error_PermissionDenied": {
+        "en": "Permission denied - EnableVPetSettingsControl is false",
+        "zh": "权限被拒绝 - EnableVPetSettingsControl 为 false"
+    },
+    "VPetSettings_Error_CommandEmpty": {
+        "en": "Invalid command format - command is empty",
+        "zh": "无效的命令格式 - 命令为空"
+    },
+    "VPetSettings_Error_InvalidFormat": {
+        "en": "Invalid command format - expected 'action:value', got: {0}",
+        "zh": "无效的命令格式 - 期望 'action:value'，得到：{0}"
+    },
+    "VPetSettings_Error_ActionEmpty": {
+        "en": "Invalid command format - action is empty in: {0}",
+        "zh": "无效的命令格式 - action 为空：{0}"
+    },
+    "VPetSettings_Error_UnknownAction": {
+        "en": "Unknown action: {0}",
+        "zh": "未知的操作：{0}"
+    },
+    "VPetSettings_Error_ExecutionError": {
+        "en": "Error executing {0}: {1}",
+        "zh": "执行 {0} 时出错：{1}"
+    },
+    "VPetSettings_Error_InvalidBoolean": {
+        "en": "Invalid boolean value: {0}",
+        "zh": "无效的布尔值：{0}"
+    },
+    "VPetSettings_Error_InvalidDouble": {
+        "en": "Invalid double value: {0}",
+        "zh": "无效的浮点数值：{0}"
+    },
+    "VPetSettings_Error_TransparencyOutOfRange": {
+        "en": "Value {0} out of range (0.0-1.0)",
+        "zh": "值 {0} 超出范围（0.0-1.0）"
+    },
+    "VPetSettings_Error_ZoomOutOfRange": {
+        "en": "Value {0} out of range (0.5-3.0)",
+        "zh": "值 {0} 超出范围（0.5-3.0）"
+    },
+    "VPetSettings_Error_NameEmpty": {
+        "en": "Name cannot be empty or whitespace",
+        "zh": "名字不能为空或仅包含空白字符"
+    },
+    "VPetSettings_Error_BirthdayEmpty": {
+        "en": "Birthday cannot be empty",
+        "zh": "生日不能为空"
+    },
+    "VPetSettings_Error_InvalidDateFormat": {
+        "en": "Invalid date format: {0} (expected YYYY-MM-DD)",
+        "zh": "无效的日期格式：{0}（期望 YYYY-MM-DD）"
+    },
+    "VPetSettings_Error_OpacityPropertyNotFound": {
+        "en": "Opacity property not found or not writable",
+        "zh": "未找到 Opacity 属性或该属性不可写"
+    },
+    "VPetSettings_Log_CommandReceived": {
+        "en": "Received command - action: {0}, parameter: {1}",
+        "zh": "收到命令 - 操作：{0}，参数：{1}"
+    },
+    "VPetSettings_Log_TopmostReceived": {
+        "en": "set_topmost Received - Parameter: {0}",
+        "zh": "收到 set_topmost - 参数：{0}"
+    },
+    "VPetSettings_Log_TopmostSuccess": {
+        "en": "set_topmost Success - TopMost set to {0}",
+        "zh": "set_topmost 成功 - 置顶状态设置为 {0}"
+    },
+    "VPetSettings_Log_TopmostFailed": {
+        "en": "set_topmost Failed - {0}",
+        "zh": "set_topmost 失败 - {0}"
+    },
+    "VPetSettings_Log_TransparencyReceived": {
+        "en": "set_transparency Received - Parameter: {0}",
+        "zh": "收到 set_transparency - 参数：{0}"
+    },
+    "VPetSettings_Log_TransparencySuccess": {
+        "en": "set_transparency Success - Opacity set to {0}",
+        "zh": "set_transparency 成功 - 透明度设置为 {0}"
+    },
+    "VPetSettings_Log_TransparencyFailed": {
+        "en": "set_transparency Failed - {0}",
+        "zh": "set_transparency 失败 - {0}"
+    },
+    "VPetSettings_Log_ZoomReceived": {
+        "en": "set_zoom Received - Parameter: {0}",
+        "zh": "收到 set_zoom - 参数：{0}"
+    },
+    "VPetSettings_Log_ZoomSuccess": {
+        "en": "set_zoom Success - Zoom level set to {0}",
+        "zh": "set_zoom 成功 - 缩放等级设置为 {0}"
+    },
+    "VPetSettings_Log_ZoomFailed": {
+        "en": "set_zoom Failed - {0}",
+        "zh": "set_zoom 失败 - {0}"
+    },
+    "VPetSettings_Log_PetNameReceived": {
+        "en": "set_pet_name Received - Parameter: {0}",
+        "zh": "收到 set_pet_name - 参数：{0}"
+    },
+    "VPetSettings_Log_PetNameSuccess": {
+        "en": "set_pet_name Success - Pet name set to '{0}'",
+        "zh": "set_pet_name 成功 - 宠物名字设置为 '{0}'"
+    },
+    "VPetSettings_Log_PetNameFailed": {
+        "en": "set_pet_name Failed - {0}",
+        "zh": "set_pet_name 失败 - {0}"
+    },
+    "VPetSettings_Log_OwnerNameReceived": {
+        "en": "set_owner_name Received - Parameter: {0}",
+        "zh": "收到 set_owner_name - 参数：{0}"
+    },
+    "VPetSettings_Log_OwnerNameSuccess": {
+        "en": "set_owner_name Success - Owner name set to '{0}'",
+        "zh": "set_owner_name 成功 - 主人名字设置为 '{0}'"
+    },
+    "VPetSettings_Log_OwnerNameFailed": {
+        "en": "set_owner_name Failed - {0}",
+        "zh": "set_owner_name 失败 - {0}"
+    },
+    "VPetSettings_Log_BirthdayReceived": {
+        "en": "set_owner_birthday Received - Parameter: {0}",
+        "zh": "收到 set_owner_birthday - 参数：{0}"
+    },
+    "VPetSettings_Log_BirthdaySuccess": {
+        "en": "set_owner_birthday Success - Owner birthday set to '{0}'",
+        "zh": "set_owner_birthday 成功 - 主人生日设置为 '{0}'"
+    },
+    "VPetSettings_Log_BirthdayFailed": {
+        "en": "set_owner_birthday Failed - {0}",
+        "zh": "set_owner_birthday 失败 - {0}"
     }
 }

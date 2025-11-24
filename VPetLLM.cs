@@ -62,6 +62,7 @@ namespace VPetLLM
                 }
             }
             ActionProcessor = new ActionProcessor(mainwin);
+            ActionProcessor.SetSettings(Settings);
             
             // 初始化Free服务配置（默认执行）
             try
