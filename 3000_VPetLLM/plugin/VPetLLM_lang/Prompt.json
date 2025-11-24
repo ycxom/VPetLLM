@@ -35,6 +35,10 @@
         "en": "The purchase only applies to itself and cannot affect the user. Available items for purchase (by category): {ItemList}. You can use approximate names when buying items, the system will automatically find the best match.",
         "zh": "该购买仅给予自身，无法影响用户。可购买物品（按类别）：{ItemList}。购买时可以使用相近的名称，系统会自动匹配最合适的物品。"
     },
+    "Available_Works_Prefix": {
+        "en": "Available work/study/play activities:\n{WorkList}\nYou can start specific activities using the format: <|action_begin|> work:job_name <|action_end|>, <|action_begin|> study:subject_name <|action_end|>, or <|action_begin|> play:activity_name <|action_end|>. The system supports fuzzy matching, so you can use approximate names.",
+        "zh": "可用的工作/学习/玩耍活动：\n{WorkList}\n你可以使用以下格式开始特定活动：<|action_begin|> work:工作名称 <|action_end|>、<|action_begin|> study:科目名称 <|action_end|> 或 <|action_begin|> play:活动名称 <|action_end|>。系统支持模糊匹配，可以使用相近的名称。"
+    },
     "Available_Plugins_Prefix": {
         "en": "Available Plugins (all plugins must be called in the format `<|plugin_begin|> plugin_name(parameters) <|plugin_end|>`):\n{PluginList}",
         "zh": "可用的插件（所有插件都必须以`<|plugin_begin|> plugin_name(parameters) <|plugin_end|>`的格式调用）：\n{PluginList}"
@@ -44,8 +48,8 @@
         "zh": "请将以下多轮对话总结为一段摘要，以便后续机器人能理解上下文。总结时不要模仿任何角色，内容要尽可能简洁，只保留核心信息，避免任何与总结任务无关的词语。"
     },
     "Handler_Action_Description": {
-        "en": "Control actions with the 'action' command. Format: <|action_begin|> touchhead <|action_end|>. Note: If the 'say' command includes a body animation, avoid using a separate 'action' command to prevent conflicts.",
-        "zh": "通过 'action' 指令控制动作。格式：<|action_begin|> touchhead <|action_end|>。注意：如果 'say' 指令已包含身体动画，请避免使用独立的 'action' 指令，以防冲突。"
+        "en": "Action command format: <|action_begin|> action_name <|action_end|>\n\nSTATES:\n- sleep: Sleep mode (recovers health)\n- wakeup/normal: Return to normal\n- stopaction: Stop current activity (use when pet is busy)\n- work: Generic work mode\n- work:name: Specific work (fuzzy match)\n- study:name: Specific study (fuzzy match)\n- play:name: Specific play (fuzzy match)\n\nINTERACTIONS:\n- touch_head, touch_body, pinch\n- Other animations: see animation list\n\nExamples:\n- Sleep: <|say_begin|> \"晚安~\" <|say_end|><|action_begin|> sleep <|action_end|>\n- Wake: <|say_begin|> \"早安！\" <|say_end|><|action_begin|> stopaction <|action_end|>\n- Work: <|say_begin|> \"开始工作！\" <|say_end|><|action_begin|> work:编程 <|action_end|>\n- Stop: <|say_begin|> \"休息一下！\" <|say_end|><|action_begin|> stopaction <|action_end|>",
+        "zh": "动作指令格式：<|action_begin|> 动作名称 <|action_end|>\n\n状态控制：\n- sleep：睡眠模式（恢复健康）\n- wakeup/normal：返回正常状态\n- stopaction：停止当前活动（宠物忙碌时使用）\n- work：通用工作模式\n- work:名称：特定工作（模糊匹配）\n- study:名称：特定学习（模糊匹配）\n- play:名称：特定玩耍（模糊匹配）\n\n交互动作：\n- touch_head, touch_body, pinch\n- 其他动画：参见动画列表\n\n示例：\n- 睡觉：<|say_begin|> \"晚安~\" <|say_end|><|action_begin|> sleep <|action_end|>\n- 起床：<|say_begin|> \"早安！\" <|say_end|><|action_begin|> stopaction <|action_end|>\n- 工作：<|say_begin|> \"开始工作！\" <|say_end|><|action_begin|> work:编程 <|action_end|>\n- 停止：<|say_begin|> \"休息一下！\" <|say_end|><|action_begin|> stopaction <|action_end|>"
     },
     "Handler_Buy_Description": {
         "en": "Purchase items with the 'buy' command. Requires the item name as a parameter. Supports fuzzy matching - you can use similar or partial names. Format: <|buy_begin|> Milk Tea <|buy_end|> or <|buy_begin|> milk <|buy_end|>",

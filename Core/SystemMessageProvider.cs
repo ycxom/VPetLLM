@@ -269,6 +269,24 @@ namespace VPetLLM.Core
                 }
             }
 
+            // 添加可用的工作/学习/玩耍列表（仅在EnableAction开启时）
+            if (_settings.EnableAction)
+            {
+                try
+                {
+                    var workList = WorkManager.GetWorkListForPrompt(_mainWindow);
+                    if (!string.IsNullOrWhiteSpace(workList))
+                    {
+                        parts.Add(PromptHelper.Get("Available_Works_Prefix", lang)
+                                    .Replace("{WorkList}", workList));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"SystemMessageProvider: Error getting work list: {ex.Message}");
+                }
+            }
+
             // 只有在EnablePlugin开启时才添加插件说明（独立于EnableAction）
             if (_settings.EnablePlugin && VPetLLM.Instance.Plugins.Any(p => p.Enabled))
             {

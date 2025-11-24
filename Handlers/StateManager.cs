@@ -40,6 +40,74 @@ namespace VPetLLM.Handlers
             public string ActionName { get; set; }
             public DateTime RequestTime { get; set; }
         }
+
+        /// <summary>
+        /// Helper method to get State (tries field first, then property)
+        /// </summary>
+        private static object GetState(IMainWindow mainWindow)
+        {
+            // Try field first (VPet uses field)
+            var stateField = mainWindow.Main.GetType().GetField("State");
+            if (stateField != null)
+            {
+                return stateField.GetValue(mainWindow.Main);
+            }
+
+            // Fallback to property
+            var stateProperty = mainWindow.Main.GetType().GetProperty("State");
+            if (stateProperty != null)
+            {
+                return stateProperty.GetValue(mainWindow.Main);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Helper method to set State (tries field first, then property)
+        /// </summary>
+        private static bool SetState(IMainWindow mainWindow, object newState)
+        {
+            // Try field first (VPet uses field)
+            var stateField = mainWindow.Main.GetType().GetField("State");
+            if (stateField != null)
+            {
+                stateField.SetValue(mainWindow.Main, newState);
+                return true;
+            }
+
+            // Fallback to property
+            var stateProperty = mainWindow.Main.GetType().GetProperty("State");
+            if (stateProperty != null)
+            {
+                stateProperty.SetValue(mainWindow.Main, newState);
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Helper method to get State type (tries field first, then property)
+        /// </summary>
+        private static Type GetStateType(IMainWindow mainWindow)
+        {
+            // Try field first (VPet uses field)
+            var stateField = mainWindow.Main.GetType().GetField("State");
+            if (stateField != null)
+            {
+                return stateField.FieldType;
+            }
+
+            // Fallback to property
+            var stateProperty = mainWindow.Main.GetType().GetProperty("State");
+            if (stateProperty != null)
+            {
+                return stateProperty.PropertyType;
+            }
+
+            return null;
+        }
         /// <summary>
         /// Transitions the VPet to a new state with proper error handling and rollback
         /// This method queues the state transition to handle concurrent requests
@@ -144,18 +212,17 @@ namespace VPetLLM.Handlers
 
             try
             {
-                // Get the current state using reflection for compatibility
-                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                if (stateProperty == null)
+                // Get the current state using helper method (tries field first, then property)
+                previousState = GetState(mainWindow);
+                var workingStateType = GetStateType(mainWindow);
+                
+                if (previousState == null || workingStateType == null)
                 {
-                    Logger.Log("StateManager: State property not found, using fallback mode for older VPet versions");
+                    Logger.Log("StateManager: State field/property not found, using fallback mode for older VPet versions");
                     // Fallback: directly call display methods without state management
                     ExecuteStateTransitionFallback(mainWindow, newState, actionName);
                     return;
                 }
-
-                previousState = stateProperty.GetValue(mainWindow.Main);
-                var workingStateType = stateProperty.PropertyType;
 
                 // Convert newState to the correct enum type if it's a string
                 object targetState = newState;
@@ -194,7 +261,7 @@ namespace VPetLLM.Handlers
                         // Transition to normal state
                         Logger.Log("StateManager: Calling DisplayToNomal() and setting State to Nomal");
                         mainWindow.Main.DisplayToNomal();
-                        stateProperty.SetValue(mainWindow.Main, targetState);
+                        SetState(mainWindow, targetState);
                         stateChanged = true;
                         Logger.Log("StateManager: DisplayToNomal() completed and State set to Nomal");
                         break;
@@ -202,7 +269,7 @@ namespace VPetLLM.Handlers
                     case "Work":
                         // Transition to work state
                         Logger.Log("StateManager: Setting State to Work");
-                        stateProperty.SetValue(mainWindow.Main, targetState);
+                        SetState(mainWindow, targetState);
                         // Optionally trigger work animation if available
                         try
                         {
@@ -220,7 +287,7 @@ namespace VPetLLM.Handlers
                     case "Study":
                         // Transition to study state (if supported by VPet version)
                         Logger.Log("StateManager: Setting State to Study");
-                        stateProperty.SetValue(mainWindow.Main, targetState);
+                        SetState(mainWindow, targetState);
                         // Optionally trigger study animation if available
                         try
                         {
@@ -238,9 +305,9 @@ namespace VPetLLM.Handlers
                     default:
                         // For other states, attempt direct state assignment
                         Logger.Log($"StateManager: Setting State directly to {targetStateName}");
-                        stateProperty.SetValue(mainWindow.Main, targetState);
+                        SetState(mainWindow, targetState);
                         stateChanged = true;
-                        Logger.Log($"StateManager: State property set to {targetStateName}");
+                        Logger.Log($"StateManager: State set to {targetStateName}");
                         break;
                 }
 
@@ -267,15 +334,13 @@ namespace VPetLLM.Handlers
                     try
                     {
                         Logger.Log($"StateManager: Attempting rollback to previous state {previousState}");
-                        var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                        if (stateProperty != null)
+                        if (SetState(mainWindow, previousState))
                         {
-                            stateProperty.SetValue(mainWindow.Main, previousState);
                             Logger.Log($"StateManager: Successfully rolled back to {previousState}");
                         }
                         else
                         {
-                            Logger.Log("StateManager: Rollback failed - State property not found");
+                            Logger.Log("StateManager: Rollback failed - State field/property not found");
                         }
                     }
                     catch (Exception rollbackEx)
@@ -289,6 +354,66 @@ namespace VPetLLM.Handlers
                 {
                     Logger.Log($"StateManager: No rollback attempted (stateChanged={stateChanged}, previousState={previousState})");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Attempts to find and invoke work-related methods using reflection
+        /// </summary>
+        /// <param name="mainWindow">The main window instance</param>
+        /// <param name="workType">The type of work (Work, Study, Play)</param>
+        /// <returns>True if a work method was found and invoked, false otherwise</returns>
+        private static bool TryInvokeWorkMethod(IMainWindow mainWindow, string workType)
+        {
+            try
+            {
+                var mainType = mainWindow.Main.GetType();
+                
+                // Try to find methods that might start work
+                var possibleMethods = new[]
+                {
+                    $"Start{workType}",
+                    $"Display{workType}",
+                    $"Set{workType}",
+                    "StartWork",
+                    "SetWork"
+                };
+
+                foreach (var methodName in possibleMethods)
+                {
+                    var method = mainType.GetMethod(methodName);
+                    if (method != null)
+                    {
+                        Logger.Log($"StateManager: Found method '{methodName}', attempting to invoke");
+                        try
+                        {
+                            method.Invoke(mainWindow.Main, null);
+                            Logger.Log($"StateManager: Successfully invoked '{methodName}'");
+                            return true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"StateManager: Failed to invoke '{methodName}': {ex.Message}");
+                        }
+                    }
+                }
+
+                // Try to set NowWork property
+                var nowWorkProperty = mainType.GetProperty("NowWork");
+                if (nowWorkProperty != null && nowWorkProperty.CanWrite)
+                {
+                    Logger.Log("StateManager: Found NowWork property, attempting to create Work object");
+                    // This would require creating a Work object, which is complex
+                    // For now, just log that we found it
+                    Logger.Log("StateManager: NowWork property found but requires Work object creation");
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"StateManager: Error in TryInvokeWorkMethod: {ex.Message}");
+                return false;
             }
         }
 
@@ -322,28 +447,90 @@ namespace VPetLLM.Handlers
                         break;
 
                     case "Work":
-                        Logger.Log("StateManager: Fallback - Triggering work animation");
+                        Logger.Log("StateManager: Fallback - Attempting to start work mode");
+                        
+                        // Try to use WorkManager to start a default work
+                        WorkManager.RefreshWorkLists(mainWindow);
+                        var defaultWork = WorkManager.FindWork("", "work"); // Get first work
+                        
+                        if (defaultWork != null && WorkManager.StartWork(mainWindow, defaultWork))
+                        {
+                            Logger.Log("StateManager: Fallback - Work mode started via StartWork");
+                            break;
+                        }
+                        
+                        // If StartWork not available, try other methods
+                        if (TryInvokeWorkMethod(mainWindow, "Work"))
+                        {
+                            Logger.Log("StateManager: Fallback - Work mode started via method invocation");
+                            break;
+                        }
+                        
+                        // If no method found, fall back to animation
+                        Logger.Log("StateManager: Fallback - No work method found, using animation (loop mode)");
                         try
                         {
-                            mainWindow.Main.Display("work", VPet_Simulator.Core.GraphInfo.AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                            Logger.Log("StateManager: Fallback - Work animation triggered");
+                            // Use A_Start to loop the animation, making it appear as a continuous work state
+                            mainWindow.Main.Display("work", VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, mainWindow.Main.DisplayToNomal);
+                            Logger.Log("StateManager: Fallback - Work animation triggered in loop mode");
                         }
                         catch (Exception ex)
                         {
                             Logger.Log($"StateManager: Fallback - Work animation failed: {ex.Message}");
+                            // Fallback to single animation if loop fails
+                            try
+                            {
+                                mainWindow.Main.Display("work", VPet_Simulator.Core.GraphInfo.AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                                Logger.Log("StateManager: Fallback - Work animation triggered in single mode (fallback)");
+                            }
+                            catch (Exception ex2)
+                            {
+                                Logger.Log($"StateManager: Fallback - Work animation single mode also failed: {ex2.Message}");
+                            }
                         }
                         break;
 
                     case "Study":
-                        Logger.Log("StateManager: Fallback - Triggering study animation");
+                        Logger.Log("StateManager: Fallback - Attempting to start study mode");
+                        
+                        // Try to use WorkManager to start a default study
+                        WorkManager.RefreshWorkLists(mainWindow);
+                        var defaultStudy = WorkManager.FindWork("", "study"); // Get first study
+                        
+                        if (defaultStudy != null && WorkManager.StartWork(mainWindow, defaultStudy))
+                        {
+                            Logger.Log("StateManager: Fallback - Study mode started via StartWork");
+                            break;
+                        }
+                        
+                        // If StartWork not available, try other methods
+                        if (TryInvokeWorkMethod(mainWindow, "Study"))
+                        {
+                            Logger.Log("StateManager: Fallback - Study mode started via method invocation");
+                            break;
+                        }
+                        
+                        // If no method found, fall back to animation
+                        Logger.Log("StateManager: Fallback - No study method found, using animation (loop mode)");
                         try
                         {
-                            mainWindow.Main.Display("study", VPet_Simulator.Core.GraphInfo.AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                            Logger.Log("StateManager: Fallback - Study animation triggered");
+                            // Use A_Start to loop the animation, making it appear as a continuous study state
+                            mainWindow.Main.Display("study", VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, mainWindow.Main.DisplayToNomal);
+                            Logger.Log("StateManager: Fallback - Study animation triggered in loop mode");
                         }
                         catch (Exception ex)
                         {
                             Logger.Log($"StateManager: Fallback - Study animation failed: {ex.Message}");
+                            // Fallback to single animation if loop fails
+                            try
+                            {
+                                mainWindow.Main.Display("study", VPet_Simulator.Core.GraphInfo.AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                                Logger.Log("StateManager: Fallback - Study animation triggered in single mode (fallback)");
+                            }
+                            catch (Exception ex2)
+                            {
+                                Logger.Log($"StateManager: Fallback - Study animation single mode also failed: {ex2.Message}");
+                            }
                         }
                         break;
 
@@ -379,14 +566,12 @@ namespace VPetLLM.Handlers
 
             try
             {
-                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                if (stateProperty == null)
+                var state = GetState(mainWindow);
+                if (state == null)
                 {
-                    Logger.Log("StateManager: State property not found");
-                    return null;
+                    Logger.Log("StateManager: State field/property not found");
                 }
-
-                return stateProperty.GetValue(mainWindow.Main);
+                return state;
             }
             catch (Exception ex)
             {
@@ -451,14 +636,14 @@ namespace VPetLLM.Handlers
 
             try
             {
-                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                if (stateProperty == null)
+                var currentState = GetState(mainWindow);
+                var workingStateType = GetStateType(mainWindow);
+                
+                if (currentState == null || workingStateType == null)
                 {
-                    Logger.Log("StateManager: State property not found, cannot verify state");
+                    Logger.Log("StateManager: State field/property not found, cannot verify state");
                     return false;
                 }
-
-                var currentState = stateProperty.GetValue(mainWindow.Main);
                 
                 // Convert expectedState to the correct enum type if it's a string
                 object expectedStateValue = expectedState;
@@ -466,7 +651,6 @@ namespace VPetLLM.Handlers
                 {
                     try
                     {
-                        var workingStateType = stateProperty.PropertyType;
                         expectedStateValue = Enum.Parse(workingStateType, stateString, ignoreCase: true);
                     }
                     catch (Exception ex)
