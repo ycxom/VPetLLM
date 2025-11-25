@@ -9,14 +9,6 @@ VPetLLM 是一个为 [VPet-Simulator](https://github.com/LorisYounger/VPet) 设�
 - VPet-Simulator 主程序
 - **MPV 播放器**（用于 TTS 音频播放）
 
-### MPV 播放器安装
-
-TTS 功能需要 MPV 播放器支持。请按以下步骤安装：
-
-1. 从 [mpv.io](https://mpv.io/installation/) 或 [SourceForge](https://sourceforge.net/projects/mpv-player-windows/files/) 下载 Windows 版本
-2. 解压后将 `mpv` 文件夹放置到插件目录下（与 VPetLLM.dll 同级目录）
-3. 确保 `mpv/mpv.exe` 文件存在
-
 ## ✨ 功能
 
 - **多样的 LLM 提供商支持：**

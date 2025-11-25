@@ -149,11 +149,9 @@ namespace VPetLLM.Core.ChatCore
             {
                 ClearContext();
             }
-            if (!string.IsNullOrEmpty(prompt))
-            {
-                //无论是用户输入还是插件返回，都作为user角色
-                await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
-            }
+            
+            // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
+            var tempUserMessage = !string.IsNullOrEmpty(prompt) ? new Message { Role = "user", Content = prompt } : null;
             
             // 获取当前节点和API Key
             var (apiUrl, apiKey) = GetCurrentEndpoint();
@@ -161,6 +159,14 @@ namespace VPetLLM.Core.ChatCore
             
             // 构建请求数据，根据启用开关决定是否包含高级参数
             List<Message> history = GetCoreHistory();
+            // 如果有临时用户消息，添加到历史末尾用于API请求
+            if (tempUserMessage != null)
+            {
+                history.Add(tempUserMessage);
+            }
+            // 在添加用户消息后注入重要记录
+            history = InjectRecordsIntoHistory(history);
+            
             object data;
             if (_openAISetting.EnableAdvanced)
             {
@@ -185,93 +191,120 @@ namespace VPetLLM.Core.ChatCore
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
             string message;
-            using (var client = GetClient())
+            try
             {
-                if (!string.IsNullOrEmpty(apiKey))
+                using (var client = GetClient())
                 {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-                }
-                
-                if (currentNode.EnableStreaming)
-                {
-                    // 流式传输模式
-                    Utils.Logger.Log("OpenAI: 使用流式传输模式");
-                    var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
+                    if (!string.IsNullOrEmpty(apiKey))
                     {
-                        Content = content
-                    };
-                    var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-                    response.EnsureSuccessStatusCode();
+                        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                    }
                     
-                    var fullMessage = new StringBuilder();
-                    var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                    if (currentNode.EnableStreaming)
                     {
-                        // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
-                        Utils.Logger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
-                        ResponseHandler?.Invoke(cmd);
-                    });
-                    var TotalUsage = 0;
-                    using (var stream = await response.Content.ReadAsStreamAsync())
-                    using (var reader = new System.IO.StreamReader(stream))
-                    {
-                        string line;
-                        while ((line = await reader.ReadLineAsync()) != null)
+                        // 流式传输模式
+                        Utils.Logger.Log("OpenAI: 使用流式传输模式");
+                        var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
                         {
-                            if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
-                                continue;
-                            
-                            var jsonData = line.Substring(6).Trim();
-                            if (jsonData == "[DONE]")
-                                break;
-                            
-                            try
+                            Content = content
+                        };
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+                        
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        {
+                            // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
+                            Utils.Logger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
+                            ResponseHandler?.Invoke(cmd);
+                        });
+                        var TotalUsage = 0;
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) != null)
                             {
-                                var chunk = JObject.Parse(jsonData);
-                                var delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
-                                if (!string.IsNullOrEmpty(delta))
+                                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                                    continue;
+                                
+                                var jsonData = line.Substring(6).Trim();
+                                if (jsonData == "[DONE]")
+                                    break;
+                                
+                                try
                                 {
-                                    fullMessage.Append(delta);
-                                    // 将新片段传递给流式处理器，检测完整命令
-                                    streamProcessor.AddChunk(delta);
-                                    // 通知流式文本更新（用于显示）
-                                    StreamingChunkHandler?.Invoke(delta);
-                                    var usage = chunk["usage"]?["total_tokens"]?.ToObject<int>() ?? 0;
-                                    TotalUsage += usage;
+                                    var chunk = JObject.Parse(jsonData);
+                                    var delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        // 将新片段传递给流式处理器，检测完整命令
+                                        streamProcessor.AddChunk(delta);
+                                        // 通知流式文本更新（用于显示）
+                                        StreamingChunkHandler?.Invoke(delta);
+                                        var usage = chunk["usage"]?["total_tokens"]?.ToObject<int>() ?? 0;
+                                        TotalUsage += usage;
+                                    }
+                                }
+                                catch
+                                {
+                                    // 忽略解析错误，继续处理下一行
                                 }
                             }
-                            catch
-                            {
-                                // 忽略解析错误，继续处理下一行
-                            }
                         }
+                        message = fullMessage.ToString();
+                        Utils.Logger.Log("OpenAI流式: 流式传输完成，总消息长度: {0},总Token用量：{1}".Translate(message.Length,TotalUsage));
+                        // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
-                    message = fullMessage.ToString();
-                    Utils.Logger.Log("OpenAI流式: 流式传输完成，总消息长度: {0},总Token用量：{1}".Translate(message.Length,TotalUsage));
-                    // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
+                    else
+                    {
+                        // 非流式传输模式
+                        Utils.Logger.Log("OpenAI: 使用非流式传输模式");
+                        var response = await client.PostAsync(apiUrl, content);
+                        
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+                        
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var responseObject = JObject.Parse(responseString);
+                        message = responseObject["choices"][0]["message"]["content"].ToString();
+                        var tokenUsage = responseObject["usage"]["total_tokens"].ToString();
+                        Utils.Logger.Log("OpenAI非流式: 收到完整消息，长度: {0}，Token用量：{1}".Translate(message.Length,tokenUsage));
+                        // 非流式模式下，一次性处理完整消息
+                        ResponseHandler?.Invoke(message);
+                    }
                 }
-                else
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
+                Utils.Logger.Log($"OpenAI Chat 异常: {ex.Message}");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+            
+            // API调用成功后，才将用户消息和助手回复保存到历史记录
+            if (Settings.KeepContext)
+            {
+                // 先保存用户消息
+                if (tempUserMessage != null)
                 {
-                    // 非流式传输模式
-                    Utils.Logger.Log("OpenAI: 使用非流式传输模式");
-                    var response = await client.PostAsync(apiUrl, content);
-                    response.EnsureSuccessStatusCode();
-                    var responseString = await response.Content.ReadAsStringAsync();
-                    var responseObject = JObject.Parse(responseString);
-                    message = responseObject["choices"][0]["message"]["content"].ToString();
-                    var tokenUsage = responseObject["usage"]["total_tokens"].ToString();
-                    Utils.Logger.Log("OpenAI非流式: 收到完整消息，长度: {0}，Token用量：{1}".Translate(message.Length,tokenUsage));
-                    // 非流式模式下，一次性处理完整消息
-                    ResponseHandler?.Invoke(message);
+                    await HistoryManager.AddMessage(tempUserMessage);
                 }
-            }
-            // 根据上下文设置决定是否保留历史（使用基类的统一状态）
-            if (Settings.KeepContext)
-            {
+                // 再保存助手回复
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
-            }
-            // 只有在保持上下文模式时才保存历史记录
-            if (Settings.KeepContext)
-            {
+                // 保存历史记录
                 SaveHistory();
             }
             return "";
@@ -279,53 +312,70 @@ namespace VPetLLM.Core.ChatCore
 
         public override async Task<string> Summarize(string systemPrompt, string userContent)
         {
-            var messages = new[]
+            try
             {
-                new { role = "system", content = systemPrompt },
-                new { role = "user", content = userContent }
-            };
-
-            // 获取当前节点和API Key
-            var (apiUrl, apiKey) = GetCurrentEndpoint();
-            var currentNode = GetCurrentNode();
-
-            object data;
-            if (_openAISetting.EnableAdvanced)
-            {
-                data = new
+                var messages = new[]
                 {
-                    model = currentNode.Model,
-                    messages = messages,
-                    temperature = _openAISetting.Temperature,
-                    max_tokens = _openAISetting.MaxTokens
+                    new { role = "system", content = systemPrompt },
+                    new { role = "user", content = userContent }
                 };
-            }
-            else
-            {
-                data = new
-                {
-                    model = currentNode.Model,
-                    messages = messages
-                };
-            }
 
-            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                // 获取当前节点和API Key
+                var (apiUrl, apiKey) = GetCurrentEndpoint();
+                var currentNode = GetCurrentNode();
 
-            using (var client = GetClient())
-            {
-                if (!string.IsNullOrEmpty(apiKey))
+                object data;
+                if (_openAISetting.EnableAdvanced)
                 {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        messages = messages,
+                        temperature = _openAISetting.Temperature,
+                        max_tokens = _openAISetting.MaxTokens
+                    };
                 }
-                var response = await client.PostAsync(apiUrl, content);
-                response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
-                var responseObject = JObject.Parse(responseString);
-                return responseObject["choices"][0]["message"]["content"].ToString();
+                else
+                {
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        messages = messages
+                    };
+                }
+
+                var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+
+                using (var client = GetClient())
+                {
+                    if (!string.IsNullOrEmpty(apiKey))
+                    {
+                        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                    }
+                    var response = await client.PostAsync(apiUrl, content);
+                    
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
+                        Utils.Logger.Log($"OpenAI Summarize 错误: {errorMessage}");
+                        return Utils.ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
+                    }
+                    
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    var responseObject = JObject.Parse(responseString);
+                    return responseObject["choices"][0]["message"]["content"].ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"OpenAI Summarize 异常: {ex.Message}");
+                return Utils.ErrorMessageHelper.IsDebugMode(Settings) 
+                    ? $"OpenAI Summarize 异常: {ex.Message}\n{ex.StackTrace}" 
+                    : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试。");
             }
         }
 
-        private List<Message> GetCoreHistory()
+        private List<Message> GetCoreHistory(bool injectRecords = false)
         {
             var history = new List<Message>
             {
@@ -333,57 +383,77 @@ namespace VPetLLM.Core.ChatCore
             };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
             
-            // Inject important records into history
-            history = InjectRecordsIntoHistory(history);
+            // Inject important records into history (only when explicitly requested, after user message is added)
+            if (injectRecords)
+            {
+                history = InjectRecordsIntoHistory(history);
+            }
             
             return history;
         }
         public List<string> RefreshModels()
         {
-            // 获取当前节点和API Key
-            var (apiUrl, apiKey) = GetCurrentEndpoint();
-            var currentNode = GetCurrentNode();
-            
-            string modelsUrl = apiUrl;
-            if (modelsUrl.Contains("/chat/completions"))
+            try
             {
-                modelsUrl = modelsUrl.Replace("/chat/completions", "/models");
-            }
-            else
-            {
-                var baseUrl = modelsUrl.TrimEnd('/');
-                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
+                // 获取当前节点和API Key
+                var (apiUrl, apiKey) = GetCurrentEndpoint();
+                var currentNode = GetCurrentNode();
+                
+                string modelsUrl = apiUrl;
+                if (modelsUrl.Contains("/chat/completions"))
                 {
-                    baseUrl += "/v1";
+                    modelsUrl = modelsUrl.Replace("/chat/completions", "/models");
                 }
-                modelsUrl = baseUrl.TrimEnd('/') + "/models";
-            }
+                else
+                {
+                    var baseUrl = modelsUrl.TrimEnd('/');
+                    if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
+                    {
+                        baseUrl += "/v1";
+                    }
+                    modelsUrl = baseUrl.TrimEnd('/') + "/models";
+                }
 
-            var url = new System.Uri(new System.Uri(modelsUrl), "");
-            using (var client = GetClient())
+                var url = new System.Uri(new System.Uri(modelsUrl), "");
+                using (var client = GetClient())
+                {
+                    if (!string.IsNullOrEmpty(apiKey))
+                    {
+                        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                    }
+                    var response = client.GetAsync(url).Result;
+                    
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var errorMessage = Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI").Result;
+                        throw new System.Exception(errorMessage);
+                    }
+                    
+                    var responseString = response.Content.ReadAsStringAsync().Result;
+                    JObject responseObject;
+                    try
+                    {
+                        responseObject = JObject.Parse(responseString);
+                    }
+                    catch (JsonReaderException)
+                    {
+                        var parseError = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                            ? $"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}"
+                            : "获取模型列表失败，服务器返回了无效的响应格式。";
+                        throw new System.Exception(parseError);
+                    }
+                    var models = new List<string>();
+                    foreach (var model in responseObject["data"])
+                    {
+                        models.Add(model["id"].ToString());
+                    }
+                    return models;
+                }
+            }
+            catch (System.Exception ex) when (!(ex.Message.Contains("API") || ex.Message.Contains("获取模型")))
             {
-                if (!string.IsNullOrEmpty(apiKey))
-                {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-                }
-                var response = client.GetAsync(url).Result;
-                response.EnsureSuccessStatusCode();
-                var responseString = response.Content.ReadAsStringAsync().Result;
-                JObject responseObject;
-                try
-                {
-                    responseObject = JObject.Parse(responseString);
-                }
-                catch (JsonReaderException)
-                {
-                    throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
-                }
-                var models = new List<string>();
-                foreach (var model in responseObject["data"])
-                {
-                    models.Add(model["id"].ToString());
-                }
-                return models;
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
+                throw new System.Exception(errorMessage);
             }
         }
 

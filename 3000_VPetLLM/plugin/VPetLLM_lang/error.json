@@ -1,70 +1,248 @@
 {
     "RefreshPluginStore.Fail": {
         "zh-hans": "刷新插件商店失败，多次失败请配置代理",
-        "en": "Failed to refresh plugin store"
+        "zh-hant": "刷新插件商店失敗，多次失敗請配置代理",
+        "en": "Failed to refresh plugin store",
+        "jp": "プラグインストアの更新に失敗しました。繰り返し失敗する場合はプロキシを設定してください"
     },
     "InstallPlugin.Fail": {
         "zh-hans": "安装插件失败，多次失败请配置代理",
-        "en": "Failed to install plugin"
+        "zh-hant": "安裝插件失敗，多次失敗請配置代理",
+        "en": "Failed to install plugin",
+        "jp": "プラグインのインストールに失敗しました。繰り返し失敗する場合はプロキシを設定してください"
     },
     "InstallPlugin.FileValidationError": {
         "zh-hans": "文件校验失败，请稍后重试",
-        "en": "File validation failed, please try again later"
+        "zh-hant": "文件校驗失敗，請稍後重試",
+        "en": "File validation failed, please try again later",
+        "jp": "ファイル検証に失敗しました。後でもう一度お試しください"
     },
     "InstallPlugin.Success": {
         "zh-hans": "插件安装成功，请重启桌宠以加载新插件",
-        "en": "Plugin installed successfully, please restart VPet to load the new plugin"
+        "zh-hant": "插件安裝成功，請重啟桌寵以加載新插件",
+        "en": "Plugin installed successfully, please restart VPet to load the new plugin",
+        "jp": "プラグインのインストールが完了しました。新しいプラグインを読み込むにはVPetを再起動してください"
     },
     "RefreshOllamaModels.Fail": {
         "zh-hans": "刷新Ollama模型失败",
-        "en": "Failed to refresh Ollama models"
+        "zh-hant": "刷新Ollama模型失敗",
+        "en": "Failed to refresh Ollama models",
+        "jp": "Ollamaモデルの更新に失敗しました"
     },
     "RefreshOpenAIModels.Fail": {
         "zh-hans": "刷新OpenAI模型失败",
-        "en": "Failed to refresh OpenAI models"
+        "zh-hant": "刷新OpenAI模型失敗",
+        "en": "Failed to refresh OpenAI models",
+        "jp": "OpenAIモデルの更新に失敗しました"
     },
     "RefreshGeminiModels.Fail": {
         "zh-hans": "刷新Gemini模型失败",
-        "en": "Failed to refresh Gemini models"
+        "zh-hant": "刷新Gemini模型失敗",
+        "en": "Failed to refresh Gemini models",
+        "jp": "Geminiモデルの更新に失敗しました"
     },
     "Error": {
         "zh-hans": "错误",
-        "en": "Error"
+        "zh-hant": "錯誤",
+        "en": "Error",
+        "jp": "エラー"
     },
     "Success": {
         "zh-hans": "成功",
-        "en": "Success"
+        "zh-hant": "成功",
+        "en": "Success",
+        "jp": "成功"
     },
     "TTS.PlayFailed": {
         "zh-hans": "TTS播放失败",
-        "en": "TTS playback failed"
+        "zh-hant": "TTS播放失敗",
+        "en": "TTS playback failed",
+        "jp": "TTS再生に失敗しました"
     },
     "TTS.NetworkError": {
         "zh-hans": "TTS网络连接失败",
-        "en": "TTS network connection failed"
+        "zh-hant": "TTS網絡連接失敗",
+        "en": "TTS network connection failed",
+        "jp": "TTSネットワーク接続に失敗しました"
     },
     "TTS.TestSuccess": {
         "zh-hans": "TTS测试成功",
-        "en": "TTS test successful"
+        "zh-hant": "TTS測試成功",
+        "en": "TTS test successful",
+        "jp": "TTSテスト成功"
     },
     "TTS.TestFailed": {
         "zh-hans": "TTS测试失败",
-        "en": "TTS test failed"
+        "zh-hant": "TTS測試失敗",
+        "en": "TTS test failed",
+        "jp": "TTSテスト失敗"
     },
     "TTS.InvalidSettings": {
         "zh-hans": "TTS设置无效",
-        "en": "Invalid TTS settings"
+        "zh-hant": "TTS設置無效",
+        "en": "Invalid TTS settings",
+        "jp": "TTS設定が無効です"
     },
     "TouchFeedback.InitializeFailed": {
         "zh-hans": "身体交互功能初始化失败",
-        "en": "Touch feedback initialization failed"
+        "zh-hant": "身體交互功能初始化失敗",
+        "en": "Touch feedback initialization failed",
+        "jp": "タッチフィードバックの初期化に失敗しました"
     },
     "TouchFeedback.ProcessingError": {
         "zh-hans": "身体交互处理出错",
-        "en": "Touch feedback processing error"
+        "zh-hant": "身體交互處理出錯",
+        "en": "Touch feedback processing error",
+        "jp": "タッチフィードバック処理エラー"
     },
     "TouchFeedback.CooldownActive": {
         "zh-hans": "触摸冷却中，请稍后再试",
-        "en": "Touch cooldown active, please try again later"
+        "zh-hant": "觸摸冷卻中，請稍後再試",
+        "en": "Touch cooldown active, please try again later",
+        "jp": "タッチクールダウン中です。後でもう一度お試しください"
+    },
+    "API.Error.Unauthorized": {
+        "zh-hans": "[401] API密钥无效或已过期，请检查您的API密钥设置。",
+        "zh-hant": "[401] API密鑰無效或已過期，請檢查您的API密鑰設置。",
+        "en": "[401] API key is invalid or expired. Please check your API key settings.",
+        "jp": "[401] APIキーが無効または期限切れです。APIキーの設定を確認してください。"
+    },
+    "API.Error.Forbidden": {
+        "zh-hans": "[403] 访问被拒绝，请检查API密钥权限或账户状态。",
+        "zh-hant": "[403] 訪問被拒絕，請檢查API密鑰權限或賬戶狀態。",
+        "en": "[403] Access denied. Please check your API key permissions or account status.",
+        "jp": "[403] アクセスが拒否されました。APIキーの権限またはアカウントの状態を確認してください。"
+    },
+    "API.Error.NotFound": {
+        "zh-hans": "[404] API地址无效，请检查URL配置是否正确。",
+        "zh-hant": "[404] API地址無效，請檢查URL配置是否正確。",
+        "en": "[404] API address is invalid. Please check if the URL configuration is correct.",
+        "jp": "[404] APIアドレスが無効です。URL設定が正しいか確認してください。"
+    },
+    "API.Error.TooManyRequests": {
+        "zh-hans": "[429] 请求过于频繁，请稍后再试。",
+        "zh-hant": "[429] 請求過於頻繁，請稍後再試。",
+        "en": "[429] Too many requests. Please try again later.",
+        "jp": "[429] リクエストが多すぎます。後でもう一度お試しください。"
+    },
+    "API.Error.BadRequest": {
+        "zh-hans": "[400] 请求格式错误，请检查配置参数。",
+        "zh-hant": "[400] 請求格式錯誤，請檢查配置參數。",
+        "en": "[400] Bad request format. Please check your configuration parameters.",
+        "jp": "[400] リクエスト形式が不正です。設定パラメータを確認してください。"
+    },
+    "API.Error.InternalServerError": {
+        "zh-hans": "[500] 服务器内部错误，请稍后再试。",
+        "zh-hant": "[500] 服務器內部錯誤，請稍後再試。",
+        "en": "[500] Internal server error. Please try again later.",
+        "jp": "[500] サーバー内部エラーです。後でもう一度お試しください。"
+    },
+    "API.Error.BadGateway": {
+        "zh-hans": "[502] 网关错误，服务暂时不可用，请稍后再试。",
+        "zh-hant": "[502] 網關錯誤，服務暫時不可用，請稍後再試。",
+        "en": "[502] Bad gateway. Service temporarily unavailable. Please try again later.",
+        "jp": "[502] ゲートウェイエラーです。サービスは一時的に利用できません。後でもう一度お試しください。"
+    },
+    "API.Error.ServiceUnavailable": {
+        "zh-hans": "[503] 服务暂时不可用，请稍后再试。",
+        "zh-hant": "[503] 服務暫時不可用，請稍後再試。",
+        "en": "[503] Service temporarily unavailable. Please try again later.",
+        "jp": "[503] サービスは一時的に利用できません。後でもう一度お試しください。"
+    },
+    "API.Error.GatewayTimeout": {
+        "zh-hans": "[504] 请求超时，请检查网络连接或稍后再试。",
+        "zh-hant": "[504] 請求超時，請檢查網絡連接或稍後再試。",
+        "en": "[504] Gateway timeout. Please check your network connection or try again later.",
+        "jp": "[504] ゲートウェイタイムアウトです。ネットワーク接続を確認するか、後でもう一度お試しください。"
+    },
+    "API.Error.Unknown": {
+        "zh-hans": "请求失败，请稍后再试。",
+        "zh-hant": "請求失敗，請稍後再試。",
+        "en": "Request failed. Please try again later.",
+        "jp": "リクエストに失敗しました。後でもう一度お試しください。"
+    },
+    "API.Error.Timeout": {
+        "zh-hans": "{Provider}请求超时，请检查网络连接或稍后再试。",
+        "zh-hant": "{Provider}請求超時，請檢查網絡連接或稍後再試。",
+        "en": "{Provider} request timed out. Please check your network connection or try again later.",
+        "jp": "{Provider}リクエストがタイムアウトしました。ネットワーク接続を確認するか、後でもう一度お試しください。"
+    },
+    "API.Error.ConnectionRefused": {
+        "zh-hans": "无法连接到{Provider}服务，请检查服务是否启动以及地址配置是否正确。",
+        "zh-hant": "無法連接到{Provider}服務，請檢查服務是否啟動以及地址配置是否正確。",
+        "en": "Cannot connect to {Provider} service. Please check if the service is running and the address is correct.",
+        "jp": "{Provider}サービスに接続できません。サービスが起動しているか、アドレス設定が正しいか確認してください。"
+    },
+    "API.Error.DnsResolution": {
+        "zh-hans": "无法解析{Provider}服务地址，请检查URL配置是否正确。",
+        "zh-hant": "無法解析{Provider}服務地址，請檢查URL配置是否正確。",
+        "en": "Cannot resolve {Provider} service address. Please check if the URL configuration is correct.",
+        "jp": "{Provider}サービスアドレスを解決できません。URL設定が正しいか確認してください。"
+    },
+    "API.Error.SslError": {
+        "zh-hans": "SSL/TLS连接失败，请检查网络设置或代理配置。",
+        "zh-hant": "SSL/TLS連接失敗，請檢查網絡設置或代理配置。",
+        "en": "SSL/TLS connection failed. Please check your network settings or proxy configuration.",
+        "jp": "SSL/TLS接続に失敗しました。ネットワーク設定またはプロキシ設定を確認してください。"
+    },
+    "API.Error.NetworkError": {
+        "zh-hans": "网络连接异常，请检查网络设置或稍后再试。",
+        "zh-hant": "網絡連接異常，請檢查網絡設置或稍後再試。",
+        "en": "Network connection error. Please check your network settings or try again later.",
+        "jp": "ネットワーク接続エラーです。ネットワーク設定を確認するか、後でもう一度お試しください。"
+    },
+    "API.Error.InvalidResponse": {
+        "zh-hans": "{Provider}返回了无效的响应格式。",
+        "zh-hant": "{Provider}返回了無效的響應格式。",
+        "en": "{Provider} returned an invalid response format.",
+        "jp": "{Provider}が無効な応答形式を返しました。"
+    },
+    "API.Error.ServiceException": {
+        "zh-hans": "{Provider}服务异常，请稍后再试。",
+        "zh-hant": "{Provider}服務異常，請稍後再試。",
+        "en": "{Provider} service error. Please try again later.",
+        "jp": "{Provider}サービスエラーです。後でもう一度お試しください。"
+    },
+    "API.Error.SummarizeFailed": {
+        "zh-hans": "总结功能暂时不可用，请稍后再试。",
+        "zh-hant": "總結功能暫時不可用，請稍後再試。",
+        "en": "Summary feature is temporarily unavailable. Please try again later.",
+        "jp": "要約機能は一時的に利用できません。後でもう一度お試しください。"
+    },
+    "API.Error.GetModelsFailed": {
+        "zh-hans": "获取模型列表失败，服务器返回了无效的响应格式。",
+        "zh-hant": "獲取模型列表失敗，服務器返回了無效的響應格式。",
+        "en": "Failed to get model list. Server returned an invalid response format.",
+        "jp": "モデルリストの取得に失敗しました。サーバーが無効な応答形式を返しました。"
+    },
+    "Ollama.Error.Timeout": {
+        "zh-hans": "Ollama请求超时，请检查：\n1. Ollama服务是否正常运行\n2. 模型是否已下载\n3. 网络连接是否正常\n4. URL配置是否正确",
+        "zh-hant": "Ollama請求超時，請檢查：\n1. Ollama服務是否正常運行\n2. 模型是否已下載\n3. 網絡連接是否正常\n4. URL配置是否正確",
+        "en": "Ollama request timed out. Please check:\n1. Is Ollama service running properly\n2. Is the model downloaded\n3. Is the network connection normal\n4. Is the URL configuration correct",
+        "jp": "Ollamaリクエストがタイムアウトしました。以下を確認してください：\n1. Ollamaサービスが正常に動作しているか\n2. モデルがダウンロードされているか\n3. ネットワーク接続が正常か\n4. URL設定が正しいか"
+    },
+    "Ollama.Error.ConnectionFailed": {
+        "zh-hans": "Ollama连接失败，请检查：\n1. Ollama服务是否启动\n2. URL配置是否正确\n3. 防火墙设置",
+        "zh-hant": "Ollama連接失敗，請檢查：\n1. Ollama服務是否啟動\n2. URL配置是否正確\n3. 防火牆設置",
+        "en": "Ollama connection failed. Please check:\n1. Is Ollama service started\n2. Is the URL configuration correct\n3. Firewall settings",
+        "jp": "Ollama接続に失敗しました。以下を確認してください：\n1. Ollamaサービスが起動しているか\n2. URL設定が正しいか\n3. ファイアウォール設定"
+    },
+    "Free.Error.ConfigNotLoaded": {
+        "zh-hans": "Free Chat配置未加载，请等待配置下载完成后重启程序",
+        "zh-hant": "Free Chat配置未加載，請等待配置下載完成後重啟程序",
+        "en": "Free Chat configuration not loaded. Please wait for the configuration to download and restart the program",
+        "jp": "Free Chat設定が読み込まれていません。設定のダウンロードが完了するまで待ってからプログラムを再起動してください"
+    },
+    "Free.Error.ServiceMaintenance": {
+        "zh-hans": "Free API服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。",
+        "zh-hant": "Free API服務正在維護中，請稍後再試。如果問題持續存在，請聯繫開發者。",
+        "en": "Free API service is under maintenance. Please try again later. If the problem persists, please contact the developer.",
+        "jp": "Free APIサービスはメンテナンス中です。後でもう一度お試しください。問題が続く場合は、開発者にお問い合わせください。"
+    },
+    "Free.Error.ServiceUnavailable": {
+        "zh-hans": "Free API服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。",
+        "zh-hant": "Free API服務暫時不可用，請稍後再試。這可能是由於服務器負載過高或維護導致的。",
+        "en": "Free API service is temporarily unavailable. Please try again later. This may be due to high server load or maintenance.",
+        "jp": "Free APIサービスは一時的に利用できません。後でもう一度お試しください。これはサーバー負荷が高いか、メンテナンス中の可能性があります。"
     }
 }

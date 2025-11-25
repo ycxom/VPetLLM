@@ -36,12 +36,19 @@ namespace VPetLLM.Core.ChatCore
                 {
                     ClearContext();
                 }
-                if (!string.IsNullOrEmpty(prompt))
-                {
-                    //无论是用户输入还是插件返回，都作为user角色
-                    await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
-                }
+                
+                // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
+                var tempUserMessage = !string.IsNullOrEmpty(prompt) ? new Message { Role = "user", Content = prompt } : null;
+                
                 List<Message> history = GetCoreHistory();
+                // 如果有临时用户消息，添加到历史末尾用于API请求
+                if (tempUserMessage != null)
+                {
+                    history.Add(tempUserMessage);
+                }
+                // 在添加用户消息后注入重要记录
+                history = InjectRecordsIntoHistory(history);
+                
                 var data = new
                 {
                     model = _ollamaSetting.Model,
@@ -131,36 +138,41 @@ namespace VPetLLM.Core.ChatCore
                     }
                 }
                 
-                // 根据上下文设置决定是否保留历史（使用基类的统一状态）
+                // API调用成功后，才将用户消息和助手回复保存到历史记录
                 if (Settings.KeepContext)
                 {
+                    // 先保存用户消息
+                    if (tempUserMessage != null)
+                    {
+                        await HistoryManager.AddMessage(tempUserMessage);
+                    }
+                    // 再保存助手回复
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
-                }
-                // 只有在保持上下文模式时才保存历史记录
-                if (Settings.KeepContext)
-                {
+                    // 保存历史记录
                     SaveHistory();
                 }
                 return "";
             }
             catch (TaskCanceledException tcEx)
             {
-                var errorMessage = "Ollama请求超时，请检查：\n1. Ollama服务是否正常运行\n2. 模型是否已下载\n3. 网络连接是否正常\n4. URL配置是否正确";
                 Utils.Logger.Log($"Ollama Chat 请求超时: {tcEx.Message}");
+                var errorMessage = Utils.ErrorMessageHelper.GetOllamaTimeoutError(Settings) 
+                    ?? $"Ollama 请求超时: {tcEx.Message}\n{tcEx.StackTrace}";
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (HttpRequestException httpEx)
             {
-                var errorMessage = "Ollama连接失败，请检查：\n1. Ollama服务是否启动\n2. URL配置是否正确\n3. 防火墙设置";
                 Utils.Logger.Log($"Ollama Chat 网络异常: {httpEx.Message}");
+                var errorMessage = Utils.ErrorMessageHelper.GetOllamaConnectionError(Settings) 
+                    ?? $"Ollama 网络异常: {httpEx.Message}\n{httpEx.StackTrace}";
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (Exception ex)
             {
-                var errorMessage = $"Ollama聊天异常: {ex.Message}";
                 Utils.Logger.Log($"Ollama Chat 异常: {ex.Message}");
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
@@ -183,7 +195,14 @@ namespace VPetLLM.Core.ChatCore
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
                     client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
                     var response = await client.PostAsync("/api/generate", content);
-                    response.EnsureSuccessStatusCode();
+                    
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Ollama");
+                        Utils.Logger.Log($"Ollama Summarize 错误: {errorMessage}");
+                        return Utils.ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败");
+                    }
+                    
                     var responseString = await response.Content.ReadAsStringAsync();
                     var responseObject = JObject.Parse(responseString);
                     return responseObject["response"].ToString();
@@ -192,21 +211,23 @@ namespace VPetLLM.Core.ChatCore
             catch (TaskCanceledException tcEx)
             {
                 Utils.Logger.Log($"Ollama Summarize 请求超时: {tcEx.Message}");
-                return "总结请求超时，请检查Ollama服务状态";
+                return Utils.ErrorMessageHelper.GetOllamaTimeoutError(Settings) 
+                    ?? $"Ollama Summarize 请求超时: {tcEx.Message}";
             }
             catch (HttpRequestException httpEx)
             {
                 Utils.Logger.Log($"Ollama Summarize 网络异常: {httpEx.Message}");
-                return "Ollama连接失败，无法完成总结";
+                return Utils.ErrorMessageHelper.GetOllamaConnectionError(Settings) 
+                    ?? $"Ollama Summarize 网络异常: {httpEx.Message}";
             }
             catch (Exception ex)
             {
                 Utils.Logger.Log($"Ollama Summarize 异常: {ex.Message}");
-                return $"总结异常: {ex.Message}";
+                return Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
             }
         }
 
-        private List<Message> GetCoreHistory()
+        private List<Message> GetCoreHistory(bool injectRecords = false)
         {
             var history = new List<Message>
             {
@@ -214,8 +235,11 @@ namespace VPetLLM.Core.ChatCore
             };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
             
-            // Inject important records into history
-            history = InjectRecordsIntoHistory(history);
+            // Inject important records into history (only when explicitly requested, after user message is added)
+            if (injectRecords)
+            {
+                history = InjectRecordsIntoHistory(history);
+            }
             
             return history;
         }
@@ -224,28 +248,45 @@ namespace VPetLLM.Core.ChatCore
         /// </summary>
         public List<string> RefreshModels()
         {
-            using (var client = GetClient())
+            try
             {
-                client.BaseAddress = new System.Uri(_ollamaSetting.Url);
-                client.Timeout = TimeSpan.FromSeconds(30); // 获取模型列表用较短超时
-                var response = client.GetAsync("/api/tags").Result;
-                response.EnsureSuccessStatusCode();
-                var responseString = response.Content.ReadAsStringAsync().Result;
-                JObject responseObject;
-                try
+                using (var client = GetClient())
                 {
-                    responseObject = JObject.Parse(responseString);
+                    client.BaseAddress = new System.Uri(_ollamaSetting.Url);
+                    client.Timeout = TimeSpan.FromSeconds(30); // 获取模型列表用较短超时
+                    var response = client.GetAsync("/api/tags").Result;
+                    
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var errorMessage = Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Ollama").Result;
+                        throw new System.Exception(errorMessage);
+                    }
+                    
+                    var responseString = response.Content.ReadAsStringAsync().Result;
+                    JObject responseObject;
+                    try
+                    {
+                        responseObject = JObject.Parse(responseString);
+                    }
+                    catch (JsonReaderException)
+                    {
+                        var parseError = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                            ? $"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}"
+                            : "获取模型列表失败，服务器返回了无效的响应格式。";
+                        throw new System.Exception(parseError);
+                    }
+                    var models = new List<string>();
+                    foreach (var model in responseObject["models"])
+                    {
+                        models.Add(model["name"].ToString());
+                    }
+                    return models;
                 }
-                catch (JsonReaderException)
-                {
-                    throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
-                }
-                var models = new List<string>();
-                foreach (var model in responseObject["models"])
-                {
-                    models.Add(model["name"].ToString());
-                }
-                return models;
+            }
+            catch (System.Exception ex) when (!(ex.Message.Contains("API") || ex.Message.Contains("获取模型")))
+            {
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
+                throw new System.Exception(errorMessage);
             }
         }
 

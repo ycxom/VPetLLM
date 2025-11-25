@@ -89,7 +89,8 @@ namespace VPetLLM.Core.ChatCore
                 
                 if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
                 {
-                    var errorMessage = "Free Chat 配置未加载，请等待配置下载完成后重启程序";
+                    var errorMessage = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded") 
+                        ?? "Free Chat 配置未加载，请等待配置下载完成后重启程序";
                     Utils.Logger.Log(errorMessage);
                     ResponseHandler?.Invoke(errorMessage);
                     return "";
@@ -100,14 +101,18 @@ namespace VPetLLM.Core.ChatCore
                     ClearContext();
                 }
 
-                if (!string.IsNullOrEmpty(prompt))
-                {
-                    // 无论是用户输入还是插件返回，都作为user角色
-                    await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
-                }
+                // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
+                var tempUserMessage = !string.IsNullOrEmpty(prompt) ? new Message { Role = "user", Content = prompt } : null;
 
                 // 构建请求数据，使用和OpenAI相同的逻辑
                 List<Message> history = GetCoreHistory();
+                // 如果有临时用户消息，添加到历史末尾用于API请求
+                if (tempUserMessage != null)
+                {
+                    history.Add(tempUserMessage);
+                }
+                // 在添加用户消息后注入重要记录
+                history = InjectRecordsIntoHistory(history);
                 var requestBody = new
                 {
                     model = _model,
@@ -180,6 +185,17 @@ namespace VPetLLM.Core.ChatCore
                         {
                             message = "无回复";
                         }
+                        
+                        // API调用成功后，才将用户消息和助手回复保存到历史记录
+                        if (Settings.KeepContext)
+                        {
+                            if (tempUserMessage != null)
+                            {
+                                await HistoryManager.AddMessage(tempUserMessage);
+                            }
+                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                            SaveHistory();
+                        }
                     }
                     else
                     {
@@ -203,17 +219,21 @@ namespace VPetLLM.Core.ChatCore
 
                             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                             {
-                                message = "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
+                                message = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceMaintenance") 
+                                    ?? "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
                             }
                             else
                             {
-                                message = "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
+                                message = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable") 
+                                    ?? "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
                             }
                         }
                         else
                         {
                             Utils.Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
-                            message = $"API调用失败: {response.StatusCode}";
+                            message = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                                ? $"API调用失败: {response.StatusCode} - {responseContent}"
+                                : await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Free");
                         }
                     }
                 }
@@ -231,6 +251,17 @@ namespace VPetLLM.Core.ChatCore
                         Utils.Logger.Log($"Free非流式: 收到完整消息，长度: {message.Length}");
                         // 非流式模式下，一次性处理完整消息
                         ResponseHandler?.Invoke(message);
+                        
+                        // API调用成功后，才将用户消息和助手回复保存到历史记录
+                        if (Settings.KeepContext)
+                        {
+                            if (tempUserMessage != null)
+                            {
+                                await HistoryManager.AddMessage(tempUserMessage);
+                            }
+                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                            SaveHistory();
+                        }
                     }
                     else
                     {
@@ -251,31 +282,23 @@ namespace VPetLLM.Core.ChatCore
 
                             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                             {
-                                message = "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
+                                message = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceMaintenance") 
+                                    ?? "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
                             }
                             else
                             {
-                                message = "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
+                                message = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable") 
+                                    ?? "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
                             }
                         }
                         else
                         {
                             Utils.Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
-                            message = $"API调用失败: {response.StatusCode}";
+                            message = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                                ? $"API调用失败: {response.StatusCode} - {responseContent}"
+                                : Utils.ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
                         }
                     }
-                }
-
-                // 根据上下文设置决定是否保留历史（使用基类的统一状态）
-                if (Settings.KeepContext)
-                {
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
-                }
-
-                // 只有在保持上下文模式时才保存历史记录
-                if (Settings.KeepContext)
-                {
-                    SaveHistory();
                 }
 
                 // 注意：ResponseHandler 已经在流式/非流式模式的各自分支中调用过了，这里不需要再次调用
@@ -293,21 +316,25 @@ namespace VPetLLM.Core.ChatCore
                     return await Chat(prompt, true);
                 }
 
-                var errorMessage = "网络连接异常，请检查网络设置或稍后再试。";
+                var errorMessage = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                    ? $"Free Chat 网络异常: {httpEx.Message}\n{httpEx.StackTrace}"
+                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (TaskCanceledException tcEx)
             {
                 Utils.Logger.Log($"Free Chat 请求超时: {tcEx.Message}");
-                var errorMessage = "请求超时，请稍后再试。";
+                var errorMessage = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                    ? $"Free Chat 请求超时: {tcEx.Message}\n{tcEx.StackTrace}"
+                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (Exception ex)
             {
                 Utils.Logger.Log($"Free Chat 异常: {ex.Message}");
-                var errorMessage = $"聊天异常: {ex.Message}";
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
@@ -322,7 +349,8 @@ namespace VPetLLM.Core.ChatCore
                 if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
                 {
                     Utils.Logger.Log("Free Chat 配置未加载，总结功能不可用");
-                    return "配置未加载，总结功能暂时不可用";
+                    return Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded") 
+                        ?? "配置未加载，总结功能暂时不可用";
                 }
 
                 var messages = new[]
@@ -357,31 +385,36 @@ namespace VPetLLM.Core.ChatCore
                         responseContent.Contains("INTERNAL_SERVER_ERROR"))
                     {
                         Utils.Logger.Log($"Free Summarize 服务器内部错误: {responseContent}");
-                        return "Free API 服务暂时不可用，总结功能无法使用。";
+                        return Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable") 
+                            ?? "Free API 服务暂时不可用，总结功能无法使用。";
                     }
 
                     Utils.Logger.Log($"Free Summarize 错误: {response.StatusCode} - {responseContent}");
-                    return "总结失败";
+                    return Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败";
                 }
             }
             catch (HttpRequestException httpEx)
             {
                 Utils.Logger.Log($"Free Summarize 网络异常: {httpEx.Message}");
-                return "网络连接异常，总结功能暂时不可用。";
+                return Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                    ? $"Free Summarize 网络异常: {httpEx.Message}"
+                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
             }
             catch (TaskCanceledException tcEx)
             {
                 Utils.Logger.Log($"Free Summarize 请求超时: {tcEx.Message}");
-                return "请求超时，总结功能暂时不可用。";
+                return Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                    ? $"Free Summarize 请求超时: {tcEx.Message}"
+                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
             }
             catch (Exception ex)
             {
                 Utils.Logger.Log($"Free Summarize 异常: {ex.Message}");
-                return "总结异常";
+                return Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
             }
         }
 
-        private List<Message> GetCoreHistory()
+        private List<Message> GetCoreHistory(bool injectRecords = false)
         {
             var history = new List<Message>
             {
@@ -389,8 +422,11 @@ namespace VPetLLM.Core.ChatCore
             };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - Settings.HistoryCompressionThreshold)));
             
-            // Inject important records into history
-            history = InjectRecordsIntoHistory(history);
+            // Inject important records into history (only when explicitly requested, after user message is added)
+            if (injectRecords)
+            {
+                history = InjectRecordsIntoHistory(history);
+            }
             
             return history;
         }

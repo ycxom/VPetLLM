@@ -62,7 +62,8 @@ namespace VPetLLM.Utils
                 return $"[{key}]";
             }
 
-            var token = _errorData.SelectToken(key);
+            // 直接通过键名访问，因为error.json的键包含点号（如 "API.Error.Unauthorized"）
+            var token = _errorData[key];
 
             return token?[langCode]?.ToString() ?? $"[{key}]";
         }

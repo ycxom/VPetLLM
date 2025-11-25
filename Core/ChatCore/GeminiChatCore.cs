@@ -60,13 +60,18 @@ namespace VPetLLM.Core.ChatCore
             {
                 ClearContext();
             }
-            if (!string.IsNullOrEmpty(prompt))
-            {
-                //无论是用户输入还是插件返回，都作为user角色
-                await HistoryManager.AddMessage(new Message { Role = "user", Content = prompt });
-            }
+            
+            // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
+            var tempUserMessage = !string.IsNullOrEmpty(prompt) ? new Message { Role = "user", Content = prompt } : null;
 
             List<Message> history = GetCoreHistory();
+            // 如果有临时用户消息，添加到历史末尾用于API请求
+            if (tempUserMessage != null)
+            {
+                history.Add(tempUserMessage);
+            }
+            // 在添加用户消息后注入重要记录
+            history = InjectRecordsIntoHistory(history);
             var node = _geminiSetting.GetCurrentGeminiSetting();
             var requestData = new
             {
@@ -96,93 +101,121 @@ namespace VPetLLM.Core.ChatCore
                 : $"{baseUrl}/models/{modelName}:generateContent";
 
             string message;
-            using (var client = GetClient())
+            try
             {
-                if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
+                using (var client = GetClient())
                 {
-                    client.DefaultRequestHeaders.Remove("User-Agent");
-                }
-                client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                var rotatedKey = GetCurrentApiKeyFromNode(node.ApiKey);
-                if (!string.IsNullOrEmpty(rotatedKey))
-                {
-                    client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey);
-                }
-                
-                if (node.EnableStreaming)
-                {
-                    // 流式传输模式
-                    Utils.Logger.Log("Gemini: 使用流式传输模式");
-                    var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint)
+                    if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
                     {
-                        Content = content
-                    };
-                    var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-                    response.EnsureSuccessStatusCode();
+                        client.DefaultRequestHeaders.Remove("User-Agent");
+                    }
+                    client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
+                    var rotatedKey = GetCurrentApiKeyFromNode(node.ApiKey);
+                    if (!string.IsNullOrEmpty(rotatedKey))
+                    {
+                        client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey);
+                    }
                     
-                    var fullMessage = new StringBuilder();
-                    var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                    if (node.EnableStreaming)
                     {
-                        // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
-                        Utils.Logger.Log($"Gemini流式: 检测到完整命令: {cmd}");
-                        ResponseHandler?.Invoke(cmd);
-                    });
-                    
-                    using (var stream = await response.Content.ReadAsStreamAsync())
-                    using (var reader = new System.IO.StreamReader(stream))
-                    {
-                        string line;
-                        while ((line = await reader.ReadLineAsync()) != null)
+                        // 流式传输模式
+                        Utils.Logger.Log("Gemini: 使用流式传输模式");
+                        var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint)
                         {
-                            if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
-                                continue;
-                            
-                            var jsonData = line.Substring(6).Trim();
-                            
-                            try
+                            Content = content
+                        };
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+                        
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        {
+                            // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
+                            Utils.Logger.Log($"Gemini流式: 检测到完整命令: {cmd}");
+                            ResponseHandler?.Invoke(cmd);
+                        });
+                        
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) != null)
                             {
-                                var chunk = JObject.Parse(jsonData);
-                                var delta = chunk["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
-                                if (!string.IsNullOrEmpty(delta))
+                                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                                    continue;
+                                
+                                var jsonData = line.Substring(6).Trim();
+                                
+                                try
                                 {
-                                    fullMessage.Append(delta);
-                                    // 将新片段传递给流式处理器，检测完整命令
-                                    streamProcessor.AddChunk(delta);
-                                    // 通知流式文本更新（用于显示）
-                                    StreamingChunkHandler?.Invoke(delta);
+                                    var chunk = JObject.Parse(jsonData);
+                                    var delta = chunk["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        // 将新片段传递给流式处理器，检测完整命令
+                                        streamProcessor.AddChunk(delta);
+                                        // 通知流式文本更新（用于显示）
+                                        StreamingChunkHandler?.Invoke(delta);
+                                    }
+                                }
+                                catch
+                                {
+                                    // 忽略解析错误，继续处理下一行
                                 }
                             }
-                            catch
-                            {
-                                // 忽略解析错误，继续处理下一行
-                            }
                         }
+                        message = fullMessage.ToString();
+                        Utils.Logger.Log($"Gemini流式: 流式传输完成，总消息长度: {message.Length}");
+                        // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
-                    message = fullMessage.ToString();
-                    Utils.Logger.Log($"Gemini流式: 流式传输完成，总消息长度: {message.Length}");
-                    // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
+                    else
+                    {
+                        // 非流式传输模式
+                        Utils.Logger.Log("Gemini: 使用非流式传输模式");
+                        var response = await client.PostAsync(apiEndpoint, content);
+                        
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+                        
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var responseObject = JObject.Parse(responseString);
+                        message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
+                        Utils.Logger.Log($"Gemini非流式: 收到完整消息，长度: {message.Length}");
+                        // 非流式模式下，一次性处理完整消息
+                        ResponseHandler?.Invoke(message);
+                    }
                 }
-                else
-                {
-                    // 非流式传输模式
-                    Utils.Logger.Log("Gemini: 使用非流式传输模式");
-                    var response = await client.PostAsync(apiEndpoint, content);
-                    response.EnsureSuccessStatusCode();
-                    var responseString = await response.Content.ReadAsStringAsync();
-                    var responseObject = JObject.Parse(responseString);
-                    message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
-                    Utils.Logger.Log($"Gemini非流式: 收到完整消息，长度: {message.Length}");
-                    // 非流式模式下，一次性处理完整消息
-                    ResponseHandler?.Invoke(message);
-                }
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
+                Utils.Logger.Log($"Gemini Chat 异常: {ex.Message}");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
             }
 
+            // API调用成功后，才将用户消息和助手回复保存到历史记录
             if (Settings.KeepContext)
             {
+                // 先保存用户消息
+                if (tempUserMessage != null)
+                {
+                    await HistoryManager.AddMessage(tempUserMessage);
+                }
+                // 再保存助手回复
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
-            }
-            if (Settings.KeepContext)
-            {
+                // 保存历史记录
                 SaveHistory();
             }
             return "";
@@ -191,48 +224,65 @@ namespace VPetLLM.Core.ChatCore
 
         public override async Task<string> Summarize(string systemPrompt, string userContent)
         {
-            var requestData = new
+            try
             {
-                system_instruction = new
+                var requestData = new
                 {
-                    parts = new[] { new { text = systemPrompt } }
-                },
-                contents = new[]
+                    system_instruction = new
+                    {
+                        parts = new[] { new { text = systemPrompt } }
+                    },
+                    contents = new[]
+                    {
+                        new { parts = new[] { new { text = userContent } } }
+                    }
+                };
+
+                var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
+
+                var node = _geminiSetting.GetCurrentGeminiSetting();
+                var baseUrl = node.Url.TrimEnd('/');
+                if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
                 {
-                    new { parts = new[] { new { text = userContent } } }
+                    baseUrl += "/v1beta";
                 }
-            };
-
-            var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
-
-            var node = _geminiSetting.GetCurrentGeminiSetting();
-            var baseUrl = node.Url.TrimEnd('/');
-            if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
-            {
-                baseUrl += "/v1beta";
+                var modelName = node.Model;
+                var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
+                using (var client = GetClient())
+                {
+                    if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
+                    {
+                        client.DefaultRequestHeaders.Remove("User-Agent");
+                    }
+                    client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
+                    var rotatedKey2 = GetCurrentApiKeyFromNode(node.ApiKey);
+                    if (!string.IsNullOrEmpty(rotatedKey2))
+                    {
+                        client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey2);
+                    }
+                    var response = await client.PostAsync(apiEndpoint, content);
+                    
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                        Utils.Logger.Log($"Gemini Summarize 错误: {errorMessage}");
+                        return Utils.ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
+                    }
+                    
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    var responseObject = JObject.Parse(responseString);
+                    return responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
+                }
             }
-            var modelName = node.Model;
-            var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
-            using (var client = GetClient())
+            catch (Exception ex)
             {
-                if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
-                {
-                    client.DefaultRequestHeaders.Remove("User-Agent");
-                }
-                client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                var rotatedKey2 = GetCurrentApiKeyFromNode(node.ApiKey);
-                if (!string.IsNullOrEmpty(rotatedKey2))
-                {
-                    client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey2);
-                }
-                var response = await client.PostAsync(apiEndpoint, content);
-                response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
-                var responseObject = JObject.Parse(responseString);
-                return responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
+                Utils.Logger.Log($"Gemini Summarize 异常: {ex.Message}");
+                return Utils.ErrorMessageHelper.IsDebugMode(Settings) 
+                    ? $"Gemini Summarize 异常: {ex.Message}\n{ex.StackTrace}" 
+                    : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试。");
             }
         }
-        private List<Message> GetCoreHistory()
+        private List<Message> GetCoreHistory(bool injectRecords = false)
         {
             var history = new List<Message>
             {
@@ -240,94 +290,107 @@ namespace VPetLLM.Core.ChatCore
             };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
             
-            // Inject important records into history
-            history = InjectRecordsIntoHistory(history);
+            // Inject important records into history (only when explicitly requested, after user message is added)
+            if (injectRecords)
+            {
+                history = InjectRecordsIntoHistory(history);
+            }
             
             return history;
         }
         public List<string> RefreshModels()
         {
-            string requestUrl;
-            var node = _geminiSetting.GetCurrentGeminiSetting();
-            if (node.Url.Contains("/models"))
+            try
             {
-                requestUrl = node.Url;
-            }
-            else
-            {
-                var baseUrl = node.Url.TrimEnd('/');
-
-                if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
+                string requestUrl;
+                var node = _geminiSetting.GetCurrentGeminiSetting();
+                if (node.Url.Contains("/models"))
                 {
-                    baseUrl += "/v1beta";
+                    requestUrl = node.Url;
                 }
-
-                requestUrl = baseUrl.EndsWith("/") ? $"{baseUrl}models/" : $"{baseUrl}/models/";
-            }
-
-            System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Request URL: {requestUrl}");
-            System.Diagnostics.Debug.WriteLine($"[GeminiDebug] API Key present: {!string.IsNullOrEmpty(node.ApiKey)}");
-
-            using (var client = GetClient())
-            {
-                if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
+                else
                 {
-                    client.DefaultRequestHeaders.Remove("User-Agent");
-                }
-                client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                var rotatedKey3 = GetCurrentApiKeyFromNode(node.ApiKey);
-                if (!string.IsNullOrEmpty(rotatedKey3))
-                {
-                    client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey3);
-                }
+                    var baseUrl = node.Url.TrimEnd('/');
 
-                var response = client.GetAsync(requestUrl).Result;
-
-                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Response Status: {(int)response.StatusCode} {response.StatusCode}");
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorContent = response.Content.ReadAsStringAsync().Result;
-                    System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Error Response: {errorContent}");
-                    throw new System.Exception($"Failed to refresh Gemini models: {response.StatusCode}. URL: {requestUrl}, Response: {errorContent}");
-                }
-
-                var responseString = response.Content.ReadAsStringAsync().Result;
-                var models = new List<string>();
-                try
-                {
-                    var jsonToken = JToken.Parse(responseString);
-
-                    // Handle official Gemini format: { "models": [...] }
-                    if (jsonToken is JObject responseObject && responseObject["models"] is JArray modelsArray)
+                    if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
                     {
-                        foreach (var model in modelsArray)
-                        {
-                            models.Add(model["name"].ToString().Replace("models/", ""));
-                        }
+                        baseUrl += "/v1beta";
                     }
-                    // Handle old format: [...]
-                    else if (jsonToken is JArray responseArray)
+
+                    requestUrl = baseUrl.EndsWith("/") ? $"{baseUrl}models/" : $"{baseUrl}/models/";
+                }
+
+                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Request URL: {requestUrl}");
+                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] API Key present: {!string.IsNullOrEmpty(node.ApiKey)}");
+
+                using (var client = GetClient())
+                {
+                    if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
                     {
-                        foreach (var model in responseArray)
+                        client.DefaultRequestHeaders.Remove("User-Agent");
+                    }
+                    client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
+                    var rotatedKey3 = GetCurrentApiKeyFromNode(node.ApiKey);
+                    if (!string.IsNullOrEmpty(rotatedKey3))
+                    {
+                        client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey3);
+                    }
+
+                    var response = client.GetAsync(requestUrl).Result;
+
+                    System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Response Status: {(int)response.StatusCode} {response.StatusCode}");
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var errorMessage = Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini").Result;
+                        throw new System.Exception(errorMessage);
+                    }
+
+                    var responseString = response.Content.ReadAsStringAsync().Result;
+                    var models = new List<string>();
+                    try
+                    {
+                        var jsonToken = JToken.Parse(responseString);
+
+                        // Handle official Gemini format: { "models": [...] }
+                        if (jsonToken is JObject responseObject && responseObject["models"] is JArray modelsArray)
                         {
-                            // The user's old format returns an array of objects with an 'id' or 'name'
-                            var modelName = model["id"]?.ToString() ?? model["name"]?.ToString();
-                            if (!string.IsNullOrEmpty(modelName))
+                            foreach (var model in modelsArray)
                             {
-                                models.Add(modelName.Replace("models/", ""));
+                                models.Add(model["name"].ToString().Replace("models/", ""));
+                            }
+                        }
+                        // Handle old format: [...]
+                        else if (jsonToken is JArray responseArray)
+                        {
+                            foreach (var model in responseArray)
+                            {
+                                // The user's old format returns an array of objects with an 'id' or 'name'
+                                var modelName = model["id"]?.ToString() ?? model["name"]?.ToString();
+                                if (!string.IsNullOrEmpty(modelName))
+                                {
+                                    models.Add(modelName.Replace("models/", ""));
+                                }
                             }
                         }
                     }
-                }
-                catch (JsonReaderException)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GeminiDebug] JSON Parse Error: {responseString}");
-                    throw new System.Exception($"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}");
-                }
+                    catch (JsonReaderException)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[GeminiDebug] JSON Parse Error: {responseString}");
+                        var parseError = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                            ? $"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}"
+                            : "获取模型列表失败，服务器返回了无效的响应格式。";
+                        throw new System.Exception(parseError);
+                    }
 
-                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Models found: {models.Count}");
-                return models;
+                    System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Models found: {models.Count}");
+                    return models;
+                }
+            }
+            catch (System.Exception ex) when (!(ex.Message.Contains("API") || ex.Message.Contains("获取模型")))
+            {
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
+                throw new System.Exception(errorMessage);
             }
         }
 
