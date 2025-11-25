@@ -8,10 +8,11 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using VPetLLM.Core;
 using VPetLLM.Core.ASRCore;
+using VPetLLM.Services;
 
 namespace VPetLLM.Utils
 {
-    public class ASRService : IDisposable
+    public class ASRService : IASRService
     {
         private Setting _settings;
         private Setting.ASRSetting _asrSettings;
@@ -24,11 +25,21 @@ namespace VPetLLM.Utils
         private ASRCoreBase? _asrCore;
 
         public event EventHandler<string>? TranscriptionCompleted;
-        public event EventHandler<string>? TranscriptionError;
+        public event EventHandler<Exception>? TranscriptionError;
         public event EventHandler? RecordingStarted;
         public event EventHandler? RecordingStopped;
 
         public bool IsRecording => _isRecording;
+
+        /// <summary>
+        /// 服务提供商名称
+        /// </summary>
+        public string ProviderName => _asrSettings?.Provider ?? "Unknown";
+
+        /// <summary>
+        /// 服务是否启用
+        /// </summary>
+        public bool IsEnabled => _asrSettings?.IsEnabled ?? false;
 
         public ASRService(Setting settings)
         {
@@ -202,7 +213,7 @@ namespace VPetLLM.Utils
             catch (Exception ex)
             {
                 Logger.Log($"ASR: Error starting recording: {ex.Message}");
-                TranscriptionError?.Invoke(this, $"启动录音失败: {ex.Message}");
+                TranscriptionError?.Invoke(this, new InvalidOperationException($"启动录音失败: {ex.Message}", ex));
                 CleanupRecording();
             }
         }
@@ -225,7 +236,7 @@ namespace VPetLLM.Utils
             catch (Exception ex)
             {
                 Logger.Log($"ASR: Error stopping recording: {ex.Message}");
-                TranscriptionError?.Invoke(this, $"停止录音失败: {ex.Message}");
+                TranscriptionError?.Invoke(this, new InvalidOperationException($"停止录音失败: {ex.Message}", ex));
                 CleanupRecording();
             }
         }
@@ -243,7 +254,7 @@ namespace VPetLLM.Utils
                 if (_recordingStream == null || _recordingStream.Length == 0)
                 {
                     Logger.Log("ASR: No audio data recorded");
-                    TranscriptionError?.Invoke(this, "没有录制到音频数据");
+                    TranscriptionError?.Invoke(this, new InvalidOperationException("没有录制到音频数据"));
                     CleanupRecording();
                     return;
                 }
@@ -254,7 +265,7 @@ namespace VPetLLM.Utils
                 if (_recordingStream.Length > 25 * 1024 * 1024)
                 {
                     Logger.Log("ASR: Audio file too large");
-                    TranscriptionError?.Invoke(this, "录音文件过大，请录制更短的音频");
+                    TranscriptionError?.Invoke(this, new InvalidOperationException("录音文件过大，请录制更短的音频"));
                     CleanupRecording();
                     return;
                 }
@@ -280,13 +291,13 @@ namespace VPetLLM.Utils
                 else
                 {
                     Logger.Log("ASR: Empty transcription result");
-                    TranscriptionError?.Invoke(this, "未识别到语音内容");
+                    TranscriptionError?.Invoke(this, new InvalidOperationException("未识别到语音内容"));
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"ASR: Error processing recording: {ex.Message}");
-                TranscriptionError?.Invoke(this, $"处理录音失败: {ex.Message}");
+                TranscriptionError?.Invoke(this, new InvalidOperationException($"处理录音失败: {ex.Message}", ex));
             }
             finally
             {
@@ -403,6 +414,128 @@ namespace VPetLLM.Utils
             {
                 Logger.Log($"ASR: Error fetching Soniox models: {ex.Message}");
                 return new List<Setting.SonioxModelInfo>();
+            }
+        }
+
+        /// <summary>
+        /// 实现 IASRService.TranscribeAsync - 将音频数据转录为文本
+        /// </summary>
+        public async Task<string?> TranscribeAsync(byte[] audioData)
+        {
+            if (!IsEnabled || audioData == null || audioData.Length == 0)
+            {
+                return null;
+            }
+
+            try
+            {
+                return await TranscribeAudio(audioData);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ASR: TranscribeAsync error: {ex.Message}");
+                TranscriptionError?.Invoke(this, ex);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 实现 IASRService.TranscribeAsync - 将音频流转录为文本
+        /// </summary>
+        public async Task<string?> TranscribeAsync(Stream audioStream)
+        {
+            if (!IsEnabled || audioStream == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                using var memoryStream = new MemoryStream();
+                await audioStream.CopyToAsync(memoryStream);
+                return await TranscribeAsync(memoryStream.ToArray());
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ASR: TranscribeAsync (stream) error: {ex.Message}");
+                TranscriptionError?.Invoke(this, ex);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 实现 IASRService.StopRecordingAsync - 停止录音并返回转录结果
+        /// </summary>
+        public async Task<string?> StopRecordingAsync()
+        {
+            if (!_isRecording)
+            {
+                Logger.Log("ASR: Not recording");
+                return null;
+            }
+
+            var tcs = new TaskCompletionSource<string?>();
+            
+            void OnTranscriptionCompleted(object? sender, string result)
+            {
+                TranscriptionCompleted -= OnTranscriptionCompleted;
+                TranscriptionError -= OnTranscriptionError;
+                tcs.TrySetResult(result);
+            }
+
+            void OnTranscriptionError(object? sender, Exception error)
+            {
+                TranscriptionCompleted -= OnTranscriptionCompleted;
+                TranscriptionError -= OnTranscriptionError;
+                tcs.TrySetResult(null);
+            }
+
+            TranscriptionCompleted += OnTranscriptionCompleted;
+            TranscriptionError += OnTranscriptionError;
+
+            StopRecording();
+
+            // 设置超时
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(60));
+            var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
+
+            if (completedTask == timeoutTask)
+            {
+                TranscriptionCompleted -= OnTranscriptionCompleted;
+                TranscriptionError -= OnTranscriptionError;
+                Logger.Log("ASR: StopRecordingAsync timed out");
+                return null;
+            }
+
+            return await tcs.Task;
+        }
+
+        /// <summary>
+        /// 实现 IASRService.CancelRecording - 取消录音
+        /// </summary>
+        public void CancelRecording()
+        {
+            if (!_isRecording)
+            {
+                return;
+            }
+
+            try
+            {
+                Logger.Log("ASR: Cancelling recording...");
+                _isRecording = false;
+                
+                // 直接清理，不触发处理
+                _waveIn?.StopRecording();
+                CleanupRecording();
+                
+                RecordingStopped?.Invoke(this, EventArgs.Empty);
+                Logger.Log("ASR: Recording cancelled");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ASR: Error cancelling recording: {ex.Message}");
+                CleanupRecording();
             }
         }
 

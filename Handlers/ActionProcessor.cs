@@ -6,14 +6,24 @@ namespace VPetLLM.Handlers
 {
     public class ActionProcessor
     {
-        public List<IActionHandler> Handlers { get; } = new List<IActionHandler>();
+        /// <summary>
+        /// 获取所有已注册的 Handler（通过 HandlerRegistry）
+        /// </summary>
+        public IEnumerable<IActionHandler> Handlers => _handlerRegistry.GetAllHandlers();
+        
         private readonly IMainWindow _mainWindow;
+        private readonly IHandlerRegistry _handlerRegistry;
         private Core.RecordManager _recordManager;
         private Setting _settings;
 
-        public ActionProcessor(IMainWindow mainWindow)
+        public ActionProcessor(IMainWindow mainWindow) : this(mainWindow, HandlerRegistry.Instance)
+        {
+        }
+
+        public ActionProcessor(IMainWindow mainWindow, IHandlerRegistry handlerRegistry)
         {
             _mainWindow = mainWindow;
+            _handlerRegistry = handlerRegistry ?? throw new ArgumentNullException(nameof(handlerRegistry));
             RegisterHandlers();
         }
         
@@ -33,27 +43,29 @@ namespace VPetLLM.Handlers
 
         public void RegisterHandlers()
         {
-            Handlers.Clear();
-            Handlers.Add(new HappyHandler());
-            Handlers.Add(new HealthHandler());
-            Handlers.Add(new ExpHandler());
-            Handlers.Add(new BuyHandler());
-            Handlers.Add(new ActionHandler());
-            Handlers.Add(new MoveHandler());
-            Handlers.Add(new SayHandler());
-            Handlers.Add(new PluginHandler());
+            _handlerRegistry.Clear();
+            
+            // 注册核心 Handler
+            _handlerRegistry.Register("happy", new HappyHandler());
+            _handlerRegistry.Register("health", new HealthHandler());
+            _handlerRegistry.Register("exp", new ExpHandler());
+            _handlerRegistry.Register("buy", new BuyHandler());
+            _handlerRegistry.Register("action", new ActionHandler());
+            _handlerRegistry.Register("move", new MoveHandler());
+            _handlerRegistry.Register("say", new SayHandler());
+            _handlerRegistry.Register("plugin", new PluginHandler());
             
             // Add RecordCommandHandler if RecordManager is available
             if (_recordManager != null)
             {
-                Handlers.Add(new RecordCommandHandler(_recordManager));
-                Handlers.Add(new RecordModifyCommandHandler(_recordManager));
+                _handlerRegistry.Register("record", new RecordCommandHandler(_recordManager));
+                _handlerRegistry.Register("record_modify", new RecordModifyCommandHandler(_recordManager));
             }
             
             // Add VPetSettingsHandler if Settings is available
             if (_settings != null)
             {
-                Handlers.Add(new VPetSettingsHandler(_settings));
+                _handlerRegistry.Register("vpet_settings", new VPetSettingsHandler(_settings));
             }
         }
 
@@ -89,8 +101,8 @@ namespace VPetLLM.Handlers
                     Logger.Log($"ActionProcessor: New plugin format detected - plugin name: {pluginName}");
                 }
 
-                // Find corresponding handler
-                IActionHandler handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == actionType);
+                // Find corresponding handler using HandlerRegistry
+                IActionHandler handler = _handlerRegistry.GetHandler(actionType);
 
                 // If no handler found, try parsing nested structure (e.g., talk(say(...)))
                 if (handler == null && !string.IsNullOrEmpty(value))
@@ -102,7 +114,7 @@ namespace VPetLLM.Handlers
                         var nestedCommand = nestedMatch.Groups[1].Value.ToLower();
                         var nestedValue = nestedMatch.Groups[2].Value;
                         
-                        handler = Handlers.FirstOrDefault(h => h.Keyword.ToLower() == nestedCommand);
+                        handler = _handlerRegistry.GetHandler(nestedCommand);
                         if (handler != null)
                         {
                             // Use nested value

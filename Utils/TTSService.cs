@@ -1,12 +1,11 @@
 using System.IO;
-using System.Windows;
-using System.Windows.Media;
 using VPetLLM.Core;
 using VPetLLM.Core.TTSCore;
+using VPetLLM.Services;
 
 namespace VPetLLM.Utils
 {
-    public class TTSService
+    public class TTSService : ITTSService
     {
         private IMediaPlayer? _mediaPlayer;
         private Setting.TTSSetting _ttsSettings;
@@ -456,6 +455,16 @@ namespace VPetLLM.Utils
         }
 
         /// <summary>
+        /// 服务提供商名称
+        /// </summary>
+        public string ProviderName => _ttsSettings?.Provider ?? "Unknown";
+
+        /// <summary>
+        /// 服务是否启用
+        /// </summary>
+        public bool IsEnabled => _ttsSettings?.IsEnabled ?? false;
+
+        /// <summary>
         /// 更新TTS设置
         /// </summary>
         /// <param name="settings">新的设置</param>
@@ -519,6 +528,66 @@ namespace VPetLLM.Utils
             var testText = "这是一个TTS测试，Hello World!";
             Logger.Log("TTS: 开始测试TTS功能");
             return await PlayTextAsync(testText);
+        }
+
+        /// <summary>
+        /// 实现 ITTSService.SynthesizeAsync - 将文本合成为音频数据
+        /// </summary>
+        public async Task<byte[]?> SynthesizeAsync(string text)
+        {
+            if (!_ttsSettings.IsEnabled || string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            try
+            {
+                var ttsCore = GetTTSCore();
+                var audioData = await ttsCore.GenerateAudioAsync(text);
+
+                if (audioData == null || audioData.Length == 0)
+                {
+                    return null;
+                }
+
+                // 应用音量增益
+                if (Math.Abs(_ttsSettings.VolumeGain) > 0.01)
+                {
+                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _ttsSettings.VolumeGain);
+                }
+
+                return audioData;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"TTS合成错误: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 实现 ITTSService.PlayAsync - 将文本合成并播放
+        /// </summary>
+        async Task ITTSService.PlayAsync(string text)
+        {
+            await PlayTextAsync(text);
+        }
+
+        /// <summary>
+        /// 实现 ITTSService.SetVolume
+        /// </summary>
+        public void SetVolume(double volume)
+        {
+            _ttsSettings.Volume = volume;
+            UpdateCurrentPlayerVolume();
+        }
+
+        /// <summary>
+        /// 实现 ITTSService.SetSpeed
+        /// </summary>
+        public void SetSpeed(double speed)
+        {
+            _ttsSettings.Speed = speed;
         }
 
         /// <summary>

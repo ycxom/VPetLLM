@@ -331,7 +331,7 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private void OnTranscriptionError(object? sender, string error)
+        private void OnTranscriptionError(object? sender, Exception error)
         {
             Dispatcher.Invoke(() =>
             {
@@ -341,10 +341,11 @@ namespace VPetLLM.UI.Windows
                     return;
                 }
 
-                Logger.Log($"VoiceInput: Transcription error: {error}");
-                StatusText.Text = $"错误: {error}";
+                var errorMessage = error?.Message ?? "未知错误";
+                Logger.Log($"VoiceInput: Transcription error: {errorMessage}");
+                StatusText.Text = $"错误: {errorMessage}";
                 StatusHint.Text = "";
-                MessageBox.Show(error, "语音识别错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(errorMessage, "语音识别错误", MessageBoxButton.OK, MessageBoxImage.Error);
             });
         }
 

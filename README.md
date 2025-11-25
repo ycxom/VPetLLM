@@ -2,6 +2,21 @@
 
 VPetLLM 是一个为 [VPet-Simulator](https://github.com/LorisYounger/VPet) 设计的插件，它允许你使用各种大型语言模型（LLM）、语音识别（ASR）和文本转语音（TTS）技术与你的虚拟宠物进行深度互动。
 
+## 📋 系统要求
+
+- Windows 10/11
+- .NET Framework 4.6.2 或更高版本
+- VPet-Simulator 主程序
+- **MPV 播放器**（用于 TTS 音频播放）
+
+### MPV 播放器安装
+
+TTS 功能需要 MPV 播放器支持。请按以下步骤安装：
+
+1. 从 [mpv.io](https://mpv.io/installation/) 或 [SourceForge](https://sourceforge.net/projects/mpv-player-windows/files/) 下载 Windows 版本
+2. 解压后将 `mpv` 文件夹放置到插件目录下（与 VPetLLM.dll 同级目录）
+3. 确保 `mpv/mpv.exe` 文件存在
+
 ## ✨ 功能
 
 - **多样的 LLM 提供商支持：**
@@ -73,6 +88,63 @@ VPetLLM 拥有一个强大的插件系统，允许开发者扩展其功能。通
 我们为插件开发者提供了一套完整的接口和文档。
 
 **➡️ [点击这里查看详细的插件开发文档](https://github.com/ycxom/VPetLLM_Plugin)**
+
+## 📁 项目结构
+
+```
+VPetLLM/
+├── Configuration/     # 配置管理模块
+│   ├── ISettings.cs          # 设置接口
+│   ├── SettingsManager.cs    # 设置管理器
+│   └── *Settings.cs          # 各类设置（LLM/TTS/ASR/Proxy）
+├── Core/              # 核心业务逻辑
+│   ├── ASRCore/              # 语音识别核心实现
+│   ├── ChatCore/             # 聊天核心实现（Ollama/OpenAI/Gemini/Free）
+│   ├── TTSCore/              # 文本转语音核心实现
+│   ├── ServiceContainer.cs   # 依赖注入容器
+│   └── *Manager.cs           # 各类管理器（历史记录/重要记录）
+├── Handlers/          # 动作处理器
+│   ├── HandlerRegistry.cs    # 处理器注册中心
+│   ├── ActionProcessor.cs    # 动作处理器
+│   ├── SmartMessageProcessor.cs  # 智能消息处理
+│   └── *Handler.cs           # 各类动作处理器
+├── Services/          # 服务层
+│   ├── VoiceInputService.cs  # 语音输入服务
+│   ├── PurchaseService.cs    # 购买服务
+│   └── I*Service.cs          # 服务接口
+├── UI/                # 用户界面
+│   ├── Controls/             # 自定义控件
+│   ├── Styles/               # 样式资源
+│   └── Windows/              # 窗口
+├── Utils/             # 工具类
+│   ├── MpvPlayer.cs          # MPV 音频播放器
+│   ├── TTSService.cs         # TTS 服务
+│   ├── ASRService.cs         # ASR 服务
+│   └── ...                   # 其他工具类
+└── VPetLLM.cs         # 插件主入口
+```
+
+## 🛠️ 开发
+
+### 构建项目
+
+```bash
+# 克隆仓库
+git clone https://github.com/ycxom/VPetLLM.git
+
+# 使用 Visual Studio 打开 VPetLLM.sln
+# 或使用命令行构建
+dotnet build VPetLLM.sln
+```
+
+### 架构说明
+
+项目采用模块化架构设计：
+
+- **依赖注入**: 使用 `ServiceContainer` 管理服务依赖
+- **处理器模式**: 通过 `HandlerRegistry` 统一管理动作处理器
+- **接口抽象**: 核心功能通过接口定义，便于扩展和测试
+- **分层设计**: Configuration → Core → Services → Handlers → UI
 
 ## 🤝 贡献
 

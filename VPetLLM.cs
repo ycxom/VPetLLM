@@ -6,6 +6,7 @@ using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
 using VPetLLM.Handlers;
+using VPetLLM.Services;
 using VPetLLM.UI.Windows;
 using VPetLLM.Utils;
 using TalkBox = VPetLLM.UI.Windows.TalkBox;
@@ -27,16 +28,11 @@ namespace VPetLLM
         public winSettingNew? SettingWindow;
         public TTSService? TTSService;
         private IntelligentConfigurationOptimizer? _configurationOptimizer;
-        private GlobalHotkey? _voiceInputHotkey;
-        private const int VOICE_INPUT_HOTKEY_ID = 9001;
-        private winVoiceInput? _currentVoiceInputWindow;
-        private enum VoiceInputState
-        {
-            Idle,           // 空闲状态
-            Recording,      // 正在录音
-            Editing         // 编辑状态（识别完成但未自动发送）
-        }
-        private VoiceInputState _voiceInputState = VoiceInputState.Idle;
+        
+        // 服务实例
+        private IVoiceInputService? _voiceInputService;
+        private IPurchaseService? _purchaseService;
+        
         private DefaultPluginChecker? _defaultPluginChecker;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
@@ -116,243 +112,68 @@ namespace VPetLLM
             // 执行配置优化
             _configurationOptimizer.PerformIntelligentOptimization();
 
+            // 初始化服务
+            InitializeServices();
+
             LoadPlugins();
             
             // 初始化默认插件检查器
             _defaultPluginChecker = new DefaultPluginChecker(this);
         }
 
-        private void InitializeVoiceInputHotkey()
+        /// <summary>
+        /// 初始化服务
+        /// </summary>
+        private void InitializeServices()
         {
             try
             {
-                if (!Settings.ASR.IsEnabled)
-                {
-                    Logger.Log("ASR is disabled, skipping hotkey registration");
-                    return;
-                }
+                // 初始化语音输入服务
+                _voiceInputService = new VoiceInputService(this, Settings);
+                _voiceInputService.TranscriptionCompleted += OnVoiceInputTranscriptionCompleted;
+                Logger.Log("VoiceInputService initialized");
 
-                // 获取主窗口句柄
-                var mainWindow = Application.Current.MainWindow;
-                if (mainWindow == null)
-                {
-                    Logger.Log("Main window not found, cannot register voice input hotkey");
-                    return;
-                }
-
-                var windowHandle = new System.Windows.Interop.WindowInteropHelper(mainWindow).Handle;
-                if (windowHandle == IntPtr.Zero)
-                {
-                    Logger.Log("Window handle is zero, cannot register voice input hotkey");
-                    return;
-                }
-
-                // 创建全局快捷键
-                _voiceInputHotkey = new GlobalHotkey(windowHandle, VOICE_INPUT_HOTKEY_ID);
-                
-                // 解析快捷键配置
-                uint modifiers = GlobalHotkey.ParseModifiers(Settings.ASR.HotkeyModifiers);
-                uint key = GlobalHotkey.ParseKey(Settings.ASR.HotkeyKey);
-
-                if (key == 0)
-                {
-                    Logger.Log($"Invalid hotkey key: {Settings.ASR.HotkeyKey}");
-                    return;
-                }
-
-                // 注册快捷键
-                bool registered = _voiceInputHotkey.Register(modifiers, key);
-                if (registered)
-                {
-                    _voiceInputHotkey.HotkeyPressed += OnVoiceInputHotkeyPressed;
-                    Logger.Log($"Voice input hotkey registered: {Settings.ASR.HotkeyModifiers}+{Settings.ASR.HotkeyKey}");
-                }
-                else
-                {
-                    Logger.Log($"Failed to register voice input hotkey: {Settings.ASR.HotkeyModifiers}+{Settings.ASR.HotkeyKey}");
-                }
+                // 初始化购买服务
+                _purchaseService = new PurchaseService(this, Settings);
+                Logger.Log("PurchaseService initialized");
             }
             catch (Exception ex)
             {
-                Logger.Log($"Error initializing voice input hotkey: {ex.Message}");
+                Logger.Log($"Error initializing services: {ex.Message}");
             }
         }
 
-        private void OnVoiceInputHotkeyPressed(object? sender, EventArgs e)
+        /// <summary>
+        /// 处理语音输入转录完成事件
+        /// </summary>
+        private void OnVoiceInputTranscriptionCompleted(object? sender, string transcription)
         {
-            try
+            if (!string.IsNullOrWhiteSpace(transcription))
             {
-                Logger.Log($"Voice input hotkey pressed, current state: {_voiceInputState}");
-                Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.InvokeAsync(async () =>
                 {
-                    HandleVoiceInputHotkey();
-                });
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error handling voice input hotkey: {ex.Message}");
-            }
-        }
-
-        private void HandleVoiceInputHotkey()
-        {
-            switch (_voiceInputState)
-            {
-                case VoiceInputState.Idle:
-                    // 空闲状态：开始录音
-                    StartVoiceInput();
-                    break;
-                    
-                case VoiceInputState.Recording:
-                    // 录音状态：停止录音
-                    StopVoiceInput();
-                    break;
-                    
-                case VoiceInputState.Editing:
-                    // 编辑状态：关闭当前窗口，重新开始录音
-                    CloseVoiceInputWindow();
-                    StartVoiceInput();
-                    break;
-            }
-        }
-
-        private void StartVoiceInput()
-        {
-            try
-            {
-                Logger.Log("Starting voice input...");
-                
-                // 如果窗口已存在，先关闭它
-                if (_currentVoiceInputWindow != null)
-                {
-                    Logger.Log("Previous voice input window still exists, closing it first");
                     try
                     {
-                        _currentVoiceInputWindow.Close();
+                        await SendChat(transcription);
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"Error closing previous window: {ex.Message}");
+                        Logger.Log($"Error sending voice input to chat: {ex.Message}");
                     }
-                    _currentVoiceInputWindow = null;
-                }
-                
-                _voiceInputState = VoiceInputState.Recording;
-                
-                // 根据设置决定是否使用快速显示模式
-                bool quickMode = Settings.ASR.AutoSend;
-                _currentVoiceInputWindow = new winVoiceInput(this, quickMode);
-                
-                // 监听窗口关闭事件
-                _currentVoiceInputWindow.Closed += (s, e) =>
-                {
-                    _currentVoiceInputWindow = null;
-                    _voiceInputState = VoiceInputState.Idle;
-                    Logger.Log("Voice input window closed, state reset to Idle");
-                };
-                
-                // 监听录音停止事件
-                _currentVoiceInputWindow.RecordingStopped += (s, e) =>
-                {
-                    Logger.Log("Recording stopped, waiting for transcription...");
-                    // 不在这里改变状态，等待转录完成
-                };
-                
-                // 监听转录完成事件
-                _currentVoiceInputWindow.TranscriptionCompleted += (s, transcription) =>
-                {
-                    Logger.Log($"Transcription completed, text length: {transcription?.Length ?? 0}");
-                    
-                    if (!string.IsNullOrWhiteSpace(transcription))
-                    {
-                        // 无论是自动发送还是手动确认，都发送到LLM
-                        Logger.Log("Sending transcription to LLM and resetting to Idle");
-                        _voiceInputState = VoiceInputState.Idle;
-                        Application.Current.Dispatcher.InvokeAsync(async () =>
-                        {
-                            try
-                            {
-                                await SendChat(transcription);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Log($"Error sending voice input to chat: {ex.Message}");
-                            }
-                        });
-                    }
-                    else
-                    {
-                        // 如果转录结果为空，重置为空闲状态
-                        Logger.Log("Empty transcription, resetting to Idle");
-                        _voiceInputState = VoiceInputState.Idle;
-                    }
-                };
-                
-                _currentVoiceInputWindow.Show();
-                Logger.Log("Voice input window shown");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error starting voice input: {ex.Message}");
-                _voiceInputState = VoiceInputState.Idle;
-                MessageBox.Show($"启动语音输入失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                });
             }
         }
 
-        private void StopVoiceInput()
+        private void InitializeVoiceInputHotkey()
         {
-            try
-            {
-                Logger.Log("Stopping voice input...");
-                
-                if (_currentVoiceInputWindow == null)
-                {
-                    Logger.Log("No voice input window to stop, resetting state to Idle");
-                    _voiceInputState = VoiceInputState.Idle;
-                    return;
-                }
-                
-                // 检查窗口是否正在录音
-                if (!_currentVoiceInputWindow.IsRecording)
-                {
-                    Logger.Log("Window is not recording, resetting state to Idle");
-                    _voiceInputState = VoiceInputState.Idle;
-                    return;
-                }
-                
-                _currentVoiceInputWindow.StopRecording();
-                // 状态将在转录完成后更新
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error stopping voice input: {ex.Message}");
-                _voiceInputState = VoiceInputState.Idle;
-            }
-        }
-
-        private void CloseVoiceInputWindow()
-        {
-            try
-            {
-                Logger.Log("Closing voice input window...");
-                if (_currentVoiceInputWindow != null)
-                {
-                    _currentVoiceInputWindow.Close();
-                    _currentVoiceInputWindow = null;
-                }
-                _voiceInputState = VoiceInputState.Idle;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error closing voice input window: {ex.Message}");
-                _voiceInputState = VoiceInputState.Idle;
-            }
+            // 委托给 VoiceInputService
+            (_voiceInputService as VoiceInputService)?.InitializeHotkey();
         }
 
         public void ShowVoiceInputWindow()
         {
-            // 使用新的快捷键处理逻辑
-            HandleVoiceInputHotkey();
+            // 委托给 VoiceInputService
+            _voiceInputService?.ShowVoiceInputWindow();
         }
 
         private void SyncNames(object sender, System.Timers.ElapsedEventArgs e)
@@ -431,40 +252,20 @@ namespace VPetLLM
                 UnregisterTakeItemHandleEvent();
             }
             
-            // 清理购买计时器
-            _purchaseTimer?.Stop();
-            _purchaseTimer?.Dispose();
+            // 清理服务
+            _voiceInputService?.Dispose();
+            _purchaseService?.Dispose();
             
             TTSService?.Dispose();
             TouchInteractionHandler?.Dispose();
-            _voiceInputHotkey?.Dispose();
             _syncTimer?.Stop();
             _syncTimer?.Dispose();
         }
 
         public void UpdateVoiceInputHotkey()
         {
-            _voiceInputHotkey?.Dispose();
-            _voiceInputHotkey = null;
-            InitializeVoiceInputHotkey();
-        }
-
-        // 购买批处理相关字段
-        private readonly List<PurchaseItem> _pendingPurchases = new();
-        private readonly object _purchaseLock = new object();
-        private System.Timers.Timer? _purchaseTimer;
-        private static readonly TimeSpan _batchProcessTime = TimeSpan.FromMilliseconds(500); // 优化：从1秒减少到500ms，提高响应速度
-
-        /// <summary>
-        /// 购买物品信息
-        /// </summary>
-        public class PurchaseItem
-        {
-            public string Name { get; set; } = "";
-            public VPet_Simulator.Windows.Interface.Food.FoodType Type { get; set; }
-            public double Price { get; set; }
-            public DateTime PurchaseTime { get; set; }
-            public int Quantity { get; set; } = 1;
+            // 委托给 VoiceInputService
+            _voiceInputService?.UpdateHotkey();
         }
 
         /// <summary>
@@ -483,44 +284,14 @@ namespace VPetLLM
 
                 Utils.Logger.Log($"Purchase event detected: {food?.Name ?? "Unknown"}, count: {count}, from: {from}");
                 
-                if (food == null)
-                {
-                    Utils.Logger.Log("Purchase event: food is null, skipping");
-                    return;
-                }
-
                 if (MW == null)
                 {
                     Utils.Logger.Log("Purchase event: MW is null, skipping");
                     return;
                 }
 
-                if (!Settings.EnableBuyFeedback)
-                {
-                    Utils.Logger.Log("Purchase event: BuyFeedback is disabled, skipping");
-                    return;
-                }
-
-                // 使用PurchaseSourceDetector模块检测购买来源
-                var purchaseSource = Utils.PurchaseSourceDetector.DetectPurchaseSource(from);
-                string sourceDescription = Utils.PurchaseSourceDetector.GetPurchaseSourceDescription(purchaseSource);
-                Utils.Logger.Log($"Purchase source detected: {sourceDescription} (from: {from})");
-
-                // 判断是否应该触发AI反馈
-                if (!Utils.PurchaseSourceDetector.ShouldTriggerAIFeedback(from))
-                {
-                    Utils.Logger.Log($"Purchase event: {sourceDescription}，跳过AI反馈");
-                    return;
-                }
-
-                if (ChatCore == null)
-                {
-                    Utils.Logger.Log("Purchase event: ChatCore is null, skipping");
-                    return;
-                }
-
-                // 添加到批处理队列（仅触发AI反馈的购买）
-                AddToPurchaseBatch(food, count);
+                // 委托给 PurchaseService 处理
+                _purchaseService?.HandlePurchase(food, count, from);
             }
             catch (Exception ex)
             {
@@ -593,238 +364,6 @@ namespace VPetLLM
             // 没有来源信息，假设为用户手动购买
             Utils.Logger.Log("Using fallback Event_TakeItem (no source information available)");
             OnTakeItemHandle(food, 1, "unknown");
-        }
-
-        /// <summary>
-        /// 添加购买物品到批处理队列
-        /// </summary>
-        private void AddToPurchaseBatch(Food food, int count = 1)
-        {
-            lock (_purchaseLock)
-            {
-                // 检查是否已存在相同物品
-                var existingItem = _pendingPurchases.FirstOrDefault(p => p.Name == food.Name);
-                if (existingItem != null)
-                {
-                    // 增加数量
-                    existingItem.Quantity += count;
-                    existingItem.PurchaseTime = DateTime.Now; // 更新最后购买时间
-                    Utils.Logger.Log($"Updated purchase quantity for {food.Name}: {existingItem.Quantity}");
-                }
-                else
-                {
-                    // 添加新物品
-                    _pendingPurchases.Add(new PurchaseItem
-                    {
-                        Name = food.Name,
-                        Type = food.Type,
-                        Price = food.Price,
-                        PurchaseTime = DateTime.Now,
-                        Quantity = count
-                    });
-                    Utils.Logger.Log($"Added new purchase item: {food.Name} x{count}");
-                }
-
-                // 重置或启动计时器
-                ResetPurchaseTimer();
-            }
-        }
-
-        /// <summary>
-        /// 重置购买处理计时器
-        /// </summary>
-        private void ResetPurchaseTimer()
-        {
-            // 停止现有计时器
-            _purchaseTimer?.Stop();
-            _purchaseTimer?.Dispose();
-
-            // 创建新计时器
-            _purchaseTimer = new System.Timers.Timer(_batchProcessTime.TotalMilliseconds);
-            _purchaseTimer.Elapsed += async (sender, e) => await ProcessPurchaseBatch();
-            _purchaseTimer.AutoReset = false; // 只执行一次
-            _purchaseTimer.Start();
-
-            Utils.Logger.Log($"Purchase timer reset, will process batch in {_batchProcessTime.TotalMilliseconds}ms");
-        }
-
-        /// <summary>
-        /// 处理购买批次
-        /// </summary>
-        private async Task ProcessPurchaseBatch()
-        {
-            List<PurchaseItem> itemsToProcess;
-            
-            lock (_purchaseLock)
-            {
-                if (_pendingPurchases.Count == 0)
-                {
-                    Utils.Logger.Log("No pending purchases to process");
-                    return;
-                }
-
-                // 复制待处理列表并清空原列表
-                itemsToProcess = new List<PurchaseItem>(_pendingPurchases);
-                _pendingPurchases.Clear();
-                Utils.Logger.Log($"Processing batch of {itemsToProcess.Count} purchase items");
-            }
-
-            try
-            {
-                await ProcessBatchPurchaseFeedback(itemsToProcess);
-            }
-            catch (Exception ex)
-            {
-                Utils.Logger.Log($"Error processing purchase batch: {ex.Message}");
-                Utils.Logger.Log($"Stack trace: {ex.StackTrace}");
-            }
-        }
-
-        /// <summary>
-        /// 处理批量购买反馈
-        /// </summary>
-        private Task ProcessBatchPurchaseFeedback(List<PurchaseItem> purchases)
-        {
-            try
-            {
-                Utils.Logger.Log($"Processing batch purchase feedback for {purchases.Count} items");
-                
-                // 构建批量购买消息
-                string message = BuildBatchPurchaseMessage(purchases);
-                
-                Utils.Logger.Log($"Sending batch message to aggregator: {message}");
-                // 非用户触发的系统反馈：进入2秒聚合，再统一回灌给AI，避免连续唤起
-                ResultAggregator.Enqueue($"[System.BuyFeedback: \"{message}\"]");
-                Utils.Logger.Log("Batch purchase feedback enqueued for aggregation");
-            }
-            catch (Exception ex)
-            {
-                Utils.Logger.Log($"Error in ProcessBatchPurchaseFeedback: {ex.Message}");
-                Utils.Logger.Log($"Stack trace: {ex.StackTrace}");
-            }
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// 构建批量购买消息
-        /// </summary>
-        private string BuildBatchPurchaseMessage(List<PurchaseItem> purchases)
-        {
-            // 获取批量购买提示词
-            string template = PromptHelper.Get("BuyFeedback_Batch", Settings.PromptLanguage);
-            
-            if (string.IsNullOrEmpty(template) || template.Contains("[Prompt Missing"))
-            {
-                // 如果没有找到批量模板，使用默认购买提示词
-                template = PromptHelper.Get("BuyFeedback_Default", Settings.PromptLanguage);
-                if (string.IsNullOrEmpty(template) || template.Contains("[Prompt Missing"))
-                {
-                    // 如果连默认提示词都没有，直接返回空字符串让AI自行判断
-                    return "";
-                }
-                
-                // 使用第一个物品的信息填充默认模板
-                var firstItem = purchases[0];
-                return template
-                    .Replace("{ItemName}", firstItem.Name)
-                    .Replace("{ItemType}", GetItemTypeName(firstItem.Type))
-                    .Replace("{ItemPrice}", firstItem.Price.ToString("F2"))
-                    .Replace("{EmotionState}", GetCurrentEmotionState());
-            }
-
-            // 构建所有占位符的替换值
-            var itemList = new List<string>();
-            double totalPrice = 0;
-            var itemsByType = purchases.GroupBy(p => p.Type).ToList();
-
-            foreach (var purchase in purchases)
-            {
-                string itemDesc = purchase.Quantity > 1 
-                    ? $"{purchase.Name} x{purchase.Quantity}" 
-                    : purchase.Name;
-                itemList.Add(itemDesc);
-                totalPrice += purchase.Price * purchase.Quantity;
-            }
-
-            // 构建类型统计
-            var typeStats = new List<string>();
-            foreach (var typeGroup in itemsByType)
-            {
-                int totalQuantity = typeGroup.Sum(p => p.Quantity);
-                string typeName = GetItemTypeName(typeGroup.Key);
-                typeStats.Add($"{typeName}({totalQuantity}个)");
-            }
-
-            // 替换所有占位符
-            string separator = Settings.PromptLanguage.StartsWith("zh") ? "、" : ", ";
-            string message = template
-                .Replace("{ItemCount}", purchases.Count.ToString())
-                .Replace("{ItemList}", string.Join(separator, itemList))
-                .Replace("{TotalPrice}", totalPrice.ToString("F2"))
-                .Replace("{TypeStats}", string.Join(separator, typeStats))
-                .Replace("{EmotionState}", GetCurrentEmotionState())
-                .Replace("{CurrentHealth}", $"{(MW.Core.Save.Health / 100.0 * 100):F0}%")
-                .Replace("{CurrentMood}", $"{(MW.Core.Save.Feeling / MW.Core.Save.FeelingMax * 100):F0}%")
-                .Replace("{CurrentMoney}", MW.Core.Save.Money.ToString("F2"))
-                .Replace("{CurrentHunger}", $"{(MW.Core.Save.StrengthFood / MW.Core.Save.StrengthMax * 100):F0}%")
-                .Replace("{CurrentThirst}", $"{(MW.Core.Save.StrengthDrink / MW.Core.Save.StrengthMax * 100):F0}%")
-                .Replace("{PurchaseTime}", DateTime.Now.ToString("HH:mm:ss"));
-
-            return message;
-        }
-
-        /// <summary>
-        /// 构建默认批量消息（已废弃，不应该被调用）
-        /// </summary>
-        private string BuildDefaultBatchMessage(List<PurchaseItem> purchases)
-        {
-            // 这个方法不应该被调用，因为我们已经移除了对它的调用
-            // 如果被调用，返回空字符串让AI自行处理
-            return "";
-        }
-
-        /// <summary>
-        /// 获取物品类型名称
-        /// </summary>
-        private string GetItemTypeName(VPet_Simulator.Windows.Interface.Food.FoodType type)
-        {
-            string key = type switch
-            {
-                VPet_Simulator.Windows.Interface.Food.FoodType.Food => "ItemType.Food",
-                VPet_Simulator.Windows.Interface.Food.FoodType.Drink => "ItemType.Drink", 
-                VPet_Simulator.Windows.Interface.Food.FoodType.Drug => "ItemType.Drug",
-                VPet_Simulator.Windows.Interface.Food.FoodType.Gift => "ItemType.Gift",
-                _ => "ItemType.General"
-            };
-            
-            string result = LanguageHelper.Get(key, Settings.Language);
-            return string.IsNullOrEmpty(result) || result.Contains("[") ? type.ToString().ToLower() : result;
-        }
-
-        /// <summary>
-        /// 获取当前情绪状态
-        /// </summary>
-        private string GetCurrentEmotionState()
-        {
-            var feeling = MW.Core.Save.Feeling;
-            var health = MW.Core.Save.Health;
-            
-            string key;
-            if (health < 50)
-                key = "EmotionState.Unwell";
-            else if (feeling > 80)
-                key = "EmotionState.VeryHappy";
-            else if (feeling > 60)
-                key = "EmotionState.Happy";
-            else if (feeling > 40)
-                key = "EmotionState.Normal";
-            else if (feeling > 20)
-                key = "EmotionState.Unhappy";
-            else
-                key = "EmotionState.VeryUnhappy";
-            
-            string result = LanguageHelper.Get(key, Settings.Language);
-            return string.IsNullOrEmpty(result) || result.Contains("[") ? "normal" : result;
         }
 
         public void UpdateChatCore(IChatCore newChatCore)

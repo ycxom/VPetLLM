@@ -162,8 +162,23 @@ namespace VPetLLM.Handlers
             
             try
             {
-                // 调用 mainWindow.Set.SetTopMost() 设置置顶状态
-                mainWindow.Set.SetTopMost(topMostValue);
+                // 从 mainWindow 获取 Dispatcher（更可靠的方式）
+                var window = mainWindow as System.Windows.Window;
+                if (window != null)
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainWindow.Set.SetTopMost(topMostValue);
+                    });
+                }
+                else
+                {
+                    // 回退到 Application.Current.Dispatcher
+                    System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+                    {
+                        mainWindow.Set.SetTopMost(topMostValue);
+                    });
+                }
                 
                 // 记录执行日志
                 Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_TopmostSuccess", topMostValue)}");
@@ -196,20 +211,31 @@ namespace VPetLLM.Handlers
             
             try
             {
-                // 通过反射访问设置窗口的 Opacity 属性
-                var windowType = mainWindow.GetType();
-                var opacityProperty = windowType.GetProperty("Opacity");
+                // 从 mainWindow 获取 Dispatcher（更可靠的方式）
+                var window = mainWindow as System.Windows.Window;
+                var dispatcher = window?.Dispatcher ?? System.Windows.Application.Current?.Dispatcher;
                 
-                if (opacityProperty != null && opacityProperty.CanWrite)
+                if (dispatcher != null)
                 {
-                    opacityProperty.SetValue(mainWindow, transparencyValue);
-                    
-                    // 记录执行日志
-                    Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_TransparencySuccess", transparencyValue)}");
+                    dispatcher.Invoke(() =>
+                    {
+                        var windowType = mainWindow.GetType();
+                        var opacityProperty = windowType.GetProperty("Opacity");
+                        
+                        if (opacityProperty != null && opacityProperty.CanWrite)
+                        {
+                            opacityProperty.SetValue(mainWindow, transparencyValue);
+                            Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_TransparencySuccess", transparencyValue)}");
+                        }
+                        else
+                        {
+                            Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_TransparencyFailed", GetLocalizedMessage("VPetSettings_Error_OpacityPropertyNotFound"))}");
+                        }
+                    });
                 }
                 else
                 {
-                    Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_TransparencyFailed", GetLocalizedMessage("VPetSettings_Error_OpacityPropertyNotFound"))}");
+                    Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_TransparencyFailed", "Dispatcher not available")}");
                 }
             }
             catch (Exception ex)
@@ -240,11 +266,24 @@ namespace VPetLLM.Handlers
             
             try
             {
-                // 调用 mainWindow.SetZoomLevel() 设置缩放等级
-                mainWindow.SetZoomLevel(zoomValue);
+                // 从 mainWindow 获取 Dispatcher（更可靠的方式）
+                var window = mainWindow as System.Windows.Window;
+                var dispatcher = window?.Dispatcher ?? System.Windows.Application.Current?.Dispatcher;
                 
-                // 记录执行日志
-                Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_ZoomSuccess", zoomValue)}");
+                if (dispatcher != null)
+                {
+                    dispatcher.Invoke(() =>
+                    {
+                        mainWindow.SetZoomLevel(zoomValue);
+                    });
+                    
+                    // 记录执行日志
+                    Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_ZoomSuccess", zoomValue)}");
+                }
+                else
+                {
+                    Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_ZoomFailed", "Dispatcher not available")}");
+                }
             }
             catch (Exception ex)
             {
