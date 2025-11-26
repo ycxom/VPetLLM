@@ -217,19 +217,32 @@ namespace VPetLLM.Handlers
                 return;
             }
 
-            // Check if action contains work specification (format: work:工作名称 or study:学习名称 or play:玩耍名称)
+            // Check if action contains work specification (format: work:工作名称 or work:工作名称:倍率)
             if (action.Contains(":"))
             {
-                var parts = action.Split(new[] { ':' }, 2);
-                if (parts.Length == 2)
+                var parts = action.Split(':');
+                if (parts.Length >= 2)
                 {
                     var actionType = parts[0].Trim().ToLower();
-                    var workName = parts[1].Trim();
 
                     if (actionType == "work" || actionType == "study" || actionType == "play")
                     {
-                        Logger.Log($"ActionHandler: Detected {actionType} request with name: {workName}");
-                        await HandleWorkAction(mainWindow, workName, actionType);
+                        // Parse work name and optional rate using RateParser
+                        string workNamePart = parts.Length >= 2 ? parts[1].Trim() : "";
+                        string ratePart = parts.Length >= 3 ? parts[2].Trim() : "";
+                        
+                        // If there are more than 3 parts, the work name might contain colons - rejoin them
+                        if (parts.Length > 3)
+                        {
+                            // Last part is rate, everything in between is work name
+                            ratePart = parts[parts.Length - 1].Trim();
+                            workNamePart = string.Join(":", parts.Skip(1).Take(parts.Length - 2)).Trim();
+                        }
+                        
+                        int rate = RateParser.ParseRate(ratePart, 1);
+                        
+                        Logger.Log($"ActionHandler: Detected {actionType} request with name: {workNamePart}, rate: {rate}");
+                        await HandleWorkAction(mainWindow, workNamePart, actionType, rate);
                         return;
                     }
                 }
@@ -427,13 +440,17 @@ namespace VPetLLM.Handlers
         }
 
         /// <summary>
-        /// Handles work/study/play actions with specific work names
+        /// Handles work/study/play actions with specific work names and optional rate
         /// </summary>
-        private async Task HandleWorkAction(IMainWindow mainWindow, string workName, string workType)
+        /// <param name="mainWindow">The main window interface</param>
+        /// <param name="workName">The name of the work to start</param>
+        /// <param name="workType">The type of work (work, study, play)</param>
+        /// <param name="rate">The rate/intensity of the work (default 1)</param>
+        private async Task HandleWorkAction(IMainWindow mainWindow, string workName, string workType, int rate = 1)
         {
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
             {
-                Logger.Log($"ActionHandler: Processing {workType} action with name: {workName}");
+                Logger.Log($"ActionHandler: Processing {workType} action with name: {workName}, requested rate: {rate}");
 
                 // Refresh work lists
                 WorkManager.RefreshWorkLists(mainWindow);
@@ -443,19 +460,28 @@ namespace VPetLLM.Handlers
 
                 if (work == null)
                 {
-                    Logger.Log($"ActionHandler: Work '{workName}' not found in {workType} list");
-                    // Fallback to generic work animation
-                    Logger.Log($"ActionHandler: Falling back to generic {workType} animation");
-                    StateManager.TransitionToState(mainWindow, workType == "study" ? "Study" : workType == "play" ? "Play" : "Work", workType);
+                    Logger.Log($"ActionHandler: Work '{workName}' not found in {workType} list, ignoring action");
+                    // Silently ignore non-existent work instead of falling back to generic animation
                     return;
                 }
 
-                // Start the work using VPet's StartWork method
-                bool success = WorkManager.StartWork(mainWindow, work);
+                bool success;
+                
+                // Use StartWorkWithRate if rate > 1, otherwise use regular StartWork
+                if (rate > 1)
+                {
+                    Logger.Log($"ActionHandler: Starting {workType} '{workName}' with rate {rate}");
+                    success = WorkManager.StartWorkWithRate(mainWindow, work, rate);
+                }
+                else
+                {
+                    Logger.Log($"ActionHandler: Starting {workType} '{workName}' with default rate");
+                    success = WorkManager.StartWork(mainWindow, work);
+                }
 
                 if (success)
                 {
-                    Logger.Log($"ActionHandler: Successfully started {workType}: {workName}");
+                    Logger.Log($"ActionHandler: Successfully started {workType}: {workName}" + (rate > 1 ? $" with rate {rate}" : ""));
                 }
                 else
                 {

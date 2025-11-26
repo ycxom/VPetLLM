@@ -333,5 +333,159 @@ namespace VPetLLM.Handlers
             _lastCacheTime = DateTime.MinValue;
             Logger.Log("WorkManager: Cache cleared");
         }
+
+        /// <summary>
+        /// Calculates the maximum allowed rate for a work based on pet level and work level limit.
+        /// Formula: Math.Min(4000, petLevel) / (workLevelLimit + 10)
+        /// </summary>
+        /// <param name="petLevel">The current pet level</param>
+        /// <param name="workLevelLimit">The work's level limit requirement</param>
+        /// <returns>The maximum allowed rate, minimum of 1</returns>
+        public static int CalculateMaxRate(int petLevel, int workLevelLimit)
+        {
+            int effectiveLevel = Math.Min(4000, petLevel);
+            int divisor = workLevelLimit + 10;
+            int maxRate = effectiveLevel / divisor;
+            return Math.Max(1, maxRate);
+        }
+
+        /// <summary>
+        /// Clamps the requested rate to the valid range [1, maxRate].
+        /// </summary>
+        /// <param name="requestedRate">The rate requested by the user</param>
+        /// <param name="maxRate">The maximum allowed rate</param>
+        /// <returns>The clamped rate within [1, maxRate]</returns>
+        public static int ClampRate(int requestedRate, int maxRate)
+        {
+            return Math.Max(1, Math.Min(requestedRate, maxRate));
+        }
+
+        /// <summary>
+        /// Gets the maximum rate for a specific work based on pet level.
+        /// </summary>
+        /// <param name="mainWindow">The main window interface</param>
+        /// <param name="work">The work object</param>
+        /// <returns>The maximum allowed rate for this work</returns>
+        public static int GetMaxRate(IMainWindow mainWindow, object work)
+        {
+            if (mainWindow?.GameSavesData?.GameSave == null || work == null)
+            {
+                Logger.Log("WorkManager: Invalid parameters for GetMaxRate, returning 1");
+                return 1;
+            }
+
+            int petLevel = mainWindow.GameSavesData.GameSave.Level;
+            int levelLimit = 0;
+
+            // Get LevelLimit from work object
+            var levelLimitValue = GetWorkProperty(work, "LevelLimit");
+            if (levelLimitValue is int ll)
+            {
+                levelLimit = ll;
+            }
+            else if (levelLimitValue != null && int.TryParse(levelLimitValue.ToString(), out int parsedLimit))
+            {
+                levelLimit = parsedLimit;
+            }
+
+            return CalculateMaxRate(petLevel, levelLimit);
+        }
+
+        /// <summary>
+        /// Starts a work activity with a specified rate.
+        /// The rate will be clamped to the valid range [1, maxRate].
+        /// </summary>
+        /// <param name="mainWindow">The main window interface</param>
+        /// <param name="work">The work object to start</param>
+        /// <param name="requestedRate">The requested rate (will be clamped if necessary)</param>
+        /// <returns>True if work started successfully, false otherwise</returns>
+        public static bool StartWorkWithRate(IMainWindow mainWindow, object work, int requestedRate)
+        {
+            if (mainWindow?.Main == null || work == null)
+            {
+                Logger.Log("WorkManager: Invalid parameters for StartWorkWithRate");
+                return false;
+            }
+
+            var workName = GetWorkProperty(work, "NameTrans") ?? GetWorkProperty(work, "Name");
+            
+            // If rate is 1, just use the original StartWork
+            if (requestedRate <= 1)
+            {
+                Logger.Log($"WorkManager: Starting work '{workName}' with rate 1 (default)");
+                return StartWork(mainWindow, work);
+            }
+
+            // Calculate max rate and clamp
+            int maxRate = GetMaxRate(mainWindow, work);
+            int clampedRate = ClampRate(requestedRate, maxRate);
+
+            // Log rate clamping information
+            if (clampedRate < requestedRate)
+            {
+                Logger.Log($"WorkManager: Rate clamped from {requestedRate} to maximum {clampedRate} for work '{workName}'");
+            }
+            else if (requestedRate < 1)
+            {
+                Logger.Log($"WorkManager: Rate clamped from {requestedRate} to minimum 1 for work '{workName}'");
+            }
+
+            // If clamped rate is 1, use original work
+            if (clampedRate == 1)
+            {
+                Logger.Log($"WorkManager: Starting work '{workName}' with rate 1 (clamped from {requestedRate})");
+                return StartWork(mainWindow, work);
+            }
+
+            try
+            {
+                // Create doubled work using VPet's Work.Double extension
+                if (work is VPet_Simulator.Core.GraphHelper.Work vpetWork)
+                {
+                    var doubledWork = VPet_Simulator.Windows.Interface.ExtensionFunction.Double(vpetWork, clampedRate);
+                    Logger.Log($"WorkManager: Starting work '{workName}' with rate {clampedRate}");
+                    bool result = mainWindow.Main.StartWork(doubledWork);
+                    if (result)
+                    {
+                        Logger.Log($"WorkManager: Successfully started work '{workName}' with rate {clampedRate}");
+                    }
+                    else
+                    {
+                        Logger.Log($"WorkManager: Failed to start work '{workName}' with rate {clampedRate}");
+                    }
+                    return result;
+                }
+                else
+                {
+                    // Fallback: try reflection for Work.Double
+                    Logger.Log($"WorkManager: Work is not VPet_Simulator.Core.GraphHelper.Work type, trying reflection");
+                    var extensionType = typeof(VPet_Simulator.Windows.Interface.ExtensionFunction);
+                    var doubleMethod = extensionType.GetMethod("Double", new[] { work.GetType(), typeof(int) });
+                    
+                    if (doubleMethod != null)
+                    {
+                        var doubledWork = doubleMethod.Invoke(null, new object[] { work, clampedRate });
+                        Logger.Log($"WorkManager: Starting work '{workName}' with rate {clampedRate} (via reflection)");
+                        return StartWork(mainWindow, doubledWork);
+                    }
+                    else
+                    {
+                        Logger.Log($"WorkManager: Could not find Double method, falling back to rate 1");
+                        return StartWork(mainWindow, work);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"WorkManager: Error starting work with rate: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Logger.Log($"WorkManager: Inner exception: {ex.InnerException.Message}");
+                }
+                // Fallback to starting without rate
+                Logger.Log($"WorkManager: Falling back to starting work '{workName}' without rate");
+                return StartWork(mainWindow, work);
+            }
+        }
     }
 }
