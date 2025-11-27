@@ -284,11 +284,15 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
 
-            public OpenAINodeSetting GetCurrentOpenAISetting()
+            public OpenAINodeSetting? GetCurrentOpenAISetting()
             {
-                // 无节点时回退到兼容配置生成的默认节点
+                // 无节点时回退到兼容配置生成的默认节点（仅当启用时）
                 if (OpenAINodes.Count == 0)
                 {
+                    // 如果兼容配置的节点未启用，返回 null
+                    if (!Enabled)
+                        return null;
+                    
                     return new OpenAINodeSetting
                     {
                         ApiKey = ApiKey,
@@ -307,23 +311,64 @@ namespace VPetLLM
                 var enabledNodes = OpenAINodes.Where(n => n.Enabled).ToList();
                 if (enabledNodes.Count == 0)
                 {
-                    // 若没有启用的节点，回退到第一个节点（保持兼容）
-                    if (CurrentNodeIndex < 0 || CurrentNodeIndex >= OpenAINodes.Count)
-                        CurrentNodeIndex = 0;
-                    return OpenAINodes[CurrentNodeIndex];
+                    // 若没有启用的节点，返回 null 而不是回退到禁用节点
+                    return null;
                 }
 
                 if (EnableLoadBalancing)
                 {
                     // 轮换到下一个启用的节点
+                    // 确保索引在有效范围内
+                    if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
+                        CurrentNodeIndex = 0;
+                    
+                    var node = enabledNodes[CurrentNodeIndex];
+                    // 更新索引指向下一个节点（为下次调用准备）
                     CurrentNodeIndex = (CurrentNodeIndex + 1) % enabledNodes.Count;
-                    return enabledNodes[CurrentNodeIndex];
+                    return node;
                 }
 
-                // 非负载均衡：如果索引越界或指向未启用节点，则回退到第一个启用的节点
+                // 非负载均衡：如果索引越界，则回退到第一个启用的节点
                 if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
                     CurrentNodeIndex = 0;
                 return enabledNodes[CurrentNodeIndex];
+            }
+
+            /// <summary>
+            /// 获取下一个未尝试过的启用节点（用于容灾）
+            /// </summary>
+            /// <param name="triedIndices">已尝试过的节点在 OpenAINodes 列表中的索引</param>
+            /// <returns>下一个未尝试的启用节点，如果没有则返回 null</returns>
+            public OpenAINodeSetting? GetNextUntriedNode(HashSet<int> triedIndices)
+            {
+                if (OpenAINodes.Count == 0)
+                    return null;
+
+                // 查找未尝试过且启用的节点
+                for (int i = 0; i < OpenAINodes.Count; i++)
+                {
+                    if (OpenAINodes[i].Enabled && !triedIndices.Contains(i))
+                    {
+                        return OpenAINodes[i];
+                    }
+                }
+                return null;
+            }
+
+            /// <summary>
+            /// 获取指定节点在 OpenAINodes 列表中的索引
+            /// </summary>
+            public int GetNodeIndex(OpenAINodeSetting node)
+            {
+                return OpenAINodes.IndexOf(node);
+            }
+
+            /// <summary>
+            /// 获取所有启用节点的数量
+            /// </summary>
+            public int GetEnabledNodeCount()
+            {
+                return OpenAINodes.Count(n => n.Enabled);
             }
         }
 
@@ -355,7 +400,7 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
 
-            public GeminiNodeSetting GetCurrentGeminiSetting()
+            public GeminiNodeSetting? GetCurrentGeminiSetting()
             {
                 // 无节点时回退到兼容配置生成的默认节点
                 if (GeminiNodes.Count == 0)
@@ -378,23 +423,64 @@ namespace VPetLLM
                 var enabledNodes = GeminiNodes.Where(n => n.Enabled).ToList();
                 if (enabledNodes.Count == 0)
                 {
-                    // 若没有启用的节点，回退到第一个节点
-                    if (CurrentNodeIndex < 0 || CurrentNodeIndex >= GeminiNodes.Count)
-                        CurrentNodeIndex = 0;
-                    return GeminiNodes[CurrentNodeIndex];
+                    // 若没有启用的节点，返回 null 而不是回退到禁用节点
+                    return null;
                 }
 
                 if (EnableLoadBalancing)
                 {
                     // 轮换到下一个启用的节点
+                    // 确保索引在有效范围内
+                    if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
+                        CurrentNodeIndex = 0;
+                    
+                    var node = enabledNodes[CurrentNodeIndex];
+                    // 更新索引指向下一个节点（为下次调用准备）
                     CurrentNodeIndex = (CurrentNodeIndex + 1) % enabledNodes.Count;
-                    return enabledNodes[CurrentNodeIndex];
+                    return node;
                 }
 
-                // 非负载均衡：如果索引越界或指向未启用节点，则回退到第一个启用的节点
+                // 非负载均衡：如果索引越界，则回退到第一个启用的节点
                 if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
                     CurrentNodeIndex = 0;
                 return enabledNodes[CurrentNodeIndex];
+            }
+
+            /// <summary>
+            /// 获取下一个未尝试过的启用节点（用于容灾）
+            /// </summary>
+            /// <param name="triedIndices">已尝试过的节点在 GeminiNodes 列表中的索引</param>
+            /// <returns>下一个未尝试的启用节点，如果没有则返回 null</returns>
+            public GeminiNodeSetting? GetNextUntriedNode(HashSet<int> triedIndices)
+            {
+                if (GeminiNodes.Count == 0)
+                    return null;
+
+                // 查找未尝试过且启用的节点
+                for (int i = 0; i < GeminiNodes.Count; i++)
+                {
+                    if (GeminiNodes[i].Enabled && !triedIndices.Contains(i))
+                    {
+                        return GeminiNodes[i];
+                    }
+                }
+                return null;
+            }
+
+            /// <summary>
+            /// 获取指定节点在 GeminiNodes 列表中的索引
+            /// </summary>
+            public int GetNodeIndex(GeminiNodeSetting node)
+            {
+                return GeminiNodes.IndexOf(node);
+            }
+
+            /// <summary>
+            /// 获取所有启用节点的数量
+            /// </summary>
+            public int GetEnabledNodeCount()
+            {
+                return GeminiNodes.Count(n => n.Enabled);
             }
         }
 

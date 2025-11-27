@@ -244,5 +244,29 @@
         "zh-hant": "Free API服務暫時不可用，請稍後再試。這可能是由於服務器負載過高或維護導致的。",
         "en": "Free API service is temporarily unavailable. Please try again later. This may be due to high server load or maintenance.",
         "jp": "Free APIサービスは一時的に利用できません。後でもう一度お試しください。これはサーバー負荷が高いか、メンテナンス中の可能性があります。"
+    },
+    "NoEnabledOpenAINodes": {
+        "zh-hans": "没有启用的 OpenAI 节点，请在设置中启用至少一个节点",
+        "zh-hant": "沒有啟用的 OpenAI 節點，請在設置中啟用至少一個節點",
+        "en": "No enabled OpenAI nodes. Please enable at least one node in settings.",
+        "jp": "有効なOpenAIノードがありません。設定で少なくとも1つのノードを有効にしてください。"
+    },
+    "NoEnabledGeminiNodes": {
+        "zh-hans": "没有启用的 Gemini 节点，请在设置中启用至少一个节点",
+        "zh-hant": "沒有啟用的 Gemini 節點，請在設置中啟用至少一個節點",
+        "en": "No enabled Gemini nodes. Please enable at least one node in settings.",
+        "jp": "有効なGeminiノードがありません。設定で少なくとも1つのノードを有効にしてください。"
+    },
+    "AllOpenAINodesFailed": {
+        "zh-hans": "所有 OpenAI 节点均请求失败，请检查网络或节点配置",
+        "zh-hant": "所有 OpenAI 節點均請求失敗，請檢查網絡或節點配置",
+        "en": "All OpenAI nodes failed. Please check your network or node configuration.",
+        "jp": "すべてのOpenAIノードが失敗しました。ネットワークまたはノード設定を確認してください。"
+    },
+    "AllGeminiNodesFailed": {
+        "zh-hans": "所有 Gemini 节点均请求失败，请检查网络或节点配置",
+        "zh-hant": "所有 Gemini 節點均請求失敗，請檢查網絡或節點配置",
+        "en": "All Gemini nodes failed. Please check your network or node configuration.",
+        "jp": "すべてのGeminiノードが失敗しました。ネットワークまたはノード設定を確認してください。"
     }
 }

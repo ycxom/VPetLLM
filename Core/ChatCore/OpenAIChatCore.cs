@@ -46,55 +46,37 @@ namespace VPetLLM.Core.ChatCore
             _setting = setting;
         }
 
-        private Setting.OpenAINodeSetting GetCurrentNode()
+        /// <summary>
+        /// 获取当前节点，使用集中式节点选择逻辑
+        /// </summary>
+        /// <returns>当前选中的节点，如果没有启用的节点则返回 null</returns>
+        private Setting.OpenAINodeSetting? GetCurrentNode()
         {
-            // 若存在单次请求的缓存节点，则优先返回并清空，确保同一请求的一致性
+            // 若存在单次请求的缓存节点，则优先返回（不清空，保持请求一致性）
             if (_currentNodeContext != null)
             {
-                var ctx = _currentNodeContext;
-                _currentNodeContext = null;
-                return ctx;
+                return _currentNodeContext;
             }
-            // 每次调用都按当前设置进行“渠道随机”
-            var nodes = _openAISetting.OpenAINodes ?? new List<Setting.OpenAINodeSetting>();
-            if (nodes.Count == 0)
+            
+            // 使用集中式节点选择逻辑
+            var node = _openAISetting.GetCurrentOpenAISetting();
+            if (node != null)
             {
-                // 兼容无节点：从全局 OpenAISetting 构造一个临时节点
-                return new Setting.OpenAINodeSetting
-                {
-                    ApiKey = _openAISetting.ApiKey,
-                    Model = _openAISetting.Model,
-                    Url = _openAISetting.Url,
-                    Temperature = _openAISetting.Temperature,
-                    MaxTokens = _openAISetting.MaxTokens,
-                    EnableAdvanced = _openAISetting.EnableAdvanced,
-                    Enabled = _openAISetting.Enabled,
-                    Name = _openAISetting.Name
-                };
+                // 缓存本次选中的节点，供同一请求中后续调用复用
+                _currentNodeContext = node;
             }
-
-            var enabled = nodes.Where(n => n.Enabled).ToList();
-            if (enabled.Count == 0)
-            {
-                // 无启用节点时，回退到第一个
-                return nodes.First();
-            }
-
-            if (_openAISetting.EnableLoadBalancing)
-            {
-                // 负载均衡开启：在启用的节点中随机选择一个
-                return enabled[_random.Next(enabled.Count)];
-            }
-            else
-            {
-                // 未开启负载均衡：固定索引，否则使用第一个
-                if (_openAISetting.CurrentNodeIndex >= 0 && _openAISetting.CurrentNodeIndex < nodes.Count)
-                    return nodes[_openAISetting.CurrentNodeIndex];
-                return nodes.First();
-            }
+            return node;
+        }
+        
+        /// <summary>
+        /// 清除当前请求的节点缓存，用于容灾切换到下一个节点
+        /// </summary>
+        private void ClearNodeContext()
+        {
+            _currentNodeContext = null;
         }
 
-        private string GetCurrentApiKey(Setting.OpenAINodeSetting node)
+        private string GetCurrentApiKey(Setting.OpenAINodeSetting? node)
         {
             if (string.IsNullOrWhiteSpace(node?.ApiKey))
                 return string.Empty;
@@ -115,9 +97,14 @@ namespace VPetLLM.Core.ChatCore
             return apiKeys[_random.Next(apiKeys.Count)];
         }
 
-        private (string apiUrl, string apiKey) GetCurrentEndpoint()
+        private (string? apiUrl, string apiKey, Setting.OpenAINodeSetting? node) GetCurrentEndpoint()
         {
             var currentNode = GetCurrentNode();
+            if (currentNode == null)
+            {
+                return (null, string.Empty, null);
+            }
+            
             var currentApiKey = GetCurrentApiKey(currentNode);
             
             string apiUrl = currentNode.Url;
@@ -131,15 +118,14 @@ namespace VPetLLM.Core.ChatCore
                 apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
             }
 
-            // 将本次选中的节点写入上下文缓存，供同一请求中后续调用复用
-            _currentNodeContext = currentNode;
-            return (apiUrl, currentApiKey);
+            return (apiUrl, currentApiKey, currentNode);
         }
 
         public override Task<string> Chat(string prompt)
         {
             return Chat(prompt, false);
         }
+
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
             // Handle conversation turn for record weight decrement
@@ -150,12 +136,33 @@ namespace VPetLLM.Core.ChatCore
                 ClearContext();
             }
             
+            // 清除上一次请求的节点缓存，确保每次新请求都重新选择节点
+            ClearNodeContext();
+            
             // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
             var tempUserMessage = !string.IsNullOrEmpty(prompt) ? new Message { Role = "user", Content = prompt } : null;
             
             // 获取当前节点和API Key
-            var (apiUrl, apiKey) = GetCurrentEndpoint();
-            var currentNode = GetCurrentNode();
+            var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
+            
+            // 检查是否有可用节点
+            if (currentNode == null || apiUrl == null)
+            {
+                var noNodeError = "NoEnabledOpenAINodes".Translate();
+                if (string.IsNullOrEmpty(noNodeError) || noNodeError == "NoEnabledOpenAINodes")
+                {
+                    noNodeError = "没有启用的 OpenAI 节点，请在设置中启用至少一个节点";
+                }
+                Utils.Logger.Log($"OpenAI Chat 错误: {noNodeError}");
+                ResponseHandler?.Invoke(noNodeError);
+                return "";
+            }
+            
+            // 调试模式：当角色设定包含 VPetLLM_DeBug 时，记录当前调用的节点信息
+            if (Settings?.Role?.Contains("VPetLLM_DeBug") == true)
+            {
+                Utils.Logger.Log($"[DEBUG] OpenAI 当前调用节点: {currentNode.Name}, URL: {currentNode.Url}, Model: {currentNode.Model}");
+            }
             
             // 构建请求数据，根据启用开关决定是否包含高级参数
             List<Message> history = GetCoreHistory();
@@ -310,6 +317,7 @@ namespace VPetLLM.Core.ChatCore
             return "";
         }
 
+
         public override async Task<string> Summarize(string systemPrompt, string userContent)
         {
             try
@@ -320,9 +328,23 @@ namespace VPetLLM.Core.ChatCore
                     new { role = "user", content = userContent }
                 };
 
+                // 清除节点缓存，确保重新选择节点
+                ClearNodeContext();
+                
                 // 获取当前节点和API Key
-                var (apiUrl, apiKey) = GetCurrentEndpoint();
-                var currentNode = GetCurrentNode();
+                var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
+
+                // 检查是否有可用节点
+                if (currentNode == null || apiUrl == null)
+                {
+                    var noNodeError = "NoEnabledOpenAINodes".Translate();
+                    if (string.IsNullOrEmpty(noNodeError) || noNodeError == "NoEnabledOpenAINodes")
+                    {
+                        noNodeError = "没有启用的 OpenAI 节点，请在设置中启用至少一个节点";
+                    }
+                    Utils.Logger.Log($"OpenAI Summarize 错误: {noNodeError}");
+                    return Utils.ErrorMessageHelper.IsDebugMode(Settings) ? noNodeError : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
+                }
 
                 object data;
                 if (_openAISetting.EnableAdvanced)
@@ -391,13 +413,27 @@ namespace VPetLLM.Core.ChatCore
             
             return history;
         }
+
         public List<string> RefreshModels()
         {
             try
             {
+                // 清除节点缓存，确保重新选择节点
+                ClearNodeContext();
+                
                 // 获取当前节点和API Key
-                var (apiUrl, apiKey) = GetCurrentEndpoint();
-                var currentNode = GetCurrentNode();
+                var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
+                
+                // 检查是否有可用节点
+                if (currentNode == null || apiUrl == null)
+                {
+                    var noNodeError = "NoEnabledOpenAINodes".Translate();
+                    if (string.IsNullOrEmpty(noNodeError) || noNodeError == "NoEnabledOpenAINodes")
+                    {
+                        noNodeError = "没有启用的 OpenAI 节点，请在设置中启用至少一个节点";
+                    }
+                    throw new System.Exception(noNodeError);
+                }
                 
                 string modelsUrl = apiUrl;
                 if (modelsUrl.Contains("/chat/completions"))
@@ -450,7 +486,7 @@ namespace VPetLLM.Core.ChatCore
                     return models;
                 }
             }
-            catch (System.Exception ex) when (!(ex.Message.Contains("API") || ex.Message.Contains("获取模型")))
+            catch (System.Exception ex) when (!(ex.Message.Contains("API") || ex.Message.Contains("获取模型") || ex.Message.Contains("没有启用")))
             {
                 var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
                 throw new System.Exception(errorMessage);

@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
+using LinePutScript.Localization.WPF;
 
 namespace VPetLLM.Core.ChatCore
 {
@@ -51,9 +52,9 @@ namespace VPetLLM.Core.ChatCore
         {
             return Chat(prompt, false);
         }
+
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
-            // Handle conversation turn for record weight decrement
             OnConversationTurn();
             
             if (!Settings.KeepContext)
@@ -61,18 +62,34 @@ namespace VPetLLM.Core.ChatCore
                 ClearContext();
             }
             
-            // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
             var tempUserMessage = !string.IsNullOrEmpty(prompt) ? new Message { Role = "user", Content = prompt } : null;
 
             List<Message> history = GetCoreHistory();
-            // 如果有临时用户消息，添加到历史末尾用于API请求
             if (tempUserMessage != null)
             {
                 history.Add(tempUserMessage);
             }
-            // 在添加用户消息后注入重要记录
             history = InjectRecordsIntoHistory(history);
+            
             var node = _geminiSetting.GetCurrentGeminiSetting();
+            if (node == null)
+            {
+                var noNodeError = "NoEnabledGeminiNodes".Translate();
+                if (string.IsNullOrEmpty(noNodeError) || noNodeError == "NoEnabledGeminiNodes")
+                {
+                    noNodeError = "没有启用的 Gemini 节点，请在设置中启用至少一个节点";
+                }
+                Utils.Logger.Log($"Gemini Chat 错误: {noNodeError}");
+                ResponseHandler?.Invoke(noNodeError);
+                return "";
+            }
+            
+            // 调试模式：当角色设定包含 VPetLLM_DeBug 时，记录当前调用的节点信息
+            if (Settings?.Role?.Contains("VPetLLM_DeBug") == true)
+            {
+                Utils.Logger.Log($"[DEBUG] Gemini 当前调用节点: {node.Name}, URL: {node.Url}, Model: {node.Model}");
+            }
+            
             var requestData = new
             {
                 contents = history.Where(m => m.Role != "system")
@@ -118,12 +135,8 @@ namespace VPetLLM.Core.ChatCore
                     
                     if (node.EnableStreaming)
                     {
-                        // 流式传输模式
                         Utils.Logger.Log("Gemini: 使用流式传输模式");
-                        var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint)
-                        {
-                            Content = content
-                        };
+                        var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint) { Content = content };
                         var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                         
                         if (!response.IsSuccessStatusCode)
@@ -136,7 +149,6 @@ namespace VPetLLM.Core.ChatCore
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
                         {
-                            // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
                             Utils.Logger.Log($"Gemini流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
                         });
@@ -151,7 +163,6 @@ namespace VPetLLM.Core.ChatCore
                                     continue;
                                 
                                 var jsonData = line.Substring(6).Trim();
-                                
                                 try
                                 {
                                     var chunk = JObject.Parse(jsonData);
@@ -159,25 +170,18 @@ namespace VPetLLM.Core.ChatCore
                                     if (!string.IsNullOrEmpty(delta))
                                     {
                                         fullMessage.Append(delta);
-                                        // 将新片段传递给流式处理器，检测完整命令
                                         streamProcessor.AddChunk(delta);
-                                        // 通知流式文本更新（用于显示）
                                         StreamingChunkHandler?.Invoke(delta);
                                     }
                                 }
-                                catch
-                                {
-                                    // 忽略解析错误，继续处理下一行
-                                }
+                                catch { }
                             }
                         }
                         message = fullMessage.ToString();
                         Utils.Logger.Log($"Gemini流式: 流式传输完成，总消息长度: {message.Length}");
-                        // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
                     else
                     {
-                        // 非流式传输模式
                         Utils.Logger.Log("Gemini: 使用非流式传输模式");
                         var response = await client.PostAsync(apiEndpoint, content);
                         
@@ -192,7 +196,6 @@ namespace VPetLLM.Core.ChatCore
                         var responseObject = JObject.Parse(responseString);
                         message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
                         Utils.Logger.Log($"Gemini非流式: 收到完整消息，长度: {message.Length}");
-                        // 非流式模式下，一次性处理完整消息
                         ResponseHandler?.Invoke(message);
                     }
                 }
@@ -205,17 +208,13 @@ namespace VPetLLM.Core.ChatCore
                 return "";
             }
 
-            // API调用成功后，才将用户消息和助手回复保存到历史记录
             if (Settings.KeepContext)
             {
-                // 先保存用户消息
                 if (tempUserMessage != null)
                 {
                     await HistoryManager.AddMessage(tempUserMessage);
                 }
-                // 再保存助手回复
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
-                // 保存历史记录
                 SaveHistory();
             }
             return "";
@@ -226,21 +225,26 @@ namespace VPetLLM.Core.ChatCore
         {
             try
             {
+                var node = _geminiSetting.GetCurrentGeminiSetting();
+                if (node == null)
+                {
+                    var noNodeError = "NoEnabledGeminiNodes".Translate();
+                    if (string.IsNullOrEmpty(noNodeError) || noNodeError == "NoEnabledGeminiNodes")
+                    {
+                        noNodeError = "没有启用的 Gemini 节点，请在设置中启用至少一个节点";
+                    }
+                    Utils.Logger.Log($"Gemini Summarize 错误: {noNodeError}");
+                    return Utils.ErrorMessageHelper.IsDebugMode(Settings) ? noNodeError : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
+                }
+
                 var requestData = new
                 {
-                    system_instruction = new
-                    {
-                        parts = new[] { new { text = systemPrompt } }
-                    },
-                    contents = new[]
-                    {
-                        new { parts = new[] { new { text = userContent } } }
-                    }
+                    system_instruction = new { parts = new[] { new { text = systemPrompt } } },
+                    contents = new[] { new { parts = new[] { new { text = userContent } } } }
                 };
 
                 var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
 
-                var node = _geminiSetting.GetCurrentGeminiSetting();
                 var baseUrl = node.Url.TrimEnd('/');
                 if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
                 {
@@ -248,6 +252,7 @@ namespace VPetLLM.Core.ChatCore
                 }
                 var modelName = node.Model;
                 var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
+                
                 using (var client = GetClient())
                 {
                     if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
@@ -282,28 +287,34 @@ namespace VPetLLM.Core.ChatCore
                     : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试。");
             }
         }
+
         private List<Message> GetCoreHistory(bool injectRecords = false)
         {
-            var history = new List<Message>
-            {
-                new Message { Role = "system", Content = GetSystemMessage() }
-            };
+            var history = new List<Message> { new Message { Role = "system", Content = GetSystemMessage() } };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
-            
-            // Inject important records into history (only when explicitly requested, after user message is added)
             if (injectRecords)
             {
                 history = InjectRecordsIntoHistory(history);
             }
-            
             return history;
         }
+
         public List<string> RefreshModels()
         {
             try
             {
-                string requestUrl;
                 var node = _geminiSetting.GetCurrentGeminiSetting();
+                if (node == null)
+                {
+                    var noNodeError = "NoEnabledGeminiNodes".Translate();
+                    if (string.IsNullOrEmpty(noNodeError) || noNodeError == "NoEnabledGeminiNodes")
+                    {
+                        noNodeError = "没有启用的 Gemini 节点，请在设置中启用至少一个节点";
+                    }
+                    throw new System.Exception(noNodeError);
+                }
+
+                string requestUrl;
                 if (node.Url.Contains("/models"))
                 {
                     requestUrl = node.Url;
@@ -311,17 +322,12 @@ namespace VPetLLM.Core.ChatCore
                 else
                 {
                     var baseUrl = node.Url.TrimEnd('/');
-
                     if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
                     {
                         baseUrl += "/v1beta";
                     }
-
                     requestUrl = baseUrl.EndsWith("/") ? $"{baseUrl}models/" : $"{baseUrl}/models/";
                 }
-
-                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Request URL: {requestUrl}");
-                System.Diagnostics.Debug.WriteLine($"[GeminiDebug] API Key present: {!string.IsNullOrEmpty(node.ApiKey)}");
 
                 using (var client = GetClient())
                 {
@@ -338,8 +344,6 @@ namespace VPetLLM.Core.ChatCore
 
                     var response = client.GetAsync(requestUrl).Result;
 
-                    System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Response Status: {(int)response.StatusCode} {response.StatusCode}");
-
                     if (!response.IsSuccessStatusCode)
                     {
                         var errorMessage = Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini").Result;
@@ -351,8 +355,6 @@ namespace VPetLLM.Core.ChatCore
                     try
                     {
                         var jsonToken = JToken.Parse(responseString);
-
-                        // Handle official Gemini format: { "models": [...] }
                         if (jsonToken is JObject responseObject && responseObject["models"] is JArray modelsArray)
                         {
                             foreach (var model in modelsArray)
@@ -360,12 +362,10 @@ namespace VPetLLM.Core.ChatCore
                                 models.Add(model["name"].ToString().Replace("models/", ""));
                             }
                         }
-                        // Handle old format: [...]
                         else if (jsonToken is JArray responseArray)
                         {
                             foreach (var model in responseArray)
                             {
-                                // The user's old format returns an array of objects with an 'id' or 'name'
                                 var modelName = model["id"]?.ToString() ?? model["name"]?.ToString();
                                 if (!string.IsNullOrEmpty(modelName))
                                 {
@@ -376,18 +376,15 @@ namespace VPetLLM.Core.ChatCore
                     }
                     catch (JsonReaderException)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[GeminiDebug] JSON Parse Error: {responseString}");
                         var parseError = Utils.ErrorMessageHelper.IsDebugMode(Settings)
                             ? $"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}"
                             : "获取模型列表失败，服务器返回了无效的响应格式。";
                         throw new System.Exception(parseError);
                     }
-
-                    System.Diagnostics.Debug.WriteLine($"[GeminiDebug] Models found: {models.Count}");
                     return models;
                 }
             }
-            catch (System.Exception ex) when (!(ex.Message.Contains("API") || ex.Message.Contains("获取模型")))
+            catch (System.Exception ex) when (!(ex.Message.Contains("API") || ex.Message.Contains("获取模型") || ex.Message.Contains("没有启用")))
             {
                 var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
                 throw new System.Exception(errorMessage);
