@@ -19,6 +19,11 @@ namespace VPetLLM.UI.Windows
         private System.Threading.CancellationTokenSource _thinkingCancellationTokenSource;
         private bool _isThinking = false;
 
+        // 流式处理状态管理
+        private enum StreamingState { Idle, FirstResponse, Streaming }
+        private StreamingState _streamingState = StreamingState.Idle;
+        private readonly object _stateLock = new object();
+
         /// <summary>
         /// 获取消息处理器（用于流式处理等待）
         /// </summary>
@@ -39,28 +44,63 @@ namespace VPetLLM.UI.Windows
         {
             _plugin.MW.Main.Say(message);
         }
+
+        /// <summary>
+        /// 重置流式处理状态（在新对话开始时调用）
+        /// </summary>
+        public void ResetStreamingState()
+        {
+            lock (_stateLock)
+            {
+                _streamingState = StreamingState.Idle;
+                Logger.Log("ResetStreamingState: 流式状态已重置为Idle");
+            }
+        }
+
+        /// <summary>
+        /// 处理AI回复 - 流式处理核心方法（优化：避免UI线程阻塞）
+        /// </summary>
         public async void HandleResponse(string response)
         {
             Logger.Log($"HandleResponse: 收到AI回复: {response}");
 
-            // 先停止思考动画，确保气泡状态清理
-            StopThinkingAnimation();
-            
-            // 短暂延迟，确保思考动画完全停止
-            await Task.Delay(150);
+            // 使用状态机管理流式处理
+            bool isFirstResponse;
+            lock (_stateLock)
+            {
+                isFirstResponse = _streamingState == StreamingState.Idle;
+                if (isFirstResponse)
+                    _streamingState = StreamingState.FirstResponse;
+                else if (_streamingState == StreamingState.FirstResponse)
+                    _streamingState = StreamingState.Streaming;
+            }
 
-            await Application.Current.Dispatcher.InvokeAsync(async () =>
+            // 首次响应：快速停止思考动画
+            if (isFirstResponse)
+            {
+                _isThinking = false;
+                var cts = _thinkingCancellationTokenSource;
+                if (cts != null)
+                {
+                    _thinkingCancellationTokenSource = null;
+                    try { cts.Cancel(); cts.Dispose(); } catch { }
+                }
+            }
+
+            // 在后台线程处理消息，避免阻塞UI
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    // 使用智能消息处理器处理回复
-                    await _messageProcessor.ProcessMessageAsync(response);
+                    await _messageProcessor.ProcessMessageAsync(response, !isFirstResponse);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log($"HandleResponse: 处理AI回复时发生错误: {ex.Message}");
-                    // 发生错误时回退到简单显示
-                    _plugin.MW.Main.Say(response);
+                    Logger.Log($"HandleResponse: 处理错误: {ex.Message}");
+                    Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        try { _plugin.MW.Main.Say(response); } catch { }
+                    }));
                 }
             });
         }
@@ -75,6 +115,9 @@ namespace VPetLLM.UI.Windows
 
             OnSendMessage?.Invoke(text);
             Logger.Log($"Responded called with text: {text}");
+            
+            // 重置流式处理状态，为新对话做准备
+            ResetStreamingState();
 
             try
             {
@@ -143,13 +186,14 @@ namespace VPetLLM.UI.Windows
             }
             finally
             {
-                // 停止思考动画（如果有的话）
-                Logger.Log("Responded: 准备停止思考动画");
-                StopThinkingAnimation();
+                // 停止思考动画（如果有的话）- 但不隐藏气泡，因为流式消息可能还在处理中
+                Logger.Log("Responded: 准备停止思考动画（仅停止动画，不隐藏气泡）");
+                StopThinkingAnimationWithoutHide();
                 
-                // 额外延迟，确保气泡状态完全清理后再继续
-                await Task.Delay(100);
-                Logger.Log("Responded: 思考动画已停止，气泡状态已清理");
+                // 重置流式处理状态，为下一次对话做准备
+                ResetStreamingState();
+                
+                Logger.Log("Responded: 思考动画已停止，流式状态已重置");
             }
         }
 
@@ -266,232 +310,141 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 启动思考动画 - 显示动态的"思考中"气泡
+        /// 启动思考动画 - 显示动态的"思考中"气泡（优化：减少UI线程压力）
         /// </summary>
         private void StartThinkingAnimation()
         {
             // 如果已经在思考，先停止
             if (_isThinking)
             {
-                StopThinkingAnimation();
+                _isThinking = false;
+                var oldCts = _thinkingCancellationTokenSource;
+                if (oldCts != null)
+                {
+                    _thinkingCancellationTokenSource = null;
+                    try { oldCts.Cancel(); oldCts.Dispose(); } catch { }
+                }
             }
 
             _isThinking = true;
-            _thinkingCancellationTokenSource = new System.Threading.CancellationTokenSource();
-            var cancellationToken = _thinkingCancellationTokenSource.Token;
+            var cts = new System.Threading.CancellationTokenSource();
+            _thinkingCancellationTokenSource = cts;
 
-            // 获取宠物名称和思考文本模板
+            // 获取宠物名称和思考文本
             var petName = _plugin.Settings.AiName ?? "VPet";
-            var thinkingTemplate = LanguageHelper.Get("Thinking.Text", _plugin.Settings.Language);
-            
-            // 如果没有找到翻译，使用默认文本
-            if (string.IsNullOrEmpty(thinkingTemplate))
-            {
-                thinkingTemplate = "{PetName} thinking";
-            }
+            var template = LanguageHelper.Get("Thinking.Text", _plugin.Settings.Language);
+            if (string.IsNullOrEmpty(template)) template = "{PetName} thinking";
+            var baseText = template.Replace("{PetName}", petName);
+            var dots = new[] { "", " ..", " ....", " ......", " ........" };
 
             // 启动后台任务循环显示思考动画
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
-                try
+                int i = 0;
+                while (_isThinking && !cts.Token.IsCancellationRequested)
                 {
-                    int dotCount = 0;
-                    var thinkingTexts = new[]
-                    {
-                        thinkingTemplate.Replace("{PetName}", petName),
-                        thinkingTemplate.Replace("{PetName}", petName) + " ..",
-                        thinkingTemplate.Replace("{PetName}", petName) + " ....",
-                        thinkingTemplate.Replace("{PetName}", petName) + " ......",
-                        thinkingTemplate.Replace("{PetName}", petName) + " ........"
-                    };
-
-                    while (!cancellationToken.IsCancellationRequested)
-                    {
-                        var currentText = thinkingTexts[dotCount % thinkingTexts.Length];
-                        
-                        // 在UI线程上更新气泡
-                        await Application.Current.Dispatcher.InvokeAsync(() =>
+                    var text = baseText + dots[i++ % dots.Length];
+                    
+                    // 使用低优先级BeginInvoke，避免阻塞动画渲染
+                    Application.Current.Dispatcher.BeginInvoke(
+                        System.Windows.Threading.DispatcherPriority.Input,
+                        new Action(() =>
                         {
-                            try
-                            {
-                                ShowThinkingBubbleInstantly(currentText);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Log($"思考动画更新失败: {ex.Message}");
-                            }
-                        });
+                            if (_isThinking) ShowThinkingBubbleInstantly(text);
+                        }));
 
-                        dotCount++;
-                        
-                        // 增加更新间隔到500ms，减少频繁更新导致的状态冲突
-                        await Task.Delay(500, cancellationToken);
-                    }
+                    try { await Task.Delay(450, cts.Token); }
+                    catch (TaskCanceledException) { break; }
                 }
-                catch (System.Threading.Tasks.TaskCanceledException)
-                {
-                    // 正常取消，不记录日志
-                    Logger.Log("思考动画已取消");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"思考动画异常: {ex.Message}");
-                }
-            }, cancellationToken);
+            });
         }
 
         /// <summary>
-        /// 停止思考动画并清理状态
+        /// 停止思考动画但不隐藏气泡（用于流式响应，让新气泡直接覆盖）
+        /// </summary>
+        private void StopThinkingAnimationWithoutHide()
+        {
+            // 快速设置标志，阻止思考动画继续更新
+            _isThinking = false;
+            
+            // 取消思考动画任务
+            var cts = _thinkingCancellationTokenSource;
+            if (cts != null)
+            {
+                _thinkingCancellationTokenSource = null;
+                try { cts.Cancel(); cts.Dispose(); } catch { }
+            }
+            
+            // 使用低优先级异步清理，避免阻塞动画
+            Application.Current.Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    try
+                    {
+                        var msgBar = _plugin.MW.Main.MsgBar;
+                        if (msgBar != null)
+                        {
+                            Utils.MessageBarHelper.StopAllTimers(msgBar);
+                            Utils.MessageBarHelper.ClearStreamState(msgBar);
+                        }
+                    }
+                    catch { }
+                }));
+        }
+
+        /// <summary>
+        /// 停止思考动画并隐藏气泡（用于错误情况或强制停止）
         /// </summary>
         private void StopThinkingAnimation()
         {
-            if (_isThinking && _thinkingCancellationTokenSource != null)
+            // 快速设置标志
+            _isThinking = false;
+            
+            // 取消思考动画任务
+            var cts = _thinkingCancellationTokenSource;
+            if (cts != null)
             {
-                try
-                {
-                    _thinkingCancellationTokenSource.Cancel();
-                    _thinkingCancellationTokenSource.Dispose();
-                    _thinkingCancellationTokenSource = null;
-                    _isThinking = false;
-                    
-                    Logger.Log("StopThinkingAnimation: 思考动画已停止");
-                    
-                    // 清理MessageBar状态，但不关闭气泡（让新内容可以立即显示）
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        try
-                        {
-                            var msgBar = _plugin.MW.Main.MsgBar;
-                            if (msgBar == null) return;
-                            
-                            var msgBarType = msgBar.GetType();
-                            
-                            // 停止所有定时器
-                            var showTimerField = msgBarType.GetField("ShowTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            var endTimerField = msgBarType.GetField("EndTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            var closeTimerField = msgBarType.GetField("CloseTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            
-                            if (showTimerField != null && endTimerField != null && closeTimerField != null)
-                            {
-                                var showTimer = showTimerField.GetValue(msgBar) as System.Timers.Timer;
-                                var endTimer = endTimerField.GetValue(msgBar) as System.Timers.Timer;
-                                var closeTimer = closeTimerField.GetValue(msgBar) as System.Timers.Timer;
-                                
-                                showTimer?.Stop();
-                                endTimer?.Stop();
-                                closeTimer?.Stop();
-                            }
-                            
-                            // 清空流式传输状态
-                            var oldsaystreamField = msgBarType.GetField("oldsaystream", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                            if (oldsaystreamField != null)
-                            {
-                                oldsaystreamField.SetValue(msgBar, null);
-                            }
-                            
-                            Logger.Log("StopThinkingAnimation: MessageBar状态已清理");
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Log($"StopThinkingAnimation: 清理MessageBar状态失败: {ex.Message}");
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"StopThinkingAnimation: 停止思考动画失败: {ex.Message}");
-                }
+                _thinkingCancellationTokenSource = null;
+                try { cts.Cancel(); cts.Dispose(); } catch { }
             }
+            
+            // 使用低优先级异步清理并隐藏气泡
+            Application.Current.Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    try
+                    {
+                        var msgBar = _plugin.MW.Main.MsgBar;
+                        if (msgBar != null)
+                        {
+                            Utils.MessageBarHelper.StopAllTimers(msgBar);
+                            Utils.MessageBarHelper.ClearStreamState(msgBar);
+                            Utils.MessageBarHelper.SetVisibility(msgBar, false);
+                        }
+                    }
+                    catch { }
+                }));
         }
 
         /// <summary>
-        /// 瞬时显示思考气泡（直接设置UI - 优化版）
+        /// 瞬时显示思考气泡（优化版，减少异常处理开销）
         /// </summary>
         private void ShowThinkingBubbleInstantly(string text)
         {
+            // 快速检查状态，避免不必要的操作
+            if (!_isThinking) return;
+            
             try
             {
                 var msgBar = _plugin.MW.Main.MsgBar;
-                if (msgBar == null) return;
-
-                var msgBarType = msgBar.GetType();
-                
-                // 1. 停止所有定时器，防止状态冲突
-                var showTimerField = msgBarType.GetField("ShowTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                var endTimerField = msgBarType.GetField("EndTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                var closeTimerField = msgBarType.GetField("CloseTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                
-                if (showTimerField != null && endTimerField != null && closeTimerField != null)
+                if (msgBar != null)
                 {
-                    var showTimer = showTimerField.GetValue(msgBar) as System.Timers.Timer;
-                    var endTimer = endTimerField.GetValue(msgBar) as System.Timers.Timer;
-                    var closeTimer = closeTimerField.GetValue(msgBar) as System.Timers.Timer;
-                    
-                    showTimer?.Stop();
-                    endTimer?.Stop();
-                    closeTimer?.Stop();
-                }
-                
-                // 2. 清空 outputtext 和 outputtextsample（防止流式显示继续）
-                var outputtextField = msgBarType.GetField("outputtext", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (outputtextField != null)
-                {
-                    var outputtext = outputtextField.GetValue(msgBar) as System.Collections.Generic.List<char>;
-                    outputtext?.Clear();
-                }
-                
-                var outputtextsampleField = msgBarType.GetField("outputtextsample", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (outputtextsampleField != null)
-                {
-                    var outputtextsample = outputtextsampleField.GetValue(msgBar) as System.Text.StringBuilder;
-                    outputtextsample?.Clear();
-                }
-                
-                // 3. 直接设置 TText.Text
-                var tTextField = msgBarType.GetField("TText", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (tTextField != null)
-                {
-                    var tText = tTextField.GetValue(msgBar) as System.Windows.Controls.TextBox;
-                    if (tText != null)
-                    {
-                        tText.Text = text;
-                    }
-                }
-                
-                // 4. 设置 LName.Content
-                var lNameField = msgBarType.GetField("LName", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (lNameField != null)
-                {
-                    var lName = lNameField.GetValue(msgBar) as System.Windows.Controls.Label;
-                    if (lName != null)
-                    {
-                        lName.Content = _plugin.MW.Core.Save.Name;
-                    }
-                }
-                
-                // 5. 清空 MessageBoxContent
-                var messageBoxContentField = msgBarType.GetField("MessageBoxContent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (messageBoxContentField != null)
-                {
-                    var messageBoxContent = messageBoxContentField.GetValue(msgBar) as System.Windows.Controls.Grid;
-                    messageBoxContent?.Children.Clear();
-                }
-                
-                // 6. 设置可见性和透明度
-                ((System.Windows.UIElement)msgBar).Visibility = System.Windows.Visibility.Visible;
-                ((System.Windows.UIElement)msgBar).Opacity = 0.8;
-                
-                // 7. 清空 oldsaystream，防止流式传输干扰
-                var oldsaystreamField = msgBarType.GetField("oldsaystream", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (oldsaystreamField != null)
-                {
-                    oldsaystreamField.SetValue(msgBar, null);
+                    Utils.MessageBarHelper.ShowBubbleQuick(msgBar, text, _plugin.MW.Core.Save.Name);
                 }
             }
-            catch (Exception ex)
-            {
-                Logger.Log($"ShowThinkingBubbleInstantly: 显示思考气泡失败: {ex.Message}");
-            }
+            catch { /* 忽略显示错误，避免日志开销 */ }
         }
     }
 }

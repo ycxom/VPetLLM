@@ -46,6 +46,10 @@ namespace VPetLLM
         public bool EnableLiveMode { get; set; } = false;
         public bool LimitStateChanges { get; set; } = true;
         public bool EnableVPetSettingsControl { get; set; } = false;
+        
+        // 流式传输批处理优化设置
+        public bool EnableStreamingBatch { get; set; } = true;
+        public int StreamingBatchWindowMs { get; set; } = 100;
         public RateLimiterSetting RateLimiter { get; set; } = new RateLimiterSetting();
         public ASRSetting ASR { get; set; } = new ASRSetting();
         public RecordSettings Records { get; set; } = new RecordSettings();

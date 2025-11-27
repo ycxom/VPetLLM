@@ -42,7 +42,8 @@ namespace VPetLLM.Handlers
         /// 优化：使用ConfigureAwait(false)避免UI线程阻塞
         /// </summary>
         /// <param name="response">AI回复内容</param>
-        public async Task ProcessMessageAsync(string response)
+        /// <param name="skipInitialization">是否跳过初始化（流式后续命令时为true）</param>
+        public async Task ProcessMessageAsync(string response, bool skipInitialization = false)
         {
             if (string.IsNullOrWhiteSpace(response))
                 return;
@@ -55,52 +56,28 @@ namespace VPetLLM.Handlers
 
             try
             {
-                Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}");
+                Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}, 跳过初始化: {skipInitialization}");
                 
-                // 清理MessageBar状态，准备显示新内容
-                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                // 只在首次响应时清理MessageBar状态
+                if (!skipInitialization)
                 {
-                    try
+                    // 清理MessageBar状态，准备显示新内容
+                    System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        var msgBar = _plugin.MW.Main.MsgBar;
-                        if (msgBar != null)
+                        try
                         {
-                            var msgBarType = msgBar.GetType();
-                            
-                            // 停止所有定时器
-                            var showTimerField = msgBarType.GetField("ShowTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            var endTimerField = msgBarType.GetField("EndTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            var closeTimerField = msgBarType.GetField("CloseTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            
-                            if (showTimerField != null && endTimerField != null && closeTimerField != null)
+                            var msgBar = _plugin.MW.Main.MsgBar;
+                            if (msgBar != null)
                             {
-                                var showTimer = showTimerField.GetValue(msgBar) as System.Timers.Timer;
-                                var endTimer = endTimerField.GetValue(msgBar) as System.Timers.Timer;
-                                var closeTimer = closeTimerField.GetValue(msgBar) as System.Timers.Timer;
-                                
-                                showTimer?.Stop();
-                                endTimer?.Stop();
-                                closeTimer?.Stop();
+                                MessageBarHelper.Initialize(msgBar);
+                                MessageBarHelper.StopAllTimers(msgBar);
+                                MessageBarHelper.ClearStreamState(msgBar);
                             }
-                            
-                            // 清空流式传输状态
-                            var oldsaystreamField = msgBarType.GetField("oldsaystream", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                            if (oldsaystreamField != null)
-                            {
-                                oldsaystreamField.SetValue(msgBar, null);
-                            }
-                            
-                            Logger.Log("SmartMessageProcessor: MessageBar状态已清理");
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"SmartMessageProcessor: 清理MessageBar状态失败: {ex.Message}");
-                    }
-                });
-                
-                // 短暂延迟，确保状态完全清理
-                await Task.Delay(50);
+                        catch { /* 忽略清理错误 */ }
+                    }));
+                    // 移除延迟，直接继续处理
+                }
                 
                 // 标记进入单条 AI 回复的处理会话，期间豁免插件/工具限流
                 var _sessionId = Guid.NewGuid();
@@ -759,6 +736,11 @@ namespace VPetLLM.Handlers
                     // 优化：利用VPet新的SayInfo架构，更智能地等待
                     await ExecuteActionAsync(segment.Content);
                     
+                    // 计算气泡显示时间
+                    int displayTime = CalculateDisplayTime(talkText);
+                    Logger.Log($"SmartMessageProcessor: TTS未启用，等待气泡显示 {displayTime}ms");
+                    await Task.Delay(displayTime).ConfigureAwait(false);
+                    
                     // TTS关闭时等待 VPet 语音完成（如EdgeTTS）
                     // 优化：利用VPet的PlayingVoice状态进行智能等待
                     await WaitForVPetVoiceWithSayInfoAsync();
@@ -812,7 +794,7 @@ namespace VPetLLM.Handlers
         }
 
         /// <summary>
-        /// 执行动作指令
+        /// 执行动作指令（优化：使用ConfigureAwait避免UI线程阻塞）
         /// </summary>
         private async Task ExecuteActionAsync(string actionContent)
         {
@@ -824,35 +806,25 @@ namespace VPetLLM.Handlers
 
                 foreach (var action in actionQueue)
                 {
-                    Logger.Log($"SmartMessageProcessor: 执行动作: {action.Keyword}, 值: {action.Value}");
-
-                    // 对插件类动作做非用户触发限流（会话内豁免）：使用配置的参数
+                    // 对插件类动作做非用户触发限流（会话内豁免）
                     var isPluginAction = action.Type == ActionType.Plugin || string.Equals(action.Keyword, "plugin", StringComparison.OrdinalIgnoreCase);
                     if (isPluginAction)
                     {
                         var inMessageSession = global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value.HasValue;
-                        if (!inMessageSession)
+                        if (!inMessageSession && !Utils.RateLimiter.TryAcquire("ai-plugin", 5, TimeSpan.FromMinutes(2)))
                         {
-                            var config = Utils.RateLimiter.GetConfig("ai-plugin");
-                            if (!Utils.RateLimiter.TryAcquire("ai-plugin", 5, TimeSpan.FromMinutes(2)))
-                            {
-                                var stats = Utils.RateLimiter.GetStats("ai-plugin");
-                                Logger.Log($"SmartMessageProcessor: 触发熔断 - 插件动作频率超限（跨消息），终止剩余动作执行");
-                                if (_plugin?.Settings?.RateLimiter?.LogRateLimitEvents == true && stats != null)
-                                {
-                                    Logger.Log($"  当前: {stats.CurrentCount}/{config?.MaxCount}, 已阻止: {stats.BlockedRequests}次");
-                                }
-                                break;
-                            }
+                            Logger.Log($"SmartMessageProcessor: 触发熔断 - 插件动作频率超限");
+                            break;
                         }
                     }
 
+                    // 使用ConfigureAwait(false)避免回到UI线程
                     if (string.IsNullOrEmpty(action.Value))
-                        await action.Handler.Execute(_plugin.MW);
+                        await action.Handler.Execute(_plugin.MW).ConfigureAwait(false);
                     else if (int.TryParse(action.Value, out int intValue))
-                        await action.Handler.Execute(intValue, _plugin.MW);
+                        await action.Handler.Execute(intValue, _plugin.MW).ConfigureAwait(false);
                     else
-                        await action.Handler.Execute(action.Value, _plugin.MW);
+                        await action.Handler.Execute(action.Value, _plugin.MW).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)

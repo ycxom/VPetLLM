@@ -9,6 +9,7 @@ namespace VPetLLM.Handlers
 {
     /// <summary>
     /// 流式命令处理器 - 在流式传输过程中实时检测和处理完整的命令
+    /// 优化：支持命令批处理，减少UI更新频率
     /// </summary>
     public class StreamingCommandProcessor
     {
@@ -20,6 +21,11 @@ namespace VPetLLM.Handlers
         private readonly object _lock = new object();
         private readonly VPetLLM _plugin;
         private readonly PluginTakeoverManager _takeoverManager = new PluginTakeoverManager();
+        
+        // 命令批处理器
+        private CommandBatcher _commandBatcher;
+        private bool _useBatching = false;
+        private int _batchWindowMs = 100;
 
         /// <summary>
         /// 命令任务，包含命令字符串和预下载的TTS音频文件路径
@@ -34,6 +40,92 @@ namespace VPetLLM.Handlers
         {
             _onCompleteCommand = onCompleteCommand;
             _plugin = plugin;
+            
+            // 从设置中读取批处理配置
+            InitializeBatching();
+        }
+        
+        /// <summary>
+        /// 初始化批处理配置
+        /// </summary>
+        private void InitializeBatching()
+        {
+            var pluginInstance = _plugin ?? VPetLLM.Instance;
+            _useBatching = pluginInstance?.Settings?.EnableStreamingBatch ?? false;
+            _batchWindowMs = pluginInstance?.Settings?.StreamingBatchWindowMs ?? 100;
+            
+            if (_useBatching)
+            {
+                _commandBatcher = new CommandBatcher(_batchWindowMs, OnBatchReady);
+                Utils.Logger.Log($"StreamingCommandProcessor: 批处理模式已启用，窗口: {_batchWindowMs}ms");
+            }
+        }
+        
+        /// <summary>
+        /// 批处理回调 - 处理一批命令
+        /// </summary>
+        private void OnBatchReady(List<string> commands)
+        {
+            if (commands == null || commands.Count == 0) return;
+            
+            Utils.Logger.Log($"StreamingCommandProcessor: 批处理回调，命令数: {commands.Count}");
+            
+            // 按顺序处理每个命令
+            foreach (var command in commands)
+            {
+                ProcessSingleCommand(command);
+            }
+        }
+        
+        /// <summary>
+        /// 处理单个命令（内部方法）
+        /// </summary>
+        private void ProcessSingleCommand(string fullCommand)
+        {
+            var commandType = GetCommandType(fullCommand);
+            
+            // Check if it's a say/talk command and TTS is enabled
+            Task<string> ttsDownloadTask = null;
+            var plugin = _plugin ?? VPetLLM.Instance;
+            if (plugin?.Settings?.TTS?.IsEnabled == true && plugin.TTSService != null)
+            {
+                var talkText = ExtractTalkText(fullCommand);
+                if (!string.IsNullOrEmpty(talkText))
+                {
+                    bool useQueueDownload = plugin.Settings.TTS.UseQueueDownload;
+                    
+                    if (!useQueueDownload)
+                    {
+                        ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
+                    }
+                    else
+                    {
+                        bool isFirstCommand;
+                        lock (_lock)
+                        {
+                            isFirstCommand = _commandQueue.Count == 0;
+                        }
+                        
+                        if (isFirstCommand)
+                        {
+                            ttsDownloadTask = plugin.TTSService.DownloadTTSAudioAsync(talkText);
+                        }
+                    }
+                }
+            }
+            
+            // Add command and TTS download task to queue
+            lock (_lock)
+            {
+                _commandQueue.Enqueue(new CommandTask
+                {
+                    Command = fullCommand,
+                    TTSDownloadTask = ttsDownloadTask
+                });
+            }
+            
+            // 启动队列处理（如果尚未处理）
+            _ = ProcessQueueAsync();
         }
 
         /// <summary>
@@ -199,21 +291,32 @@ namespace VPetLLM.Handlers
                     }
                 }
                 
-                // Add command and TTS download task to queue
-                lock (_lock)
-                {
-                    _commandQueue.Enqueue(new CommandTask
-                    {
-                        Command = fullCommand,
-                        TTSDownloadTask = ttsDownloadTask
-                    });
-                }
-                
                 // 记录检测到的命令
                 Utils.Logger.Log($"StreamingCommandProcessor: 检测到完整命令类型: {commandType}, 格式: 新格式, 命令: {fullCommand.Substring(0, Math.Min(fullCommand.Length, 100))}...");
                 
-                // 启动队列处理（如果尚未处理）
-                _ = ProcessQueueAsync();
+                // 根据是否启用批处理选择处理方式
+                if (_useBatching && _commandBatcher != null)
+                {
+                    // 批处理模式：添加到批处理器
+                    _commandBatcher.AddCommand(fullCommand);
+                }
+                else
+                {
+                    // 非批处理模式：直接处理，使用外层已声明的ttsDownloadTask和plugin变量
+                    
+                    // Add command and TTS download task to queue
+                    lock (_lock)
+                    {
+                        _commandQueue.Enqueue(new CommandTask
+                        {
+                            Command = fullCommand,
+                            TTSDownloadTask = ttsDownloadTask
+                        });
+                    }
+                    
+                    // 启动队列处理（如果尚未处理）
+                    _ = ProcessQueueAsync();
+                }
                 
                 // 移动到下一个位置
                 index = _lastProcessedIndex;
@@ -454,12 +557,17 @@ namespace VPetLLM.Handlers
                 return;
             }
 
-            // 获取命令类型
-            var match = Regex.Match(command, @"\[:(\w+)");
+            // 获取命令类型（支持新格式 <|xxx_begin|>）
+            var match = Regex.Match(command, @"<\|\s*(\w+)\s*_begin\s*\|>");
             if (!match.Success)
             {
-                await Task.Delay(50).ConfigureAwait(false);
-                return;
+                // 尝试旧格式作为后备
+                match = Regex.Match(command, @"\[:(\w+)");
+                if (!match.Success)
+                {
+                    await Task.Delay(50).ConfigureAwait(false);
+                    return;
+                }
             }
             var commandType = match.Groups[1].Value.ToLower();
             Utils.Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: 命令类型: {commandType}");
@@ -486,36 +594,26 @@ namespace VPetLLM.Handlers
             // 等待 SmartMessageProcessor 完成当前命令的处理（主要用于talk/say命令）
             if (pluginInstance?.TalkBox?.MessageProcessor != null)
             {
-                // 先等待一小段时间，让消息有机会开始处理
-                await Task.Delay(30).ConfigureAwait(false);
+                // 优化：减少初始等待时间
+                await Task.Delay(20).ConfigureAwait(false);
                 
-                int maxWaitTime = 60000; // 最多等待 60 秒
-                int checkInterval = 200; // 优化：增加检查间隔到200ms，减少CPU占用
+                int maxWaitTime = 30000; // 优化：从60秒减少到30秒
+                int checkInterval = 100; // 优化：从200ms减少到100ms，更快响应
                 int elapsedTime = 0;
                 int startWaitTime = 0;
 
-                // 等待消息开始处理（最多等待3秒，优化：从5秒减少到3秒）
-                while (!pluginInstance.TalkBox.MessageProcessor.IsProcessing && startWaitTime < 3000)
+                // 等待消息开始处理（优化：从3秒减少到1秒）
+                while (!pluginInstance.TalkBox.MessageProcessor.IsProcessing && startWaitTime < 1000)
                 {
-                    await Task.Delay(100).ConfigureAwait(false);
-                    startWaitTime += 100;
+                    await Task.Delay(50).ConfigureAwait(false);
+                    startWaitTime += 50;
                 }
 
-                if (startWaitTime > 0)
-                {
-                    Utils.Logger.Log($"StreamingCommandProcessor: 等待消息开始处理，耗时: {startWaitTime}ms");
-                }
-
-                // 等待消息处理完成（优化：使用更长的检查间隔）
+                // 等待消息处理完成
                 while (pluginInstance.TalkBox.MessageProcessor.IsProcessing && elapsedTime < maxWaitTime)
                 {
                     await Task.Delay(checkInterval).ConfigureAwait(false);
                     elapsedTime += checkInterval;
-                }
-
-                if (elapsedTime > 0)
-                {
-                    Utils.Logger.Log($"StreamingCommandProcessor: 等待命令处理完成，耗时: {elapsedTime}ms");
                 }
             }
             else
@@ -523,37 +621,37 @@ namespace VPetLLM.Handlers
                 // 如果无法访问 MessageProcessor，使用传统的等待策略（优化：减少延迟时间）
                 Utils.Logger.Log("StreamingCommandProcessor: 无法访问 MessageProcessor，使用传统等待策略");
 
-                // 根据命令类型采用不同的等待策略
+                // 根据命令类型采用不同的等待策略（优化：大幅减少延迟时间）
                 switch (commandType)
                 {
                     case "say":
                     case "talk":
-                        // 语音命令：优化延迟估算（从3秒减少到2秒）
-                        await Task.Delay(2000).ConfigureAwait(false);
+                        // 语音命令：优化延迟（从2秒减少到500ms）
+                        await Task.Delay(500).ConfigureAwait(false);
                         break;
                     
                     case "action":
                     case "move":
-                        // 动作命令：等待动画完成（从1秒减少到800ms）
-                        await Task.Delay(800).ConfigureAwait(false);
+                        // 动作命令：优化延迟（从800ms减少到300ms）
+                        await Task.Delay(300).ConfigureAwait(false);
                         break;
                     
                     case "buy":
                     case "happy":
                     case "health":
                     case "exp":
-                        // 状态命令：短暂延迟（从500ms减少到300ms）
-                        await Task.Delay(300).ConfigureAwait(false);
+                        // 状态命令：优化延迟（从300ms减少到100ms）
+                        await Task.Delay(100).ConfigureAwait(false);
                         break;
                     
                     case "plugin":
                     case "tool":
-                        // Plugin/Tool命令：优化等待时间（从2秒减少到1.5秒）
-                        await Task.Delay(1500).ConfigureAwait(false);
+                        // Plugin/Tool命令：优化延迟（从1.5秒减少到800ms）
+                        await Task.Delay(800).ConfigureAwait(false);
                         break;
                     
                     default:
-                        await Task.Delay(50).ConfigureAwait(false);
+                        await Task.Delay(30).ConfigureAwait(false);
                         break;
                 }
             }
@@ -657,11 +755,51 @@ namespace VPetLLM.Handlers
                 _isProcessing = false;
             }
             _takeoverManager.Reset();
+            
+            // 清空批处理器
+            _commandBatcher?.Clear();
+        }
+        
+        /// <summary>
+        /// 刷新批处理器（强制处理所有待处理命令）
+        /// </summary>
+        public void FlushBatch()
+        {
+            _commandBatcher?.Flush();
+        }
+        
+        /// <summary>
+        /// 设置批处理配置
+        /// </summary>
+        /// <param name="enabled">是否启用批处理</param>
+        /// <param name="windowMs">批处理窗口时间（毫秒）</param>
+        public void SetBatchingConfig(bool enabled, int windowMs = 100)
+        {
+            _useBatching = enabled;
+            _batchWindowMs = windowMs;
+            
+            if (enabled && _commandBatcher == null)
+            {
+                _commandBatcher = new CommandBatcher(windowMs, OnBatchReady);
+                Utils.Logger.Log($"StreamingCommandProcessor: 批处理模式已启用，窗口: {windowMs}ms");
+            }
+            else if (!enabled && _commandBatcher != null)
+            {
+                _commandBatcher.Flush();
+                _commandBatcher.Dispose();
+                _commandBatcher = null;
+                Utils.Logger.Log("StreamingCommandProcessor: 批处理模式已禁用");
+            }
         }
 
         /// <summary>
         /// 获取接管管理器
         /// </summary>
         public PluginTakeoverManager TakeoverManager => _takeoverManager;
+        
+        /// <summary>
+        /// 是否启用批处理
+        /// </summary>
+        public bool IsBatchingEnabled => _useBatching;
     }
 }

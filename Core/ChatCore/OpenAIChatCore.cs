@@ -230,7 +230,13 @@ namespace VPetLLM.Core.ChatCore
                             // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
                             Utils.Logger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
-                        });
+                        }, VPetLLM.Instance);
+                        
+                        // 配置批处理设置
+                        bool useBatch = Settings?.EnableStreamingBatch ?? true;
+                        int batchWindow = Settings?.StreamingBatchWindowMs ?? 100;
+                        streamProcessor.SetBatchingConfig(useBatch, batchWindow);
+                        
                         var TotalUsage = 0;
                         using (var stream = await response.Content.ReadAsStreamAsync())
                         using (var reader = new System.IO.StreamReader(stream))
@@ -267,6 +273,10 @@ namespace VPetLLM.Core.ChatCore
                             }
                         }
                         message = fullMessage.ToString();
+                        
+                        // 刷新批处理器，确保所有待处理命令都被处理
+                        streamProcessor.FlushBatch();
+                        
                         Utils.Logger.Log("OpenAI流式: 流式传输完成，总消息长度: {0},总Token用量：{1}".Translate(message.Length,TotalUsage));
                         // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
