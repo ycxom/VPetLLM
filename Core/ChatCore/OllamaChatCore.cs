@@ -38,7 +38,8 @@ namespace VPetLLM.Core.ChatCore
                 }
                 
                 // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
-                var tempUserMessage = !string.IsNullOrEmpty(prompt) ? new Message { Role = "user", Content = prompt } : null;
+                // 使用 CreateUserMessage 自动设置时间戳和状态信息
+                var tempUserMessage = CreateUserMessage(prompt);
                 
                 List<Message> history = GetCoreHistory();
                 // 如果有临时用户消息，添加到历史末尾用于API请求

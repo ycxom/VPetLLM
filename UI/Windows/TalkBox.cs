@@ -97,7 +97,7 @@ namespace VPetLLM.UI.Windows
                 catch (Exception ex)
                 {
                     Logger.Log($"HandleResponse: 处理错误: {ex.Message}");
-                    Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                    _ = Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
                         try { _plugin.MW.Main.Say(response); } catch { }
                     }));
@@ -346,7 +346,7 @@ namespace VPetLLM.UI.Windows
                     var text = baseText + dots[i++ % dots.Length];
                     
                     // 使用低优先级BeginInvoke，避免阻塞动画渲染
-                    Application.Current.Dispatcher.BeginInvoke(
+                    _ = Application.Current.Dispatcher.BeginInvoke(
                         System.Windows.Threading.DispatcherPriority.Input,
                         new Action(() =>
                         {

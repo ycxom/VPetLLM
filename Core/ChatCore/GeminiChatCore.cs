@@ -62,7 +62,8 @@ namespace VPetLLM.Core.ChatCore
                 ClearContext();
             }
             
-            var tempUserMessage = !string.IsNullOrEmpty(prompt) ? new Message { Role = "user", Content = prompt } : null;
+            // 使用 CreateUserMessage 自动设置时间戳和状态信息
+            var tempUserMessage = CreateUserMessage(prompt);
 
             List<Message> history = GetCoreHistory();
             if (tempUserMessage != null)

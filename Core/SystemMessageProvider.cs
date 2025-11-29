@@ -337,13 +337,7 @@ namespace VPetLLM.Core
             var hungerDesc = GetStatusDescription(hungerPercent, "hunger");
             var thirstDesc = GetStatusDescription(thirstPercent, "thirst");
             
-            // 构建简洁的状态字符串 - 明确标识为宠物状态
-            var statusPrefix = lang switch 
-            { 
-                "zh" => "[桌宠状态]", 
-                _ => "[Pet Status]" 
-            };
-            
+            // 构建简洁的状态字符串（不再添加前缀，由 DisplayContent 的 JSON 格式标识）
             var statusParts = new List<string>
             {
                 $"Lv{core.Save.Level}",
@@ -366,7 +360,7 @@ namespace VPetLLM.Core
                 }
             }
             
-            return $"{statusPrefix} {string.Join(";", statusParts)}";
+            return string.Join(";", statusParts);
         }
         
         /// <summary>

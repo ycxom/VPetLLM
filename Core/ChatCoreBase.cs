@@ -28,6 +28,37 @@ namespace VPetLLM.Core
         }
 
         /// <summary>
+        /// 创建用户消息，自动设置时间戳和状态信息
+        /// </summary>
+        /// <param name="content">消息内容</param>
+        /// <param name="messageType">消息类型：User（默认）、System、Plugin</param>
+        protected Message CreateUserMessage(string content, string messageType = "User")
+        {
+            if (string.IsNullOrEmpty(content))
+                return null;
+
+            var message = new Message { Role = "user", Content = content, MessageType = messageType };
+
+            // 如果允许获取当前时间，设置Unix时间戳
+            if (Settings?.EnableTime == true)
+            {
+                message.UnixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
+            }
+
+            // 如果启用了减少输入token消耗，设置状态信息字段
+            if (Settings?.ReduceInputTokenUsage == true && SystemMessageProvider != null)
+            {
+                var statusString = SystemMessageProvider.GetStatusString();
+                if (!string.IsNullOrEmpty(statusString))
+                {
+                    message.StatusInfo = statusString;
+                }
+            }
+
+            return message;
+        }
+
+        /// <summary>
         /// Called at the start of each conversation turn to handle record weight decrement
         /// </summary>
         protected void OnConversationTurn()
@@ -365,63 +396,112 @@ namespace VPetLLM.Core
         [JsonProperty(Order = 5)]
         public string? StatusInfo { get; set; }
 
+        /// <summary>
+        /// 消息类型：User（用户输入）、System（系统消息）、Plugin（插件消息）
+        /// </summary>
+        [JsonProperty(Order = 6)]
+        public string? MessageType { get; set; }
+
         [JsonIgnore]
         public string DisplayContent
         {
             get
             {
-                // 基础文本：对assistant提取 say("...")，否则直接使用Content
-                string baseText;
+                // 对于 assistant 角色，直接返回原始内容
                 if (Role == "assistant")
                 {
-                    var match = System.Text.RegularExpressions.Regex.Match(Content ?? "", @"(?<=say\("")(?:[^""\\]|\\.)*(?=""\))");
-                    baseText = match.Success ? match.Value : (Content ?? "");
-                }
-                else
-                {
-                    baseText = Content ?? "";
+                    return Content ?? "";
                 }
 
-                // 时间前缀：若存在UnixTime则动态渲染为 [yyyy/MM/dd HH:mm:ss]
-                string timePrefix = "";
-                if (UnixTime.HasValue && Role == "user")
+                // 对于 user 角色，构建 JSON 格式
+                var baseText = Content ?? "";
+
+                // 构建时间字符串（ISO 8601 格式）
+                string nowTime = "";
+                if (UnixTime.HasValue)
                 {
                     try
                     {
-                        var dt = DateTimeOffset.FromUnixTimeSeconds(UnixTime.Value).ToLocalTime().DateTime;
-                        timePrefix = $"[{dt:yyyy/MM/dd HH:mm:ss}]";
+                        var dt = DateTimeOffset.FromUnixTimeSeconds(UnixTime.Value);
+                        nowTime = dt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                     }
                     catch
                     {
-                        // 忽略解析异常，保持无前缀
+                        // 忽略解析异常
                     }
                 }
 
-                // 状态信息前缀：若存在StatusInfo则动态添加
-                string statusPrefix = "";
+                // 提取状态信息（兼容旧版本，去掉可能存在的前缀）
+                string vpetStatus = "";
                 if (!string.IsNullOrEmpty(StatusInfo))
                 {
-                    statusPrefix = $"[{StatusInfo}]";
+                    vpetStatus = StatusInfo
+                        .Replace("[桌宠状态] ", "")
+                        .Replace("[Pet Status] ", "")
+                        .TrimStart();
                 }
 
-                // 组合前缀：时间和状态信息
-                string prefix = "";
-                if (!string.IsNullOrEmpty(timePrefix) && !string.IsNullOrEmpty(statusPrefix))
+                // 如果没有时间和状态信息，直接返回原始内容
+                if (string.IsNullOrEmpty(nowTime) && string.IsNullOrEmpty(vpetStatus))
                 {
-                    // 如果同时有时间和状态，合并为一个方括号：[Time;Status]
-                    prefix = $"[{timePrefix.Trim('[', ']')};{statusPrefix.Trim('[', ']')}] ";
-                }
-                else if (!string.IsNullOrEmpty(timePrefix))
-                {
-                    prefix = timePrefix + " ";
-                }
-                else if (!string.IsNullOrEmpty(statusPrefix))
-                {
-                    prefix = statusPrefix + " ";
+                    return baseText;
                 }
 
-                return prefix + baseText;
+                // 构建 JSON 格式输出
+                var parts = new List<string>();
+
+                if (!string.IsNullOrEmpty(nowTime))
+                {
+                    parts.Add($"\"NowTime\": \"{nowTime}\"");
+                }
+
+                if (!string.IsNullOrEmpty(vpetStatus))
+                {
+                    parts.Add($"\"VPetStatus\": \"{vpetStatus}\"");
+                }
+
+                // 检测是否为插件消息（格式：[Plugin Result: XXX] 内容）
+                var pluginMatch = System.Text.RegularExpressions.Regex.Match(baseText, @"^\[Plugin Result:\s*([^\]]+)\]\s*(.*)$", System.Text.RegularExpressions.RegexOptions.Singleline);
+                if (pluginMatch.Success)
+                {
+                    var pluginName = pluginMatch.Groups[1].Value.Trim();
+                    var pluginContent = pluginMatch.Groups[2].Value.Trim();
+                    parts.Add($"\"Plugin\": \"[{EscapeJsonString(pluginName)}] {EscapeJsonString(pluginContent)}\"");
+                }
+                else
+                {
+                    // 根据消息类型选择对应的字段名
+                    var msgType = MessageType ?? "User";
+                    switch (msgType)
+                    {
+                        case "System":
+                            parts.Add($"\"System\": \"{EscapeJsonString(baseText)}\"");
+                            break;
+                        case "Plugin":
+                            parts.Add($"\"Plugin\": \"{EscapeJsonString(baseText)}\"");
+                            break;
+                        default: // User
+                            parts.Add($"\"UserSay\": \"{EscapeJsonString(baseText)}\"");
+                            break;
+                    }
+                }
+
+                return "{" + string.Join(", ", parts) + "}";
             }
+        }
+
+        /// <summary>
+        /// 转义 JSON 字符串中的特殊字符
+        /// </summary>
+        private static string EscapeJsonString(string str)
+        {
+            if (string.IsNullOrEmpty(str)) return "";
+            return str
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t");
         }
     }
 }

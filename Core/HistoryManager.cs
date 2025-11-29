@@ -79,13 +79,15 @@ namespace VPetLLM.Core
             }
 
             // 如果允许获取当前时间，仅写入Unix时间戳，显示时再根据UnixTime动态补全时间前缀
-            if (_settings.EnableTime && message.Role == "user")
+            // 只在UnixTime未设置时才设置（避免覆盖CreateUserMessage中已设置的值）
+            if (_settings.EnableTime && message.Role == "user" && !message.UnixTime.HasValue)
             {
                 message.UnixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
             }
 
             // 如果启用了减少输入token消耗且是用户消息，设置状态信息字段（不修改Content）
-            if (_settings.ReduceInputTokenUsage && message.Role == "user" && _systemMessageProvider != null)
+            // 只在StatusInfo未设置时才设置（避免覆盖CreateUserMessage中已设置的值）
+            if (_settings.ReduceInputTokenUsage && message.Role == "user" && _systemMessageProvider != null && string.IsNullOrEmpty(message.StatusInfo))
             {
                 var statusString = _systemMessageProvider.GetStatusString();
                 if (!string.IsNullOrEmpty(statusString))

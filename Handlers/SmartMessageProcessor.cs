@@ -62,7 +62,7 @@ namespace VPetLLM.Handlers
                 if (!skipInitialization)
                 {
                     // 清理MessageBar状态，准备显示新内容
-                    System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                    _ = System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
                         try
                         {
