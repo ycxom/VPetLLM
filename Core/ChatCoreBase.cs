@@ -416,14 +416,17 @@ namespace VPetLLM.Core
                 // 对于 user 角色，构建 JSON 格式
                 var baseText = Content ?? "";
 
-                // 构建时间字符串（ISO 8601 格式）
+                // 构建时间字符串（ISO 8601 格式，使用本地时区）
                 string nowTime = "";
                 if (UnixTime.HasValue)
                 {
                     try
                     {
-                        var dt = DateTimeOffset.FromUnixTimeSeconds(UnixTime.Value);
-                        nowTime = dt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                        // 从Unix时间戳转换为DateTimeOffset，然后转换为本地时间
+                        var utcTime = DateTimeOffset.FromUnixTimeSeconds(UnixTime.Value);
+                        var localTime = utcTime.ToLocalTime();
+                        // 使用带时区偏移的格式，如 "2025-12-07T15:30:00+08:00"
+                        nowTime = localTime.ToString("yyyy-MM-ddTHH:mm:sszzz");
                     }
                     catch
                     {
