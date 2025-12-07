@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Services;
 using VPetLLM.Utils;
 
 namespace VPetLLM.Handlers
@@ -15,6 +16,7 @@ namespace VPetLLM.Handlers
         private readonly IHandlerRegistry _handlerRegistry;
         private Core.RecordManager _recordManager;
         private Setting _settings;
+        private IMediaPlaybackService _mediaPlaybackService;
 
         public ActionProcessor(IMainWindow mainWindow) : this(mainWindow, HandlerRegistry.Instance)
         {
@@ -38,6 +40,13 @@ namespace VPetLLM.Handlers
         {
             _recordManager = recordManager;
             // Re-register handlers to include RecordCommandHandler
+            RegisterHandlers();
+        }
+
+        public void SetMediaPlaybackService(IMediaPlaybackService mediaPlaybackService)
+        {
+            _mediaPlaybackService = mediaPlaybackService;
+            // Re-register handlers to include PlayHandler
             RegisterHandlers();
         }
 
@@ -66,6 +75,12 @@ namespace VPetLLM.Handlers
             if (_settings != null)
             {
                 _handlerRegistry.Register("vpet_settings", new VPetSettingsHandler(_settings));
+            }
+            
+            // Add PlayHandler if MediaPlaybackService is available
+            if (_mediaPlaybackService != null)
+            {
+                _handlerRegistry.Register("play", new PlayHandler(_mediaPlaybackService));
             }
         }
 
@@ -171,6 +186,12 @@ namespace VPetLLM.Handlers
             if (handler.Keyword.ToLower() == "record" || handler.Keyword.ToLower() == "record_modify")
             {
                 isEnabled = settings.Records?.EnableRecords ?? true;
+            }
+            
+            // Special handling for play command - check if MediaPlayback is enabled
+            if (handler.Keyword.ToLower() == "play")
+            {
+                isEnabled = settings.EnableMediaPlayback;
             }
             
             return isEnabled;

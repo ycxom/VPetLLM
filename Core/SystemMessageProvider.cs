@@ -210,6 +210,12 @@ namespace VPetLLM.Core
                     {
                         isEnabled = _settings.Records?.EnableRecords ?? true;
                     }
+                    
+                    // 特殊处理play指令 - 检查MediaPlayback是否启用
+                    if (handler.Keyword.ToLower() == "play")
+                    {
+                        isEnabled = _settings.EnableMediaPlayback;
+                    }
 
                     if (isEnabled)
                     {

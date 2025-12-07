@@ -270,5 +270,9 @@
     "VPetSettings_Log_BirthdayFailed": {
         "en": "set_owner_birthday Failed - {0}",
         "zh": "set_owner_birthday 失败 - {0}"
+    },
+    "Handler_Play_Description": {
+        "en": "Play media (video/music) from URL using mpv player.\nFormat: <|play_begin|> url <|play_end|> or <|play_begin|> url, volume <|play_end|>\nStop playback: <|play_begin|> stop <|play_end|>\n\nParameters:\n- url: Media URL (video or audio link)\n- volume: Optional, 0-100 (default: 100)\n\nExamples:\n- Play video: <|play_begin|> https://example.com/video.mp4 <|play_end|>\n- Play music with volume: <|play_begin|> https://example.com/music.mp3, 80 <|play_end|>\n- Stop playback: <|play_begin|> stop <|play_end|>\n\nNOTE: The mpv window will always be visible during playback.",
+        "zh": "使用 mpv 播放器播放媒体（视频/音乐）链接。\n格式：<|play_begin|> url <|play_end|> 或 <|play_begin|> url, 音量 <|play_end|>\n停止播放：<|play_begin|> stop <|play_end|>\n\n参数说明：\n- url：媒体链接（视频或音频）\n- 音量：可选，0-100（默认：100）\n\n示例：\n- 播放视频：<|play_begin|> https://example.com/video.mp4 <|play_end|>\n- 指定音量播放音乐：<|play_begin|> https://example.com/music.mp3, 80 <|play_end|>\n- 停止播放：<|play_begin|> stop <|play_end|>\n\n注意：播放期间 mpv 窗口将始终保持可见。"
     }
 }

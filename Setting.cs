@@ -53,6 +53,8 @@ namespace VPetLLM
         public RateLimiterSetting RateLimiter { get; set; } = new RateLimiterSetting();
         public ASRSetting ASR { get; set; } = new ASRSetting();
         public RecordSettings Records { get; set; } = new RecordSettings();
+        public bool EnableMediaPlayback { get; set; } = true;
+        public MediaPlaybackSetting MediaPlayback { get; set; } = new MediaPlaybackSetting();
         private readonly string _path;
 
         public Setting(string path)
@@ -136,6 +138,10 @@ namespace VPetLLM
             if (Records == null)
             {
                 Records = new RecordSettings();
+            }
+            if (MediaPlayback == null)
+            {
+                MediaPlayback = new MediaPlaybackSetting();
             }
 
             // 旧版OpenAI单节点配置迁移到多节点结构，避免用户配置丢失
@@ -735,6 +741,32 @@ namespace VPetLLM
             /// Default: 10, Range: 1-100
             /// </summary>
             public int MaxRecordsLimit { get; set; } = 10;
+        }
+
+        /// <summary>
+        /// 媒体播放设置
+        /// </summary>
+        public class MediaPlaybackSetting
+        {
+            /// <summary>
+            /// 默认音量 (0-100)
+            /// </summary>
+            public int DefaultVolume { get; set; } = 100;
+            
+            /// <summary>
+            /// 是否监控窗口可见性
+            /// </summary>
+            public bool MonitorWindowVisibility { get; set; } = true;
+            
+            /// <summary>
+            /// 窗口可见性检查间隔（毫秒）
+            /// </summary>
+            public int WindowCheckIntervalMs { get; set; } = 1000;
+            
+            /// <summary>
+            /// mpv.exe 路径（留空则使用插件目录下的 mpv.exe）
+            /// </summary>
+            public string MpvPath { get; set; } = "";
         }
 
     }

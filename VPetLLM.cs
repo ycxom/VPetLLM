@@ -136,10 +136,51 @@ namespace VPetLLM
                 // 初始化购买服务
                 _purchaseService = new PurchaseService(this, Settings);
                 Logger.Log("PurchaseService initialized");
+                
+                // 初始化媒体播放服务
+                InitializeMediaPlaybackService();
             }
             catch (Exception ex)
             {
                 Logger.Log($"Error initializing services: {ex.Message}");
+            }
+        }
+        
+        private IMediaPlaybackService? _mediaPlaybackService;
+        
+        /// <summary>
+        /// 初始化媒体播放服务
+        /// </summary>
+        private void InitializeMediaPlaybackService()
+        {
+            try
+            {
+                // 确定 mpv.exe 路径
+                var mpvPath = Settings.MediaPlayback?.MpvPath;
+                if (string.IsNullOrWhiteSpace(mpvPath))
+                {
+                    // 默认使用插件目录下的 mpv/mpv.exe（与 TTS 一致）
+                    var dllPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                    var mpvDir = Path.Combine(dllPath ?? "", "mpv");
+                    mpvPath = Path.Combine(mpvDir, "mpv.exe");
+                }
+                
+                // 始终创建 MediaPlaybackService（即使 mpv.exe 不存在，执行时会报错）
+                _mediaPlaybackService = new MediaPlaybackService(mpvPath, Settings.MediaPlayback ?? new Setting.MediaPlaybackSetting());
+                ActionProcessor?.SetMediaPlaybackService(_mediaPlaybackService);
+                
+                if (File.Exists(mpvPath))
+                {
+                    Logger.Log($"MediaPlaybackService initialized with mpv path: {mpvPath}");
+                }
+                else
+                {
+                    Logger.Log($"MediaPlaybackService initialized, but mpv.exe not found at {mpvPath}. Playback will fail until mpv.exe is available.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error initializing MediaPlaybackService: {ex.Message}");
             }
         }
 

@@ -1916,6 +1916,12 @@
                                         IsChecked="False"
                                         Margin="0,0,0,8"
                                         Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableMediaPlayback"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableMediaPlayback}"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
+                                        IsChecked="True"
+                                        Margin="0,0,0,8"
+                                        Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableBuy"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableBuy}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
