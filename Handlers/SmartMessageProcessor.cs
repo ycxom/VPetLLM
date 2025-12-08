@@ -9,11 +9,13 @@ namespace VPetLLM.Handlers
     /// <summary>
     /// 智能消息处理器，用于处理包含动作指令的AI回复
     /// 支持TTS语音播放与气泡同步显示
+    /// 优化：使用 BubbleManager 统一管理气泡显示
     /// </summary>
     public class SmartMessageProcessor
     {
         private readonly VPetLLM _plugin;
         private readonly ActionProcessor _actionProcessor;
+        private readonly BubbleManager _bubbleManager;
         private bool _isProcessing = false;
         private readonly object _processingLock = new object();
 
@@ -21,7 +23,13 @@ namespace VPetLLM.Handlers
         {
             _plugin = plugin;
             _actionProcessor = plugin.ActionProcessor;
+            _bubbleManager = new BubbleManager(plugin);
         }
+        
+        /// <summary>
+        /// 获取气泡管理器
+        /// </summary>
+        public BubbleManager BubbleManager => _bubbleManager;
 
         /// <summary>
         /// 获取当前是否正在处理消息
@@ -58,25 +66,25 @@ namespace VPetLLM.Handlers
             {
                 Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}, 跳过初始化: {skipInitialization}");
                 
-                // 只在首次响应时清理MessageBar状态
+                // 只在首次响应时清理状态
                 if (!skipInitialization)
                 {
-                    // 清理MessageBar状态，准备显示新内容
+                    // 使用 BubbleManager 清理状态（幂等操作）
+                    _bubbleManager.Clear();
+                    
+                    // 预初始化 MessageBarHelper（如果尚未初始化）
                     _ = System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
                         try
                         {
                             var msgBar = _plugin.MW.Main.MsgBar;
-                            if (msgBar != null)
+                            if (msgBar != null && !MessageBarHelper.IsInitialized)
                             {
-                                MessageBarHelper.Initialize(msgBar);
-                                MessageBarHelper.StopAllTimers(msgBar);
-                                MessageBarHelper.ClearStreamState(msgBar);
+                                MessageBarHelper.PreInitialize(msgBar);
                             }
                         }
-                        catch { /* 忽略清理错误 */ }
+                        catch { /* 忽略初始化错误 */ }
                     }));
-                    // 移除延迟，直接继续处理
                 }
                 
                 // 标记进入单条 AI 回复的处理会话，期间豁免插件/工具限流
@@ -476,6 +484,11 @@ namespace VPetLLM.Handlers
                     {
                         Logger.Log($"SmartMessageProcessor: 音频 #{talkIndex} 准备就绪，开始播放: {audioFile}");
 
+                        // 使用 BubbleManager 同步 TTS
+                        // 基于文本长度估算音频时长（约每字符100ms）
+                        int estimatedDuration = Math.Max(talkText.Length * 100, 1000);
+                        _bubbleManager.SyncWithTTS(true, estimatedDuration);
+
                         // 立即显示气泡（与音频同步）
                         var bubbleTask = ExecuteActionAsync(segment.Content);
                         Logger.Log($"SmartMessageProcessor: 气泡显示任务已启动");
@@ -732,18 +745,30 @@ namespace VPetLLM.Handlers
                 }
                 else
                 {
-                    // 如果TTS未启用，直接执行动作
-                    // 优化：利用VPet新的SayInfo架构，更智能地等待
+                    // 如果内置TTS未启用，直接执行动作
                     await ExecuteActionAsync(segment.Content);
                     
-                    // 计算气泡显示时间
-                    int displayTime = CalculateDisplayTime(talkText);
-                    Logger.Log($"SmartMessageProcessor: TTS未启用，等待气泡显示 {displayTime}ms");
-                    await Task.Delay(displayTime).ConfigureAwait(false);
+                    // 等待一小段时间让外置TTS有机会启动
+                    await Task.Delay(100).ConfigureAwait(false);
                     
-                    // TTS关闭时等待 VPet 语音完成（如EdgeTTS）
-                    // 优化：利用VPet的PlayingVoice状态进行智能等待
-                    await WaitForVPetVoiceWithSayInfoAsync();
+                    // 检查是否有外置TTS正在运行（如EdgeTTS）
+                    // 通过检查 VPet 的 PlayingVoice 状态来判断
+                    bool hasExternalTTS = _plugin.MW?.Main?.PlayingVoice ?? false;
+                    
+                    if (hasExternalTTS)
+                    {
+                        // 外置TTS正在运行，等待语音完成
+                        Logger.Log($"SmartMessageProcessor: 检测到外置TTS正在运行，等待语音完成");
+                        await WaitForVPetVoiceWithSayInfoAsync();
+                        // 语音完成后不需要额外等待，直接继续
+                    }
+                    else
+                    {
+                        // 没有TTS运行，按计算时间等待气泡显示
+                        int displayTime = CalculateDisplayTime(talkText);
+                        Logger.Log($"SmartMessageProcessor: 无TTS运行，等待气泡显示 {displayTime}ms");
+                        await Task.Delay(displayTime).ConfigureAwait(false);
+                    }
                 }
             }
             else

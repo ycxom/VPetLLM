@@ -84,6 +84,134 @@ namespace VPetLLM.Utils
         /// 检查是否已初始化
         /// </summary>
         public static bool IsInitialized => _isInitialized;
+        
+        /// <summary>
+        /// 预初始化（在应用启动时调用，提前缓存反射引用）
+        /// </summary>
+        /// <param name="msgBar">MessageBar实例</param>
+        /// <returns>是否预初始化成功</returns>
+        public static bool PreInitialize(object msgBar)
+        {
+            if (msgBar == null) return false;
+            
+            // 预初始化就是调用 Initialize，但记录不同的日志
+            var result = Initialize(msgBar);
+            if (result)
+            {
+                Logger.Log("MessageBarHelper: 预初始化完成，反射缓存已就绪");
+            }
+            return result;
+        }
+        
+        /// <summary>
+        /// 获取字段值（泛型版本）
+        /// </summary>
+        /// <typeparam name="T">字段类型</typeparam>
+        /// <param name="msgBar">MessageBar实例</param>
+        /// <param name="fieldName">字段名称</param>
+        /// <returns>字段值，失败返回默认值</returns>
+        public static T GetFieldValue<T>(object msgBar, string fieldName)
+        {
+            if (msgBar == null) return default;
+            
+            if (!_isInitialized)
+            {
+                Initialize(msgBar);
+            }
+            
+            try
+            {
+                var field = GetCachedField(fieldName);
+                if (field != null)
+                {
+                    var value = field.GetValue(msgBar);
+                    if (value is T typedValue)
+                    {
+                        return typedValue;
+                    }
+                }
+                
+                // 回退：直接反射获取
+                var directField = msgBar.GetType().GetField(fieldName, 
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (directField != null)
+                {
+                    var value = directField.GetValue(msgBar);
+                    if (value is T typedValue)
+                    {
+                        return typedValue;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MessageBarHelper.GetFieldValue<{typeof(T).Name}>: 获取字段 {fieldName} 失败: {ex.Message}");
+            }
+            
+            return default;
+        }
+        
+        /// <summary>
+        /// 设置字段值
+        /// </summary>
+        /// <param name="msgBar">MessageBar实例</param>
+        /// <param name="fieldName">字段名称</param>
+        /// <param name="value">要设置的值</param>
+        /// <returns>是否设置成功</returns>
+        public static bool SetFieldValue(object msgBar, string fieldName, object value)
+        {
+            if (msgBar == null) return false;
+            
+            if (!_isInitialized)
+            {
+                Initialize(msgBar);
+            }
+            
+            try
+            {
+                var field = GetCachedField(fieldName);
+                if (field != null)
+                {
+                    field.SetValue(msgBar, value);
+                    return true;
+                }
+                
+                // 回退：直接反射设置
+                var directField = msgBar.GetType().GetField(fieldName, 
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (directField != null)
+                {
+                    directField.SetValue(msgBar, value);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MessageBarHelper.SetFieldValue: 设置字段 {fieldName} 失败: {ex.Message}");
+            }
+            
+            return false;
+        }
+        
+        /// <summary>
+        /// 获取缓存的字段引用
+        /// </summary>
+        private static FieldInfo GetCachedField(string fieldName)
+        {
+            return fieldName switch
+            {
+                "ShowTimer" => _showTimerField,
+                "EndTimer" => _endTimerField,
+                "CloseTimer" => _closeTimerField,
+                "TText" => _tTextField,
+                "LName" => _lNameField,
+                "oldsaystream" => _oldsaystreamField,
+                "outputtext" => _outputtextField,
+                "outputtextsample" => _outputtextsampleField,
+                "MessageBoxContent" => _messageBoxContentField,
+                _ => null
+            };
+        }
 
         /// <summary>
         /// 停止所有定时器（使用缓存的引用）

@@ -1,4 +1,5 @@
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Handlers.Animation;
 using VPetLLM.Utils;
 using static VPet_Simulator.Core.GraphInfo;
 
@@ -263,28 +264,56 @@ namespace VPetLLM.Handlers
                     switch (action.ToLower())
                     {
                         case "sleep":
-                            Logger.Log("ActionHandler: Executing state-based action 'sleep' - calling StateManager.TransitionToState");
-                            StateManager.TransitionToState(mainWindow, "Sleep", action);
+                            Logger.Log("ActionHandler: Executing state-based action 'sleep' via AnimationHelper");
+                            if (AnimationHelper.IsInitialized)
+                            {
+                                await AnimationHelper.RequestStateChangeAsync("ActionHandler", "Sleep", AnimationPriority.High);
+                            }
+                            else
+                            {
+                                StateManager.TransitionToState(mainWindow, "Sleep", action);
+                            }
                             actionTriggered = true;
                             Logger.Log("ActionHandler: State-based action 'sleep' completed");
                             break;
                         case "wakeup":
                         case "normal":
                         case "nomal":
-                            Logger.Log($"ActionHandler: Executing state-based action '{action}' (wakeup/normal) - calling StateManager.TransitionToState");
-                            StateManager.TransitionToState(mainWindow, "Nomal", action);
+                            Logger.Log($"ActionHandler: Executing state-based action '{action}' (wakeup/normal) via AnimationHelper");
+                            if (AnimationHelper.IsInitialized)
+                            {
+                                await AnimationHelper.RequestStateChangeAsync("ActionHandler", "Nomal", AnimationPriority.High);
+                            }
+                            else
+                            {
+                                StateManager.TransitionToState(mainWindow, "Nomal", action);
+                            }
                             actionTriggered = true;
                             Logger.Log($"ActionHandler: State-based action '{action}' (wakeup/normal) completed");
                             break;
                         case "work":
-                            Logger.Log("ActionHandler: Executing state-based action 'work' - calling StateManager.TransitionToState");
-                            StateManager.TransitionToState(mainWindow, "Work", action);
+                            Logger.Log("ActionHandler: Executing state-based action 'work' via AnimationHelper");
+                            if (AnimationHelper.IsInitialized)
+                            {
+                                await AnimationHelper.RequestStateChangeAsync("ActionHandler", "Work", AnimationPriority.High);
+                            }
+                            else
+                            {
+                                StateManager.TransitionToState(mainWindow, "Work", action);
+                            }
                             actionTriggered = true;
                             Logger.Log("ActionHandler: State-based action 'work' completed");
                             break;
                         case "study":
-                            Logger.Log("ActionHandler: Executing state-based action 'study' - calling StateManager.TransitionToState");
-                            StateManager.TransitionToState(mainWindow, "Study", action);
+                            Logger.Log("ActionHandler: Executing state-based action 'study' via AnimationHelper");
+                            if (AnimationHelper.IsInitialized)
+                            {
+                                await AnimationHelper.RequestStateChangeAsync("ActionHandler", "Study", AnimationPriority.High);
+                            }
+                            else
+                            {
+                                StateManager.TransitionToState(mainWindow, "Study", action);
+                            }
                             actionTriggered = true;
                             Logger.Log("ActionHandler: State-based action 'study' completed");
                             break;
@@ -344,16 +373,28 @@ namespace VPetLLM.Handlers
                     switch (action.ToLower())
                     {
                         case "move":
-                            Logger.Log("ActionHandler: Executing 'move' animation");
-                            // 直接调用Display方法显示移动动画，绕过可能失效的委托属性
-                            mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            Logger.Log("ActionHandler: Executing 'move' animation via AnimationHelper");
+                            if (AnimationHelper.IsInitialized)
+                            {
+                                await AnimationHelper.RequestDisplayAsync("ActionHandler", GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            }
+                            else
+                            {
+                                mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            }
                             actionTriggered = true;
                             Logger.Log("ActionHandler: 'move' animation completed");
                             break;
                         case "idel":
-                            Logger.Log("ActionHandler: Executing 'idel' (DisplayToNomal)");
-                            // 使用DisplayToNomal()作为待机状态的替代方法
-                            mainWindow.Main.DisplayToNomal();
+                            Logger.Log("ActionHandler: Executing 'idel' via AnimationHelper");
+                            if (AnimationHelper.IsInitialized)
+                            {
+                                await AnimationHelper.RequestStopAsync("ActionHandler");
+                            }
+                            else
+                            {
+                                mainWindow.Main.DisplayToNomal();
+                            }
                             actionTriggered = true;
                             Logger.Log("ActionHandler: 'idel' completed");
                             break;
@@ -418,8 +459,15 @@ namespace VPetLLM.Handlers
                             }
                             break;
                         default:
-                            Logger.Log($"ActionHandler: Executing generic animation '{action}'");
-                            mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            Logger.Log($"ActionHandler: Executing generic animation '{action}' via AnimationHelper");
+                            if (AnimationHelper.IsInitialized)
+                            {
+                                await AnimationHelper.RequestDisplayAsync("ActionHandler", action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            }
+                            else
+                            {
+                                mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            }
                             actionTriggered = true;
                             Logger.Log($"ActionHandler: Generic animation '{action}' completed");
                             break;

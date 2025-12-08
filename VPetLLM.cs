@@ -6,6 +6,7 @@ using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
 using VPetLLM.Handlers;
+using VPetLLM.Handlers.Animation;
 using VPetLLM.Services;
 using VPetLLM.UI.Windows;
 using VPetLLM.Utils;
@@ -273,9 +274,29 @@ namespace VPetLLM
                     _defaultPluginChecker.RefreshWindowTitle();
                 }
                 
+                // 初始化动画协调器
+                InitializeAnimationCoordinator();
+                
                 Utils.Logger.Log("Dispatcher.Invoke finished.");
             });
             Utils.Logger.Log("LoadPlugin finished.");
+        }
+
+        /// <summary>
+        /// 初始化动画协调器
+        /// </summary>
+        private void InitializeAnimationCoordinator()
+        {
+            try
+            {
+                Logger.Log("开始初始化AnimationCoordinator...");
+                AnimationHelper.Initialize(MW);
+                Logger.Log("AnimationCoordinator初始化成功");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"初始化AnimationCoordinator时发生错误: {ex.Message}");
+            }
         }
 
         public override void Save()

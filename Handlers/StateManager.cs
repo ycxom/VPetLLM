@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Handlers.Animation;
 using VPetLLM.Utils;
 
 namespace VPetLLM.Handlers

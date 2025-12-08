@@ -28,6 +28,11 @@ namespace VPetLLM.UI.Windows
         /// 获取消息处理器（用于流式处理等待）
         /// </summary>
         public SmartMessageProcessor MessageProcessor => _messageProcessor;
+        
+        /// <summary>
+        /// 获取气泡管理器（通过消息处理器）
+        /// </summary>
+        public BubbleManager BubbleManager => _messageProcessor?.BubbleManager;
 
         public TalkBox(VPetLLM plugin) : base(plugin)
         {
@@ -37,7 +42,24 @@ namespace VPetLLM.UI.Windows
             {
                 _plugin.ChatCore.SetResponseHandler(HandleResponse);
             }
-            Logger.Log("TalkBox created.");
+            
+            // 预初始化 MessageBarHelper
+            _ = Application.Current.Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    try
+                    {
+                        var msgBar = _plugin.MW?.Main?.MsgBar;
+                        if (msgBar != null)
+                        {
+                            Utils.MessageBarHelper.PreInitialize(msgBar);
+                        }
+                    }
+                    catch { }
+                }));
+            
+            Logger.Log("TalkBox created with BubbleManager integration.");
         }
 
         public void HandleNormalResponse(string message)
@@ -310,7 +332,7 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 启动思考动画 - 显示动态的"思考中"气泡（优化：减少UI线程压力）
+        /// 启动思考动画 - 显示动态的"思考中"气泡（优化：使用 BubbleManager）
         /// </summary>
         private void StartThinkingAnimation()
         {
@@ -337,6 +359,9 @@ namespace VPetLLM.UI.Windows
             var baseText = template.Replace("{PetName}", petName);
             var dots = new[] { "", " ..", " ....", " ......", " ........" };
 
+            // 使用 BubbleManager 的 TimerCoordinator 暂停定时器
+            BubbleManager?.TimerCoordinator?.PauseAllTimers();
+
             // 启动后台任务循环显示思考动画
             _ = Task.Run(async () =>
             {
@@ -345,13 +370,11 @@ namespace VPetLLM.UI.Windows
                 {
                     var text = baseText + dots[i++ % dots.Length];
                     
-                    // 使用低优先级BeginInvoke，避免阻塞动画渲染
-                    _ = Application.Current.Dispatcher.BeginInvoke(
-                        System.Windows.Threading.DispatcherPriority.Input,
-                        new Action(() =>
-                        {
-                            if (_isThinking) ShowThinkingBubbleInstantly(text);
-                        }));
+                    // 使用 BubbleManager 显示思考气泡
+                    if (_isThinking)
+                    {
+                        BubbleManager?.ShowThinkingBubble(text);
+                    }
 
                     try { await Task.Delay(450, cts.Token); }
                     catch (TaskCanceledException) { break; }
@@ -361,6 +384,7 @@ namespace VPetLLM.UI.Windows
 
         /// <summary>
         /// 停止思考动画但不隐藏气泡（用于流式响应，让新气泡直接覆盖）
+        /// 优化：使用 BubbleManager 的状态过渡
         /// </summary>
         private void StopThinkingAnimationWithoutHide()
         {
@@ -375,7 +399,11 @@ namespace VPetLLM.UI.Windows
                 try { cts.Cancel(); cts.Dispose(); } catch { }
             }
             
-            // 使用低优先级异步清理，避免阻塞动画
+            // 使用 BubbleManager 的 TimerCoordinator 停止定时器
+            // 但不清理状态，保持气泡可见以便平滑过渡
+            BubbleManager?.TimerCoordinator?.ForceStopAll();
+            
+            // 使用低优先级异步清理流式状态
             Application.Current.Dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.Background,
                 new Action(() =>
@@ -385,7 +413,6 @@ namespace VPetLLM.UI.Windows
                         var msgBar = _plugin.MW.Main.MsgBar;
                         if (msgBar != null)
                         {
-                            Utils.MessageBarHelper.StopAllTimers(msgBar);
                             Utils.MessageBarHelper.ClearStreamState(msgBar);
                         }
                     }
@@ -395,6 +422,7 @@ namespace VPetLLM.UI.Windows
 
         /// <summary>
         /// 停止思考动画并隐藏气泡（用于错误情况或强制停止）
+        /// 优化：使用 BubbleManager 统一管理
         /// </summary>
         private void StopThinkingAnimation()
         {
@@ -409,23 +437,9 @@ namespace VPetLLM.UI.Windows
                 try { cts.Cancel(); cts.Dispose(); } catch { }
             }
             
-            // 使用低优先级异步清理并隐藏气泡
-            Application.Current.Dispatcher.BeginInvoke(
-                System.Windows.Threading.DispatcherPriority.Background,
-                new Action(() =>
-                {
-                    try
-                    {
-                        var msgBar = _plugin.MW.Main.MsgBar;
-                        if (msgBar != null)
-                        {
-                            Utils.MessageBarHelper.StopAllTimers(msgBar);
-                            Utils.MessageBarHelper.ClearStreamState(msgBar);
-                            Utils.MessageBarHelper.SetVisibility(msgBar, false);
-                        }
-                    }
-                    catch { }
-                }));
+            // 使用 BubbleManager 清理状态并隐藏气泡
+            BubbleManager?.Clear();
+            BubbleManager?.HideBubble();
         }
 
         /// <summary>
