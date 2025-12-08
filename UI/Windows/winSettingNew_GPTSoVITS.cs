@@ -16,6 +16,121 @@ namespace VPetLLM.UI.Windows
         private Dictionary<string, Dictionary<string, List<string>>> _currentModels = new Dictionary<string, Dictionary<string, List<string>>>();
 
         /// <summary>
+        /// API 模式选择变化事件
+        /// </summary>
+        private void ComboBox_TTS_GPTSoVITS_ApiMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // 初始化时 _plugin 可能为空，跳过
+            if (_plugin == null || _plugin.Settings?.TTS?.GPTSoVITS == null)
+                return;
+                
+            if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem selectedItem)
+            {
+                var mode = selectedItem.Tag?.ToString();
+                var isApiV2 = mode == "ApiV2";
+                
+                // 切换面板可见性
+                var webUIPanel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_WebUI");
+                var apiV2Panel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_ApiV2");
+                
+                if (webUIPanel != null)
+                    webUIPanel.Visibility = isApiV2 ? Visibility.Collapsed : Visibility.Visible;
+                if (apiV2Panel != null)
+                    apiV2Panel.Visibility = isApiV2 ? Visibility.Visible : Visibility.Collapsed;
+                
+                // 保存设置
+                _plugin.Settings.TTS.GPTSoVITS.ApiMode = isApiV2 
+                    ? Setting.GPTSoVITSApiMode.ApiV2 
+                    : Setting.GPTSoVITSApiMode.WebUI;
+                ScheduleAutoSave();
+            }
+        }
+
+        /// <summary>
+        /// 应用 GPT 模型权重按钮点击事件
+        /// </summary>
+        private async void Button_TTS_GPTSoVITS_ApplyGptWeights_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            try
+            {
+                StartButtonLoadingAnimation(button);
+                
+                var weightsPath = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_GptWeightsPath"))?.Text;
+                if (string.IsNullOrWhiteSpace(weightsPath))
+                {
+                    MessageBox.Show("请输入 GPT 模型权重路径", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var ttsCore = new GPTSoVITSTTSCore(_plugin.Settings);
+                var success = await ttsCore.SetGptWeightsAsync(weightsPath);
+                
+                if (success)
+                {
+                    _plugin.Settings.TTS.GPTSoVITS.GptWeightsPath = weightsPath;
+                    ScheduleAutoSave();
+                    MessageBox.Show("GPT 模型切换成功", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show("GPT 模型切换失败，请检查路径是否正确", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"应用 GPT 模型权重失败: {ex.Message}");
+                MessageBox.Show($"应用失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
+        }
+
+        /// <summary>
+        /// 应用 SoVITS 模型权重按钮点击事件
+        /// </summary>
+        private async void Button_TTS_GPTSoVITS_ApplySovitsWeights_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            try
+            {
+                StartButtonLoadingAnimation(button);
+                
+                var weightsPath = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SovitsWeightsPath"))?.Text;
+                if (string.IsNullOrWhiteSpace(weightsPath))
+                {
+                    MessageBox.Show("请输入 SoVITS 模型权重路径", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var ttsCore = new GPTSoVITSTTSCore(_plugin.Settings);
+                var success = await ttsCore.SetSovitsWeightsAsync(weightsPath);
+                
+                if (success)
+                {
+                    _plugin.Settings.TTS.GPTSoVITS.SovitsWeightsPath = weightsPath;
+                    ScheduleAutoSave();
+                    MessageBox.Show("SoVITS 模型切换成功", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show("SoVITS 模型切换失败，请检查路径是否正确", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"应用 SoVITS 模型权重失败: {ex.Message}");
+                MessageBox.Show($"应用失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
+        }
+
+        /// <summary>
         /// 检测版本按钮点击事件
         /// </summary>
         private async void Button_TTS_GPTSoVITS_DetectVersion_Click(object sender, RoutedEventArgs e)
@@ -354,12 +469,39 @@ namespace VPetLLM.UI.Windows
 
             var settings = _plugin.Settings.TTS.GPTSoVITS;
 
+            // 加载 API 模式
+            var apiModeComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_ApiMode");
+            if (apiModeComboBox != null)
+            {
+                var modeTag = settings.ApiMode == Setting.GPTSoVITSApiMode.ApiV2 ? "ApiV2" : "WebUI";
+                foreach (ComboBoxItem item in apiModeComboBox.Items)
+                {
+                    if (item.Tag?.ToString() == modeTag)
+                    {
+                        apiModeComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+                
+                // 设置面板可见性
+                var isApiV2 = settings.ApiMode == Setting.GPTSoVITSApiMode.ApiV2;
+                var webUIPanel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_WebUI");
+                var apiV2Panel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_ApiV2");
+                if (webUIPanel != null)
+                    webUIPanel.Visibility = isApiV2 ? Visibility.Collapsed : Visibility.Visible;
+                if (apiV2Panel != null)
+                    apiV2Panel.Visibility = isApiV2 ? Visibility.Visible : Visibility.Collapsed;
+            }
+
             // 加载基本设置
             var baseUrlTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl");
             if (baseUrlTextBox != null)
             {
                 baseUrlTextBox.Text = settings.BaseUrl;
             }
+
+            // 加载 API v2 专用设置
+            LoadGPTSoVITSApiV2Settings(settings);
 
             var cutPuncTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc");
             if (cutPuncTextBox != null)
@@ -566,6 +708,241 @@ namespace VPetLLM.UI.Windows
             if (languageComboBox?.SelectedItem is ComboBoxItem langItem)
             {
                 _plugin.Settings.TTS.GPTSoVITS.PromptLanguage = langItem.Tag?.ToString() ?? "中文";
+            }
+
+            // 保存 API v2 专用设置
+            SaveGPTSoVITSApiV2Settings();
+        }
+
+        /// <summary>
+        /// 加载 API v2 专用设置
+        /// </summary>
+        private void LoadGPTSoVITSApiV2Settings(Setting.GPTSoVITSTTSSetting settings)
+        {
+            // 参考音频路径
+            var refAudioPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_RefAudioPath");
+            if (refAudioPathTextBox != null)
+            {
+                refAudioPathTextBox.Text = settings.RefAudioPath;
+            }
+
+            // 提示文本
+            var promptTextV2TextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptTextV2");
+            if (promptTextV2TextBox != null)
+            {
+                promptTextV2TextBox.Text = settings.PromptTextV2;
+            }
+
+            // 提示语言
+            var promptLangV2ComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_PromptLangV2");
+            if (promptLangV2ComboBox != null)
+            {
+                foreach (ComboBoxItem item in promptLangV2ComboBox.Items)
+                {
+                    if (item.Tag?.ToString() == settings.PromptLangV2)
+                    {
+                        promptLangV2ComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+
+            // 合成文本语言
+            var textLangV2ComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextLangV2");
+            if (textLangV2ComboBox != null)
+            {
+                foreach (ComboBoxItem item in textLangV2ComboBox.Items)
+                {
+                    if (item.Tag?.ToString() == settings.TextLangV2)
+                    {
+                        textLangV2ComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+
+            // 文本切分方法
+            var textSplitMethodV2ComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextSplitMethodV2");
+            if (textSplitMethodV2ComboBox != null)
+            {
+                foreach (ComboBoxItem item in textSplitMethodV2ComboBox.Items)
+                {
+                    if (item.Tag?.ToString() == settings.TextSplitMethodV2)
+                    {
+                        textSplitMethodV2ComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+
+            // 输出格式
+            var mediaTypeComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_MediaType");
+            if (mediaTypeComboBox != null)
+            {
+                foreach (ComboBoxItem item in mediaTypeComboBox.Items)
+                {
+                    if (item.Tag?.ToString() == settings.MediaType)
+                    {
+                        mediaTypeComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+
+            // 批处理大小
+            var batchSizeTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BatchSize");
+            if (batchSizeTextBox != null)
+            {
+                batchSizeTextBox.Text = settings.BatchSize.ToString();
+            }
+
+            // 采样步数
+            var sampleStepsTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SampleSteps");
+            if (sampleStepsTextBox != null)
+            {
+                sampleStepsTextBox.Text = settings.SampleSteps.ToString();
+            }
+
+            // 重复惩罚
+            var repetitionPenaltyTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_RepetitionPenalty");
+            if (repetitionPenaltyTextBox != null)
+            {
+                repetitionPenaltyTextBox.Text = settings.RepetitionPenalty.ToString();
+            }
+
+            // 流式模式
+            var streamingModeComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_StreamingMode");
+            if (streamingModeComboBox != null)
+            {
+                foreach (ComboBoxItem item in streamingModeComboBox.Items)
+                {
+                    if (item.Tag?.ToString() == settings.StreamingMode.ToString())
+                    {
+                        streamingModeComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+
+            // 超采样
+            var superSamplingCheckBox = (CheckBox)this.FindName("CheckBox_TTS_GPTSoVITS_SuperSampling");
+            if (superSamplingCheckBox != null)
+            {
+                superSamplingCheckBox.IsChecked = settings.SuperSampling;
+            }
+
+            // GPT 模型权重路径
+            var gptWeightsPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_GptWeightsPath");
+            if (gptWeightsPathTextBox != null)
+            {
+                gptWeightsPathTextBox.Text = settings.GptWeightsPath;
+            }
+
+            // SoVITS 模型权重路径
+            var sovitsWeightsPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SovitsWeightsPath");
+            if (sovitsWeightsPathTextBox != null)
+            {
+                sovitsWeightsPathTextBox.Text = settings.SovitsWeightsPath;
+            }
+        }
+
+        /// <summary>
+        /// 保存 API v2 专用设置
+        /// </summary>
+        private void SaveGPTSoVITSApiV2Settings()
+        {
+            // 参考音频路径
+            var refAudioPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_RefAudioPath");
+            if (refAudioPathTextBox != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.RefAudioPath = refAudioPathTextBox.Text;
+            }
+
+            // 提示文本
+            var promptTextV2TextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptTextV2");
+            if (promptTextV2TextBox != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.PromptTextV2 = promptTextV2TextBox.Text;
+            }
+
+            // 提示语言
+            var promptLangV2ComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_PromptLangV2");
+            if (promptLangV2ComboBox?.SelectedItem is ComboBoxItem promptLangItem)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.PromptLangV2 = promptLangItem.Tag?.ToString() ?? "zh";
+            }
+
+            // 合成文本语言
+            var textLangV2ComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextLangV2");
+            if (textLangV2ComboBox?.SelectedItem is ComboBoxItem textLangItem)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.TextLangV2 = textLangItem.Tag?.ToString() ?? "zh";
+            }
+
+            // 文本切分方法
+            var textSplitMethodV2ComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextSplitMethodV2");
+            if (textSplitMethodV2ComboBox?.SelectedItem is ComboBoxItem splitMethodItem)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.TextSplitMethodV2 = splitMethodItem.Tag?.ToString() ?? "cut5";
+            }
+
+            // 输出格式
+            var mediaTypeComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_MediaType");
+            if (mediaTypeComboBox?.SelectedItem is ComboBoxItem mediaTypeItem)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.MediaType = mediaTypeItem.Tag?.ToString() ?? "wav";
+            }
+
+            // 批处理大小
+            var batchSizeTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BatchSize");
+            if (batchSizeTextBox != null && int.TryParse(batchSizeTextBox.Text, out int batchSize))
+            {
+                _plugin.Settings.TTS.GPTSoVITS.BatchSize = batchSize;
+            }
+
+            // 采样步数
+            var sampleStepsTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SampleSteps");
+            if (sampleStepsTextBox != null && int.TryParse(sampleStepsTextBox.Text, out int sampleSteps))
+            {
+                _plugin.Settings.TTS.GPTSoVITS.SampleSteps = sampleSteps;
+            }
+
+            // 重复惩罚
+            var repetitionPenaltyTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_RepetitionPenalty");
+            if (repetitionPenaltyTextBox != null && double.TryParse(repetitionPenaltyTextBox.Text, out double repetitionPenalty))
+            {
+                _plugin.Settings.TTS.GPTSoVITS.RepetitionPenalty = repetitionPenalty;
+            }
+
+            // 流式模式
+            var streamingModeComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_StreamingMode");
+            if (streamingModeComboBox?.SelectedItem is ComboBoxItem streamingModeItem)
+            {
+                if (int.TryParse(streamingModeItem.Tag?.ToString(), out int streamingMode))
+                {
+                    _plugin.Settings.TTS.GPTSoVITS.StreamingMode = streamingMode;
+                }
+            }
+
+            // 超采样
+            var superSamplingCheckBox = (CheckBox)this.FindName("CheckBox_TTS_GPTSoVITS_SuperSampling");
+            if (superSamplingCheckBox != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.SuperSampling = superSamplingCheckBox.IsChecked ?? false;
+            }
+
+            // GPT 模型权重路径
+            var gptWeightsPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_GptWeightsPath");
+            if (gptWeightsPathTextBox != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.GptWeightsPath = gptWeightsPathTextBox.Text;
+            }
+
+            // SoVITS 模型权重路径
+            var sovitsWeightsPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SovitsWeightsPath");
+            if (sovitsWeightsPathTextBox != null)
+            {
+                _plugin.Settings.TTS.GPTSoVITS.SovitsWeightsPath = sovitsWeightsPathTextBox.Text;
             }
         }
     }

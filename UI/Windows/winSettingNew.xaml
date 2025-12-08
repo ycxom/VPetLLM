@@ -1386,6 +1386,20 @@
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
+                                    <!-- API 模式选择 -->
+                                    <Label Content="API 模式"
+                                          Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_ApiMode"
+                                            Margin="0,0,0,8"
+                                            SelectionChanged="ComboBox_TTS_GPTSoVITS_ApiMode_SelectionChanged"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="整合包网页" Tag="WebUI" IsSelected="True"/>
+                                        <ComboBoxItem Content="API v2" Tag="ApiV2"/>
+                                    </ComboBox>
+                                    <TextBlock Text="整合包网页模式使用 /infer_single 端点；API v2 模式使用官方 /tts 端点"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
                                     <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.BaseUrl}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <Grid Margin="0,0,0,16">
@@ -1405,6 +1419,187 @@
                                                 Style="{StaticResource ModernButton}"/>
                                     </Grid>
 
+                                    <!-- API v2 专用设置面板 -->
+                                    <StackPanel x:Name="Panel_TTS_GPTSoVITS_ApiV2"
+                                            Visibility="Collapsed">
+                                        <TextBlock Text="API v2 设置"
+                                                Style="{StaticResource SectionHeader}"
+                                                FontSize="14"
+                                                Margin="0,0,0,8"/>
+
+                                        <Label Content="参考音频路径 (必需)"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_RefAudioPath"
+                                                Margin="0,0,0,8"
+                                                Style="{StaticResource ModernTextBox}"/>
+                                        <TextBlock Text="服务器上的参考音频文件路径，用于声音克隆"
+                                                Style="{StaticResource DescriptionText}"
+                                                Margin="0,0,0,16"/>
+
+                                        <Label Content="提示文本"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_PromptTextV2"
+                                                Margin="0,0,0,8"
+                                                Style="{StaticResource ModernTextBox}"/>
+                                        <TextBlock Text="参考音频对应的文本内容（可选）"
+                                                Style="{StaticResource DescriptionText}"
+                                                Margin="0,0,0,16"/>
+
+                                        <Label Content="提示语言"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_PromptLangV2"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernComboBox}">
+                                            <ComboBoxItem Content="中文" Tag="zh" IsSelected="True"/>
+                                            <ComboBoxItem Content="英文" Tag="en"/>
+                                            <ComboBoxItem Content="日文" Tag="ja"/>
+                                            <ComboBoxItem Content="韩文" Tag="ko"/>
+                                            <ComboBoxItem Content="粤语" Tag="yue"/>
+                                            <ComboBoxItem Content="自动" Tag="auto"/>
+                                        </ComboBox>
+
+                                        <Label Content="合成文本语言"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_TextLangV2"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernComboBox}">
+                                            <ComboBoxItem Content="中文" Tag="zh" IsSelected="True"/>
+                                            <ComboBoxItem Content="英文" Tag="en"/>
+                                            <ComboBoxItem Content="日文" Tag="ja"/>
+                                            <ComboBoxItem Content="韩文" Tag="ko"/>
+                                            <ComboBoxItem Content="粤语" Tag="yue"/>
+                                            <ComboBoxItem Content="自动" Tag="auto"/>
+                                            <ComboBoxItem Content="全中文" Tag="all_zh"/>
+                                            <ComboBoxItem Content="全日文" Tag="all_ja"/>
+                                            <ComboBoxItem Content="全韩文" Tag="all_ko"/>
+                                            <ComboBoxItem Content="全粤语" Tag="all_yue"/>
+                                        </ComboBox>
+
+                                        <Label Content="文本切分方法"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_TextSplitMethodV2"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernComboBox}">
+                                            <ComboBoxItem Content="不切" Tag="cut0"/>
+                                            <ComboBoxItem Content="凑四句一切" Tag="cut1"/>
+                                            <ComboBoxItem Content="凑50字一切" Tag="cut2"/>
+                                            <ComboBoxItem Content="按中文句号切" Tag="cut3"/>
+                                            <ComboBoxItem Content="按英文句号切" Tag="cut4"/>
+                                            <ComboBoxItem Content="按标点符号切" Tag="cut5" IsSelected="True"/>
+                                        </ComboBox>
+
+                                        <Label Content="输出格式"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_MediaType"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernComboBox}">
+                                            <ComboBoxItem Content="WAV" Tag="wav" IsSelected="True"/>
+                                            <ComboBoxItem Content="OGG" Tag="ogg"/>
+                                            <ComboBoxItem Content="AAC" Tag="aac"/>
+                                            <ComboBoxItem Content="RAW" Tag="raw"/>
+                                        </ComboBox>
+
+                                        <TextBlock Text="API v2 高级设置"
+                                                Style="{StaticResource SectionHeader}"
+                                                FontSize="14"
+                                                Margin="0,8,0,8"/>
+
+                                        <Label Content="批处理大小"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_BatchSize"
+                                                Margin="0,0,0,16"
+                                                Text="1"
+                                                Style="{StaticResource ModernTextBox}"/>
+
+                                        <Label Content="采样步数"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_SampleSteps"
+                                                Margin="0,0,0,16"
+                                                Text="32"
+                                                Style="{StaticResource ModernTextBox}"/>
+
+                                        <Label Content="重复惩罚"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_RepetitionPenalty"
+                                                Margin="0,0,0,16"
+                                                Text="1.35"
+                                                Style="{StaticResource ModernTextBox}"/>
+
+                                        <Label Content="流式模式"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_StreamingMode"
+                                                Margin="0,0,0,8"
+                                                Style="{StaticResource ModernComboBox}">
+                                            <ComboBoxItem Content="禁用" Tag="0" IsSelected="True"/>
+                                            <ComboBoxItem Content="最佳质量" Tag="1"/>
+                                            <ComboBoxItem Content="中等质量" Tag="2"/>
+                                            <ComboBoxItem Content="快速响应" Tag="3"/>
+                                        </ComboBox>
+                                        <TextBlock Text="流式模式可加快首次响应速度，但可能影响音质"
+                                                Style="{StaticResource DescriptionText}"
+                                                Margin="0,0,0,16"/>
+
+                                        <CheckBox x:Name="CheckBox_TTS_GPTSoVITS_SuperSampling"
+                                                Content="启用超采样"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernCheckBox}"/>
+
+                                        <TextBlock Text="模型权重设置"
+                                                Style="{StaticResource SectionHeader}"
+                                                FontSize="14"
+                                                Margin="0,8,0,8"/>
+                                        <TextBlock Text="指定服务器上的模型权重文件路径，留空则使用服务器默认模型"
+                                                Style="{StaticResource DescriptionText}"
+                                                Margin="0,0,0,8"/>
+
+                                        <Label Content="GPT 模型权重路径"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="TextBox_TTS_GPTSoVITS_GptWeightsPath"
+                                                    Grid.Column="0"
+                                                    Margin="0,0,8,0"
+                                                    Style="{StaticResource ModernTextBox}"/>
+                                            <Button x:Name="Button_TTS_GPTSoVITS_ApplyGptWeights"
+                                                    Grid.Column="1"
+                                                    Content="应用"
+                                                    Click="Button_TTS_GPTSoVITS_ApplyGptWeights_Click"
+                                                    Padding="12,6"
+                                                    Style="{StaticResource SecondaryButton}"/>
+                                        </Grid>
+                                        <TextBlock Text="例如: GPT_SoVITS/pretrained_models/xxx.ckpt"
+                                                Style="{StaticResource DescriptionText}"
+                                                Margin="0,0,0,16"/>
+
+                                        <Label Content="SoVITS 模型权重路径"
+                                              Style="{StaticResource SettingLabel}"/>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="TextBox_TTS_GPTSoVITS_SovitsWeightsPath"
+                                                    Grid.Column="0"
+                                                    Margin="0,0,8,0"
+                                                    Style="{StaticResource ModernTextBox}"/>
+                                            <Button x:Name="Button_TTS_GPTSoVITS_ApplySovitsWeights"
+                                                    Grid.Column="1"
+                                                    Content="应用"
+                                                    Click="Button_TTS_GPTSoVITS_ApplySovitsWeights_Click"
+                                                    Padding="12,6"
+                                                    Style="{StaticResource SecondaryButton}"/>
+                                        </Grid>
+                                        <TextBlock Text="例如: GPT_SoVITS/pretrained_models/xxx.pth"
+                                                Style="{StaticResource DescriptionText}"
+                                                Margin="0,0,0,16"/>
+                                    </StackPanel>
+
+                                    <!-- WebUI 专用设置面板 -->
+                                    <StackPanel x:Name="Panel_TTS_GPTSoVITS_WebUI"
+                                            Visibility="Visible">
                                     <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Version}"
                                           Style="{StaticResource SettingLabel}"/>
                                     <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Version"
@@ -1529,6 +1724,7 @@
                                     <TextBox x:Name="TextBox_TTS_GPTSoVITS_Speed"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
+                                    </StackPanel>
                                 </StackPanel>
 
                                 <!-- Free TTS 配置 -->

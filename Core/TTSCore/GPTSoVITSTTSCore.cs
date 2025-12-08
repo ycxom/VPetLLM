@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -10,9 +9,9 @@ namespace VPetLLM.Core.TTSCore
 {
     /// <summary>
     /// GPT-SoVITS TTS 实现
-    /// 完全基于 GPT-SoVITS-API.md 标准接口
-    /// 使用 /infer_single 端点，返回音频 URL 后二次下载
-    /// 支持版本检测和模型选择
+    /// 支持两种 API 模式：
+    /// - 整合包网页模式：使用 /infer_single 端点，返回音频 URL 后二次下载
+    /// - API v2 模式：使用 /tts 端点，直接返回音频流
     /// </summary>
     public class GPTSoVITSTTSCore : TTSCoreBase
     {
@@ -25,7 +24,19 @@ namespace VPetLLM.Core.TTSCore
         }
 
         /// <summary>
-        /// 版本信息响应模型
+        /// 根据当前设置获取对应的 API 策略
+        /// </summary>
+        private IGPTSoVITSApiStrategy GetStrategy()
+        {
+            return _gptSoVITSSetting.ApiMode switch
+            {
+                Setting.GPTSoVITSApiMode.ApiV2 => new GPTSoVITSApiV2Strategy(),
+                _ => new GPTSoVITSWebUIStrategy()
+            };
+        }
+
+        /// <summary>
+        /// 版本信息响应模型（WebUI 模式专用）
         /// </summary>
         private class VersionResponse
         {
@@ -34,7 +45,7 @@ namespace VPetLLM.Core.TTSCore
         }
 
         /// <summary>
-        /// 模型列表响应模型
+        /// 模型列表响应模型（WebUI 模式专用）
         /// </summary>
         private class ModelsResponse
         {
@@ -43,16 +54,7 @@ namespace VPetLLM.Core.TTSCore
         }
 
         /// <summary>
-        /// API 响应模型
-        /// </summary>
-        private class InferSingleResponse
-        {
-            public string msg { get; set; }
-            public string audio_url { get; set; }
-        }
-
-        /// <summary>
-        /// 获取支持的版本列表
+        /// 获取支持的版本列表（仅 WebUI 模式）
         /// </summary>
         public async Task<List<string>> GetSupportedVersionsAsync()
         {
@@ -90,7 +92,7 @@ namespace VPetLLM.Core.TTSCore
         }
 
         /// <summary>
-        /// 获取指定版本的模型列表
+        /// 获取指定版本的模型列表（仅 WebUI 模式）
         /// </summary>
         public async Task<Dictionary<string, Dictionary<string, List<string>>>> GetModelsAsync(string version)
         {
@@ -129,130 +131,166 @@ namespace VPetLLM.Core.TTSCore
 
         public override async Task<byte[]> GenerateAudioAsync(string text)
         {
+            var strategy = GetStrategy();
+            
             try
             {
                 var baseUrl = _gptSoVITSSetting.BaseUrl?.TrimEnd('/');
                 
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 开始生成音频");
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 服务器地址: {baseUrl}");
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 文本内容: {text}");
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 使用版本: {_gptSoVITSSetting.Version}");
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 使用模型: {_gptSoVITSSetting.ModelName}");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 开始生成音频");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 服务器地址: {baseUrl}");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 文本内容: {text}");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): API 模式: {_gptSoVITSSetting.ApiMode}");
 
-                // 步骤1: 构建请求体 - 完全按照 GPT-SoVITS-API.md 标准
-                var requestBody = new
-                {
-                    dl_url = baseUrl,
-                    version = string.IsNullOrWhiteSpace(_gptSoVITSSetting.Version) ? "v4" : _gptSoVITSSetting.Version,
-                    model_name = string.IsNullOrWhiteSpace(_gptSoVITSSetting.ModelName) 
-                        ? "默认模型" 
-                        : _gptSoVITSSetting.ModelName,
-                    prompt_text_lang = string.IsNullOrWhiteSpace(_gptSoVITSSetting.PromptLanguage) 
-                        ? "中文" 
-                        : _gptSoVITSSetting.PromptLanguage, // 从模型数据中获取的语言
-                    emotion = string.IsNullOrWhiteSpace(_gptSoVITSSetting.Emotion) ? "默认" : _gptSoVITSSetting.Emotion,
-                    text = text,
-                    text_lang = _gptSoVITSSetting.TextLanguage,
-                    top_k = _gptSoVITSSetting.TopK,
-                    top_p = _gptSoVITSSetting.TopP,
-                    temperature = _gptSoVITSSetting.Temperature,
-                    text_split_method = string.IsNullOrWhiteSpace(_gptSoVITSSetting.TextSplitMethod) 
-                        ? "按标点符号切" 
-                        : _gptSoVITSSetting.TextSplitMethod,
-                    batch_size = 10,
-                    batch_threshold = 0.75,
-                    split_bucket = true,
-                    speed_facter = _gptSoVITSSetting.Speed,
-                    fragment_interval = 0.3,
-                    media_type = "wav",
-                    parallel_infer = true,
-                    repetition_penalty = 1.35,
-                    seed = -1,
-                    sample_steps = 16,
-                    if_sr = false
-                };
+                // 验证设置
+                strategy.ValidateSettings(_gptSoVITSSetting);
 
+                // 构建请求体
+                var requestBody = strategy.BuildRequestBody(text, _gptSoVITSSetting);
                 var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions 
                 { 
                     WriteIndented = false,
                     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                 });
                 
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 请求参数: {json}");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 请求参数: {json}");
 
-                // 步骤2: 发送 POST 请求到 /infer_single
-                var endpoint = baseUrl.Contains("/infer_") ? baseUrl : $"{baseUrl}/infer_single";
-                Utils.Logger.Log($"TTS (GPT-SoVITS): POST {endpoint}");
+                // 获取端点并发送请求
+                var endpoint = strategy.GetEndpoint(baseUrl);
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): POST {endpoint}");
                 
                 using var client = CreateHttpClient();
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var response = await client.PostAsync(endpoint, content);
 
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 响应状态: {response.StatusCode}");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 响应状态: {response.StatusCode}");
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    Utils.Logger.Log($"TTS (GPT-SoVITS): 错误: {errorContent}");
-                    throw new Exception($"API 请求失败: {response.StatusCode} - {errorContent}");
-                }
-
-                // 步骤3: 解析响应获取 audio_url
-                var responseText = await response.Content.ReadAsStringAsync();
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 响应: {responseText}");
-
-                var apiResponse = JsonSerializer.Deserialize<InferSingleResponse>(responseText, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                if (apiResponse == null || string.IsNullOrWhiteSpace(apiResponse.audio_url))
-                {
-                    throw new Exception($"响应格式错误: {responseText}");
-                }
-
-                Utils.Logger.Log($"TTS (GPT-SoVITS): {apiResponse.msg}");
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 音频URL: {apiResponse.audio_url}");
-
-                // 步骤4: 下载音频文件
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 开始下载音频");
-                var audioResponse = await client.GetAsync(apiResponse.audio_url);
+                // 解析响应
+                var audioData = await strategy.ParseResponseAsync(response, client);
                 
-                if (!audioResponse.IsSuccessStatusCode)
-                {
-                    throw new Exception($"下载音频失败: {audioResponse.StatusCode}");
-                }
-
-                var audioData = await audioResponse.Content.ReadAsByteArrayAsync();
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 下载完成，大小: {audioData.Length} 字节");
-
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 音频生成完成，大小: {audioData.Length} 字节");
                 return audioData;
+            }
+            catch (ArgumentException ex)
+            {
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 参数错误: {ex.Message}");
+                throw;
             }
             catch (TaskCanceledException ex)
             {
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 请求超时: {ex.Message}");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 请求超时: {ex.Message}");
                 throw new Exception("请求超时，请检查 GPT-SoVITS 服务是否正常运行");
             }
             catch (HttpRequestException ex)
             {
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 网络错误: {ex.Message}");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 网络错误: {ex.Message}");
                 throw new Exception($"网络错误: {ex.Message}");
             }
             catch (JsonException ex)
             {
-                Utils.Logger.Log($"TTS (GPT-SoVITS): JSON 解析错误: {ex.Message}");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): JSON 解析错误: {ex.Message}");
                 throw new Exception($"响应解析失败: {ex.Message}");
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"TTS (GPT-SoVITS): 错误: {ex.Message}");
+                Utils.Logger.Log($"TTS (GPT-SoVITS {strategy.ModeName}): 错误: {ex.Message}");
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// 切换 GPT 模型权重（API v2 模式）
+        /// </summary>
+        /// <param name="weightsPath">GPT 模型权重文件路径</param>
+        /// <returns>是否成功</returns>
+        public async Task<bool> SetGptWeightsAsync(string weightsPath)
+        {
+            if (string.IsNullOrWhiteSpace(weightsPath))
+            {
+                Utils.Logger.Log("TTS (GPT-SoVITS): GPT 权重路径为空");
+                return false;
+            }
+
+            try
+            {
+                var baseUrl = _gptSoVITSSetting.BaseUrl?.TrimEnd('/');
+                var endpoint = $"{baseUrl}/set_gpt_weights?weights_path={Uri.EscapeDataString(weightsPath)}";
+                
+                Utils.Logger.Log($"TTS (GPT-SoVITS): 切换 GPT 模型: {endpoint}");
+                
+                using var client = CreateHttpClient();
+                var response = await client.GetAsync(endpoint);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    Utils.Logger.Log("TTS (GPT-SoVITS): GPT 模型切换成功");
+                    return true;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Utils.Logger.Log($"TTS (GPT-SoVITS): GPT 模型切换失败: {response.StatusCode} - {errorContent}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"TTS (GPT-SoVITS): GPT 模型切换错误: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 切换 SoVITS 模型权重（API v2 模式）
+        /// </summary>
+        /// <param name="weightsPath">SoVITS 模型权重文件路径</param>
+        /// <returns>是否成功</returns>
+        public async Task<bool> SetSovitsWeightsAsync(string weightsPath)
+        {
+            if (string.IsNullOrWhiteSpace(weightsPath))
+            {
+                Utils.Logger.Log("TTS (GPT-SoVITS): SoVITS 权重路径为空");
+                return false;
+            }
+
+            try
+            {
+                var baseUrl = _gptSoVITSSetting.BaseUrl?.TrimEnd('/');
+                var endpoint = $"{baseUrl}/set_sovits_weights?weights_path={Uri.EscapeDataString(weightsPath)}";
+                
+                Utils.Logger.Log($"TTS (GPT-SoVITS): 切换 SoVITS 模型: {endpoint}");
+                
+                using var client = CreateHttpClient();
+                var response = await client.GetAsync(endpoint);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    Utils.Logger.Log("TTS (GPT-SoVITS): SoVITS 模型切换成功");
+                    return true;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Utils.Logger.Log($"TTS (GPT-SoVITS): SoVITS 模型切换失败: {response.StatusCode} - {errorContent}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"TTS (GPT-SoVITS): SoVITS 模型切换错误: {ex.Message}");
+                return false;
             }
         }
 
         public override string GetAudioFormat()
         {
-            // GPT-SoVITS 默认返回 wav 格式
+            // API v2 模式支持自定义格式
+            if (_gptSoVITSSetting.ApiMode == Setting.GPTSoVITSApiMode.ApiV2 
+                && !string.IsNullOrWhiteSpace(_gptSoVITSSetting.MediaType))
+            {
+                return _gptSoVITSSetting.MediaType;
+            }
+            // 默认返回 wav 格式
             return "wav";
         }
     }

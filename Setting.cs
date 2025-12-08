@@ -608,9 +608,28 @@ namespace VPetLLM
             public bool IsEnabled { get; set; } = true;
         }
 
+        /// <summary>
+        /// GPT-SoVITS API 模式枚举
+        /// </summary>
+        public enum GPTSoVITSApiMode
+        {
+            /// <summary>
+            /// 整合包网页模式 - 使用 /infer_single 端点
+            /// </summary>
+            WebUI,
+            /// <summary>
+            /// API v2 模式 - 使用 /tts 端点
+            /// </summary>
+            ApiV2
+        }
+
         public class GPTSoVITSTTSSetting
         {
+            // 通用设置
             public string BaseUrl { get; set; } = "http://127.0.0.1:9880";
+            public GPTSoVITSApiMode ApiMode { get; set; } = GPTSoVITSApiMode.WebUI; // API 模式选择
+            
+            // WebUI 模式专用设置（整合包网页）
             public string Version { get; set; } = "v4"; // API版本
             public string ModelName { get; set; } = ""; // 模型名称
             public string Emotion { get; set; } = "默认"; // 情感
@@ -620,10 +639,29 @@ namespace VPetLLM
             public string TextLanguage { get; set; } = "中文"; // 使用完整语言名称
             public string TextSplitMethod { get; set; } = "按标点符号切"; // 文本切分方法
             public string CutPunc { get; set; } = "";
+            
+            // 通用推理参数
             public int TopK { get; set; } = 15;
             public double TopP { get; set; } = 1.0;
             public double Temperature { get; set; } = 1.0;
             public double Speed { get; set; } = 1.0;
+            
+            // API v2 模式专用设置
+            public string RefAudioPath { get; set; } = "";           // 参考音频路径（API v2 必需）
+            public string PromptTextV2 { get; set; } = "";           // 提示文本
+            public string PromptLangV2 { get; set; } = "zh";         // 提示语言 (zh/en/ja/ko/yue/auto)
+            public string TextLangV2 { get; set; } = "zh";           // 合成文本语言
+            public string TextSplitMethodV2 { get; set; } = "cut5";  // 文本切分方法 (cut0-cut5)
+            public int BatchSize { get; set; } = 1;                  // 批处理大小
+            public int StreamingMode { get; set; } = 0;              // 流式模式 (0: 禁用, 1: 最佳质量, 2: 中等, 3: 快速)
+            public int SampleSteps { get; set; } = 32;               // 采样步数
+            public double RepetitionPenalty { get; set; } = 1.35;    // 重复惩罚
+            public bool SuperSampling { get; set; } = false;         // 超采样
+            public string MediaType { get; set; } = "wav";           // 输出格式 (wav/ogg/aac/raw)
+            
+            // 模型权重路径（可选，用于动态切换模型）
+            public string GptWeightsPath { get; set; } = "";
+            public string SovitsWeightsPath { get; set; } = "";
         }
 
         public class FreeTTSSetting
