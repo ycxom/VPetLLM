@@ -1,0 +1,143 @@
+<Window x:Class="VPetLLMPlugin.UI.Windows.winFloatingSidebar"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="VPetLLM Floating Sidebar"
+        Height="Auto" Width="60"
+        WindowStartupLocation="Manual"
+        ResizeMode="NoResize"
+        Topmost="True"
+        Background="Transparent"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        SizeToContent="Height"
+        ShowInTaskbar="False"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/Colors.xaml"/>
+                <ResourceDictionary Source="../Styles/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            
+            <!-- Sidebar Button Style -->
+            <Style x:Key="SidebarButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Width" Value="44"/>
+                <Setter Property="Height" Value="44"/>
+                <Setter Property="Margin" Value="0,2"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="ButtonBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource HoverBrush}"/>
+                                    <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource HoverBorderBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource PressedBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource DisabledBrush}"/>
+                                    <Setter Property="Foreground" Value="{StaticResource DisabledTextBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Close Button Style -->
+            <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource SidebarButtonStyle}">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Width" Value="20"/>
+                <Setter Property="Height" Value="20"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="ButtonBorder"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="10">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource ErrorBrush}"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Main Sidebar Container -->
+        <Border x:Name="SidebarContainer"
+                Background="{StaticResource SecondaryBackgroundBrush}"
+                CornerRadius="12"
+                Padding="8"
+                Margin="4"
+                Opacity="0.9">
+            <Border.Effect>
+                <DropShadowEffect Color="#000000" 
+                                  Direction="270" 
+                                  ShadowDepth="3" 
+                                  BlurRadius="12" 
+                                  Opacity="0.2"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header with Close Button -->
+                <Grid Grid.Row="0" Margin="0,0,0,8">
+                    <Button x:Name="CloseButton" 
+                            Style="{StaticResource CloseButtonStyle}"
+                            HorizontalAlignment="Right"
+                            Click="CloseButton_Click"
+                            ToolTip="关闭侧边栏">
+                        <TextBlock Text="×" FontSize="12" FontWeight="Bold"/>
+                    </Button>
+                </Grid>
+
+                <!-- Button Container -->
+                <StackPanel x:Name="ButtonContainer" 
+                           Grid.Row="1"
+                           Orientation="Vertical"
+                           HorizontalAlignment="Center">
+                    <!-- Buttons will be added dynamically -->
+                </StackPanel>
+
+                <!-- Footer (reserved for future use) -->
+                <Grid Grid.Row="2" Height="0">
+                    <!-- Reserved for future features -->
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

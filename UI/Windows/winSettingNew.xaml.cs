@@ -11,6 +11,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using VPetLLM.Configuration;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
 using VPetLLM.UI.Controls;
@@ -480,6 +481,13 @@ namespace VPetLLM.UI.Windows
             // 负载均衡开关点击即保存
             if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLBBind) cbGemLBBind.Click += LoadBalancing_CheckBox_Click;
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLBBind) cbOpenLBBind.Click += LoadBalancing_CheckBox_Click;
+            
+            // 悬浮侧边栏设置事件绑定
+            if (this.FindName("CheckBox_EnableFloatingSidebar") is CheckBox cbEnableSidebar) cbEnableSidebar.Click += Control_Click;
+            if (this.FindName("CheckBox_FloatingSidebar_AutoHide") is CheckBox cbSidebarAutoHide) cbSidebarAutoHide.Click += Control_Click;
+            if (this.FindName("ComboBox_FloatingSidebar_Position") is ComboBox cbSidebarPosition) cbSidebarPosition.SelectionChanged += Control_SelectionChanged;
+            if (this.FindName("Slider_FloatingSidebar_DefaultOpacity") is Slider slSidebarDefaultOpacity) slSidebarDefaultOpacity.ValueChanged += Control_ValueChanged;
+            if (this.FindName("Slider_FloatingSidebar_InactiveOpacity") is Slider slSidebarInactiveOpacity) slSidebarInactiveOpacity.ValueChanged += Control_ValueChanged;
         }
 
         // 移除所有弹窗相关方法，避免不必要的弹窗干扰用户体验
@@ -943,6 +951,132 @@ namespace VPetLLM.UI.Windows
 
             // 更新 ASR Provider 面板显示
             UpdateASRProviderPanel();
+
+            // 悬浮侧边栏设置
+            LoadFloatingSidebarSettings();
+        }
+
+        /// <summary>
+        /// 加载悬浮侧边栏设置
+        /// </summary>
+        private void LoadFloatingSidebarSettings()
+        {
+            try
+            {
+                var settings = _plugin.Settings.FloatingSidebar;
+                
+                if (this.FindName("CheckBox_EnableFloatingSidebar") is CheckBox cbEnable)
+                    cbEnable.IsChecked = settings.IsEnabled;
+                
+                if (this.FindName("CheckBox_FloatingSidebar_AutoHide") is CheckBox cbAutoHide)
+                    cbAutoHide.IsChecked = settings.AutoHide;
+                
+                // 位置设置
+                if (this.FindName("ComboBox_FloatingSidebar_Position") is ComboBox cbPosition)
+                {
+                    foreach (ComboBoxItem item in cbPosition.Items)
+                    {
+                        if (item.Tag?.ToString() == settings.Position.ToString())
+                        {
+                            cbPosition.SelectedItem = item;
+                            break;
+                        }
+                    }
+                }
+                
+                // 透明度设置
+                if (this.FindName("Slider_FloatingSidebar_DefaultOpacity") is Slider slDefaultOpacity)
+                {
+                    slDefaultOpacity.Value = settings.DefaultOpacity;
+                    slDefaultOpacity.ValueChanged += (s, e) =>
+                    {
+                        if (this.FindName("TextBlock_FloatingSidebar_DefaultOpacityValue") is TextBlock tb)
+                            tb.Text = slDefaultOpacity.Value.ToString("F2");
+                    };
+                    if (this.FindName("TextBlock_FloatingSidebar_DefaultOpacityValue") is TextBlock tbDefault)
+                        tbDefault.Text = settings.DefaultOpacity.ToString("F2");
+                }
+                
+                if (this.FindName("Slider_FloatingSidebar_InactiveOpacity") is Slider slInactiveOpacity)
+                {
+                    slInactiveOpacity.Value = settings.InactiveOpacity;
+                    slInactiveOpacity.ValueChanged += (s, e) =>
+                    {
+                        if (this.FindName("TextBlock_FloatingSidebar_InactiveOpacityValue") is TextBlock tb)
+                            tb.Text = slInactiveOpacity.Value.ToString("F2");
+                    };
+                    if (this.FindName("TextBlock_FloatingSidebar_InactiveOpacityValue") is TextBlock tbInactive)
+                        tbInactive.Text = settings.InactiveOpacity.ToString("F2");
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error loading floating sidebar settings: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 保存悬浮侧边栏设置
+        /// </summary>
+        private void SaveFloatingSidebarSettings()
+        {
+            try
+            {
+                var settings = _plugin.Settings.FloatingSidebar;
+                var wasEnabled = settings.IsEnabled;
+                
+                if (this.FindName("CheckBox_EnableFloatingSidebar") is CheckBox cbEnable)
+                    settings.IsEnabled = cbEnable.IsChecked ?? false;
+                
+                if (this.FindName("CheckBox_FloatingSidebar_AutoHide") is CheckBox cbAutoHide)
+                    settings.AutoHide = cbAutoHide.IsChecked ?? true;
+                
+                // 位置设置
+                if (this.FindName("ComboBox_FloatingSidebar_Position") is ComboBox cbPosition)
+                {
+                    if (cbPosition.SelectedItem is ComboBoxItem selectedItem)
+                    {
+                        if (Enum.TryParse<Configuration.SidebarPosition>(selectedItem.Tag?.ToString(), out var position))
+                        {
+                            settings.Position = position;
+                        }
+                    }
+                }
+                
+                // 透明度设置
+                if (this.FindName("Slider_FloatingSidebar_DefaultOpacity") is Slider slDefaultOpacity)
+                    settings.DefaultOpacity = slDefaultOpacity.Value;
+                
+                if (this.FindName("Slider_FloatingSidebar_InactiveOpacity") is Slider slInactiveOpacity)
+                    settings.InactiveOpacity = slInactiveOpacity.Value;
+                
+                // 标记有未保存的更改，确保设置会被保存到文件
+                _hasUnsavedChanges = true;
+                
+                // 根据启用状态显示或隐藏侧边栏
+                if (settings.IsEnabled != wasEnabled)
+                {
+                    if (settings.IsEnabled)
+                    {
+                        _plugin.ShowFloatingSidebar();
+                    }
+                    else
+                    {
+                        _plugin.HideFloatingSidebar();
+                    }
+                }
+                else if (settings.IsEnabled)
+                {
+                    // 如果已启用，刷新配置
+                    _plugin.RefreshFloatingSidebar();
+                }
+                
+                Utils.Logger.Log($"FloatingSidebar settings updated: IsEnabled={settings.IsEnabled}, AutoHide={settings.AutoHide}, Position={settings.Position}");
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error saving floating sidebar settings: {ex.Message}");
+            }
         }
 
         private void SaveSettings()
@@ -1242,7 +1376,10 @@ namespace VPetLLM.UI.Windows
 
             // Free ASR 无需保存配置
 
-// 更新语音输入快捷键
+            // 悬浮侧边栏设置
+            SaveFloatingSidebarSettings();
+
+            // 更新语音输入快捷键
             _plugin.UpdateVoiceInputHotkey();
 
             // 只在没有发生实际更改时才保存设置，避免循环保存

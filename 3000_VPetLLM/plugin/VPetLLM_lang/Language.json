@@ -2270,5 +2270,151 @@
             "zh-hant": "{PetName} 思考中",
             "jp": "{PetName} 考え中"
         }
+    },
+    "FloatingSidebar": {
+        "Title": {
+            "en": "Floating Sidebar",
+            "zh-hans": "悬浮侧边栏",
+            "zh-hant": "懸浮側邊欄",
+            "jp": "フローティングサイドバー"
+        },
+        "Tab": {
+            "en": "Floating Sidebar",
+            "zh-hans": "悬浮侧边栏",
+            "zh-hant": "懸浮側邊欄",
+            "jp": "フローティングサイドバー"
+        },
+        "Enable": {
+            "en": "Enable Floating Sidebar",
+            "zh-hans": "启用悬浮侧边栏",
+            "zh-hant": "啟用懸浮側邊欄",
+            "jp": "フローティングサイドバーを有効にする"
+        },
+        "EnableTooltip": {
+            "en": "Display a quick action panel next to the desktop pet",
+            "zh-hans": "在桌宠旁边显示快捷操作面板",
+            "zh-hant": "在桌寵旁邊顯示快捷操作面板",
+            "jp": "デスクトップペットの横にクイックアクションパネルを表示"
+        },
+        "AutoHide": {
+            "en": "Auto Hide",
+            "zh-hans": "自动隐藏",
+            "zh-hant": "自動隱藏",
+            "jp": "自動非表示"
+        },
+        "AutoHideTooltip": {
+            "en": "Automatically reduce opacity when not interacting",
+            "zh-hans": "无交互时自动降低透明度",
+            "zh-hant": "無交互時自動降低透明度",
+            "jp": "操作がないときに自動的に透明度を下げる"
+        },
+        "Position": {
+            "en": "Position:",
+            "zh-hans": "位置:",
+            "zh-hant": "位置:",
+            "jp": "位置:"
+        },
+        "Position_Left": {
+            "en": "Left",
+            "zh-hans": "左侧",
+            "zh-hant": "左側",
+            "jp": "左"
+        },
+        "Position_Right": {
+            "en": "Right",
+            "zh-hans": "右侧",
+            "zh-hant": "右側",
+            "jp": "右"
+        },
+        "Position_Top": {
+            "en": "Top",
+            "zh-hans": "上方",
+            "zh-hant": "上方",
+            "jp": "上"
+        },
+        "Position_Bottom": {
+            "en": "Bottom",
+            "zh-hans": "下方",
+            "zh-hant": "下方",
+            "jp": "下"
+        },
+        "DefaultOpacity": {
+            "en": "Default Opacity:",
+            "zh-hans": "默认透明度:",
+            "zh-hant": "預設透明度:",
+            "jp": "デフォルト不透明度:"
+        },
+        "InactiveOpacity": {
+            "en": "Inactive Opacity:",
+            "zh-hans": "非活动透明度:",
+            "zh-hant": "非活動透明度:",
+            "jp": "非アクティブ時の不透明度:"
+        },
+        "AutoHideDelay": {
+            "en": "Auto Hide Delay (seconds)",
+            "zh-hans": "自动隐藏延迟（秒）",
+            "zh-hant": "自動隱藏延遲（秒）",
+            "jp": "自動非表示遅延（秒）"
+        },
+        "Settings": {
+            "en": "Open Settings",
+            "zh-hans": "打开设置",
+            "zh-hant": "開啟設定",
+            "jp": "設定を開く"
+        },
+        "VoiceInput": {
+            "en": "Voice Input",
+            "zh-hans": "语音输入",
+            "zh-hant": "語音輸入",
+            "jp": "音声入力"
+        },
+        "VoiceInputDisabled": {
+            "en": "Voice input not enabled, please configure ASR in settings",
+            "zh-hans": "语音输入未启用，请在设置中配置ASR",
+            "zh-hant": "語音輸入未啟用，請在設定中配置ASR",
+            "jp": "音声入力が有効になっていません。設定でASRを構成してください"
+        },
+        "ClearHistory": {
+            "en": "Clear Chat History",
+            "zh-hans": "清除聊天历史",
+            "zh-hant": "清除聊天歷史",
+            "jp": "チャット履歴をクリア"
+        },
+        "ToggleChat": {
+            "en": "Toggle Chat",
+            "zh-hans": "切换聊天功能",
+            "zh-hant": "切換聊天功能",
+            "jp": "チャットを切り替え"
+        },
+        "Plugins": {
+            "en": "Plugin Management",
+            "zh-hans": "插件管理",
+            "zh-hant": "插件管理",
+            "jp": "プラグイン管理"
+        },
+        "ShowSidebar": {
+            "en": "Show Floating Sidebar",
+            "zh-hans": "显示悬浮侧边栏",
+            "zh-hant": "顯示懸浮側邊欄",
+            "jp": "フローティングサイドバーを表示"
+        },
+        "HideSidebar": {
+            "en": "Hide Floating Sidebar",
+            "zh-hans": "隐藏悬浮侧边栏",
+            "zh-hant": "隱藏懸浮側邊欄",
+            "jp": "フローティングサイドバーを非表示"
+        },
+        "ButtonSettings": {
+            "en": "Button Settings",
+            "zh-hans": "按钮设置",
+            "zh-hant": "按鈕設定",
+            "jp": "ボタン設定"
+        },
+        "EnabledButtons": {
+            "en": "Enabled Buttons",
+            "zh-hans": "启用的按钮",
+            "zh-hant": "啟用的按鈕",
+            "jp": "有効なボタン"
+        }
     }
 }

@@ -55,6 +55,7 @@ namespace VPetLLM
         public RecordSettings Records { get; set; } = new RecordSettings();
         public bool EnableMediaPlayback { get; set; } = true;
         public MediaPlaybackSetting MediaPlayback { get; set; } = new MediaPlaybackSetting();
+        public Configuration.FloatingSidebarSettings FloatingSidebar { get; set; } = new Configuration.FloatingSidebarSettings();
         private readonly string _path;
 
         public Setting(string path)
@@ -142,6 +143,10 @@ namespace VPetLLM
             if (MediaPlayback == null)
             {
                 MediaPlayback = new MediaPlaybackSetting();
+            }
+            if (FloatingSidebar == null)
+            {
+                FloatingSidebar = new Configuration.FloatingSidebarSettings();
             }
 
             // 旧版OpenAI单节点配置迁移到多节点结构，避免用户配置丢失

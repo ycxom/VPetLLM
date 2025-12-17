@@ -35,6 +35,7 @@ namespace VPetLLM
         private IPurchaseService? _purchaseService;
         
         private DefaultPluginChecker? _defaultPluginChecker;
+        private FloatingSidebarManager? _floatingSidebarManager;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -277,6 +278,9 @@ namespace VPetLLM
                 // 初始化动画协调器
                 InitializeAnimationCoordinator();
                 
+                // 初始化悬浮侧边栏
+                InitializeFloatingSidebar();
+                
                 Utils.Logger.Log("Dispatcher.Invoke finished.");
             });
             Utils.Logger.Log("LoadPlugin finished.");
@@ -299,6 +303,30 @@ namespace VPetLLM
             }
         }
 
+        /// <summary>
+        /// 初始化悬浮侧边栏
+        /// </summary>
+        private void InitializeFloatingSidebar()
+        {
+            try
+            {
+                Logger.Log("开始初始化FloatingSidebar...");
+                _floatingSidebarManager = new FloatingSidebarManager(this);
+                
+                // 如果设置中启用了悬浮侧边栏，则显示它
+                if (Settings.FloatingSidebar.IsEnabled)
+                {
+                    _floatingSidebarManager.Show();
+                }
+                
+                Logger.Log("FloatingSidebar初始化成功");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"初始化FloatingSidebar时发生错误: {ex.Message}");
+            }
+        }
+
         public override void Save()
         {
             Settings.Save();
@@ -317,6 +345,7 @@ namespace VPetLLM
             // 清理服务
             _voiceInputService?.Dispose();
             _purchaseService?.Dispose();
+            _floatingSidebarManager?.Dispose();
             
             TTSService?.Dispose();
             TouchInteractionHandler?.Dispose();
@@ -749,6 +778,82 @@ namespace VPetLLM
         public bool IsVPetLLMDefaultPlugin()
         {
             return _defaultPluginChecker?.IsVPetLLMDefaultPlugin() ?? false;
+        }
+
+        /// <summary>
+        /// 显示悬浮侧边栏
+        /// </summary>
+        public void ShowFloatingSidebar()
+        {
+            try
+            {
+                if (_floatingSidebarManager == null)
+                {
+                    InitializeFloatingSidebar();
+                }
+                _floatingSidebarManager?.Show();
+                Settings.FloatingSidebar.IsEnabled = true;
+                Settings.Save();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error showing floating sidebar: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 隐藏悬浮侧边栏
+        /// </summary>
+        public void HideFloatingSidebar()
+        {
+            try
+            {
+                _floatingSidebarManager?.Hide();
+                Settings.FloatingSidebar.IsEnabled = false;
+                Settings.Save();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error hiding floating sidebar: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 切换悬浮侧边栏显示状态
+        /// </summary>
+        public void ToggleFloatingSidebar()
+        {
+            try
+            {
+                if (_floatingSidebarManager?.IsVisible == true)
+                {
+                    HideFloatingSidebar();
+                }
+                else
+                {
+                    ShowFloatingSidebar();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error toggling floating sidebar: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 刷新悬浮侧边栏
+        /// </summary>
+        public void RefreshFloatingSidebar()
+        {
+            try
+            {
+                _floatingSidebarManager?.RefreshButtons();
+                _floatingSidebarManager?.ApplyConfiguration(Settings.FloatingSidebar);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error refreshing floating sidebar: {ex.Message}");
+            }
         }
     }
 }

@@ -2354,6 +2354,108 @@
                                      Margin="0,0,0,16"
                                      Foreground="{StaticResource PrimaryTextBrush}"/>
                             <ContentPresenter x:Name="TouchFeedbackSettingsContainer"/>
+
+                            <!-- 悬浮侧边栏设置 -->
+                            <Separator Margin="0,20,0,20"
+                                     Background="{StaticResource BorderBrush}"
+                                     Height="1"/>
+                            <TextBlock Name="TextBlock_FloatingSidebarTitle"
+                                     Text="{utils:Localize KeyPath=FloatingSidebar.Title, Default=悬浮侧边栏}"
+                                     FontSize="16"
+                                     FontWeight="SemiBold"
+                                     Margin="0,0,0,16"
+                                     Foreground="{StaticResource PrimaryTextBrush}"/>
+                            
+                            <!-- 启用悬浮侧边栏 -->
+                            <CheckBox x:Name="CheckBox_EnableFloatingSidebar"
+                                    Content="{utils:Localize KeyPath=FloatingSidebar.Enable, Default=启用悬浮侧边栏}"
+                                    Margin="0,0,0,12"
+                                    Style="{StaticResource ModernCheckBox}">
+                                <CheckBox.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.EnableTooltip, Default=在桌宠旁边显示快捷操作面板}"/>
+                                    </ToolTip>
+                                </CheckBox.ToolTip>
+                            </CheckBox>
+                            
+                            <!-- 自动隐藏 -->
+                            <CheckBox x:Name="CheckBox_FloatingSidebar_AutoHide"
+                                    Content="{utils:Localize KeyPath=FloatingSidebar.AutoHide, Default=自动隐藏}"
+                                    IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
+                                    Margin="20,0,0,12"
+                                    Style="{StaticResource ModernCheckBox}">
+                                <CheckBox.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.AutoHideTooltip, Default=无交互时自动降低透明度}"/>
+                                    </ToolTip>
+                                </CheckBox.ToolTip>
+                            </CheckBox>
+                            
+                            <!-- 侧边栏位置 -->
+                            <StackPanel Orientation="Horizontal"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
+                                        Margin="20,0,0,12">
+                                <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.Position, Default=位置:}"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"
+                                        Width="80"/>
+                                <ComboBox x:Name="ComboBox_FloatingSidebar_Position"
+                                        Width="120"
+                                        Margin="10,0"
+                                        Style="{StaticResource ModernComboBox}">
+                                    <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Left, Default=左侧}" Tag="Left"/>
+                                    <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Right, Default=右侧}" Tag="Right"/>
+                                    <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Top, Default=上方}" Tag="Top"/>
+                                    <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Bottom, Default=下方}" Tag="Bottom"/>
+                                </ComboBox>
+                            </StackPanel>
+                            
+                            <!-- 默认透明度 -->
+                            <StackPanel Orientation="Horizontal"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
+                                        Margin="20,0,0,12">
+                                <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.DefaultOpacity, Default=默认透明度:}"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"
+                                        Width="80"/>
+                                <Slider x:Name="Slider_FloatingSidebar_DefaultOpacity"
+                                        Minimum="0.1"
+                                        Maximum="1.0"
+                                        Width="150"
+                                        Margin="10,0"
+                                        VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TextBlock_FloatingSidebar_DefaultOpacityValue"
+                                        Width="40"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                        FontSize="14"/>
+                            </StackPanel>
+                            
+                            <!-- 非活动透明度 -->
+                            <StackPanel Orientation="Horizontal"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
+                                        Margin="20,0,0,12">
+                                <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.InactiveOpacity, Default=非活动透明度:}"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"
+                                        Width="80"/>
+                                <Slider x:Name="Slider_FloatingSidebar_InactiveOpacity"
+                                        Minimum="0.1"
+                                        Maximum="1.0"
+                                        Width="150"
+                                        Margin="10,0"
+                                        VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TextBlock_FloatingSidebar_InactiveOpacityValue"
+                                        Width="40"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                        FontSize="14"/>
+                            </StackPanel>
+                            
+
                         </StackPanel>
                     </Border>
                 </ScrollViewer>
