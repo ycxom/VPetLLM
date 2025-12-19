@@ -104,13 +104,7 @@ namespace VPetLLM.Utils
                     return null;
                 }
 
-                // 应用音量增益
-                if (Math.Abs(_ttsSettings.VolumeGain) > 0.01)
-                {
-                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _ttsSettings.VolumeGain);
-                }
-
-                // 保存到临时文件
+                // 保存到临时文件（音量增益由 mpv 播放器处理）
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
@@ -214,13 +208,7 @@ namespace VPetLLM.Utils
 
                 Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
-                // 应用音量增益
-                if (Math.Abs(_ttsSettings.VolumeGain) > 0.01)
-                {
-                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _ttsSettings.VolumeGain);
-                }
-
-                // 保存到临时文件
+                // 保存到临时文件（音量增益由 mpv 播放器处理）
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
@@ -272,13 +260,7 @@ namespace VPetLLM.Utils
 
                 Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
-                // 应用音量增益
-                if (Math.Abs(_ttsSettings.VolumeGain) > 0.01)
-                {
-                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _ttsSettings.VolumeGain);
-                }
-
-                // 保存到临时文件
+                // 保存到临时文件（音量增益由 mpv 播放器处理）
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
@@ -327,13 +309,7 @@ namespace VPetLLM.Utils
 
                 Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
-                // 应用音量增益
-                if (Math.Abs(_ttsSettings.VolumeGain) > 0.01)
-                {
-                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _ttsSettings.VolumeGain);
-                }
-
-                // 保存到临时文件
+                // 保存到临时文件（音量增益由 mpv 播放器处理）
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
@@ -371,11 +347,9 @@ namespace VPetLLM.Utils
                     currentTask = _currentPlaybackTask;
                 }
 
-                // 设置音量（基础音量 + 增益转换为线性系数）
-                double baseVolume = _ttsSettings.Volume;
-                double gainLinear = Math.Pow(10.0, _ttsSettings.VolumeGain / 20.0);
-                double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
-                _mediaPlayer?.SetVolume(finalVolume);
+                // 设置音量和增益（直接传递给 mpv）
+                _mediaPlayer?.SetVolume(_ttsSettings.Volume);
+                _mediaPlayer?.SetGain(_ttsSettings.VolumeGain);
 
                 Logger.Log($"TTS: 开始播放音频: {filePath}");
 
@@ -493,12 +467,9 @@ namespace VPetLLM.Utils
             {
                 try
                 {
-                    // 计算最终音量（基础音量 + 增益转换为线性系数）
-                    double baseVolume = _ttsSettings.Volume;
-                    double gainLinear = Math.Pow(10.0, _ttsSettings.VolumeGain / 20.0);
-                    double finalVolume = Math.Min(100.0, Math.Max(0.0, baseVolume * gainLinear));
-                    
-                    _mediaPlayer.SetVolume(finalVolume);
+                    // 直接设置音量和增益（由 mpv 处理）
+                    _mediaPlayer.SetVolume(_ttsSettings.Volume);
+                    _mediaPlayer.SetGain(_ttsSettings.VolumeGain);
                 }
                 catch (Exception ex)
                 {
@@ -510,8 +481,8 @@ namespace VPetLLM.Utils
         /// <summary>
         /// 公共方法：立即更新音量设置并应用到当前播放器
         /// </summary>
-        /// <param name="volume">基础音量 (0-10)</param>
-        /// <param name="volumeGain">音量增益 (dB, -20到+40)</param>
+        /// <param name="volume">基础音量百分比 (0-100)</param>
+        /// <param name="volumeGain">音量增益 (dB)</param>
         public void UpdateVolumeSettings(double volume, double volumeGain)
         {
             _ttsSettings.Volume = volume;
@@ -550,12 +521,7 @@ namespace VPetLLM.Utils
                     return null;
                 }
 
-                // 应用音量增益
-                if (Math.Abs(_ttsSettings.VolumeGain) > 0.01)
-                {
-                    audioData = AudioProcessor.ApplyVolumeGain(audioData, _ttsSettings.VolumeGain);
-                }
-
+                // 音量增益由 mpv 播放器处理，这里直接返回原始音频数据
                 return audioData;
             }
             catch (Exception ex)

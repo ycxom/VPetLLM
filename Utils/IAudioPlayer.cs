@@ -24,6 +24,12 @@ namespace VPetLLM.Utils
         void SetVolume(double volume);
 
         /// <summary>
+        /// 设置音量增益 (dB)
+        /// </summary>
+        /// <param name="gainDb">增益值，单位dB</param>
+        void SetGain(double gainDb);
+
+        /// <summary>
         /// 是否正在播放
         /// </summary>
         bool IsPlaying { get; }

@@ -1101,8 +1101,8 @@
                                                 FontSize="14"/>
                                         <Slider x:Name="Slider_TTS_Volume"
                                                 Minimum="0"
-                                                Maximum="10"
-                                                Value="1"
+                                                Maximum="100"
+                                                Value="100"
                                                 Width="125"
                                                 Margin="10,0"
                                                 VerticalAlignment="Center"/>

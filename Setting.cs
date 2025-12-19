@@ -568,9 +568,9 @@ namespace VPetLLM
             public string Provider { get; set; } = "URL";
             public bool OnlyPlayAIResponse { get; set; } = true;
             public bool AutoPlay { get; set; } = true;
-            public double Volume { get; set; } = 1.0; // 基础音量，范围0到10
+            public double Volume { get; set; } = 100; // 基础音量百分比，范围0-100%
             public double Speed { get; set; } = 1.0;
-            public double VolumeGain { get; set; } = 0.0; // 音量增益，单位dB，范围-20到+40
+            public double VolumeGain { get; set; } = 0.0; // 音量增益，单位dB，直接传递给mpv的--af=volume参数
             public bool UseQueueDownload { get; set; } = false; // 是否使用队列下载模式（适用于无法并发请求的接口）
 
             // URL TTS 设置

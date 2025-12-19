@@ -518,7 +518,7 @@ namespace VPetLLM.UI.Windows
                 }
                 else if (slider.Name == "Slider_TTS_Volume")
                 {
-                    ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = slider.Value.ToString("F2");
+                    ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = slider.Value.ToString("F0") + "%";
 
                     // 立即更新所有TTS服务实例的音量设置
                     var volumeGainSlider = (Slider)this.FindName("Slider_TTS_VolumeGain");
@@ -839,7 +839,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked = _plugin.Settings.TTS.OnlyPlayAIResponse;
             ((CheckBox)this.FindName("CheckBox_TTS_UseQueueDownload")).IsChecked = _plugin.Settings.TTS.UseQueueDownload;
             ((Slider)this.FindName("Slider_TTS_Volume")).Value = _plugin.Settings.TTS.Volume;
-            ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = _plugin.Settings.TTS.Volume.ToString("F2");
+            ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = _plugin.Settings.TTS.Volume.ToString("F0") + "%";
             ((Slider)this.FindName("Slider_TTS_VolumeGain")).Value = _plugin.Settings.TTS.VolumeGain;
             ((TextBlock)this.FindName("TextBlock_TTS_VolumeGainValue")).Text = _plugin.Settings.TTS.VolumeGain.ToString("F1");
             ((Slider)this.FindName("Slider_TTS_Speed")).Value = _plugin.Settings.TTS.Speed;

@@ -14,6 +14,7 @@ namespace VPetLLM.Utils
         private bool _isPlaying = false;
         private readonly string _mpvExePath;
         private double _volume = 100.0;
+        private double _gain = 0.0;
 
         public string Name => "mpv";
 
@@ -57,11 +58,22 @@ namespace VPetLLM.Utils
 
                 Logger.Log($"mpv: 开始播放: {filePath}");
 
+                // 构建命令行参数
+                var args = $"--no-video --volume={_volume}";
+                
+                // 当增益不为0时，添加音频滤镜参数
+                if (Math.Abs(_gain) > 0.01)
+                {
+                    args += $" --af=volume={_gain}dB";
+                }
+                
+                args += $" \"{filePath}\"";
+
                 // 创建进程启动信息
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = _mpvExePath,
-                    Arguments = $"--no-video --volume={_volume} \"{filePath}\"",
+                    Arguments = args,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -118,6 +130,12 @@ namespace VPetLLM.Utils
         {
             // mpv 音量范围是 0-100
             _volume = Math.Clamp(volume, 0.0, 100.0);
+        }
+
+        public void SetGain(double gainDb)
+        {
+            // mpv 增益范围是 -200dB 到 +60dB
+            _gain = Math.Clamp(gainDb, -200.0, 60.0);
         }
 
         public void Dispose()
