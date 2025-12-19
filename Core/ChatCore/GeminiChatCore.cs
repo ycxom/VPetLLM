@@ -53,6 +53,189 @@ namespace VPetLLM.Core.ChatCore
             return Chat(prompt, false);
         }
 
+        /// <summary>
+        /// 发送带图像的多模态消息
+        /// </summary>
+        public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
+        {
+            OnConversationTurn();
+            
+            if (!Settings.KeepContext)
+            {
+                ClearContext();
+            }
+            
+            var node = _geminiSetting.GetCurrentGeminiSetting();
+            if (node == null)
+            {
+                var noNodeError = "没有启用的 Gemini 节点，请在设置中启用至少一个节点";
+                Utils.Logger.Log($"Gemini ChatWithImage 错误: {noNodeError}");
+                ResponseHandler?.Invoke(noNodeError);
+                return "";
+            }
+            
+            // 检查视觉能力是否启用
+            if (!node.EnableVision)
+            {
+                var visionError = "当前节点未启用视觉能力，请在设置中启用 EnableVision";
+                Utils.Logger.Log($"Gemini ChatWithImage 错误: {visionError}");
+                ResponseHandler?.Invoke(visionError);
+                return "";
+            }
+            
+            Utils.Logger.Log($"Gemini ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+            
+            // 构建历史消息
+            List<Message> history = GetCoreHistory();
+            
+            // 构建请求内容
+            var contents = new List<object>();
+            foreach (var msg in history.Where(m => m.Role != "system"))
+            {
+                contents.Add(new { role = msg.Role == "assistant" ? "model" : msg.Role, parts = new[] { new { text = msg.DisplayContent } } });
+            }
+            
+            // 添加带图像的用户消息
+            var base64Image = Convert.ToBase64String(imageData);
+            contents.Add(new 
+            { 
+                role = "user", 
+                parts = new object[] 
+                { 
+                    new { text = prompt },
+                    new { inline_data = new { mime_type = "image/png", data = base64Image } }
+                } 
+            });
+            
+            var requestData = new
+            {
+                contents = contents,
+                generationConfig = new
+                {
+                    maxOutputTokens = node.EnableAdvanced ? node.MaxTokens : 4096,
+                    temperature = node.EnableAdvanced ? node.Temperature : 0.8
+                },
+                systemInstruction = new
+                {
+                    parts = new[] { new { text = GetSystemMessage() } }
+                }
+            };
+
+            var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
+
+            var baseUrl = node.Url.TrimEnd('/');
+            if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
+            {
+                baseUrl += "/v1beta";
+            }
+            var modelName = node.Model;
+            var apiEndpoint = node.EnableStreaming 
+                ? $"{baseUrl}/models/{modelName}:streamGenerateContent?alt=sse"
+                : $"{baseUrl}/models/{modelName}:generateContent";
+
+            string message;
+            try
+            {
+                using (var client = GetClient())
+                {
+                    if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
+                    {
+                        client.DefaultRequestHeaders.Remove("User-Agent");
+                    }
+                    client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
+                    var rotatedKey = GetCurrentApiKeyFromNode(node.ApiKey);
+                    if (!string.IsNullOrEmpty(rotatedKey))
+                    {
+                        client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey);
+                    }
+                    
+                    if (node.EnableStreaming)
+                    {
+                        Utils.Logger.Log("Gemini ChatWithImage: 使用流式传输模式");
+                        var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint) { Content = content };
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+                        
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        {
+                            Utils.Logger.Log($"Gemini流式: 检测到完整命令: {cmd}");
+                            ResponseHandler?.Invoke(cmd);
+                        });
+                        
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) != null)
+                            {
+                                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                                    continue;
+                                
+                                var jsonData = line.Substring(6).Trim();
+                                try
+                                {
+                                    var chunk = JObject.Parse(jsonData);
+                                    var delta = chunk["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        streamProcessor.AddChunk(delta);
+                                        StreamingChunkHandler?.Invoke(delta);
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        message = fullMessage.ToString();
+                    }
+                    else
+                    {
+                        Utils.Logger.Log("Gemini ChatWithImage: 使用非流式传输模式");
+                        var response = await client.PostAsync(apiEndpoint, content);
+                        
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+                        
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var responseObject = JObject.Parse(responseString);
+                        message = responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
+                        ResponseHandler?.Invoke(message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
+                Utils.Logger.Log($"Gemini ChatWithImage 异常: {ex.Message}");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+
+            // 保存历史记录
+            if (Settings.KeepContext)
+            {
+                var userMessage = CreateUserMessage($"[图像] {prompt}");
+                if (userMessage != null)
+                {
+                    await HistoryManager.AddMessage(userMessage);
+                }
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                SaveHistory();
+            }
+            return "";
+        }
+
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
             OnConversationTurn();

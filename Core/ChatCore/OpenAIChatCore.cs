@@ -126,6 +126,198 @@ namespace VPetLLM.Core.ChatCore
             return Chat(prompt, false);
         }
 
+        /// <summary>
+        /// 发送带图像的多模态消息
+        /// </summary>
+        /// <param name="prompt">文本提示</param>
+        /// <param name="imageData">图像数据</param>
+        /// <returns>响应内容</returns>
+        public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
+        {
+            // Handle conversation turn for record weight decrement
+            OnConversationTurn();
+            
+            if (!Settings.KeepContext)
+            {
+                ClearContext();
+            }
+            
+            // 清除上一次请求的节点缓存
+            ClearNodeContext();
+            
+            // 获取当前节点和API Key
+            var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
+            
+            // 检查是否有可用节点
+            if (currentNode == null || apiUrl == null)
+            {
+                var noNodeError = "没有启用的 OpenAI 节点，请在设置中启用至少一个节点";
+                Utils.Logger.Log($"OpenAI ChatWithImage 错误: {noNodeError}");
+                ResponseHandler?.Invoke(noNodeError);
+                return "";
+            }
+            
+            // 检查视觉能力是否启用
+            if (!currentNode.EnableVision)
+            {
+                var visionError = "当前节点未启用视觉能力，请在设置中启用 EnableVision";
+                Utils.Logger.Log($"OpenAI ChatWithImage 错误: {visionError}");
+                ResponseHandler?.Invoke(visionError);
+                return "";
+            }
+            
+            Utils.Logger.Log($"OpenAI ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+            
+            // 构建多模态消息内容
+            var base64Image = Convert.ToBase64String(imageData);
+            var userContent = new object[]
+            {
+                new { type = "text", text = prompt },
+                new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Image}" } }
+            };
+            
+            // 构建历史消息（不包含图像）
+            List<Message> history = GetCoreHistory();
+            
+            // 构建请求消息列表
+            var requestMessages = new List<object>();
+            foreach (var msg in history)
+            {
+                requestMessages.Add(new { role = msg.Role, content = msg.DisplayContent });
+            }
+            // 添加带图像的用户消息
+            requestMessages.Add(new { role = "user", content = userContent });
+            
+            object data;
+            if (_openAISetting.EnableAdvanced)
+            {
+                data = new
+                {
+                    model = currentNode.Model,
+                    messages = requestMessages,
+                    temperature = _openAISetting.Temperature,
+                    max_tokens = _openAISetting.MaxTokens,
+                    stream = currentNode.EnableStreaming
+                };
+            }
+            else
+            {
+                data = new
+                {
+                    model = currentNode.Model,
+                    messages = requestMessages,
+                    max_tokens = 4096,
+                    stream = currentNode.EnableStreaming
+                };
+            }
+            
+            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+            string message;
+            
+            try
+            {
+                using (var client = GetClient())
+                {
+                    if (!string.IsNullOrEmpty(apiKey))
+                    {
+                        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                    }
+                    
+                    if (currentNode.EnableStreaming)
+                    {
+                        Utils.Logger.Log("OpenAI ChatWithImage: 使用流式传输模式");
+                        var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
+                        {
+                            Content = content
+                        };
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+                        
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        {
+                            Utils.Logger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
+                            ResponseHandler?.Invoke(cmd);
+                        }, VPetLLM.Instance);
+                        
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) != null)
+                            {
+                                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                                    continue;
+                                
+                                var jsonData = line.Substring(6).Trim();
+                                if (jsonData == "[DONE]")
+                                    break;
+                                
+                                try
+                                {
+                                    var chunk = JObject.Parse(jsonData);
+                                    var delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        streamProcessor.AddChunk(delta);
+                                        StreamingChunkHandler?.Invoke(delta);
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        message = fullMessage.ToString();
+                        streamProcessor.FlushBatch();
+                    }
+                    else
+                    {
+                        Utils.Logger.Log("OpenAI ChatWithImage: 使用非流式传输模式");
+                        var response = await client.PostAsync(apiUrl, content);
+                        
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+                        
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var responseObject = JObject.Parse(responseString);
+                        message = responseObject["choices"][0]["message"]["content"].ToString();
+                        ResponseHandler?.Invoke(message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
+                Utils.Logger.Log($"OpenAI ChatWithImage 异常: {ex.Message}");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+            
+            // 保存历史记录（不保存图像数据，只保存文本）
+            if (Settings.KeepContext)
+            {
+                var userMessage = CreateUserMessage($"[图像] {prompt}");
+                if (userMessage != null)
+                {
+                    await HistoryManager.AddMessage(userMessage);
+                }
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                SaveHistory();
+            }
+            
+            return "";
+        }
+
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
             // Handle conversation turn for record weight decrement

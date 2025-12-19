@@ -334,7 +334,7 @@ namespace VPetLLM.UI.Windows
         /// <summary>
         /// 启动思考动画 - 显示动态的"思考中"气泡（优化：使用 BubbleManager）
         /// </summary>
-        private void StartThinkingAnimation()
+        public void StartThinkingAnimation()
         {
             // 如果已经在思考，先停止
             if (_isThinking)
@@ -386,7 +386,7 @@ namespace VPetLLM.UI.Windows
         /// 停止思考动画但不隐藏气泡（用于流式响应，让新气泡直接覆盖）
         /// 优化：使用 BubbleManager 的状态过渡
         /// </summary>
-        private void StopThinkingAnimationWithoutHide()
+        public void StopThinkingAnimationWithoutHide()
         {
             // 快速设置标志，阻止思考动画继续更新
             _isThinking = false;

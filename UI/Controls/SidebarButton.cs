@@ -281,6 +281,22 @@ namespace VPetLLM.UI.Controls
         }
 
         /// <summary>
+        /// 创建预定义的截图按钮
+        /// </summary>
+        public static SidebarButton CreateScreenshotButton()
+        {
+            return new SidebarButton
+            {
+                ButtonId = "screenshot",
+                DisplayName = "Screenshot",
+                IconText = "📷",
+                ToolTip = LocalizationService.Instance["FloatingSidebar.Screenshot"] ?? "截图",
+                Action = (vpetLLM) => vpetLLM.StartScreenshotCapture(),
+                Order = 3
+            };
+        }
+
+        /// <summary>
         /// 获取所有预定义按钮（只保留设置和ASR）
         /// </summary>
         public static List<SidebarButton> GetDefaultButtons()
@@ -288,7 +304,8 @@ namespace VPetLLM.UI.Controls
             return new List<SidebarButton>
             {
                 CreateSettingsButton(),
-                CreateASRButton()
+                CreateASRButton(),
+                CreateScreenshotButton()
             };
         }
     }

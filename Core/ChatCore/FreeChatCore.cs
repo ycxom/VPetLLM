@@ -80,6 +80,203 @@ namespace VPetLLM.Core.ChatCore
             return Chat(prompt, false);
         }
 
+        /// <summary>
+        /// 发送带图像的多模态消息
+        /// </summary>
+        /// <param name="prompt">文本提示</param>
+        /// <param name="imageData">图像数据</param>
+        /// <returns>响应内容</returns>
+        public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
+        {
+            try
+            {
+                // Handle conversation turn for record weight decrement
+                OnConversationTurn();
+                
+                if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
+                {
+                    var errorMessage = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded") 
+                        ?? "Free Chat 配置未加载，请等待配置下载完成后重启程序";
+                    Utils.Logger.Log(errorMessage);
+                    ResponseHandler?.Invoke(errorMessage);
+                    return "";
+                }
+
+                // 检查视觉能力是否启用
+                if (!_freeSetting.EnableVision)
+                {
+                    var visionError = "Free 接口未启用视觉能力，请在设置中启用 EnableVision";
+                    Utils.Logger.Log($"Free ChatWithImage 错误: {visionError}");
+                    ResponseHandler?.Invoke(visionError);
+                    return "";
+                }
+
+                if (!Settings.KeepContext)
+                {
+                    ClearContext();
+                }
+
+                Utils.Logger.Log($"Free ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+
+                // 构建多模态消息内容
+                var base64Image = Convert.ToBase64String(imageData);
+                var userContent = new object[]
+                {
+                    new { type = "text", text = prompt },
+                    new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Image}" } }
+                };
+
+                // 构建历史消息（不包含图像）
+                List<Message> history = GetCoreHistory();
+
+                // 构建请求消息列表
+                var requestMessages = new List<object>();
+                foreach (var msg in history)
+                {
+                    requestMessages.Add(new { role = msg.Role, content = msg.DisplayContent });
+                }
+                // 添加带图像的用户消息
+                requestMessages.Add(new { role = "user", content = userContent });
+
+                var requestBody = new
+                {
+                    model = _model,
+                    messages = requestMessages,
+                    temperature = _freeSetting.Temperature,
+                    max_tokens = _freeSetting.MaxTokens,
+                    stream = _freeSetting.EnableStreaming
+                };
+
+                var json = JsonConvert.SerializeObject(requestBody);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                string message;
+                if (_freeSetting.EnableStreaming)
+                {
+                    // 流式传输模式
+                    Utils.Logger.Log("Free ChatWithImage: 使用流式传输模式");
+                    var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl)
+                    {
+                        Content = content
+                    };
+                    var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        {
+                            Utils.Logger.Log($"Free流式: 检测到完整命令: {cmd}");
+                            ResponseHandler?.Invoke(cmd);
+                        });
+
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) != null)
+                            {
+                                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                                    continue;
+
+                                var jsonData = line.Substring(6).Trim();
+                                if (jsonData == "[DONE]")
+                                    break;
+
+                                try
+                                {
+                                    var chunk = JObject.Parse(jsonData);
+                                    var delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        streamProcessor.AddChunk(delta);
+                                        StreamingChunkHandler?.Invoke(delta);
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        message = fullMessage.ToString();
+                        Utils.Logger.Log($"Free流式: 流式传输完成，总消息长度: {message.Length}");
+                    }
+                    else
+                    {
+                        var responseContent = await response.Content.ReadAsStringAsync();
+                        Utils.Logger.Log($"Free ChatWithImage API 错误: {response.StatusCode} - {responseContent}");
+                        message = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                            ? $"API调用失败: {response.StatusCode} - {responseContent}"
+                            : await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Free");
+                        ResponseHandler?.Invoke(message);
+                        return "";
+                    }
+                }
+                else
+                {
+                    // 非流式传输模式
+                    Utils.Logger.Log("Free ChatWithImage: 使用非流式传输模式");
+                    var response = await _httpClient.PostAsync(_apiUrl, content);
+                    var responseContent = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
+                        message = responseObj?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "无回复";
+                        Utils.Logger.Log($"Free非流式: 收到完整消息，长度: {message.Length}");
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else
+                    {
+                        Utils.Logger.Log($"Free ChatWithImage API 错误: {response.StatusCode} - {responseContent}");
+                        message = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                            ? $"API调用失败: {response.StatusCode} - {responseContent}"
+                            : Utils.ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
+                        ResponseHandler?.Invoke(message);
+                        return "";
+                    }
+                }
+
+                // 保存历史记录（不保存图像数据，只保存文本）
+                if (Settings.KeepContext)
+                {
+                    var userMessage = CreateUserMessage($"[图像] {prompt}");
+                    if (userMessage != null)
+                    {
+                        await HistoryManager.AddMessage(userMessage);
+                    }
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                    SaveHistory();
+                }
+
+                return "";
+            }
+            catch (HttpRequestException httpEx)
+            {
+                Utils.Logger.Log($"Free ChatWithImage 网络异常: {httpEx.Message}");
+                var errorMessage = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                    ? $"Free ChatWithImage 网络异常: {httpEx.Message}\n{httpEx.StackTrace}"
+                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+            catch (TaskCanceledException tcEx)
+            {
+                Utils.Logger.Log($"Free ChatWithImage 请求超时: {tcEx.Message}");
+                var errorMessage = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                    ? $"Free ChatWithImage 请求超时: {tcEx.Message}\n{tcEx.StackTrace}"
+                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Free ChatWithImage 异常: {ex.Message}");
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+        }
+
         public override async Task<string> Chat(string prompt, bool isRetry)
         {
             try

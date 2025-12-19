@@ -316,8 +316,18 @@
                                         </Grid>
                                         <CheckBox x:Name="CheckBox_Ollama_EnableStreaming"
                                                 Content="{utils:Localize KeyPath=Ollama.EnableStreaming}"
-                                                Margin="0,0,0,16"
+                                                Margin="0,0,0,8"
                                                 Style="{StaticResource ModernCheckBox}"/>
+                                        <CheckBox x:Name="CheckBox_Ollama_EnableVision"
+                                                Content="{utils:Localize KeyPath=Ollama.EnableVision, Default=启用视觉能力}"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernCheckBox}">
+                                            <CheckBox.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock Text="{utils:Localize KeyPath=Ollama.EnableVisionTooltip, Default=启用后可以发送图像给此模型进行多模态分析（需要使用支持视觉的模型如 llava）}"/>
+                                                </ToolTip>
+                                            </CheckBox.ToolTip>
+                                        </CheckBox>
                                         <CheckBox x:Name="CheckBox_Ollama_EnableAdvanced"
                                                 Content="{utils:Localize KeyPath=Ollama.EnableAdvanced}"
                                                 Margin="0,0,0,16"
@@ -520,8 +530,18 @@
 
                                             <CheckBox x:Name="CheckBox_OpenAI_EnableStreaming"
                                                     Content="{utils:Localize KeyPath=OpenAI.EnableStreaming}"
-                                                    Margin="0,16,0,16"
+                                                    Margin="0,16,0,8"
                                                     Style="{StaticResource ModernCheckBox}"/>
+                                            <CheckBox x:Name="CheckBox_OpenAI_EnableVision"
+                                                    Content="{utils:Localize KeyPath=OpenAI.EnableVision, Default=启用视觉能力}"
+                                                    Margin="0,0,0,16"
+                                                    Style="{StaticResource ModernCheckBox}">
+                                                <CheckBox.ToolTip>
+                                                    <ToolTip>
+                                                        <TextBlock Text="{utils:Localize KeyPath=OpenAI.EnableVisionTooltip, Default=启用后可以发送图像给此节点进行多模态分析}"/>
+                                                    </ToolTip>
+                                                </CheckBox.ToolTip>
+                                            </CheckBox>
                                             <CheckBox x:Name="CheckBox_OpenAI_EnableAdvanced"
                                                     Content="{utils:Localize KeyPath=OpenAI.EnableAdvanced}"
                                                     Margin="0,0,0,16"
@@ -718,8 +738,18 @@
                                             </Grid>
                                             <CheckBox x:Name="CheckBox_GeminiNode_EnableStreaming"
                                                       Content="{utils:Localize KeyPath=Gemini.EnableStreaming}"
-                                                      Margin="0,16,0,16"
+                                                      Margin="0,16,0,8"
                                                       Style="{StaticResource ModernCheckBox}"/>
+                                            <CheckBox x:Name="CheckBox_GeminiNode_EnableVision"
+                                                      Content="{utils:Localize KeyPath=Gemini.EnableVision, Default=启用视觉能力}"
+                                                      Margin="0,0,0,16"
+                                                      Style="{StaticResource ModernCheckBox}">
+                                                <CheckBox.ToolTip>
+                                                    <ToolTip>
+                                                        <TextBlock Text="{utils:Localize KeyPath=Gemini.EnableVisionTooltip, Default=启用后可以发送图像给此节点进行多模态分析}"/>
+                                                    </ToolTip>
+                                                </CheckBox.ToolTip>
+                                            </CheckBox>
                                             <CheckBox x:Name="CheckBox_GeminiNode_EnableAdvanced"
                                                       Content="{utils:Localize KeyPath=Gemini.EnableAdvanced}"
                                                       Margin="0,0,0,16"
@@ -782,6 +812,11 @@
 
                                         <CheckBox x:Name="CheckBox_Free_EnableStreaming"
                                                 Content="{utils:Localize KeyPath=Free.EnableStreaming}"
+                                                Margin="0,0,0,16"
+                                                Style="{StaticResource ModernCheckBox}"/>
+                                        <CheckBox x:Name="CheckBox_Free_EnableVision"
+                                                Content="{utils:Localize KeyPath=Free.EnableVision}"
+                                                ToolTip="{utils:Localize KeyPath=Free.EnableVisionTooltip}"
                                                 Margin="0,0,0,16"
                                                 Style="{StaticResource ModernCheckBox}"/>
                                         <CheckBox x:Name="CheckBox_Free_EnableAdvanced"
@@ -2057,7 +2092,180 @@
                     </ScrollViewer>
                 </Grid>
             </TabItem>
-        </TabControl>
+                </TabControl>
+            </TabItem>
+            
+            <!-- Screenshot 独立标签页 -->
+            <TabItem Header="{utils:Localize KeyPath=Screenshot.Tab, Default=截图与OCR}"
+                    x:Name="Tab_Screenshot_Main"
+                    Style="{StaticResource ModernTabItem}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollViewer Grid.Column="0"
+                            VerticalScrollBarVisibility="Auto">
+                        <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
+                            <StackPanel Style="{StaticResource SettingGroup}">
+                                <CheckBox x:Name="CheckBox_Screenshot_Main_IsEnabled"
+                                        Content="{utils:Localize KeyPath=Screenshot.Enable, Default=启用截图功能}"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernCheckBox}">
+                                    <CheckBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="{utils:Localize KeyPath=Screenshot.EnableTooltip, Default=启用后可以使用快捷键进行截图}"/>
+                                        </ToolTip>
+                                    </CheckBox.ToolTip>
+                                </CheckBox>
+
+                                <StackPanel IsEnabled="{Binding ElementName=CheckBox_Screenshot_Main_IsEnabled, Path=IsChecked}">
+                                    <Label Content="{utils:Localize KeyPath=Screenshot.ProcessingMode, Default=处理模式}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_Screenshot_Main_ProcessingMode"
+                                            Margin="0,0,0,8"
+                                            SelectionChanged="ComboBox_Screenshot_ProcessingMode_SelectionChanged"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Screenshot.Mode.NativeMultimodal, Default=原生多模态}" Tag="NativeMultimodal" IsSelected="True"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Screenshot.Mode.OCRApi, Default=OCR API}" Tag="OCRApi"/>
+                                    </ComboBox>
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.ProcessingModeTip, Default=原生多模态：将图像发送给支持视觉的LLM；OCR API：提取图像中的文字}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <CheckBox x:Name="CheckBox_Screenshot_Main_AutoSend"
+                                            Content="{utils:Localize KeyPath=Screenshot.AutoSend, Default=截图后自动发送}"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernCheckBox}"/>
+
+                                    <Label Content="{utils:Localize KeyPath=Screenshot.Hotkey, Default=快捷键}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0"
+                                                x:Name="TextBox_Screenshot_Main_HotkeyDisplay"
+                                                IsReadOnly="True"
+                                                Style="{StaticResource ModernTextBox}"
+                                                ToolTip="当前快捷键"/>
+                                        <Button Grid.Column="1"
+                                                x:Name="Button_Screenshot_Main_CaptureHotkey"
+                                                Content="{utils:Localize KeyPath=Screenshot.CaptureHotkey, Default=捕获快捷键}"
+                                                Click="Button_Screenshot_CaptureHotkey_Click"
+                                                Margin="8,0,0,0"
+                                                Padding="12,6"
+                                                Style="{StaticResource ModernButton}"/>
+                                        <Button Grid.Column="2"
+                                                x:Name="Button_Screenshot_Main_ResetHotkey"
+                                                Content="{utils:Localize KeyPath=Screenshot.ResetHotkey, Default=还原默认}"
+                                                Click="Button_Screenshot_ResetHotkey_Click"
+                                                Margin="8,0,0,0"
+                                                Padding="12,6"
+                                                Style="{StaticResource ModernButton}"/>
+                                    </Grid>
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.HotkeyDescription, Default=点击捕获按钮后，按下您想要的快捷键组合}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,8"/>
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.DefaultHotkey, Default=默认快捷键: Win + Alt + S}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Foreground="#666666"
+                                            FontSize="11"
+                                            Margin="0,0,0,16"/>
+
+                                    <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
+                                        <Button x:Name="Button_Screenshot_Main_Test"
+                                                Content="{utils:Localize KeyPath=Screenshot.TestButton, Default=测试截图}"
+                                                Click="Button_Screenshot_Test_Click"
+                                                Style="{StaticResource ModernButton}"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+
+                    <ScrollViewer Grid.Column="1"
+                            VerticalScrollBarVisibility="Auto">
+                        <Border Style="{StaticResource CardContainer}">
+                            <StackPanel Style="{StaticResource SettingGroup}"
+                                IsEnabled="{Binding ElementName=CheckBox_Screenshot_Main_IsEnabled, Path=IsChecked}">
+                                <!-- OCR 配置 -->
+                                <StackPanel x:Name="Panel_Screenshot_Main_OCR"
+                                        Visibility="Collapsed">
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.OCRSettings, Default=OCR 配置}"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+
+                                    <Label Content="{utils:Localize KeyPath=Screenshot.OCR.Provider, Default=OCR 提供商}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_Screenshot_Main_OCR_Provider"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="OpenAI" Tag="OpenAI" IsSelected="True"/>
+                                        <ComboBoxItem Content="Free" Tag="Free"/>
+                                    </ComboBox>
+
+                                    <Label Content="{utils:Localize KeyPath=Screenshot.OCR.BaseUrl, Default=API 地址}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_Screenshot_Main_OCR_BaseUrl"
+                                            Text="https://api.openai.com/v1"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernTextBox}"/>
+
+                                    <Label Content="{utils:Localize KeyPath=Screenshot.OCR.ApiKey, Default=API Key}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <TextBox x:Name="TextBox_Screenshot_Main_OCR_ApiKey"
+                                            Margin="0,0,0,16"
+                                            Style="{StaticResource ModernTextBox}"/>
+
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.OCR.Description, Default=OCR 模式将使用 OpenAI Vision API 识别图像中的文字}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+                                </StackPanel>
+
+                                <!-- 原生多模态配置 -->
+                                <StackPanel x:Name="Panel_Screenshot_Main_Multimodal"
+                                        Visibility="Visible">
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.MultimodalSettings, Default=多模态配置}"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.Multimodal.Description, Default=原生多模态模式将截图直接发送给支持视觉能力的 LLM 进行分析。}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.Multimodal.EnableVisionTip, Default=请确保在 LLM 设置中为相应节点启用了视觉能力 (EnableVision)。}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Foreground="#FF9800"
+                                            Margin="0,0,0,16"/>
+
+                                    <TextBlock Style="{StaticResource SectionHeader}"
+                                            Margin="0,16,0,8">
+                                        <Run Text="{utils:Localize KeyPath=Screenshot.SupportedModels, Default=支持的模型}" FontSize="14"/>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,4">
+                                        <Run Text="• OpenAI: " FontWeight="SemiBold"/>
+                                        <Run Text="gpt-4o, gpt-4o-mini, gpt-4-vision-preview"/>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,4">
+                                        <Run Text="• Gemini: " FontWeight="SemiBold"/>
+                                        <Run Text="gemini-pro-vision, gemini-1.5-pro, gemini-1.5-flash"/>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16">
+                                        <Run Text="• Ollama: " FontWeight="SemiBold"/>
+                                        <Run Text="llava, bakllava, llava-llama3"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+                </Grid>
             </TabItem>
             
             <TabItem Header="{utils:Localize KeyPath=Language.Tab}"

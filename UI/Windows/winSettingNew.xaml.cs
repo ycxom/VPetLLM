@@ -391,6 +391,7 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdvBind)
                 cbGemAdvBind.Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_Free_EnableVision")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).Click += Control_Click;
             if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMaxBind)
                 tbGemMaxBind.TextChanged += Control_TextChanged;
@@ -760,6 +761,7 @@ namespace VPetLLM.UI.Windows
             ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming")).IsChecked = _plugin.Settings.Ollama.EnableStreaming;
+            ((CheckBox)this.FindName("CheckBox_Ollama_EnableVision")).IsChecked = _plugin.Settings.Ollama.EnableVision;
             ((Slider)this.FindName("Slider_Ollama_Temperature")).Value = _plugin.Settings.Ollama.Temperature;
             ((TextBlock)this.FindName("TextBlock_Ollama_TemperatureValue")).Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
             ((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).Text = _plugin.Settings.Ollama.MaxTokens.ToString();
@@ -780,6 +782,7 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMax)
                 tbGemMax.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
             ((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).IsChecked = _plugin.Settings.Free.EnableStreaming;
+            ((CheckBox)this.FindName("CheckBox_Free_EnableVision")).IsChecked = _plugin.Settings.Free.EnableVision;
             ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).IsChecked = _plugin.Settings.Free.EnableAdvanced;
             ((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
             ((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
@@ -954,6 +957,9 @@ namespace VPetLLM.UI.Windows
 
             // 悬浮侧边栏设置
             LoadFloatingSidebarSettings();
+
+            // 截图设置
+            LoadScreenshotSettings();
         }
 
         /// <summary>
@@ -1210,6 +1216,8 @@ namespace VPetLLM.UI.Windows
                 _plugin.Settings.MaxLogCount = maxLogCount;
             _plugin.Settings.Ollama.EnableAdvanced = ollamaEnableAdvancedCheckBox.IsChecked ?? false;
             _plugin.Settings.Ollama.EnableStreaming = ollamaEnableStreamingCheckBox.IsChecked ?? true;
+            if (this.FindName("CheckBox_Ollama_EnableVision") is CheckBox cbOllamaVision)
+                _plugin.Settings.Ollama.EnableVision = cbOllamaVision.IsChecked ?? false;
             _plugin.Settings.Ollama.Temperature = ollamaTemperatureSlider.Value;
             if (int.TryParse(ollamaMaxTokensTextBox.Text, out int ollamaMaxTokens))
                 _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
@@ -1232,6 +1240,8 @@ namespace VPetLLM.UI.Windows
             // 保存 Free 设置
             if (freeEnableStreamingCheckBox != null)
                 _plugin.Settings.Free.EnableStreaming = freeEnableStreamingCheckBox.IsChecked ?? false;
+            if (this.FindName("CheckBox_Free_EnableVision") is CheckBox cbFreeVision)
+                _plugin.Settings.Free.EnableVision = cbFreeVision.IsChecked ?? false;
             if (freeEnableAdvancedCheckBox != null)
                 _plugin.Settings.Free.EnableAdvanced = freeEnableAdvancedCheckBox.IsChecked ?? false;
             if (freeTemperatureSlider != null)
@@ -1378,6 +1388,9 @@ namespace VPetLLM.UI.Windows
 
             // 悬浮侧边栏设置
             SaveFloatingSidebarSettings();
+
+            // 截图设置
+            SaveScreenshotSettings();
 
             // 更新语音输入快捷键
             _plugin.UpdateVoiceInputHotkey();
@@ -3668,6 +3681,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl) tbUrl.Text = node.Url ?? string.Empty;
             if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.IsChecked = node.EnableAdvanced;
             if (this.FindName("CheckBox_OpenAI_EnableStreaming") is CheckBox cbStream) cbStream.IsChecked = node.EnableStreaming;
+            if (this.FindName("CheckBox_OpenAI_EnableVision") is CheckBox cbVision) cbVision.IsChecked = node.EnableVision;
             if (this.FindName("Slider_OpenAI_Temperature") is Slider slTemp)
             {
                 slTemp.Value = node.Temperature;
@@ -3755,6 +3769,12 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     RefreshOpenAINodesList();
                     SaveSettings();
                 }
+                else if (cb.Name == "CheckBox_OpenAI_EnableVision")
+                {
+                    node.EnableVision = cb.IsChecked ?? false;
+                    RefreshOpenAINodesList();
+                    SaveSettings();
+                }
             }
         }
 
@@ -3787,6 +3807,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl) { tbUrl.TextChanged += OpenAINodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; }
             if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += OpenAINodeDetail_Click;
             if (this.FindName("CheckBox_OpenAI_EnableStreaming") is CheckBox cbStream) cbStream.Click += OpenAINodeDetail_Click;
+            if (this.FindName("CheckBox_OpenAI_EnableVision") is CheckBox cbVision) cbVision.Click += OpenAINodeDetail_Click;
             if (this.FindName("Slider_OpenAI_Temperature") is Slider slTemp) slTemp.ValueChanged += OpenAINodeDetail_TemperatureChanged;
             if (this.FindName("TextBox_OpenAI_MaxTokens") is TextBox tbMax) tbMax.TextChanged += OpenAINodeDetail_TextChanged;
             if (this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbPlain) tbPlain.TextChanged += OpenAINodeDetail_TextChanged;
@@ -3848,6 +3869,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (this.FindName("TextBox_GeminiNodeUrl") is TextBox tbUrl) tbUrl.Text = node.Url ?? string.Empty;
             if (this.FindName("CheckBox_GeminiNode_EnableAdvanced") is CheckBox cbAdv) cbAdv.IsChecked = node.EnableAdvanced;
             if (this.FindName("CheckBox_GeminiNode_EnableStreaming") is CheckBox cbStream) cbStream.IsChecked = node.EnableStreaming;
+            if (this.FindName("CheckBox_GeminiNode_EnableVision") is CheckBox cbVision) cbVision.IsChecked = node.EnableVision;
             if (this.FindName("Slider_GeminiNode_Temperature") is Slider slTemp)
             {
                 slTemp.Value = node.Temperature;
@@ -3939,6 +3961,12 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     ScheduleGeminiListRefresh();
                     ScheduleAutoSave();
                 }
+                else if (cb.Name == "CheckBox_GeminiNode_EnableVision")
+                {
+                    node.EnableVision = cb.IsChecked ?? false;
+                    ScheduleGeminiListRefresh();
+                    ScheduleAutoSave();
+                }
             }
         }
 
@@ -3964,6 +3992,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (this.FindName("TextBox_GeminiNodeUrl") is TextBox tbUrl) { tbUrl.TextChanged += GeminiNodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; }
             if (this.FindName("CheckBox_GeminiNode_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += GeminiNodeDetail_Click;
             if (this.FindName("CheckBox_GeminiNode_EnableStreaming") is CheckBox cbStream) cbStream.Click += GeminiNodeDetail_Click;
+            if (this.FindName("CheckBox_GeminiNode_EnableVision") is CheckBox cbVision) cbVision.Click += GeminiNodeDetail_Click;
             if (this.FindName("Slider_GeminiNode_Temperature") is Slider slTemp) slTemp.ValueChanged += GeminiNodeDetail_TemperatureChanged;
             if (this.FindName("TextBox_GeminiNode_MaxTokens") is TextBox tbMax) tbMax.TextChanged += GeminiNodeDetail_TextChanged;
             if (this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbPlain) tbPlain.TextChanged += GeminiNodeDetail_TextChanged;
@@ -4700,5 +4729,256 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 }
             }
         }
+
+        #region Screenshot Settings
+
+        private void ComboBox_Screenshot_ProcessingMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateScreenshotProcessingModePanel();
+        }
+
+        private void UpdateScreenshotProcessingModePanel()
+        {
+            try
+            {
+                var comboBox = (ComboBox)this.FindName("ComboBox_Screenshot_Main_ProcessingMode");
+                var ocrPanel = (StackPanel)this.FindName("Panel_Screenshot_Main_OCR");
+                var multimodalPanel = (StackPanel)this.FindName("Panel_Screenshot_Main_Multimodal");
+
+                if (comboBox == null || ocrPanel == null || multimodalPanel == null) return;
+
+                var selectedItem = comboBox.SelectedItem as ComboBoxItem;
+                var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
+
+                if (mode == "OCRApi")
+                {
+                    ocrPanel.Visibility = Visibility.Visible;
+                    multimodalPanel.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    ocrPanel.Visibility = Visibility.Collapsed;
+                    multimodalPanel.Visibility = Visibility.Visible;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error updating processing mode panel: {ex.Message}");
+            }
+        }
+
+        private void Button_Screenshot_CaptureHotkey_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Log("Screenshot: Opening hotkey capture window...");
+                
+                var captureWindow = new HotkeyCapture
+                {
+                    Owner = this
+                };
+                
+                var result = captureWindow.ShowDialog();
+                
+                if (result == true && captureWindow.IsCaptured)
+                {
+                    _plugin.Settings.Screenshot.HotkeyModifiers = captureWindow.CapturedModifiers;
+                    _plugin.Settings.Screenshot.HotkeyKey = captureWindow.CapturedKey;
+                    
+                    Logger.Log($"Screenshot: Hotkey captured - Modifiers: {captureWindow.CapturedModifiers}, Key: {captureWindow.CapturedKey}");
+                    
+                    SaveSettings();
+                    UpdateScreenshotHotkeyDisplay();
+                    
+                    // 更新快捷键注册
+                    _plugin.UpdateScreenshotHotkey();
+                    
+                    Logger.Log("Screenshot: Hotkey saved successfully");
+                }
+                else
+                {
+                    Logger.Log("Screenshot: Hotkey capture cancelled");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error capturing hotkey: {ex.Message}");
+                MessageBox.Show($"捕获快捷键失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void Button_Screenshot_ResetHotkey_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Log("Screenshot: Resetting hotkey to default...");
+                
+                _plugin.Settings.Screenshot.HotkeyModifiers = "Win+Alt";
+                _plugin.Settings.Screenshot.HotkeyKey = "S";
+                
+                SaveSettings();
+                UpdateScreenshotHotkeyDisplay();
+                
+                // 更新快捷键注册
+                _plugin.UpdateScreenshotHotkey();
+                
+                Logger.Log("Screenshot: Hotkey reset to default (Win+Alt+S)");
+                
+                MessageBox.Show(
+                    LanguageHelper.Get("Screenshot.HotkeyResetSuccess", _plugin.Settings.Language) ?? "快捷键已还原为默认值: Win + Alt + S",
+                    LanguageHelper.Get("Success", _plugin.Settings.Language) ?? "成功",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error resetting hotkey: {ex.Message}");
+                MessageBox.Show($"还原快捷键失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void Button_Screenshot_Test_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Log("Screenshot: Testing screenshot capture...");
+                _plugin.StartScreenshotCapture();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error testing screenshot: {ex.Message}");
+                MessageBox.Show($"测试截图失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void UpdateScreenshotHotkeyDisplay()
+        {
+            var textBox = (TextBox)this.FindName("TextBox_Screenshot_Main_HotkeyDisplay");
+            if (textBox != null)
+            {
+                var modifiers = _plugin.Settings.Screenshot.HotkeyModifiers;
+                var key = _plugin.Settings.Screenshot.HotkeyKey;
+                
+                if (string.IsNullOrEmpty(modifiers) && string.IsNullOrEmpty(key))
+                {
+                    textBox.Text = LanguageHelper.Get("Screenshot.NoHotkey", _plugin.Settings.Language) ?? "未设置";
+                }
+                else if (string.IsNullOrEmpty(modifiers))
+                {
+                    textBox.Text = key;
+                }
+                else
+                {
+                    textBox.Text = $"{modifiers} + {key}";
+                }
+            }
+        }
+
+        private void LoadScreenshotSettings()
+        {
+            try
+            {
+                var checkBoxEnabled = (CheckBox)this.FindName("CheckBox_Screenshot_Main_IsEnabled");
+                var comboBoxMode = (ComboBox)this.FindName("ComboBox_Screenshot_Main_ProcessingMode");
+                var checkBoxAutoSend = (CheckBox)this.FindName("CheckBox_Screenshot_Main_AutoSend");
+                var comboBoxOCRProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_OCR_Provider");
+                var textBoxOCRBaseUrl = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_BaseUrl");
+                var textBoxOCRApiKey = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_ApiKey");
+
+                if (checkBoxEnabled != null)
+                    checkBoxEnabled.IsChecked = _plugin.Settings.Screenshot.IsEnabled;
+
+                if (comboBoxMode != null)
+                {
+                    var mode = _plugin.Settings.Screenshot.ProcessingMode.ToString();
+                    foreach (ComboBoxItem item in comboBoxMode.Items)
+                    {
+                        if (item.Tag?.ToString() == mode)
+                        {
+                            comboBoxMode.SelectedItem = item;
+                            break;
+                        }
+                    }
+                }
+
+                if (checkBoxAutoSend != null)
+                    checkBoxAutoSend.IsChecked = _plugin.Settings.Screenshot.AutoSend;
+
+                if (comboBoxOCRProvider != null)
+                {
+                    var provider = _plugin.Settings.Screenshot.OCR.Provider;
+                    foreach (ComboBoxItem item in comboBoxOCRProvider.Items)
+                    {
+                        if (item.Tag?.ToString() == provider)
+                        {
+                            comboBoxOCRProvider.SelectedItem = item;
+                            break;
+                        }
+                    }
+                }
+
+                if (textBoxOCRBaseUrl != null)
+                    textBoxOCRBaseUrl.Text = _plugin.Settings.Screenshot.OCR.BaseUrl;
+
+                if (textBoxOCRApiKey != null)
+                    textBoxOCRApiKey.Text = _plugin.Settings.Screenshot.OCR.ApiKey;
+
+                UpdateScreenshotHotkeyDisplay();
+                UpdateScreenshotProcessingModePanel();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error loading settings: {ex.Message}");
+            }
+        }
+
+        private void SaveScreenshotSettings()
+        {
+            try
+            {
+                var checkBoxEnabled = (CheckBox)this.FindName("CheckBox_Screenshot_Main_IsEnabled");
+                var comboBoxMode = (ComboBox)this.FindName("ComboBox_Screenshot_Main_ProcessingMode");
+                var checkBoxAutoSend = (CheckBox)this.FindName("CheckBox_Screenshot_Main_AutoSend");
+                var comboBoxOCRProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_OCR_Provider");
+                var textBoxOCRBaseUrl = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_BaseUrl");
+                var textBoxOCRApiKey = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_ApiKey");
+
+                if (checkBoxEnabled != null)
+                    _plugin.Settings.Screenshot.IsEnabled = checkBoxEnabled.IsChecked ?? false;
+
+                if (comboBoxMode != null)
+                {
+                    var selectedItem = comboBoxMode.SelectedItem as ComboBoxItem;
+                    var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
+                    _plugin.Settings.Screenshot.ProcessingMode = mode == "OCRApi" 
+                        ? Configuration.ScreenshotProcessingMode.OCRApi 
+                        : Configuration.ScreenshotProcessingMode.NativeMultimodal;
+                }
+
+                if (checkBoxAutoSend != null)
+                    _plugin.Settings.Screenshot.AutoSend = checkBoxAutoSend.IsChecked ?? false;
+
+                if (comboBoxOCRProvider != null)
+                {
+                    var selectedItem = comboBoxOCRProvider.SelectedItem as ComboBoxItem;
+                    _plugin.Settings.Screenshot.OCR.Provider = selectedItem?.Tag?.ToString() ?? "OpenAI";
+                }
+
+                if (textBoxOCRBaseUrl != null)
+                    _plugin.Settings.Screenshot.OCR.BaseUrl = textBoxOCRBaseUrl.Text;
+
+                if (textBoxOCRApiKey != null)
+                    _plugin.Settings.Screenshot.OCR.ApiKey = textBoxOCRApiKey.Text;
+
+                // 更新快捷键注册
+                _plugin.UpdateScreenshotHotkey();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error saving settings: {ex.Message}");
+            }
+        }
+
+        #endregion
     }
 }

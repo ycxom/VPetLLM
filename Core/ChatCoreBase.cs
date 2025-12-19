@@ -21,6 +21,16 @@ namespace VPetLLM.Core
         public abstract Task<string> Chat(string prompt);
         public abstract Task<string> Chat(string prompt, bool isFunctionCall);
         public abstract Task<string> Summarize(string systemPrompt, string userContent);
+        
+        /// <summary>
+        /// 发送带图像的多模态消息（默认实现：不支持）
+        /// </summary>
+        public virtual Task<string> ChatWithImage(string prompt, byte[] imageData)
+        {
+            Utils.Logger.Log($"{Name} 不支持多模态消息");
+            ResponseHandler?.Invoke("当前模型不支持图像输入");
+            return Task.FromResult("");
+        }
 
         protected string GetSystemMessage()
         {
@@ -506,6 +516,24 @@ namespace VPetLLM.Core
                 .Replace("\r", "\\r")
                 .Replace("\t", "\\t");
         }
+
+        /// <summary>
+        /// 图像数据（用于多模态消息）
+        /// </summary>
+        [JsonIgnore]
+        public byte[]? ImageData { get; set; }
+
+        /// <summary>
+        /// 图像 MIME 类型
+        /// </summary>
+        [JsonIgnore]
+        public string ImageMimeType { get; set; } = "image/png";
+
+        /// <summary>
+        /// 是否包含图像
+        /// </summary>
+        [JsonIgnore]
+        public bool HasImage => ImageData != null && ImageData.Length > 0;
     }
 }
 

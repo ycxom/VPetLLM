@@ -56,6 +56,7 @@ namespace VPetLLM
         public bool EnableMediaPlayback { get; set; } = true;
         public MediaPlaybackSetting MediaPlayback { get; set; } = new MediaPlaybackSetting();
         public Configuration.FloatingSidebarSettings FloatingSidebar { get; set; } = new Configuration.FloatingSidebarSettings();
+        public Configuration.ScreenshotSettings Screenshot { get; set; } = new Configuration.ScreenshotSettings();
         private readonly string _path;
 
         public Setting(string path)
@@ -147,6 +148,10 @@ namespace VPetLLM
             if (FloatingSidebar == null)
             {
                 FloatingSidebar = new Configuration.FloatingSidebarSettings();
+            }
+            if (Screenshot == null)
+            {
+                Screenshot = new Configuration.ScreenshotSettings();
             }
 
             // 旧版OpenAI单节点配置迁移到多节点结构，避免用户配置丢失
@@ -251,6 +256,7 @@ namespace VPetLLM
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
+            public bool EnableVision { get; set; } = false;
         }
 
         public class OpenAINodeSetting
@@ -264,6 +270,7 @@ namespace VPetLLM
             public bool EnableStreaming { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
+            public bool EnableVision { get; set; } = false;
             
             public OpenAISetting GetCurrentOpenAISetting()
             {
@@ -398,6 +405,7 @@ namespace VPetLLM
             public bool EnableStreaming { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "Gemini节点";
+            public bool EnableVision { get; set; } = false;
         }
 
         public class GeminiSetting
@@ -506,6 +514,7 @@ namespace VPetLLM
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
+            public bool EnableVision { get; set; } = false;
         }
 
         public class ToolSetting

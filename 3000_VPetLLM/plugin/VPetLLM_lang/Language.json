@@ -233,6 +233,18 @@
             "zh-hans": "渠道配置",
             "zh-hant": "渠道配置",
             "jp": "チャネル設定"
+        },
+        "EnableVision": {
+            "en": "Enable Vision",
+            "zh-hans": "启用视觉",
+            "zh-hant": "啟用視覺",
+            "jp": "ビジョンを有効にする"
+        },
+        "EnableVisionTooltip": {
+            "en": "Enable vision capability for this channel to process images and screenshots",
+            "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
+            "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
+            "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
         }
     },
     "OpenAI": {
@@ -349,6 +361,18 @@
             "zh-hans": "启用",
             "zh-hant": "啟用",
             "jp": "有効"
+        },
+        "EnableVision": {
+            "en": "Enable Vision",
+            "zh-hans": "启用视觉",
+            "zh-hant": "啟用視覺",
+            "jp": "ビジョンを有効にする"
+        },
+        "EnableVisionTooltip": {
+            "en": "Enable vision capability for this channel to process images and screenshots",
+            "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
+            "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
+            "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
         }
     },
     "Gemini": {
@@ -471,6 +495,18 @@
             "zh-hans": "显示/隐藏",
             "zh-hant": "顯示/隱藏",
             "jp": "表示/非表示"
+        },
+        "EnableVision": {
+            "en": "Enable Vision",
+            "zh-hans": "启用视觉",
+            "zh-hant": "啟用視覺",
+            "jp": "ビジョンを有効にする"
+        },
+        "EnableVisionTooltip": {
+            "en": "Enable vision capability for this channel to process images and screenshots",
+            "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
+            "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
+            "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
         }
     },
     "Free": {
@@ -521,6 +557,18 @@
             "zh-hans": "最大Token:",
             "zh-hant": "最大Token:",
             "jp": "最大トークン:"
+        },
+        "EnableVision": {
+            "en": "Enable Vision",
+            "zh-hans": "启用视觉",
+            "zh-hant": "啟用視覺",
+            "jp": "ビジョンを有効にする"
+        },
+        "EnableVisionTooltip": {
+            "en": "Enable vision capability for this channel to process images and screenshots",
+            "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
+            "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
+            "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
         }
     },
     "Advanced_Options": {
@@ -2415,6 +2463,420 @@
             "zh-hans": "启用的按钮",
             "zh-hant": "啟用的按鈕",
             "jp": "有効なボタン"
+        },
+        "Screenshot": {
+            "en": "Screenshot",
+            "zh-hans": "截图",
+            "zh-hant": "截圖",
+            "jp": "スクリーンショット"
+        },
+        "ScreenshotDisabled": {
+            "en": "Screenshot not enabled, please configure in settings",
+            "zh-hans": "截图功能未启用，请在设置中配置",
+            "zh-hant": "截圖功能未啟用，請在設定中配置",
+            "jp": "スクリーンショットが有効になっていません。設定で構成してください"
+        }
+    },
+    "Screenshot": {
+        "Tab": {
+            "en": "Screenshot & OCR",
+            "zh-hans": "截图与OCR",
+            "zh-hant": "截圖與OCR",
+            "jp": "スクリーンショット＆OCR"
+        },
+        "BasicSettings": {
+            "en": "Basic Settings",
+            "zh-hans": "基本设置",
+            "zh-hant": "基本設置",
+            "jp": "基本設定"
+        },
+        "Enable": {
+            "en": "Enable Screenshot Feature",
+            "zh-hans": "启用截图功能",
+            "zh-hant": "啟用截圖功能",
+            "jp": "スクリーンショット機能を有効にする"
+        },
+        "EnableTooltip": {
+            "en": "Enable screenshot capture with hotkey or sidebar button",
+            "zh-hans": "启用后可以使用快捷键或侧边栏按钮进行截图",
+            "zh-hant": "啟用後可以使用快捷鍵或側邊欄按鈕進行截圖",
+            "jp": "有効にすると、ホットキーまたはサイドバーボタンでスクリーンショットが使用できます"
+        },
+        "HotkeySettings": {
+            "en": "Hotkey Settings",
+            "zh-hans": "快捷键设置",
+            "zh-hant": "快捷鍵設置",
+            "jp": "ホットキー設定"
+        },
+        "HotkeyModifiers": {
+            "en": "Modifiers:",
+            "zh-hans": "修饰键:",
+            "zh-hant": "修飾鍵:",
+            "jp": "修飾キー:"
+        },
+        "HotkeyKey": {
+            "en": "Key:",
+            "zh-hans": "按键:",
+            "zh-hant": "按鍵:",
+            "jp": "キー:"
+        },
+        "HotkeyDescription": {
+            "en": "Click the capture button, then press your desired hotkey combination.",
+            "zh-hans": "点击捕获按钮后，按下您想要的快捷键组合",
+            "zh-hant": "點擊捕獲按鈕後，按下您想要的快速鍵組合",
+            "jp": "キャプチャボタンをクリックしてから、ご希望のホットキーの組み合わせを押してください。"
+        },
+        "CaptureHotkey": {
+            "en": "Capture Hotkey",
+            "zh-hans": "捕获快捷键",
+            "zh-hant": "捕獲快捷鍵",
+            "jp": "ホットキーをキャプチャ"
+        },
+        "EndCapture": {
+            "en": "End Capture",
+            "zh-hans": "结束捕获",
+            "zh-hant": "結束捕獲",
+            "jp": "キャプチャ終了"
+        },
+        "PressKey": {
+            "en": "Press your hotkey combination...",
+            "zh-hans": "请按下快捷键...",
+            "zh-hant": "請按下快捷鍵...",
+            "jp": "ホットキーを押してください..."
+        },
+        "NoHotkey": {
+            "en": "Not set",
+            "zh-hans": "未设置",
+            "zh-hant": "未設置",
+            "jp": "未設定"
+        },
+        "ResetHotkey": {
+            "en": "Reset Default",
+            "zh-hans": "还原默认",
+            "zh-hant": "還原默認",
+            "jp": "デフォルトに戻す"
+        },
+        "DefaultHotkey": {
+            "en": "Default hotkey: Win + Alt + S",
+            "zh-hans": "默认快捷键: Win + Alt + S",
+            "zh-hant": "默認快捷鍵: Win + Alt + S",
+            "jp": "デフォルトホットキー: Win + Alt + S"
+        },
+        "Hotkey": {
+            "en": "Hotkey",
+            "zh-hans": "快捷键",
+            "zh-hant": "快捷鍵",
+            "jp": "ホットキー"
+        },
+        "TestButton": {
+            "en": "Test Screenshot",
+            "zh-hans": "测试截图",
+            "zh-hant": "測試截圖",
+            "jp": "スクリーンショットテスト"
+        },
+        "ProcessingSettings": {
+            "en": "Processing Settings",
+            "zh-hans": "处理设置",
+            "zh-hant": "處理設置",
+            "jp": "処理設定"
+        },
+        "ProcessingMode": {
+            "en": "Processing Mode",
+            "zh-hans": "处理模式",
+            "zh-hant": "處理模式",
+            "jp": "処理モード"
+        },
+        "ProcessingModeTooltip": {
+            "en": "Choose how to process captured screenshots",
+            "zh-hans": "选择如何处理截取的图片",
+            "zh-hant": "選擇如何處理截取的圖片",
+            "jp": "キャプチャしたスクリーンショットの処理方法を選択"
+        },
+        "ModeNativeMultimodal": {
+            "en": "Native Multimodal (Send to Vision LLM)",
+            "zh-hans": "原生多模态（发送给视觉LLM）",
+            "zh-hant": "原生多模態（發送給視覺LLM）",
+            "jp": "ネイティブマルチモーダル（Vision LLMに送信）"
+        },
+        "ModeOCRApi": {
+            "en": "OCR API (Extract Text)",
+            "zh-hans": "OCR API（提取文字）",
+            "zh-hant": "OCR API（提取文字）",
+            "jp": "OCR API（テキスト抽出）"
+        },
+        "Mode": {
+            "NativeMultimodal": {
+                "en": "Native Multimodal",
+                "zh-hans": "原生多模态",
+                "zh-hant": "原生多模態",
+                "jp": "ネイティブマルチモーダル"
+            },
+            "OCRApi": {
+                "en": "OCR API",
+                "zh-hans": "OCR API",
+                "zh-hant": "OCR API",
+                "jp": "OCR API"
+            }
+        },
+        "ProcessingModeTip": {
+            "en": "Native Multimodal: Send image to vision-capable LLM; OCR API: Extract text from image",
+            "zh-hans": "原生多模态：将图像发送给支持视觉的LLM；OCR API：提取图像中的文字",
+            "zh-hant": "原生多模態：將圖像發送給支持視覺的LLM；OCR API：提取圖像中的文字",
+            "jp": "ネイティブマルチモーダル：画像をビジョン対応LLMに送信；OCR API：画像からテキストを抽出"
+        },
+        "AutoSend": {
+            "en": "Auto-send after capture",
+            "zh-hans": "截图后自动发送",
+            "zh-hant": "截圖後自動發送",
+            "jp": "キャプチャ後に自動送信"
+        },
+        "AutoSendTooltip": {
+            "en": "Automatically send the screenshot to LLM after capture",
+            "zh-hans": "截图完成后自动发送给LLM",
+            "zh-hant": "截圖完成後自動發送給LLM",
+            "jp": "キャプチャ後に自動的にLLMに送信"
+        },
+        "OCRSettings": {
+            "en": "OCR Settings",
+            "zh-hans": "OCR设置",
+            "zh-hant": "OCR設置",
+            "jp": "OCR設定"
+        },
+        "OCR": {
+            "Provider": {
+                "en": "OCR Provider",
+                "zh-hans": "OCR 提供商",
+                "zh-hant": "OCR 提供商",
+                "jp": "OCRプロバイダー"
+            },
+            "ApiKey": {
+                "en": "API Key",
+                "zh-hans": "API Key",
+                "zh-hant": "API Key",
+                "jp": "APIキー"
+            },
+            "BaseUrl": {
+                "en": "API URL",
+                "zh-hans": "API 地址",
+                "zh-hant": "API 地址",
+                "jp": "API URL"
+            },
+            "Language": {
+                "en": "Recognition Language",
+                "zh-hans": "识别语言",
+                "zh-hant": "識別語言",
+                "jp": "認識言語"
+            },
+            "Description": {
+                "en": "OCR mode uses OpenAI Vision API to recognize text in images",
+                "zh-hans": "OCR 模式将使用 OpenAI Vision API 识别图像中的文字",
+                "zh-hant": "OCR 模式將使用 OpenAI Vision API 識別圖像中的文字",
+                "jp": "OCRモードはOpenAI Vision APIを使用して画像内のテキストを認識します"
+            }
+        },
+        "OCRProvider": {
+            "en": "OCR Provider",
+            "zh-hans": "OCR提供商",
+            "zh-hant": "OCR提供商",
+            "jp": "OCRプロバイダー"
+        },
+        "OCRApiKey": {
+            "en": "API Key",
+            "zh-hans": "API Key",
+            "zh-hant": "API Key",
+            "jp": "APIキー"
+        },
+        "OCRBaseUrl": {
+            "en": "API URL",
+            "zh-hans": "API 地址",
+            "zh-hant": "API 地址",
+            "jp": "API URL"
+        },
+        "OCRLanguage": {
+            "en": "Recognition Language",
+            "zh-hans": "识别语言",
+            "zh-hant": "識別語言",
+            "jp": "認識言語"
+        },
+        "OCRLanguageAuto": {
+            "en": "Auto Detect",
+            "zh-hans": "自动检测",
+            "zh-hant": "自動檢測",
+            "jp": "自動検出"
+        },
+        "VisionSettings": {
+            "en": "Vision Capability",
+            "zh-hans": "视觉能力",
+            "zh-hant": "視覺能力",
+            "jp": "ビジョン機能"
+        },
+        "EnableVision": {
+            "en": "Enable Vision",
+            "zh-hans": "启用视觉",
+            "zh-hant": "啟用視覺",
+            "jp": "ビジョンを有効にする"
+        },
+        "EnableVisionTooltip": {
+            "en": "Enable vision capability for this LLM channel to process images",
+            "zh-hans": "为此LLM渠道启用视觉能力以处理图片",
+            "zh-hant": "為此LLM渠道啟用視覺能力以處理圖片",
+            "jp": "このLLMチャネルのビジョン機能を有効にして画像を処理"
+        },
+        "VisionNotSupported": {
+            "en": "Current LLM channel does not support vision. Please enable vision in channel settings or switch to OCR mode.",
+            "zh-hans": "当前LLM渠道不支持视觉功能。请在渠道设置中启用视觉或切换到OCR模式。",
+            "zh-hant": "當前LLM渠道不支持視覺功能。請在渠道設置中啟用視覺或切換到OCR模式。",
+            "jp": "現在のLLMチャネルはビジョンをサポートしていません。チャネル設定でビジョンを有効にするか、OCRモードに切り替えてください。"
+        },
+        "MultimodalSettings": {
+            "en": "Multimodal Settings",
+            "zh-hans": "多模态配置",
+            "zh-hant": "多模態配置",
+            "jp": "マルチモーダル設定"
+        },
+        "Multimodal": {
+            "Description": {
+                "en": "Native multimodal mode sends screenshots directly to vision-capable LLM for analysis.",
+                "zh-hans": "原生多模态模式将截图直接发送给支持视觉能力的 LLM 进行分析。",
+                "zh-hant": "原生多模態模式將截圖直接發送給支持視覺能力的 LLM 進行分析。",
+                "jp": "ネイティブマルチモーダルモードは、スクリーンショットをビジョン対応LLMに直接送信して分析します。"
+            },
+            "EnableVisionTip": {
+                "en": "Please ensure vision capability (EnableVision) is enabled for the corresponding node in LLM settings.",
+                "zh-hans": "请确保在 LLM 设置中为相应节点启用了视觉能力 (EnableVision)。",
+                "zh-hant": "請確保在 LLM 設置中為相應節點啟用了視覺能力 (EnableVision)。",
+                "jp": "LLM設定で対応するノードのビジョン機能（EnableVision）が有効になっていることを確認してください。"
+            }
+        },
+        "SupportedModels": {
+            "en": "Supported Models",
+            "zh-hans": "支持的模型",
+            "zh-hant": "支持的模型",
+            "jp": "サポートされているモデル"
+        },
+        "CaptureWindow": {
+            "Title": {
+                "en": "Screenshot Capture - Press Enter to confirm, Escape to cancel",
+                "zh-hans": "截图捕获 - 按Enter确认，Escape取消",
+                "zh-hant": "截圖捕獲 - 按Enter確認，Escape取消",
+                "jp": "スクリーンショットキャプチャ - Enterで確認、Escapeでキャンセル"
+            },
+            "SelectRegion": {
+                "en": "Drag to select region",
+                "zh-hans": "拖动选择区域",
+                "zh-hant": "拖動選擇區域",
+                "jp": "ドラッグして領域を選択"
+            }
+        },
+        "Status": {
+            "Idle": {
+                "en": "Ready",
+                "zh-hans": "就绪",
+                "zh-hant": "就緒",
+                "jp": "準備完了"
+            },
+            "Capturing": {
+                "en": "Capturing...",
+                "zh-hans": "截图中...",
+                "zh-hant": "截圖中...",
+                "jp": "キャプチャ中..."
+            },
+            "Processing": {
+                "en": "Processing...",
+                "zh-hans": "处理中...",
+                "zh-hant": "處理中...",
+                "jp": "処理中..."
+            }
+        },
+        "Error": {
+            "CaptureFailedTitle": {
+                "en": "Screenshot Failed",
+                "zh-hans": "截图失败",
+                "zh-hant": "截圖失敗",
+                "jp": "スクリーンショット失敗"
+            },
+            "CaptureFailedMessage": {
+                "en": "Failed to capture screenshot. Please try again.",
+                "zh-hans": "截图失败，请重试。",
+                "zh-hant": "截圖失敗，請重試。",
+                "jp": "スクリーンショットのキャプチャに失敗しました。もう一度お試しください。"
+            },
+            "OCRFailedTitle": {
+                "en": "OCR Failed",
+                "zh-hans": "OCR失败",
+                "zh-hant": "OCR失敗",
+                "jp": "OCR失敗"
+            },
+            "OCRFailedMessage": {
+                "en": "Failed to extract text from image. Please check OCR settings.",
+                "zh-hans": "从图片提取文字失败，请检查OCR设置。",
+                "zh-hant": "從圖片提取文字失敗，請檢查OCR設置。",
+                "jp": "画像からテキストを抽出できませんでした。OCR設定を確認してください。"
+            },
+            "NoTextDetected": {
+                "en": "No text detected in the image.",
+                "zh-hans": "未在图片中检测到文字。",
+                "zh-hant": "未在圖片中檢測到文字。",
+                "jp": "画像内にテキストが検出されませんでした。"
+            },
+            "HotkeyRegistrationFailed": {
+                "en": "Failed to register screenshot hotkey. The key combination may be in use by another application.",
+                "zh-hans": "截图快捷键注册失败，该组合键可能被其他程序占用。",
+                "zh-hant": "截圖快捷鍵註冊失敗，該組合鍵可能被其他程序佔用。",
+                "jp": "スクリーンショットホットキーの登録に失敗しました。キーの組み合わせが他のアプリケーションで使用されている可能性があります。"
+            }
+        },
+        "Success": {
+            "OCRComplete": {
+                "en": "Text extracted successfully",
+                "zh-hans": "文字提取成功",
+                "zh-hant": "文字提取成功",
+                "jp": "テキスト抽出成功"
+            },
+            "ImageAttached": {
+                "en": "Screenshot attached to message",
+                "zh-hans": "截图已附加到消息",
+                "zh-hant": "截圖已附加到消息",
+                "jp": "スクリーンショットがメッセージに添付されました"
+            }
+        },
+        "Editor": {
+            "Title": {
+                "en": "Screenshot Editor",
+                "zh-hans": "截图编辑器",
+                "zh-hant": "截圖編輯器",
+                "jp": "スクリーンショットエディター"
+            },
+            "RemoveImage": {
+                "en": "Remove Image",
+                "zh-hans": "删除图片",
+                "zh-hant": "刪除圖片",
+                "jp": "画像を削除"
+            },
+            "DefaultPrompt": {
+                "en": "",
+                "zh-hans": "",
+                "zh-hant": "",
+                "jp": ""
+            },
+            "PromptPlaceholder": {
+                "en": "Enter your question about the image...",
+                "zh-hans": "输入关于图片的问题...",
+                "zh-hant": "輸入關於圖片的問題...",
+                "jp": "画像についての質問を入力..."
+            },
+            "Cancel": {
+                "en": "Cancel",
+                "zh-hans": "取消",
+                "zh-hant": "取消",
+                "jp": "キャンセル"
+            },
+            "Send": {
+                "en": "Send",
+                "zh-hans": "发送",
+                "zh-hant": "發送",
+                "jp": "送信"
+            }
         }
     }
 }

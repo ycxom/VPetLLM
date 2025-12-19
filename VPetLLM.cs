@@ -32,6 +32,7 @@ namespace VPetLLM
         
         // 服务实例
         private IVoiceInputService? _voiceInputService;
+        private Services.IScreenshotService? _screenshotService;
         private IPurchaseService? _purchaseService;
         
         private DefaultPluginChecker? _defaultPluginChecker;
@@ -135,6 +136,13 @@ namespace VPetLLM
                 _voiceInputService.TranscriptionCompleted += OnVoiceInputTranscriptionCompleted;
                 Logger.Log("VoiceInputService initialized");
 
+                // 初始化截图服务
+                _screenshotService = new Services.ScreenshotService(this, Settings);
+                _screenshotService.ScreenshotCaptured += OnScreenshotCaptured;
+                _screenshotService.OCRCompleted += OnOCRCompleted;
+                _screenshotService.ErrorOccurred += OnScreenshotError;
+                Logger.Log("ScreenshotService initialized");
+
                 // 初始化购买服务
                 _purchaseService = new PurchaseService(this, Settings);
                 Logger.Log("PurchaseService initialized");
@@ -213,10 +221,162 @@ namespace VPetLLM
             (_voiceInputService as VoiceInputService)?.InitializeHotkey();
         }
 
+        private void InitializeScreenshotHotkey()
+        {
+            // 委托给 ScreenshotService
+            (_screenshotService as Services.ScreenshotService)?.InitializeHotkey();
+        }
+
         public void ShowVoiceInputWindow()
         {
             // 委托给 VoiceInputService
             _voiceInputService?.ShowVoiceInputWindow();
+        }
+
+        /// <summary>
+        /// 开始截图捕获
+        /// </summary>
+        public void StartScreenshotCapture()
+        {
+            _screenshotService?.StartCapture();
+        }
+
+        /// <summary>
+        /// 更新截图快捷键
+        /// </summary>
+        public void UpdateScreenshotHotkey()
+        {
+            _screenshotService?.UpdateHotkey();
+        }
+
+        private void OnScreenshotCaptured(object? sender, Services.ScreenshotCapturedEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"Screenshot captured, size: {e.ImageData.Length} bytes");
+                
+                // 如果是原生多模态模式，打开编辑窗口让用户预览和编辑
+                if (Settings.Screenshot.ProcessingMode == Configuration.ScreenshotProcessingMode.NativeMultimodal)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        ShowScreenshotEditor(e.ImageData);
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling screenshot captured: {ex.Message}");
+            }
+        }
+
+        private void ShowScreenshotEditor(byte[] imageData)
+        {
+            try
+            {
+                var editor = new UI.Windows.winScreenshotEditor(this, imageData);
+                
+                editor.SendRequested += async (s, args) =>
+                {
+                    try
+                    {
+                        // 启动思考动画
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            TalkBox?.DisplayThink();
+                            TalkBox?.StartThinkingAnimation();
+                        });
+
+                        if (args.ImageData != null && args.ImageData.Length > 0)
+                        {
+                            Logger.Log($"Sending screenshot with prompt: {args.Prompt}");
+                            
+                            // 使用多模态消息发送
+                            if (ChatCore != null)
+                            {
+                                await ChatCore.ChatWithImage(args.Prompt, args.ImageData);
+                            }
+                            else
+                            {
+                                Logger.Log("ChatCore is null, cannot send multimodal message");
+                            }
+                        }
+                        else
+                        {
+                            // 没有图片，只发送文本
+                            if (!string.IsNullOrWhiteSpace(args.Prompt) && ChatCore != null)
+                            {
+                                await ChatCore.Chat(args.Prompt);
+                            }
+                        }
+
+                        // 停止思考动画
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            TalkBox?.StopThinkingAnimationWithoutHide();
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error sending screenshot message: {ex.Message}");
+                        // 出错时也要停止思考动画
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            TalkBox?.StopThinkingAnimationWithoutHide();
+                        });
+                    }
+                };
+
+                editor.Cancelled += (s, args) =>
+                {
+                    Logger.Log("Screenshot editor cancelled");
+                };
+
+                editor.Show();
+                Logger.Log("Screenshot editor window opened");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error showing screenshot editor: {ex.Message}");
+            }
+        }
+
+        private byte[]? _pendingImageData;
+
+        private void OnOCRCompleted(object? sender, string text)
+        {
+            try
+            {
+                Logger.Log($"OCR completed, text length: {text.Length}");
+                
+                // 将OCR文本插入到聊天输入
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    // 这里可以触发一个事件或直接发送消息
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        // 如果启用了自动发送，直接发送
+                        if (Settings.Screenshot.AutoSend)
+                        {
+                            _ = ChatCore?.Chat(text);
+                        }
+                        else
+                        {
+                            // 否则显示文本供用户编辑
+                            Logger.Log($"OCR text ready for user: {text.Substring(0, Math.Min(50, text.Length))}...");
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling OCR completed: {ex.Message}");
+            }
+        }
+
+        private void OnScreenshotError(object? sender, string error)
+        {
+            Logger.Log($"Screenshot error: {error}");
         }
 
         private void SyncNames(object sender, System.Timers.ElapsedEventArgs e)
@@ -266,6 +426,9 @@ namespace VPetLLM
                 
                 // 初始化语音输入快捷键
                 InitializeVoiceInputHotkey();
+                
+                // 初始化截图快捷键
+                InitializeScreenshotHotkey();
                 
                 // 初始化默认插件状态检查器
                 if (_defaultPluginChecker != null)

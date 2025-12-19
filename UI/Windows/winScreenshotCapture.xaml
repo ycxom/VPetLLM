@@ -1,0 +1,34 @@
+<Window x:Class="VPetLLM.UI.Windows.winScreenshotCapture"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Screenshot Capture"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        WindowState="Maximized"
+        Cursor="Cross">
+    <Grid>
+        <!-- 半透明遮罩层 -->
+        <Canvas x:Name="OverlayCanvas" Background="#40000000">
+            <!-- 选择区域矩形 -->
+            <Rectangle x:Name="SelectionRect"
+                       Stroke="#FF00BFFF"
+                       StrokeThickness="2"
+                       Fill="#20FFFFFF"
+                       Visibility="Collapsed"/>
+        </Canvas>
+        
+        <!-- 提示文本 -->
+        <TextBlock x:Name="HintText"
+                   Text="拖动鼠标选择截图区域，按 Enter 确认，按 Escape 取消"
+                   Foreground="White"
+                   FontSize="16"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Top"
+                   Margin="0,50,0,0"
+                   Padding="20,10"
+                   Background="#80000000"/>
+    </Grid>
+</Window>

@@ -292,6 +292,16 @@ namespace VPetLLM.Handlers
                                 ?? "语音输入未启用，请在设置中配置ASR";
                         }
                     }
+                    else if (button.ButtonId == "screenshot")
+                    {
+                        bool screenshotAvailable = IsScreenshotAvailable();
+                        button.IsEnabled = screenshotAvailable;
+                        if (!screenshotAvailable)
+                        {
+                            button.ToolTip = LocalizationService.Instance["FloatingSidebar.ScreenshotDisabled"] 
+                                ?? "截图功能未启用，请在设置中配置截图";
+                        }
+                    }
                     _sidebar.AddButton(button);
                 }
 
@@ -342,6 +352,21 @@ namespace VPetLLM.Handlers
             try
             {
                 return _vpetLLM.Settings?.ASR?.IsEnabled == true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 检查截图功能是否可用
+        /// </summary>
+        private bool IsScreenshotAvailable()
+        {
+            try
+            {
+                return _vpetLLM.Settings?.Screenshot?.IsEnabled == true;
             }
             catch
             {
