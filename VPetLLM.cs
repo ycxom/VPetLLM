@@ -141,6 +141,10 @@ namespace VPetLLM
                 _screenshotService.ScreenshotCaptured += OnScreenshotCaptured;
                 _screenshotService.OCRCompleted += OnOCRCompleted;
                 _screenshotService.ErrorOccurred += OnScreenshotError;
+                if (_screenshotService is Services.ScreenshotService screenshotService)
+                {
+                    screenshotService.PreprocessingCompleted += OnPreprocessingCompleted;
+                }
                 Logger.Log("ScreenshotService initialized");
 
                 // 初始化购买服务
@@ -255,14 +259,25 @@ namespace VPetLLM
             {
                 Logger.Log($"Screenshot captured, size: {e.ImageData.Length} bytes");
                 
-                // 如果是原生多模态模式，打开编辑窗口让用户预览和编辑
-                if (Settings.Screenshot.ProcessingMode == Configuration.ScreenshotProcessingMode.NativeMultimodal)
+                var processingMode = Settings.Screenshot.ProcessingMode;
+                
+                if (processingMode == Configuration.ScreenshotProcessingMode.NativeMultimodal)
                 {
+                    // 原生多模态模式：打开编辑窗口让用户预览和编辑，直接发送图片给主 LLM
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         ShowScreenshotEditor(e.ImageData);
                     });
                 }
+                else if (processingMode == Configuration.ScreenshotProcessingMode.PreprocessingMultimodal)
+                {
+                    // 前置多模态模式：打开编辑窗口，使用前置多模态处理
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        ShowScreenshotEditorForPreprocessing(e.ImageData);
+                    });
+                }
+                // OCR 模式在 ScreenshotService 中处理
             }
             catch (Exception ex)
             {
@@ -280,20 +295,19 @@ namespace VPetLLM
                 {
                     try
                     {
-                        // 启动思考动画
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            TalkBox?.DisplayThink();
-                            TalkBox?.StartThinkingAnimation();
-                        });
-
                         if (args.ImageData != null && args.ImageData.Length > 0)
                         {
                             Logger.Log($"Sending screenshot with prompt: {args.Prompt}");
                             
-                            // 使用多模态消息发送
-                            if (ChatCore != null)
+                            // 使用 TalkBox.SendChat 统一处理动画和消息发送
+                            // TalkBox.SendChat 内部会自动管理思考动画
+                            if (TalkBox != null)
                             {
+                                await TalkBox.SendChatWithImage(args.Prompt, args.ImageData);
+                            }
+                            else if (ChatCore != null)
+                            {
+                                // 降级：直接调用 ChatCore
                                 await ChatCore.ChatWithImage(args.Prompt, args.ImageData);
                             }
                             else
@@ -304,26 +318,22 @@ namespace VPetLLM
                         else
                         {
                             // 没有图片，只发送文本
-                            if (!string.IsNullOrWhiteSpace(args.Prompt) && ChatCore != null)
+                            if (!string.IsNullOrWhiteSpace(args.Prompt))
                             {
-                                await ChatCore.Chat(args.Prompt);
+                                if (TalkBox != null)
+                                {
+                                    await TalkBox.SendChat(args.Prompt);
+                                }
+                                else if (ChatCore != null)
+                                {
+                                    await ChatCore.Chat(args.Prompt);
+                                }
                             }
                         }
-
-                        // 停止思考动画
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            TalkBox?.StopThinkingAnimationWithoutHide();
-                        });
                     }
                     catch (Exception ex)
                     {
                         Logger.Log($"Error sending screenshot message: {ex.Message}");
-                        // 出错时也要停止思考动画
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            TalkBox?.StopThinkingAnimationWithoutHide();
-                        });
                     }
                 };
 
@@ -342,6 +352,142 @@ namespace VPetLLM
         }
 
         private byte[]? _pendingImageData;
+
+        /// <summary>
+        /// 显示截图编辑器（前置多模态模式）
+        /// </summary>
+        private void ShowScreenshotEditorForPreprocessing(byte[] imageData)
+        {
+            try
+            {
+                var editor = new UI.Windows.winScreenshotEditor(this, imageData);
+                
+                editor.SendRequested += async (s, args) =>
+                {
+                    try
+                    {
+                        if (args.ImageData != null && args.ImageData.Length > 0)
+                        {
+                            Logger.Log($"Processing screenshot with preprocessing multimodal, prompt: {args.Prompt}");
+                            
+                            // 启动思考动画（前置多模态需要等待两次 API 调用）
+                            Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                TalkBox?.DisplayThink();
+                                TalkBox?.StartThinkingAnimation();
+                            });
+                            
+                            // 使用前置多模态处理：先分析图片，再发送描述给主 LLM
+                            if (_screenshotService is Services.ScreenshotService screenshotService)
+                            {
+                                _pendingImageData = args.ImageData;
+                                await screenshotService.ProcessWithPreprocessingAsync(args.ImageData, args.Prompt);
+                            }
+                            else
+                            {
+                                Logger.Log("ScreenshotService is null, cannot process with preprocessing");
+                                // 服务不可用时停止思考动画
+                                Application.Current.Dispatcher.Invoke(() =>
+                                {
+                                    TalkBox?.StopThinkingAnimationWithoutHide();
+                                });
+                            }
+                        }
+                        else
+                        {
+                            // 没有图片，只发送文本，使用 TalkBox.SendChat 统一处理
+                            if (!string.IsNullOrWhiteSpace(args.Prompt))
+                            {
+                                if (TalkBox != null)
+                                {
+                                    await TalkBox.SendChat(args.Prompt);
+                                }
+                                else if (ChatCore != null)
+                                {
+                                    await ChatCore.Chat(args.Prompt);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error processing screenshot with preprocessing: {ex.Message}");
+                        // 出错时停止思考动画
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            TalkBox?.StopThinkingAnimationWithoutHide();
+                        });
+                    }
+                };
+
+                editor.Cancelled += (s, args) =>
+                {
+                    Logger.Log("Screenshot editor cancelled (preprocessing mode)");
+                };
+
+                editor.Show();
+                Logger.Log("Screenshot editor window opened (preprocessing mode)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error showing screenshot editor for preprocessing: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 处理前置多模态处理完成事件
+        /// </summary>
+        private void OnPreprocessingCompleted(object? sender, Services.PreprocessingCompletedEventArgs e)
+        {
+            try
+            {
+                if (e.Success)
+                {
+                    Logger.Log($"Preprocessing completed successfully, provider: {e.UsedProvider}");
+                    
+                    // 将组合后的消息发送给主 LLM
+                    // 注意：思考动画已在 ShowScreenshotEditorForPreprocessing 中启动
+                    // ChatCore.Chat() 内部会通过 SmartMessageProcessor 处理响应，
+                    // SmartMessageProcessor 会在处理完成后自动管理动画状态，
+                    // 所以这里不需要手动停止思考动画
+                    Application.Current.Dispatcher.Invoke(async () =>
+                    {
+                        try
+                        {
+                            if (ChatCore != null && !string.IsNullOrWhiteSpace(e.CombinedMessage))
+                            {
+                                await ChatCore.Chat(e.CombinedMessage);
+                            }
+                            // 注意：不在这里停止思考动画，由 SmartMessageProcessor 处理
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Error sending preprocessed message: {ex.Message}");
+                            // 只有在发送失败时才停止思考动画
+                            TalkBox?.StopThinkingAnimationWithoutHide();
+                        }
+                    });
+                }
+                else
+                {
+                    Logger.Log($"Preprocessing failed: {e.ErrorMessage}");
+                    // 前置处理失败时，停止思考动画
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        TalkBox?.StopThinkingAnimationWithoutHide();
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling preprocessing completed: {ex.Message}");
+                // 异常时也要停止思考动画
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    TalkBox?.StopThinkingAnimationWithoutHide();
+                });
+            }
+        }
 
         private void OnOCRCompleted(object? sender, string text)
         {

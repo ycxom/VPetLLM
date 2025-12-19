@@ -13,12 +13,18 @@ namespace VPetLLM.Services
     {
         private readonly VPetLLM _plugin;
         private readonly Setting _settings;
+        private readonly IPreprocessingMultimodal _preprocessingMultimodal;
         private GlobalHotkey? _screenshotHotkey;
         private UI.Windows.winScreenshotCapture? _captureWindow;
         private ScreenshotState _currentState = ScreenshotState.Idle;
         private byte[]? _currentImage;
         private const int SCREENSHOT_HOTKEY_ID = 9002;
         private bool _disposed;
+
+        /// <summary>
+        /// 前置多模态处理完成事件
+        /// </summary>
+        public event EventHandler<PreprocessingCompletedEventArgs>? PreprocessingCompleted;
 
         /// <inheritdoc/>
         public ScreenshotState CurrentState => _currentState;
@@ -42,6 +48,7 @@ namespace VPetLLM.Services
         {
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _preprocessingMultimodal = new PreprocessingMultimodal(settings, plugin);
         }
 
         /// <inheritdoc/>
@@ -260,9 +267,16 @@ namespace VPetLLM.Services
                         }
                     });
                 }
+                else if (processingMode == ScreenshotProcessingMode.PreprocessingMultimodal)
+                {
+                    // PreprocessingMultimodal mode - 前置多模态处理
+                    // 实际处理在 ProcessWithPreprocessingAsync 中进行
+                    SetState(ScreenshotState.Idle);
+                }
                 else
                 {
-                    // NativeMultimodal mode - image will be attached to message
+                    // NativeMultimodal mode - 原生多模态，直接发送图片给视觉 LLM
+                    // 图片数据将通过 ChatCore 直接发送
                     SetState(ScreenshotState.Idle);
                 }
             }
@@ -272,6 +286,95 @@ namespace VPetLLM.Services
                 SetState(ScreenshotState.Idle);
                 ErrorOccurred?.Invoke(this, $"处理截图失败: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 使用前置多模态处理图片
+        /// </summary>
+        /// <param name="imageData">图片数据</param>
+        /// <param name="userQuestion">用户问题</param>
+        public async Task<PreprocessingResult> ProcessWithPreprocessingAsync(byte[] imageData, string userQuestion)
+        {
+            try
+            {
+                Logger.Log($"Starting preprocessing multimodal analysis, image size: {imageData.Length} bytes");
+                SetState(ScreenshotState.Processing);
+
+                var result = await _preprocessingMultimodal.AnalyzeImageAsync(imageData);
+
+                if (result.Success)
+                {
+                    Logger.Log($"Preprocessing completed successfully, provider: {result.UsedProvider}");
+                    
+                    // 组合图片描述和用户问题
+                    var combinedMessage = MessageCombiner.Combine(result.ImageDescription, userQuestion);
+                    
+                    // 触发完成事件
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        PreprocessingCompleted?.Invoke(this, new PreprocessingCompletedEventArgs
+                        {
+                            Success = true,
+                            CombinedMessage = combinedMessage,
+                            ImageDescription = result.ImageDescription,
+                            UsedProvider = result.UsedProvider
+                        });
+                        SetState(ScreenshotState.Idle);
+                    });
+                }
+                else
+                {
+                    Logger.Log($"Preprocessing failed: {result.ErrorMessage}");
+                    
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        PreprocessingCompleted?.Invoke(this, new PreprocessingCompletedEventArgs
+                        {
+                            Success = false,
+                            ErrorMessage = result.ErrorMessage
+                        });
+                        ErrorOccurred?.Invoke(this, result.ErrorMessage);
+                        SetState(ScreenshotState.Idle);
+                    });
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error in preprocessing: {ex.Message}");
+                SetState(ScreenshotState.Idle);
+                
+                var errorResult = PreprocessingResult.CreateFailure($"前置处理异常: {ex.Message}");
+                
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    PreprocessingCompleted?.Invoke(this, new PreprocessingCompletedEventArgs
+                    {
+                        Success = false,
+                        ErrorMessage = errorResult.ErrorMessage
+                    });
+                    ErrorOccurred?.Invoke(this, errorResult.ErrorMessage);
+                });
+
+                return errorResult;
+            }
+        }
+
+        /// <summary>
+        /// 获取可用的视觉节点列表
+        /// </summary>
+        public System.Collections.Generic.List<VisionNodeIdentifier> GetAvailableVisionNodes()
+        {
+            return _preprocessingMultimodal.GetAvailableVisionNodes();
+        }
+
+        /// <summary>
+        /// 检查是否有可用的多模态提供商
+        /// </summary>
+        public bool HasAvailableProvider()
+        {
+            return _preprocessingMultimodal.HasAvailableProvider();
         }
 
         /// <inheritdoc/>

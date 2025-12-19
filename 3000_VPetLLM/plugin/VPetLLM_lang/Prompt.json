@@ -274,5 +274,9 @@
     "Handler_Play_Description": {
         "en": "Play media (video/music) from URL using mpv player.\nFormat: <|play_begin|> url <|play_end|> or <|play_begin|> url, volume <|play_end|>\nStop playback: <|play_begin|> stop <|play_end|>\n\nParameters:\n- url: Media URL (video or audio link)\n- volume: Optional, 0-100 (default: 100)\n\nExamples:\n- Play video: <|play_begin|> https://example.com/video.mp4 <|play_end|>\n- Play music with volume: <|play_begin|> https://example.com/music.mp3, 80 <|play_end|>\n- Stop playback: <|play_begin|> stop <|play_end|>\n\nNOTE: The mpv window will always be visible during playback.",
         "zh": "使用 mpv 播放器播放媒体（视频/音乐）链接。\n格式：<|play_begin|> url <|play_end|> 或 <|play_begin|> url, 音量 <|play_end|>\n停止播放：<|play_begin|> stop <|play_end|>\n\n参数说明：\n- url：媒体链接（视频或音频）\n- 音量：可选，0-100（默认：100）\n\n示例：\n- 播放视频：<|play_begin|> https://example.com/video.mp4 <|play_end|>\n- 指定音量播放音乐：<|play_begin|> https://example.com/music.mp3, 80 <|play_end|>\n- 停止播放：<|play_begin|> stop <|play_end|>\n\n注意：播放期间 mpv 窗口将始终保持可见。"
+    },
+    "Screenshot_ImageDescription_Prompt": {
+        "en": "Please describe this image in detail, including:\n1. Main elements and objects in the image\n2. Any text or characters visible\n3. Layout and composition\n4. Colors and visual style\n5. Any notable details or context\n\nProvide a comprehensive description that captures all important information from the image.",
+        "zh": "请详细描述这张图片，包括：\n1. 图片中的主要元素和物体\n2. 可见的任何文字或字符\n3. 布局和构图\n4. 颜色和视觉风格\n5. 任何值得注意的细节或上下文\n\n请提供一个全面的描述，捕捉图片中所有重要的信息。"
     }
 }

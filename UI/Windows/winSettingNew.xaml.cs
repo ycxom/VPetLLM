@@ -4735,6 +4735,8 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         private void ComboBox_Screenshot_ProcessingMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateScreenshotProcessingModePanel();
+            // 立即保存设置，确保处理模式变更生效
+            SaveScreenshotSettings();
         }
 
         private void UpdateScreenshotProcessingModePanel()
@@ -4744,21 +4746,34 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 var comboBox = (ComboBox)this.FindName("ComboBox_Screenshot_Main_ProcessingMode");
                 var ocrPanel = (StackPanel)this.FindName("Panel_Screenshot_Main_OCR");
                 var multimodalPanel = (StackPanel)this.FindName("Panel_Screenshot_Main_Multimodal");
+                var nativeMultimodalPanel = (StackPanel)this.FindName("Panel_Screenshot_Main_NativeMultimodal");
 
                 if (comboBox == null || ocrPanel == null || multimodalPanel == null) return;
 
                 var selectedItem = comboBox.SelectedItem as ComboBoxItem;
                 var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
 
-                if (mode == "OCRApi")
+                // 根据模式显示对应的配置面板
+                switch (mode)
                 {
-                    ocrPanel.Visibility = Visibility.Visible;
-                    multimodalPanel.Visibility = Visibility.Collapsed;
-                }
-                else
-                {
-                    ocrPanel.Visibility = Visibility.Collapsed;
-                    multimodalPanel.Visibility = Visibility.Visible;
+                    case "NativeMultimodal":
+                        // 原生多模态：显示原生多模态说明面板
+                        ocrPanel.Visibility = Visibility.Collapsed;
+                        multimodalPanel.Visibility = Visibility.Collapsed;
+                        if (nativeMultimodalPanel != null) nativeMultimodalPanel.Visibility = Visibility.Visible;
+                        break;
+                    case "PreprocessingMultimodal":
+                        // 前置多模态：显示多模态提供商配置
+                        ocrPanel.Visibility = Visibility.Collapsed;
+                        multimodalPanel.Visibility = Visibility.Visible;
+                        if (nativeMultimodalPanel != null) nativeMultimodalPanel.Visibility = Visibility.Collapsed;
+                        break;
+                    case "OCRApi":
+                        // OCR API：显示 OCR 配置
+                        ocrPanel.Visibility = Visibility.Visible;
+                        multimodalPanel.Visibility = Visibility.Collapsed;
+                        if (nativeMultimodalPanel != null) nativeMultimodalPanel.Visibility = Visibility.Collapsed;
+                        break;
                 }
             }
             catch (Exception ex)
@@ -4925,6 +4940,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                 UpdateScreenshotHotkeyDisplay();
                 UpdateScreenshotProcessingModePanel();
+                LoadMultimodalProviderSettings();
             }
             catch (Exception ex)
             {
@@ -4950,9 +4966,12 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 {
                     var selectedItem = comboBoxMode.SelectedItem as ComboBoxItem;
                     var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
-                    _plugin.Settings.Screenshot.ProcessingMode = mode == "OCRApi" 
-                        ? Configuration.ScreenshotProcessingMode.OCRApi 
-                        : Configuration.ScreenshotProcessingMode.NativeMultimodal;
+                    _plugin.Settings.Screenshot.ProcessingMode = mode switch
+                    {
+                        "OCRApi" => Configuration.ScreenshotProcessingMode.OCRApi,
+                        "PreprocessingMultimodal" => Configuration.ScreenshotProcessingMode.PreprocessingMultimodal,
+                        _ => Configuration.ScreenshotProcessingMode.NativeMultimodal
+                    };
                 }
 
                 if (checkBoxAutoSend != null)
@@ -4972,10 +4991,179 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                 // 更新快捷键注册
                 _plugin.UpdateScreenshotHotkey();
+
+                // 保存多模态提供商设置
+                SaveMultimodalProviderSettings();
             }
             catch (Exception ex)
             {
                 Logger.Log($"Screenshot: Error saving settings: {ex.Message}");
+            }
+        }
+
+        private void ComboBox_Screenshot_MultimodalProvider_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateMultimodalProviderPanel();
+        }
+
+        private void ListBox_Screenshot_VisionNodes_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // 选择变化时自动保存
+            SaveMultimodalProviderSettings();
+        }
+
+        private void UpdateMultimodalProviderPanel()
+        {
+            try
+            {
+                var comboBox = (ComboBox)this.FindName("ComboBox_Screenshot_Main_Multimodal_Provider");
+                var visionNodesPanel = (StackPanel)this.FindName("Panel_Screenshot_Main_VisionNodes");
+                var freeProviderTip = (TextBlock)this.FindName("TextBlock_Screenshot_Main_FreeProviderTip");
+                var visionChannelsProviderTip = (TextBlock)this.FindName("TextBlock_Screenshot_Main_VisionChannelsProviderTip");
+
+                if (comboBox == null || visionNodesPanel == null) return;
+
+                var selectedItem = comboBox.SelectedItem as ComboBoxItem;
+                var providerType = selectedItem?.Tag?.ToString() ?? "Free";
+
+                if (providerType == "VisionChannels")
+                {
+                    visionNodesPanel.Visibility = Visibility.Visible;
+                    if (freeProviderTip != null) freeProviderTip.Visibility = Visibility.Collapsed;
+                    if (visionChannelsProviderTip != null) visionChannelsProviderTip.Visibility = Visibility.Visible;
+                    RefreshVisionNodesList();
+                }
+                else
+                {
+                    visionNodesPanel.Visibility = Visibility.Collapsed;
+                    if (freeProviderTip != null) freeProviderTip.Visibility = Visibility.Visible;
+                    if (visionChannelsProviderTip != null) visionChannelsProviderTip.Visibility = Visibility.Collapsed;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error updating multimodal provider panel: {ex.Message}");
+            }
+        }
+
+        private void RefreshVisionNodesList()
+        {
+            try
+            {
+                var listBox = (ListBox)this.FindName("ListBox_Screenshot_Main_VisionNodes");
+                var noNodesText = (TextBlock)this.FindName("TextBlock_Screenshot_Main_NoVisionNodes");
+
+                if (listBox == null) return;
+
+                // 获取可用的视觉节点
+                var preprocessingService = new Services.PreprocessingMultimodal(_plugin.Settings, _plugin);
+                var availableNodes = preprocessingService.GetAvailableVisionNodes();
+
+                listBox.Items.Clear();
+
+                if (availableNodes.Count == 0)
+                {
+                    if (noNodesText != null)
+                        noNodesText.Visibility = Visibility.Visible;
+                    listBox.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    if (noNodesText != null)
+                        noNodesText.Visibility = Visibility.Collapsed;
+                    listBox.Visibility = Visibility.Visible;
+
+                    foreach (var node in availableNodes)
+                    {
+                        listBox.Items.Add(node);
+                    }
+
+                    // 恢复之前选中的节点
+                    var selectedNodes = _plugin.Settings.Screenshot.MultimodalProvider?.SelectedNodes ?? new System.Collections.Generic.List<Configuration.VisionNodeIdentifier>();
+                    foreach (var item in listBox.Items)
+                    {
+                        if (item is Configuration.VisionNodeIdentifier node)
+                        {
+                            if (selectedNodes.Any(n => n.UniqueId == node.UniqueId))
+                            {
+                                listBox.SelectedItems.Add(item);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error refreshing vision nodes list: {ex.Message}");
+            }
+        }
+
+        private void LoadMultimodalProviderSettings()
+        {
+            try
+            {
+                var comboBoxProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_Multimodal_Provider");
+
+                if (comboBoxProvider != null)
+                {
+                    var providerType = _plugin.Settings.Screenshot.MultimodalProvider?.ProviderType.ToString() ?? "Free";
+                    foreach (ComboBoxItem item in comboBoxProvider.Items)
+                    {
+                        if (item.Tag?.ToString() == providerType)
+                        {
+                            comboBoxProvider.SelectedItem = item;
+                            break;
+                        }
+                    }
+                }
+
+                UpdateMultimodalProviderPanel();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error loading multimodal provider settings: {ex.Message}");
+            }
+        }
+
+        private void SaveMultimodalProviderSettings()
+        {
+            try
+            {
+                var comboBoxProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_Multimodal_Provider");
+                var listBoxNodes = (ListBox)this.FindName("ListBox_Screenshot_Main_VisionNodes");
+
+                if (_plugin.Settings.Screenshot.MultimodalProvider == null)
+                {
+                    _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
+                }
+
+                if (comboBoxProvider != null)
+                {
+                    var selectedItem = comboBoxProvider.SelectedItem as ComboBoxItem;
+                    var providerType = selectedItem?.Tag?.ToString() ?? "Free";
+                    _plugin.Settings.Screenshot.MultimodalProvider.ProviderType = providerType == "VisionChannels"
+                        ? Configuration.MultimodalProviderType.VisionChannels
+                        : Configuration.MultimodalProviderType.Free;
+                }
+
+                if (listBoxNodes != null)
+                {
+                    var selectedNodes = new System.Collections.Generic.List<Configuration.VisionNodeIdentifier>();
+                    foreach (var item in listBoxNodes.SelectedItems)
+                    {
+                        if (item is Configuration.VisionNodeIdentifier node)
+                        {
+                            selectedNodes.Add(node);
+                        }
+                    }
+                    _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = selectedNodes;
+                }
+
+                // 提示词现在是只读的，从 Prompt.json 读取，不需要保存
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error saving multimodal provider settings: {ex.Message}");
             }
         }
 

@@ -2128,9 +2128,10 @@
                                             SelectionChanged="ComboBox_Screenshot_ProcessingMode_SelectionChanged"
                                             Style="{StaticResource ModernComboBox}">
                                         <ComboBoxItem Content="{utils:Localize KeyPath=Screenshot.Mode.NativeMultimodal, Default=原生多模态}" Tag="NativeMultimodal" IsSelected="True"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Screenshot.Mode.PreprocessingMultimodal, Default=前置多模态}" Tag="PreprocessingMultimodal"/>
                                         <ComboBoxItem Content="{utils:Localize KeyPath=Screenshot.Mode.OCRApi, Default=OCR API}" Tag="OCRApi"/>
                                     </ComboBox>
-                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.ProcessingModeTip, Default=原生多模态：将图像发送给支持视觉的LLM；OCR API：提取图像中的文字}"
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.ProcessingModeTip, Default=原生多模态：直接发送图片给视觉LLM；前置多模态：先分析图片再发送描述给主LLM；OCR：提取文字}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
@@ -2226,10 +2227,10 @@
                                             Margin="0,0,0,16"/>
                                 </StackPanel>
 
-                                <!-- 原生多模态配置 -->
-                                <StackPanel x:Name="Panel_Screenshot_Main_Multimodal"
+                                <!-- 原生多模态说明（仅在原生多模态模式下显示） -->
+                                <StackPanel x:Name="Panel_Screenshot_Main_NativeMultimodal"
                                         Visibility="Visible">
-                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.MultimodalSettings, Default=多模态配置}"
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.NativeMultimodalSettings, Default=原生多模态配置}"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
 
@@ -2261,6 +2262,76 @@
                                         <Run Text="• Ollama: " FontWeight="SemiBold"/>
                                         <Run Text="llava, bakllava, llava-llama3"/>
                                     </TextBlock>
+                                </StackPanel>
+
+                                <!-- 前置多模态配置（仅在前置多模态模式下显示） -->
+                                <StackPanel x:Name="Panel_Screenshot_Main_Multimodal"
+                                        Visibility="Collapsed">
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.PreprocessingSettings, Default=前置多模态配置}"
+                                            Style="{StaticResource SectionHeader}"
+                                            Margin="0,0,0,16"/>
+
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.Multimodal.PreprocessDescription, Default=前置多模态模式：先用多模态模型分析图片生成描述，再将描述与问题发送给主 LLM，保持对话体验一致。}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
+                                    <!-- 多模态提供商选择 -->
+                                    <Label Content="{utils:Localize KeyPath=Screenshot.Multimodal.Provider, Default=多模态提供商}"
+                                            Style="{StaticResource SettingLabel}"/>
+                                    <ComboBox x:Name="ComboBox_Screenshot_Main_Multimodal_Provider"
+                                            Margin="0,0,0,8"
+                                            SelectionChanged="ComboBox_Screenshot_MultimodalProvider_SelectionChanged"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Screenshot.Multimodal.Provider.Free, Default=Free 渠道}" Tag="Free" IsSelected="True"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Screenshot.Multimodal.Provider.VisionChannels, Default=启用视觉的渠道}" Tag="VisionChannels"/>
+                                    </ComboBox>
+                                    <!-- Free 渠道提示（仅当选择 Free 时显示） -->
+                                    <TextBlock x:Name="TextBlock_Screenshot_Main_FreeProviderTip"
+                                            Text="{utils:Localize KeyPath=Screenshot.Multimodal.FreeProviderTip, Default=使用 Free 渠道需要在 LLM 设置 -> Free 接口 中启用 EnableVision 选项}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Foreground="#FF9800"
+                                            Visibility="Visible"
+                                            Margin="0,0,0,16"/>
+
+                                    <!-- VisionChannels 提示（仅当选择 VisionChannels 时显示） -->
+                                    <TextBlock x:Name="TextBlock_Screenshot_Main_VisionChannelsProviderTip"
+                                            Text="{utils:Localize KeyPath=Screenshot.Multimodal.VisionChannelsProviderTip, Default=启用视觉的渠道需要在 LLM 设置中为相应节点启用 EnableVision}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Foreground="#FF9800"
+                                            Visibility="Collapsed"
+                                            Margin="0,0,0,16"/>
+
+                                    <!-- 视觉节点列表（仅当选择 VisionChannels 时显示） -->
+                                    <StackPanel x:Name="Panel_Screenshot_Main_VisionNodes"
+                                            Visibility="Collapsed">
+                                        <Label Content="{utils:Localize KeyPath=Screenshot.Multimodal.SelectNodes, Default=选择视觉节点（可多选）}"
+                                                Style="{StaticResource SettingLabel}"/>
+                                        <ListBox x:Name="ListBox_Screenshot_Main_VisionNodes"
+                                                Height="150"
+                                                Margin="0,0,0,8"
+                                                SelectionMode="Multiple"
+                                                Background="{StaticResource BackgroundBrush}"
+                                                BorderBrush="{StaticResource BorderBrush}"
+                                                BorderThickness="1"
+                                                SelectionChanged="ListBox_Screenshot_VisionNodes_SelectionChanged">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <TextBlock x:Name="TextBlock_Screenshot_Main_NoVisionNodes"
+                                                Text="{utils:Localize KeyPath=Screenshot.Multimodal.NoVisionNodes, Default=没有可用的视觉节点，请在 LLM 设置中启用 EnableVision}"
+                                                Style="{StaticResource DescriptionText}"
+                                                Foreground="#FF5722"
+                                                Visibility="Collapsed"
+                                                Margin="0,0,0,8"/>
+                                        <TextBlock Text="{utils:Localize KeyPath=Screenshot.Multimodal.LoadBalanceTip, Default=选择多个节点时将随机选择一个进行请求，失败时自动切换到其他节点}"
+                                                Style="{StaticResource DescriptionText}"
+                                                Margin="0,0,0,16"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

@@ -219,6 +219,103 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+        /// <summary>
+        /// 发送聊天消息（带动画处理）
+        /// </summary>
+        /// <param name="text">消息文本</param>
+        public async Task SendChat(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return;
+            
+            Logger.Log($"SendChat called with text: {text}");
+            
+            // 重置流式处理状态
+            ResetStreamingState();
+
+            try
+            {
+                // 检查VPet是否正在执行重要动画
+                bool isPlayingImportantAnimation = AnimationStateChecker.IsPlayingImportantAnimation(_plugin.MW);
+                
+                // 显示思考动画
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    if (!isPlayingImportantAnimation)
+                    {
+                        DisplayThink();
+                    }
+                    StartThinkingAnimation();
+                });
+
+                // 发送消息
+                if (_plugin.ChatCore != null)
+                {
+                    await _plugin.ChatCore.Chat(text);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"An error occurred in SendChat: {e}");
+                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
+            }
+            finally
+            {
+                StopThinkingAnimationWithoutHide();
+                ResetStreamingState();
+            }
+        }
+
+        /// <summary>
+        /// 发送带图片的聊天消息（带动画处理）
+        /// </summary>
+        /// <param name="text">消息文本</param>
+        /// <param name="imageData">图片数据</param>
+        public async Task SendChatWithImage(string text, byte[] imageData)
+        {
+            if (imageData == null || imageData.Length == 0)
+            {
+                await SendChat(text);
+                return;
+            }
+            
+            Logger.Log($"SendChatWithImage called with text: {text}, image size: {imageData.Length}");
+            
+            // 重置流式处理状态
+            ResetStreamingState();
+
+            try
+            {
+                // 检查VPet是否正在执行重要动画
+                bool isPlayingImportantAnimation = AnimationStateChecker.IsPlayingImportantAnimation(_plugin.MW);
+                
+                // 显示思考动画
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    if (!isPlayingImportantAnimation)
+                    {
+                        DisplayThink();
+                    }
+                    StartThinkingAnimation();
+                });
+
+                // 发送带图片的消息
+                if (_plugin.ChatCore != null)
+                {
+                    await _plugin.ChatCore.ChatWithImage(text, imageData);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"An error occurred in SendChatWithImage: {e}");
+                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
+            }
+            finally
+            {
+                StopThinkingAnimationWithoutHide();
+                ResetStreamingState();
+            }
+        }
+
         private async Task ProcessTools(string text)
         {
             if (_plugin.Settings.Tools == null) return;

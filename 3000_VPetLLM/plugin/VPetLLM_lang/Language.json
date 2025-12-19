@@ -2611,6 +2611,12 @@
                 "zh-hant": "原生多模態",
                 "jp": "ネイティブマルチモーダル"
             },
+            "PreprocessingMultimodal": {
+                "en": "Preprocessing Multimodal",
+                "zh-hans": "前置多模态",
+                "zh-hant": "前置多模態",
+                "jp": "前処理マルチモーダル"
+            },
             "OCRApi": {
                 "en": "OCR API",
                 "zh-hans": "OCR API",
@@ -2619,10 +2625,10 @@
             }
         },
         "ProcessingModeTip": {
-            "en": "Native Multimodal: Send image to vision-capable LLM; OCR API: Extract text from image",
-            "zh-hans": "原生多模态：将图像发送给支持视觉的LLM；OCR API：提取图像中的文字",
-            "zh-hant": "原生多模態：將圖像發送給支持視覺的LLM；OCR API：提取圖像中的文字",
-            "jp": "ネイティブマルチモーダル：画像をビジョン対応LLMに送信；OCR API：画像からテキストを抽出"
+            "en": "Native: Send image directly to vision LLM; Preprocessing: Analyze image first, then send description to main LLM; OCR: Extract text",
+            "zh-hans": "原生多模态：直接发送图片给视觉LLM；前置多模态：先分析图片再发送描述给主LLM；OCR：提取文字",
+            "zh-hant": "原生多模態：直接發送圖片給視覺LLM；前置多模態：先分析圖片再發送描述給主LLM；OCR：提取文字",
+            "jp": "ネイティブ：画像を直接ビジョンLLMに送信；前処理：まず画像を分析し、説明をメインLLMに送信；OCR：テキスト抽出"
         },
         "AutoSend": {
             "en": "Auto-send after capture",
@@ -2734,6 +2740,18 @@
             "zh-hant": "多模態配置",
             "jp": "マルチモーダル設定"
         },
+        "PreprocessingSettings": {
+            "en": "Preprocessing Multimodal Settings",
+            "zh-hans": "前置多模态配置",
+            "zh-hant": "前置多模態配置",
+            "jp": "前処理マルチモーダル設定"
+        },
+        "NativeMultimodalSettings": {
+            "en": "Native Multimodal Settings",
+            "zh-hans": "原生多模态配置",
+            "zh-hant": "原生多模態配置",
+            "jp": "ネイティブマルチモーダル設定"
+        },
         "Multimodal": {
             "Description": {
                 "en": "Native multimodal mode sends screenshots directly to vision-capable LLM for analysis.",
@@ -2741,11 +2759,83 @@
                 "zh-hant": "原生多模態模式將截圖直接發送給支持視覺能力的 LLM 進行分析。",
                 "jp": "ネイティブマルチモーダルモードは、スクリーンショットをビジョン対応LLMに直接送信して分析します。"
             },
+            "PreprocessDescription": {
+                "en": "Preprocessing mode: First analyze the image with a multimodal model to generate a description, then send the description with your question to the main LLM for a consistent conversation experience.",
+                "zh-hans": "前置多模态模式：先用多模态模型分析图片生成描述，再将描述与问题发送给主 LLM，保持对话体验一致。",
+                "zh-hant": "前置多模態模式：先用多模態模型分析圖片生成描述，再將描述與問題發送給主 LLM，保持對話體驗一致。",
+                "jp": "前処理モード：まずマルチモーダルモデルで画像を分析して説明を生成し、その説明と質問をメインLLMに送信して一貫した会話体験を提供します。"
+            },
             "EnableVisionTip": {
                 "en": "Please ensure vision capability (EnableVision) is enabled for the corresponding node in LLM settings.",
                 "zh-hans": "请确保在 LLM 设置中为相应节点启用了视觉能力 (EnableVision)。",
                 "zh-hant": "請確保在 LLM 設置中為相應節點啟用了視覺能力 (EnableVision)。",
                 "jp": "LLM設定で対応するノードのビジョン機能（EnableVision）が有効になっていることを確認してください。"
+            },
+            "Provider": {
+                "en": "Multimodal Provider",
+                "zh-hans": "多模态提供商",
+                "zh-hant": "多模態提供商",
+                "jp": "マルチモーダルプロバイダー",
+                "Free": {
+                    "en": "Free Channel",
+                    "zh-hans": "Free 渠道",
+                    "zh-hant": "Free 渠道",
+                    "jp": "無料チャネル"
+                },
+                "VisionChannels": {
+                    "en": "Vision-Enabled Channels",
+                    "zh-hans": "启用视觉的渠道",
+                    "zh-hant": "啟用視覺的渠道",
+                    "jp": "ビジョン対応チャネル"
+                }
+            },
+            "ProviderTip": {
+                "en": "Free channel requires no configuration; Vision-enabled channels require EnableVision to be enabled in LLM settings",
+                "zh-hans": "Free 渠道无需配置；启用视觉的渠道需要在 LLM 设置中启用 EnableVision",
+                "zh-hant": "Free 渠道無需配置；啟用視覺的渠道需要在 LLM 設置中啟用 EnableVision",
+                "jp": "無料チャネルは設定不要；ビジョン対応チャネルはLLM設定でEnableVisionを有効にする必要があります"
+            },
+            "FreeProviderTip": {
+                "en": "Using Free channel requires enabling EnableVision in LLM Settings -> Free Interface",
+                "zh-hans": "使用 Free 渠道需要在 LLM 设置 -> Free 接口 中启用 EnableVision 选项",
+                "zh-hant": "使用 Free 渠道需要在 LLM 設置 -> Free 接口 中啟用 EnableVision 選項",
+                "jp": "Freeチャネルを使用するには、LLM設定 -> Freeインターフェースで EnableVision を有効にする必要があります"
+            },
+            "VisionChannelsProviderTip": {
+                "en": "Vision-enabled channels require EnableVision to be enabled for the corresponding node in LLM settings",
+                "zh-hans": "启用视觉的渠道需要在 LLM 设置中为相应节点启用 EnableVision",
+                "zh-hant": "啟用視覺的渠道需要在 LLM 設置中為相應節點啟用 EnableVision",
+                "jp": "ビジョン対応チャネルは、LLM設定で対応するノードのEnableVisionを有効にする必要があります"
+            },
+            "SelectNodes": {
+                "en": "Select Vision Nodes (Multi-select)",
+                "zh-hans": "选择视觉节点（可多选）",
+                "zh-hant": "選擇視覺節點（可多選）",
+                "jp": "ビジョンノードを選択（複数選択可）"
+            },
+            "NoVisionNodes": {
+                "en": "No vision nodes available. Please enable EnableVision in LLM settings.",
+                "zh-hans": "没有可用的视觉节点，请在 LLM 设置中启用 EnableVision",
+                "zh-hant": "沒有可用的視覺節點，請在 LLM 設置中啟用 EnableVision",
+                "jp": "利用可能なビジョンノードがありません。LLM設定でEnableVisionを有効にしてください。"
+            },
+            "LoadBalanceTip": {
+                "en": "When multiple nodes are selected, one will be randomly chosen for each request. If it fails, another node will be tried automatically.",
+                "zh-hans": "选择多个节点时将随机选择一个进行请求，失败时自动切换到其他节点",
+                "zh-hant": "選擇多個節點時將隨機選擇一個進行請求，失敗時自動切換到其他節點",
+                "jp": "複数のノードを選択すると、リクエストごとにランダムに1つが選択されます。失敗した場合は自動的に別のノードが試行されます。"
+            },
+            "ImagePrompt": {
+                "en": "Image Description Prompt",
+                "zh-hans": "图片描述提示词",
+                "zh-hant": "圖片描述提示詞",
+                "jp": "画像説明プロンプト"
+            },
+            "ImagePromptTip": {
+                "en": "This prompt is built-in and cannot be modified",
+                "zh-hans": "此提示词由系统内置，不可修改",
+                "zh-hant": "此提示詞由系統內置，不可修改",
+                "jp": "このプロンプトはシステム内蔵で、変更できません"
             }
         },
         "SupportedModels": {

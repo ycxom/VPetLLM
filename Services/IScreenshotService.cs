@@ -46,6 +46,37 @@ namespace VPetLLM.Services
     }
 
     /// <summary>
+    /// 前置多模态处理完成事件参数
+    /// </summary>
+    public class PreprocessingCompletedEventArgs : EventArgs
+    {
+        /// <summary>
+        /// 是否成功
+        /// </summary>
+        public bool Success { get; set; }
+
+        /// <summary>
+        /// 组合后的消息（图片描述 + 用户问题）
+        /// </summary>
+        public string CombinedMessage { get; set; } = "";
+
+        /// <summary>
+        /// 图片描述
+        /// </summary>
+        public string ImageDescription { get; set; } = "";
+
+        /// <summary>
+        /// 使用的提供商
+        /// </summary>
+        public string UsedProvider { get; set; } = "";
+
+        /// <summary>
+        /// 错误消息（失败时）
+        /// </summary>
+        public string ErrorMessage { get; set; } = "";
+    }
+
+    /// <summary>
     /// 截图服务接口
     /// </summary>
     public interface IScreenshotService : IDisposable

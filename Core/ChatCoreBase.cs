@@ -16,6 +16,7 @@ namespace VPetLLM.Core
         protected IMainWindow? MainWindow { get; }
         protected ActionProcessor? ActionProcessor { get; }
         protected SystemMessageProvider SystemMessageProvider { get; }
+        protected ContextFilter ContextFilter { get; }
         protected Action<string> ResponseHandler;
         protected Action<string> StreamingChunkHandler;
         public abstract Task<string> Chat(string prompt);
@@ -113,6 +114,7 @@ namespace VPetLLM.Core
             ActionProcessor = actionProcessor;
             HistoryManager = new HistoryManager(settings, Name, this);
             SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
+            ContextFilter = new ContextFilter();
             HistoryManager.SetSystemMessageProvider(SystemMessageProvider);
             
             // Initialize RecordManager
@@ -133,6 +135,28 @@ namespace VPetLLM.Core
                 // Create a dummy RecordManager to prevent null reference errors
                 RecordManager = null;
             }
+        }
+
+        /// <summary>
+        /// 检查当前模型是否支持视觉
+        /// </summary>
+        protected bool CheckVisionSupport()
+        {
+            return ContextFilter?.CheckVisionSupport(Settings) ?? false;
+        }
+
+        /// <summary>
+        /// 根据当前模型的视觉能力过滤消息历史
+        /// </summary>
+        protected List<Message> FilterMessagesForModel(List<Message> messages)
+        {
+            if (ContextFilter == null || Settings == null)
+            {
+                return messages;
+            }
+
+            var supportsVision = CheckVisionSupport();
+            return ContextFilter.FilterForModel(messages, supportsVision);
         }
 
         public virtual List<string> GetModels()
