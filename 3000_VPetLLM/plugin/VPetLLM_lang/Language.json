@@ -1202,6 +1202,12 @@
             "zh-hant": "內容",
             "jp": "内容"
         },
+        "Image": {
+            "en": "Image",
+            "zh-hans": "图像",
+            "zh-hant": "圖像",
+            "jp": "画像"
+        },
         "Save": {
             "en": "Save",
             "zh-hans": "保存",

@@ -222,12 +222,14 @@ namespace VPetLLM.Core.ChatCore
                 return "";
             }
 
-            // 保存历史记录
+            // 保存历史记录（包含图像数据用于上下文编辑器显示）
             if (Settings.KeepContext)
             {
                 var userMessage = CreateUserMessage($"[图像] {prompt}");
                 if (userMessage != null)
                 {
+                    // 保存图像数据到消息对象（用于上下文编辑器显示）
+                    userMessage.ImageData = imageData;
                     await HistoryManager.AddMessage(userMessage);
                 }
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });

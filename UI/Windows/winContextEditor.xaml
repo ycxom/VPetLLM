@@ -5,13 +5,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VPetLLM"
         mc:Ignorable="d"
-        Title="上下文编辑器" Height="450" Width="800"
+        Title="上下文编辑器" Height="450" Width="900"
         Background="{DynamicResource PrimaryBackgroundBrush}">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="../Styles/Controls.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            
+            <!-- Bool to Visibility 转换器 -->
+            <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
             
             <!-- 现代化DataGrid样式 -->
             <Style x:Key="ModernDataGrid" TargetType="DataGrid">
@@ -37,6 +40,31 @@
                 <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
                 <Setter Property="BorderThickness" Value="0,0,1,1"/>
             </Style>
+            
+            <!-- 图像删除按钮样式 -->
+            <Style x:Key="ImageDeleteButton" TargetType="Button">
+                <Setter Property="Background" Value="#E81123"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Width" Value="20"/>
+                <Setter Property="Height" Value="20"/>
+                <Setter Property="FontSize" Value="10"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="10">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#F1707A"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
     
@@ -59,7 +87,7 @@
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="角色" 
                                         Binding="{Binding Role}" 
-                                        Width="120" 
+                                        Width="80" 
                                         IsReadOnly="True" 
                                         x:Name="Column_Role">
                         <DataGridTextColumn.ElementStyle>
@@ -71,6 +99,33 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
+                    
+                    <!-- 图像列 -->
+                    <DataGridTemplateColumn Header="图像" Width="90" x:Name="Column_Image" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Grid Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}"
+                                      Margin="4">
+                                    <Border Background="#2D2D2D" CornerRadius="4" Padding="2">
+                                        <Image Source="{Binding ThumbnailSource}" 
+                                               MaxHeight="50" MaxWidth="70"
+                                               Stretch="Uniform"
+                                               Cursor="Hand"
+                                               MouseLeftButtonUp="Thumbnail_Click"
+                                               ToolTip="点击查看大图"/>
+                                    </Border>
+                                    <Button Content="✕" 
+                                            Style="{StaticResource ImageDeleteButton}"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Top"
+                                            Margin="0,-2,-2,0"
+                                            ToolTip="删除图像"
+                                            Click="RemoveImage_Click"/>
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    
                     <DataGridTextColumn Header="内容" 
                                         Binding="{Binding Content}" 
                                         Width="*" 
