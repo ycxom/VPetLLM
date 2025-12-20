@@ -221,6 +221,7 @@ namespace VPetLLM.UI.Windows
 
         /// <summary>
         /// 发送聊天消息（带动画处理）
+        /// 注意：动画状态由 SmartMessageProcessor 在处理完成后自动管理
         /// </summary>
         /// <param name="text">消息文本</param>
         public async Task SendChat(string text)
@@ -248,25 +249,26 @@ namespace VPetLLM.UI.Windows
                 });
 
                 // 发送消息
+                // ChatCore.Chat() 内部会通过 ResponseHandler 触发 SmartMessageProcessor
+                // SmartMessageProcessor 会在处理完成后自动管理动画状态
                 if (_plugin.ChatCore != null)
                 {
                     await _plugin.ChatCore.Chat(text);
                 }
+                // 注意：不在这里停止思考动画，由 SmartMessageProcessor 处理
             }
             catch (Exception e)
             {
                 Logger.Log($"An error occurred in SendChat: {e}");
-                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
-            }
-            finally
-            {
+                // 只有在发生异常时才停止思考动画
                 StopThinkingAnimationWithoutHide();
-                ResetStreamingState();
+                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
             }
         }
 
         /// <summary>
         /// 发送带图片的聊天消息（带动画处理）
+        /// 注意：动画状态由 SmartMessageProcessor 在处理完成后自动管理
         /// </summary>
         /// <param name="text">消息文本</param>
         /// <param name="imageData">图片数据</param>
@@ -299,20 +301,20 @@ namespace VPetLLM.UI.Windows
                 });
 
                 // 发送带图片的消息
+                // ChatCore.ChatWithImage() 内部会通过 ResponseHandler 触发 SmartMessageProcessor
+                // SmartMessageProcessor 会在处理完成后自动管理动画状态
                 if (_plugin.ChatCore != null)
                 {
                     await _plugin.ChatCore.ChatWithImage(text, imageData);
                 }
+                // 注意：不在这里停止思考动画，由 SmartMessageProcessor 处理
             }
             catch (Exception e)
             {
                 Logger.Log($"An error occurred in SendChatWithImage: {e}");
-                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
-            }
-            finally
-            {
+                // 只有在发生异常时才停止思考动画
                 StopThinkingAnimationWithoutHide();
-                ResetStreamingState();
+                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
             }
         }
 

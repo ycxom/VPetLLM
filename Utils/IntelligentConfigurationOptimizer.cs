@@ -409,12 +409,12 @@ namespace VPetLLM.Utils
         /// </summary>
         private void ValidateAndFixNumericRanges()
         {
-            // TTS音量范围
+            // TTS音量范围（0-100 百分比）
             if (_settings.TTS != null)
             {
-                if (_settings.TTS.Volume < 0 || _settings.TTS.Volume > 10)
+                if (_settings.TTS.Volume < 0 || _settings.TTS.Volume > 100)
                 {
-                    _settings.TTS.Volume = Math.Max(0, Math.Min(10, _settings.TTS.Volume));
+                    _settings.TTS.Volume = Math.Max(0, Math.Min(100, _settings.TTS.Volume));
                     _optimizationLog.Add("修复了TTS音量范围");
                 }
 

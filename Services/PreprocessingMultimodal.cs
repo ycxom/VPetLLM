@@ -142,6 +142,7 @@ namespace VPetLLM.Services
 
         /// <summary>
         /// 调用 ChatWithImage 获取图片描述
+        /// 注意：前置多模态处理不应该保存历史记录到主上下文
         /// </summary>
         private async Task<string> CallChatWithImageForDescription(
             string providerType, VisionNodeIdentifier? node, byte[] imageData, string prompt)
@@ -156,8 +157,14 @@ namespace VPetLLM.Services
 
             IChatCore? chatCore = null;
 
+            // 保存原始的 KeepContext 设置
+            var originalKeepContext = _settings.KeepContext;
+
             try
             {
+                // 临时禁用上下文保存，防止前置多模态的 prompt 被写入主上下文
+                _settings.KeepContext = false;
+
                 // 获取 MainWindow 引用
                 var mainWindow = _plugin.MW;
 
@@ -208,6 +215,9 @@ namespace VPetLLM.Services
                     throw new InvalidOperationException($"无法创建 {providerType} 的 ChatCore 实例");
                 }
 
+                // 清除临时 ChatCore 的上下文，确保不使用主上下文的历史
+                chatCore.ClearContext();
+
                 // 设置响应处理器
                 chatCore.SetResponseHandler(responseHandler);
 
@@ -218,6 +228,9 @@ namespace VPetLLM.Services
             }
             finally
             {
+                // 恢复原始的 KeepContext 设置
+                _settings.KeepContext = originalKeepContext;
+
                 // 清理资源
                 if (chatCore is IDisposable disposable)
                 {
