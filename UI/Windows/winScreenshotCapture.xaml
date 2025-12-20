@@ -7,7 +7,7 @@
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="False"
-        WindowState="Maximized"
+        WindowStartupLocation="Manual"
         Cursor="Cross">
     <Grid>
         <!-- 半透明遮罩层 -->

@@ -11,7 +11,7 @@ using VPetLLM.Utils;
 namespace VPetLLM.UI.Windows
 {
     /// <summary>
-    /// 截图捕获窗口
+    /// 截图捕获窗口 - 支持多屏幕
     /// </summary>
     public partial class winScreenshotCapture : Window
     {
@@ -32,14 +32,77 @@ namespace VPetLLM.UI.Windows
         private double _selectionWidth;
         private double _selectionHeight;
 
+        // 虚拟桌面边界（所有屏幕的组合区域）
+        private int _virtualLeft;
+        private int _virtualTop;
+        private int _virtualWidth;
+        private int _virtualHeight;
+
         public winScreenshotCapture()
         {
             InitializeComponent();
+            
+            // 计算虚拟桌面边界（覆盖所有屏幕）
+            CalculateVirtualDesktopBounds();
+            
+            // 设置窗口位置和大小以覆盖所有屏幕
+            SetWindowToVirtualDesktop();
             
             MouseLeftButtonDown += OnMouseLeftButtonDown;
             MouseMove += OnMouseMove;
             MouseLeftButtonUp += OnMouseLeftButtonUp;
             KeyDown += OnKeyDown;
+        }
+
+        /// <summary>
+        /// 计算虚拟桌面边界（所有屏幕的组合区域）
+        /// </summary>
+        private void CalculateVirtualDesktopBounds()
+        {
+            // 使用 System.Windows.Forms.Screen 获取所有屏幕信息
+            var screens = System.Windows.Forms.Screen.AllScreens;
+            
+            int minX = int.MaxValue, minY = int.MaxValue;
+            int maxX = int.MinValue, maxY = int.MinValue;
+
+            foreach (var screen in screens)
+            {
+                var bounds = screen.Bounds;
+                minX = Math.Min(minX, bounds.Left);
+                minY = Math.Min(minY, bounds.Top);
+                maxX = Math.Max(maxX, bounds.Right);
+                maxY = Math.Max(maxY, bounds.Bottom);
+            }
+
+            _virtualLeft = minX;
+            _virtualTop = minY;
+            _virtualWidth = maxX - minX;
+            _virtualHeight = maxY - minY;
+
+            Logger.Log($"Virtual desktop bounds: Left={_virtualLeft}, Top={_virtualTop}, Width={_virtualWidth}, Height={_virtualHeight}, Screens={screens.Length}");
+        }
+
+        /// <summary>
+        /// 设置窗口以覆盖整个虚拟桌面
+        /// </summary>
+        private void SetWindowToVirtualDesktop()
+        {
+            // 获取 DPI 缩放因子
+            var source = PresentationSource.FromVisual(Application.Current.MainWindow);
+            double dpiX = 1.0, dpiY = 1.0;
+            if (source?.CompositionTarget != null)
+            {
+                dpiX = source.CompositionTarget.TransformToDevice.M11;
+                dpiY = source.CompositionTarget.TransformToDevice.M22;
+            }
+
+            // 将物理像素转换为 WPF 单位
+            Left = _virtualLeft / dpiX;
+            Top = _virtualTop / dpiY;
+            Width = _virtualWidth / dpiX;
+            Height = _virtualHeight / dpiY;
+
+            Logger.Log($"Window set to: Left={Left}, Top={Top}, Width={Width}, Height={Height}");
         }
 
         private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -120,7 +183,7 @@ namespace VPetLLM.UI.Windows
                 System.Threading.Thread.Sleep(100);
 
                 // 获取屏幕 DPI 缩放
-                var source = PresentationSource.FromVisual(this);
+                var source = PresentationSource.FromVisual(Application.Current.MainWindow);
                 double dpiX = 1.0, dpiY = 1.0;
                 if (source?.CompositionTarget != null)
                 {
@@ -128,9 +191,9 @@ namespace VPetLLM.UI.Windows
                     dpiY = source.CompositionTarget.TransformToDevice.M22;
                 }
 
-                // 计算实际像素坐标
-                int x = (int)(_selectionLeft * dpiX);
-                int y = (int)(_selectionTop * dpiY);
+                // 计算实际像素坐标（相对于虚拟桌面原点）
+                int x = _virtualLeft + (int)(_selectionLeft * dpiX);
+                int y = _virtualTop + (int)(_selectionTop * dpiY);
                 int width = (int)(_selectionWidth * dpiX);
                 int height = (int)(_selectionHeight * dpiY);
 
