@@ -153,6 +153,21 @@ namespace VPetLLM
             {
                 Screenshot = new Configuration.ScreenshotSettings();
             }
+            
+            // 确保Screenshot的嵌套配置对象也被正确初始化
+            if (Screenshot.OCR == null)
+            {
+                Screenshot.OCR = new Configuration.OCRSettings();
+            }
+            if (Screenshot.MultimodalProvider == null)
+            {
+                Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
+            }
+            // 确保MultimodalProvider的SelectedNodes列表被正确初始化
+            if (Screenshot.MultimodalProvider.SelectedNodes == null)
+            {
+                Screenshot.MultimodalProvider.SelectedNodes = new List<Configuration.VisionNodeIdentifier>();
+            }
 
             // 旧版OpenAI单节点配置迁移到多节点结构，避免用户配置丢失
             if (OpenAI == null)

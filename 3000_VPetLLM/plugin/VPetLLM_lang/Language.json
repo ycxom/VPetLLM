@@ -2973,6 +2973,50 @@
                 "zh-hant": "發送",
                 "jp": "送信"
             }
+        },
+        "Validation": {
+            "FreeVisionRequired": {
+                "en": "Preprocessing multimodal requires Free channel to enable vision capability. Please enable EnableVision in LLM Settings -> Free Interface.",
+                "zh-hans": "前置多模态需要 Free 渠道启用视觉能力。请在 LLM 设置 -> Free 接口 中启用 EnableVision 选项。",
+                "zh-hant": "前置多模態需要 Free 渠道啟用視覺能力。請在 LLM 設置 -> Free 接口 中啟用 EnableVision 選項。",
+                "jp": "前処理マルチモーダルには、Freeチャネルでビジョン機能を有効にする必要があります。LLM設定 -> Freeインターフェースで EnableVision を有効にしてください。"
+            },
+            "VisionNodeRequired": {
+                "en": "When using vision channels, at least one vision node must be selected.",
+                "zh-hans": "使用视觉渠道时必须选择至少一个视觉节点。",
+                "zh-hant": "使用視覺渠道時必須選擇至少一個視覺節點。",
+                "jp": "ビジョンチャネルを使用する場合、少なくとも1つのビジョンノードを選択する必要があります。"
+            },
+            "NoVisionNodesAvailable": {
+                "en": "No vision nodes available. Please select at least one vision-enabled node in settings.",
+                "zh-hans": "没有可用的视觉节点，请在设置中选择至少一个启用视觉的节点",
+                "zh-hant": "沒有可用的視覺節點，請在設置中選擇至少一個啟用視覺的節點",
+                "jp": "利用可能なビジョンノードがありません。設定で少なくとも1つのビジョン対応ノードを選択してください。"
+            },
+            "AllVisionNodesFailed": {
+                "en": "All vision nodes failed",
+                "zh-hans": "所有视觉节点都失败",
+                "zh-hant": "所有視覺節點都失敗",
+                "jp": "すべてのビジョンノードが失敗しました"
+            },
+            "EmptyResponse": {
+                "en": "returned empty description",
+                "zh-hans": "返回空描述",
+                "zh-hant": "返回空描述",
+                "jp": "空の説明を返しました"
+            },
+            "FreeChannelEmptyResponse": {
+                "en": "Free channel returned empty description",
+                "zh-hans": "Free 渠道返回空描述",
+                "zh-hant": "Free 渠道返回空描述",
+                "jp": "Freeチャネルが空の説明を返しました"
+            },
+            "FreeChannelAnalysisFailed": {
+                "en": "Free channel analysis failed",
+                "zh-hans": "Free 渠道分析失败",
+                "zh-hant": "Free 渠道分析失敗",
+                "jp": "Freeチャネルの分析に失敗しました"
+            }
         }
     }
 }

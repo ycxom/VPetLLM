@@ -2306,28 +2306,42 @@
                                             Visibility="Collapsed">
                                         <Label Content="{utils:Localize KeyPath=Screenshot.Multimodal.SelectNodes, Default=选择视觉节点（可多选）}"
                                                 Style="{StaticResource SettingLabel}"/>
-                                        <ListBox x:Name="ListBox_Screenshot_Main_VisionNodes"
-                                                Height="150"
-                                                Margin="0,0,0,8"
-                                                SelectionMode="Multiple"
-                                                Background="{StaticResource BackgroundBrush}"
+                                        <Border Background="{StaticResource BackgroundBrush}"
                                                 BorderBrush="{StaticResource BorderBrush}"
                                                 BorderThickness="1"
-                                                SelectionChanged="ListBox_Screenshot_VisionNodes_SelectionChanged">
-                                            <ListBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ListBox.ItemTemplate>
-                                        </ListBox>
+                                                CornerRadius="4"
+                                                Padding="8"
+                                                Height="150"
+                                                Margin="0,0,0,8">
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <ItemsControl x:Name="ItemsControl_Screenshot_VisionNodes">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <CheckBox Content="{Binding DisplayName}"
+                                                                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                                      Checked="VisionNodeCheckBox_Checked"
+                                                                      Unchecked="VisionNodeCheckBox_Unchecked"
+                                                                      Style="{StaticResource ModernCheckBox}"
+                                                                      Margin="0,4"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </Border>
                                         <TextBlock x:Name="TextBlock_Screenshot_Main_NoVisionNodes"
                                                 Text="{utils:Localize KeyPath=Screenshot.Multimodal.NoVisionNodes, Default=没有可用的视觉节点，请在 LLM 设置中启用 EnableVision}"
                                                 Style="{StaticResource DescriptionText}"
                                                 Foreground="#FF5722"
                                                 Visibility="Collapsed"
                                                 Margin="0,0,0,8"/>
+                                        
+                                        <!-- 验证错误显示面板 -->
+                                        <StackPanel x:Name="Panel_Screenshot_ValidationErrors"
+                                                    Visibility="Collapsed"
+                                                    Margin="0,0,0,8">
+                                            <!-- 错误消息将动态添加到这里 -->
+                                        </StackPanel>
+                                        
                                         <TextBlock Text="{utils:Localize KeyPath=Screenshot.Multimodal.LoadBalanceTip, Default=选择多个节点时将随机选择一个进行请求，失败时自动切换到其他节点}"
                                                 Style="{StaticResource DescriptionText}"
                                                 Margin="0,0,0,16"/>

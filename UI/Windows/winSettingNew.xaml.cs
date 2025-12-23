@@ -244,11 +244,16 @@ namespace VPetLLM.UI.Windows
         // UI 就绪标记：Loaded 后才允许保存，避免初始化阶段触发立即保存导致 NRE
         private bool _isReadyToSave = false;
         private bool _isUpdatingNodeDetails = false;
+        // 多模态提供商设置加载标记，防止加载时触发保存
+        private bool _isLoadingMultimodalSettings = false;
 
         // TTS服务
         private TTSService? _ttsService;
         // 随机选择器（负载均衡随机用）
         private readonly Random _rand = new Random();
+
+        // 视觉节点集合（用于多模态提供商配置）
+        private System.Collections.ObjectModel.ObservableCollection<Configuration.SelectableVisionNode> _visionNodes = new();
 
         // 在同一渠道内，若 ApiKey 包含多个 key，则自动随机选择一个（不受负载均衡开关影响）
         private string SelectRandomKey(string raw)
@@ -326,6 +331,13 @@ namespace VPetLLM.UI.Windows
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
                 // 标记界面已就绪，允许后续的立即保存
                 _isReadyToSave = true;
+                
+                // 在UI完全就绪后重新加载多模态提供商设置
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    LoadMultimodalProviderSettings();
+                }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+                
                 // 视觉树稳定后再挂载列表冒泡监听，避免初始化/布局阶段触发保存
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
@@ -4734,9 +4746,34 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
         private void ComboBox_Screenshot_ProcessingMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateScreenshotProcessingModePanel();
-            // 立即保存设置，确保处理模式变更生效
-            SaveScreenshotSettings();
+            // 获取当前选择的处理模式
+            var comboBox = sender as ComboBox;
+            var selectedItem = comboBox?.SelectedItem as ComboBoxItem;
+            var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
+            
+            // 如果切换到前置多模态模式，需要先加载已保存的多模态提供商设置
+            // 然后再保存处理模式变更，避免覆盖已保存的多模态提供商配置
+            if (mode == "PreprocessingMultimodal")
+            {
+                // 设置加载标志，防止在加载过程中触发保存
+                _isLoadingMultimodalSettings = true;
+                try
+                {
+                    UpdateScreenshotProcessingModePanel();
+                    // 只保存处理模式，不保存多模态提供商设置（因为刚刚加载了）
+                    SaveScreenshotSettingsWithoutMultimodalProvider();
+                }
+                finally
+                {
+                    _isLoadingMultimodalSettings = false;
+                }
+            }
+            else
+            {
+                UpdateScreenshotProcessingModePanel();
+                // 立即保存设置，确保处理模式变更生效
+                SaveScreenshotSettings();
+            }
         }
 
         private void UpdateScreenshotProcessingModePanel()
@@ -4767,6 +4804,8 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         ocrPanel.Visibility = Visibility.Collapsed;
                         multimodalPanel.Visibility = Visibility.Visible;
                         if (nativeMultimodalPanel != null) nativeMultimodalPanel.Visibility = Visibility.Collapsed;
+                        // 切换到前置多模态时，先加载已保存的多模态提供商设置
+                        LoadMultimodalProviderSettings();
                         break;
                     case "OCRApi":
                         // OCR API：显示 OCR 配置
@@ -4893,6 +4932,12 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                // 确保 Screenshot 配置存在
+                if (_plugin.Settings.Screenshot == null)
+                {
+                    _plugin.Settings.Screenshot = new Configuration.ScreenshotSettings();
+                }
+
                 var checkBoxEnabled = (CheckBox)this.FindName("CheckBox_Screenshot_Main_IsEnabled");
                 var comboBoxMode = (ComboBox)this.FindName("ComboBox_Screenshot_Main_ProcessingMode");
                 var checkBoxAutoSend = (CheckBox)this.FindName("CheckBox_Screenshot_Main_AutoSend");
@@ -4994,6 +5039,71 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                 // 保存多模态提供商设置
                 SaveMultimodalProviderSettings();
+                
+                // 确保设置被持久化到磁盘
+                _plugin.Settings.Save();
+                Utils.Logger.Log("Screenshot settings saved to disk");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Screenshot: Error saving settings: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 保存截图设置，但不保存多模态提供商设置
+        /// 用于切换到前置多模态模式时，避免覆盖已保存的多模态提供商配置
+        /// </summary>
+        private void SaveScreenshotSettingsWithoutMultimodalProvider()
+        {
+            try
+            {
+                var checkBoxEnabled = (CheckBox)this.FindName("CheckBox_Screenshot_Main_IsEnabled");
+                var comboBoxMode = (ComboBox)this.FindName("ComboBox_Screenshot_Main_ProcessingMode");
+                var checkBoxAutoSend = (CheckBox)this.FindName("CheckBox_Screenshot_Main_AutoSend");
+                var comboBoxOCRProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_OCR_Provider");
+                var textBoxOCRBaseUrl = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_BaseUrl");
+                var textBoxOCRApiKey = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_ApiKey");
+
+                if (checkBoxEnabled != null)
+                    _plugin.Settings.Screenshot.IsEnabled = checkBoxEnabled.IsChecked ?? false;
+
+                if (comboBoxMode != null)
+                {
+                    var selectedItem = comboBoxMode.SelectedItem as ComboBoxItem;
+                    var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
+                    _plugin.Settings.Screenshot.ProcessingMode = mode switch
+                    {
+                        "OCRApi" => Configuration.ScreenshotProcessingMode.OCRApi,
+                        "PreprocessingMultimodal" => Configuration.ScreenshotProcessingMode.PreprocessingMultimodal,
+                        _ => Configuration.ScreenshotProcessingMode.NativeMultimodal
+                    };
+                }
+
+                if (checkBoxAutoSend != null)
+                    _plugin.Settings.Screenshot.AutoSend = checkBoxAutoSend.IsChecked ?? false;
+
+                if (comboBoxOCRProvider != null)
+                {
+                    var selectedItem = comboBoxOCRProvider.SelectedItem as ComboBoxItem;
+                    _plugin.Settings.Screenshot.OCR.Provider = selectedItem?.Tag?.ToString() ?? "OpenAI";
+                }
+
+                if (textBoxOCRBaseUrl != null)
+                    _plugin.Settings.Screenshot.OCR.BaseUrl = textBoxOCRBaseUrl.Text;
+
+                if (textBoxOCRApiKey != null)
+                    _plugin.Settings.Screenshot.OCR.ApiKey = textBoxOCRApiKey.Text;
+
+                // 更新快捷键注册
+                _plugin.UpdateScreenshotHotkey();
+
+                // 注意：这里不调用 SaveMultimodalProviderSettings()
+                // 因为我们刚刚加载了已保存的多模态提供商设置，不需要再保存
+                
+                // 确保设置被持久化到磁盘
+                _plugin.Settings.Save();
+                Utils.Logger.Log("Screenshot settings saved to disk (without multimodal provider settings)");
             }
             catch (Exception ex)
             {
@@ -5003,13 +5113,87 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
         private void ComboBox_Screenshot_MultimodalProvider_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateMultimodalProviderPanel();
+            try
+            {
+                // 只有在UI完全就绪后才处理选择变更
+                if (!_isReadyToSave)
+                {
+                    return;
+                }
+                
+                // 如果正在加载设置，不触发保存
+                if (_isLoadingMultimodalSettings)
+                {
+                    Utils.Logger.Log("ComboBox_Screenshot_MultimodalProvider_SelectionChanged: Skipping save during load");
+                    return;
+                }
+                
+                UpdateMultimodalProviderPanel();
+                SaveMultimodalProviderSettings();
+                _plugin.Settings.Save(); // 确保立即持久化到磁盘
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error in multimodal provider selection changed: {ex.Message}");
+            }
         }
 
-        private void ListBox_Screenshot_VisionNodes_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void VisionNodeCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            // 选择变化时自动保存
-            SaveMultimodalProviderSettings();
+            try
+            {
+                // 只有在UI完全就绪后才处理复选框变更
+                if (!_isReadyToSave)
+                {
+                    return;
+                }
+                
+                // 如果正在加载设置，不触发保存
+                if (_isLoadingMultimodalSettings)
+                {
+                    return;
+                }
+                
+                if (sender is CheckBox checkBox && checkBox.DataContext is Configuration.SelectableVisionNode wrapper)
+                {
+                    wrapper.IsSelected = true;
+                    SaveMultimodalProviderSettings();
+                    _plugin.Settings.Save();
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error in vision node checkbox checked: {ex.Message}");
+            }
+        }
+
+        private void VisionNodeCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 只有在UI完全就绪后才处理复选框变更
+                if (!_isReadyToSave)
+                {
+                    return;
+                }
+                
+                // 如果正在加载设置，不触发保存
+                if (_isLoadingMultimodalSettings)
+                {
+                    return;
+                }
+                
+                if (sender is CheckBox checkBox && checkBox.DataContext is Configuration.SelectableVisionNode wrapper)
+                {
+                    wrapper.IsSelected = false;
+                    SaveMultimodalProviderSettings();
+                    _plugin.Settings.Save();
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error in vision node checkbox unchecked: {ex.Message}");
+            }
         }
 
         private void UpdateMultimodalProviderPanel()
@@ -5021,7 +5205,17 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 var freeProviderTip = (TextBlock)this.FindName("TextBlock_Screenshot_Main_FreeProviderTip");
                 var visionChannelsProviderTip = (TextBlock)this.FindName("TextBlock_Screenshot_Main_VisionChannelsProviderTip");
 
-                if (comboBox == null || visionNodesPanel == null) return;
+                if (comboBox == null)
+                {
+                    Utils.Logger.Log("Warning: ComboBox_Screenshot_Main_Multimodal_Provider not found in UpdateMultimodalProviderPanel");
+                    return;
+                }
+                
+                if (visionNodesPanel == null)
+                {
+                    Utils.Logger.Log("Warning: Panel_Screenshot_Main_VisionNodes not found in UpdateMultimodalProviderPanel");
+                    return;
+                }
 
                 var selectedItem = comboBox.SelectedItem as ComboBoxItem;
                 var providerType = selectedItem?.Tag?.ToString() ?? "Free";
@@ -5050,63 +5244,119 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var listBox = (ListBox)this.FindName("ListBox_Screenshot_Main_VisionNodes");
+                var visionNodesControl = (ItemsControl)this.FindName("ItemsControl_Screenshot_VisionNodes");
                 var noNodesText = (TextBlock)this.FindName("TextBlock_Screenshot_Main_NoVisionNodes");
 
-                if (listBox == null) return;
+                if (visionNodesControl == null) 
+                {
+                    Utils.Logger.Log("Warning: ItemsControl_Screenshot_VisionNodes not found");
+                    return;
+                }
 
                 // 获取可用的视觉节点
-                var preprocessingService = new Services.PreprocessingMultimodal(_plugin.Settings, _plugin);
-                var availableNodes = preprocessingService.GetAvailableVisionNodes();
+                List<Configuration.VisionNodeIdentifier> availableNodes;
+                try
+                {
+                    var preprocessingService = new Services.PreprocessingMultimodal(_plugin.Settings, _plugin);
+                    availableNodes = preprocessingService.GetAvailableVisionNodes();
+                    Utils.Logger.Log($"RefreshVisionNodesList: Found {availableNodes.Count} available vision nodes");
+                }
+                catch (Exception ex)
+                {
+                    Utils.Logger.Log($"Error creating PreprocessingMultimodal service: {ex.Message}");
+                    availableNodes = new List<Configuration.VisionNodeIdentifier>();
+                }
 
-                listBox.Items.Clear();
+                var selectedNodes = _plugin.Settings.Screenshot.MultimodalProvider?.SelectedNodes ?? new System.Collections.Generic.List<Configuration.VisionNodeIdentifier>();
+                Utils.Logger.Log($"RefreshVisionNodesList: Saved selection has {selectedNodes.Count} nodes");
+                foreach (var node in selectedNodes)
+                {
+                    Utils.Logger.Log($"RefreshVisionNodesList: Saved node - {node.UniqueId}");
+                }
 
+                // 清除并重建集合
+                _visionNodes.Clear();
+                
                 if (availableNodes.Count == 0)
                 {
-                    if (noNodesText != null)
-                        noNodesText.Visibility = Visibility.Visible;
-                    listBox.Visibility = Visibility.Collapsed;
+                    if (noNodesText != null) noNodesText.Visibility = Visibility.Visible;
+                    visionNodesControl.Visibility = Visibility.Collapsed;
                 }
                 else
                 {
-                    if (noNodesText != null)
-                        noNodesText.Visibility = Visibility.Collapsed;
-                    listBox.Visibility = Visibility.Visible;
+                    if (noNodesText != null) noNodesText.Visibility = Visibility.Collapsed;
+                    visionNodesControl.Visibility = Visibility.Visible;
 
                     foreach (var node in availableNodes)
                     {
-                        listBox.Items.Add(node);
+                        var isSelected = selectedNodes.Any(n => n.UniqueId == node.UniqueId);
+                        Utils.Logger.Log($"RefreshVisionNodesList: Node {node.UniqueId} - IsSelected = {isSelected}");
+                        var wrapper = new Configuration.SelectableVisionNode
+                        {
+                            Node = node,
+                            IsSelected = isSelected
+                        };
+                        _visionNodes.Add(wrapper);
                     }
 
-                    // 恢复之前选中的节点
-                    var selectedNodes = _plugin.Settings.Screenshot.MultimodalProvider?.SelectedNodes ?? new System.Collections.Generic.List<Configuration.VisionNodeIdentifier>();
-                    foreach (var item in listBox.Items)
-                    {
-                        if (item is Configuration.VisionNodeIdentifier node)
-                        {
-                            if (selectedNodes.Any(n => n.UniqueId == node.UniqueId))
-                            {
-                                listBox.SelectedItems.Add(item);
-                            }
-                        }
-                    }
+                    visionNodesControl.ItemsSource = _visionNodes;
                 }
+                
+                Utils.Logger.Log($"RefreshVisionNodesList: Completed with {_visionNodes.Count} nodes in collection");
             }
             catch (Exception ex)
             {
-                Logger.Log($"Screenshot: Error refreshing vision nodes list: {ex.Message}");
+                Utils.Logger.Log($"Error refreshing vision nodes list: {ex.Message}");
             }
         }
 
         private void LoadMultimodalProviderSettings()
         {
+            // 检查是否由外部调用者已经设置了加载标志
+            bool wasAlreadyLoading = _isLoadingMultimodalSettings;
+            
+            // 设置加载标志，防止在加载过程中触发保存
+            _isLoadingMultimodalSettings = true;
+            
             try
             {
+                // 确保窗口已完全加载
+                if (!_isReadyToSave)
+                {
+                    Utils.Logger.Log("LoadMultimodalProviderSettings: Window not ready, deferring load");
+                    return;
+                }
+
                 var comboBoxProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_Multimodal_Provider");
 
+                // 确保 MultimodalProvider 配置存在
+                if (_plugin.Settings.Screenshot.MultimodalProvider == null)
+                {
+                    _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
+                    Utils.Logger.Log("LoadMultimodalProviderSettings: Created new MultimodalProviderConfig");
+                }
+                
+                // 确保SelectedNodes列表被正确初始化
+                if (_plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes == null)
+                {
+                    _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = new List<Configuration.VisionNodeIdentifier>();
+                    Utils.Logger.Log("LoadMultimodalProviderSettings: Created new SelectedNodes list");
+                }
+                
+                // 记录当前保存的配置
+                var savedProviderType = _plugin.Settings.Screenshot.MultimodalProvider.ProviderType;
+                var savedNodes = _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes;
+                Utils.Logger.Log($"LoadMultimodalProviderSettings: Saved ProviderType = {savedProviderType}, SelectedNodes count = {savedNodes.Count}");
+                foreach (var node in savedNodes)
+                {
+                    Utils.Logger.Log($"LoadMultimodalProviderSettings: Saved node - {node.UniqueId}");
+                }
+
+                // 加载提供商类型
                 if (comboBoxProvider != null)
                 {
                     var providerType = _plugin.Settings.Screenshot.MultimodalProvider?.ProviderType.ToString() ?? "Free";
+                    Utils.Logger.Log($"LoadMultimodalProviderSettings: Setting ComboBox to {providerType}");
                     foreach (ComboBoxItem item in comboBoxProvider.Items)
                     {
                         if (item.Tag?.ToString() == providerType)
@@ -5116,12 +5366,28 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         }
                     }
                 }
+                else
+                {
+                    Utils.Logger.Log("Warning: ComboBox_Screenshot_Main_Multimodal_Provider not found during load");
+                }
 
+                // 加载并设置视觉节点
+                RefreshVisionNodesList();
                 UpdateMultimodalProviderPanel();
+                
+                Utils.Logger.Log("Multimodal provider settings loaded successfully");
             }
             catch (Exception ex)
             {
-                Logger.Log($"Screenshot: Error loading multimodal provider settings: {ex.Message}");
+                Utils.Logger.Log($"Error loading multimodal provider settings: {ex.Message}");
+            }
+            finally
+            {
+                // 只有当我们自己设置的标志时才重置，如果是外部调用者设置的则保持
+                if (!wasAlreadyLoading)
+                {
+                    _isLoadingMultimodalSettings = false;
+                }
             }
         }
 
@@ -5129,14 +5395,28 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                // 如果正在加载设置，不执行保存
+                if (_isLoadingMultimodalSettings)
+                {
+                    Utils.Logger.Log("SaveMultimodalProviderSettings: Skipping save during load");
+                    return;
+                }
+                
                 var comboBoxProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_Multimodal_Provider");
-                var listBoxNodes = (ListBox)this.FindName("ListBox_Screenshot_Main_VisionNodes");
+                var visionNodesControl = (ItemsControl)this.FindName("ItemsControl_Screenshot_VisionNodes");
 
                 if (_plugin.Settings.Screenshot.MultimodalProvider == null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
                 }
+                
+                // 确保SelectedNodes列表被正确初始化
+                if (_plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes == null)
+                {
+                    _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = new List<Configuration.VisionNodeIdentifier>();
+                }
 
+                // 保存提供商类型
                 if (comboBoxProvider != null)
                 {
                     var selectedItem = comboBoxProvider.SelectedItem as ComboBoxItem;
@@ -5144,27 +5424,116 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     _plugin.Settings.Screenshot.MultimodalProvider.ProviderType = providerType == "VisionChannels"
                         ? Configuration.MultimodalProviderType.VisionChannels
                         : Configuration.MultimodalProviderType.Free;
+                    Utils.Logger.Log($"SaveMultimodalProviderSettings: ProviderType = {providerType}");
                 }
 
-                if (listBoxNodes != null)
+                // 保存选中的节点
+                List<Configuration.VisionNodeIdentifier> selectedNodes = new List<Configuration.VisionNodeIdentifier>();
+                
+                if (visionNodesControl?.ItemsSource is System.Collections.ObjectModel.ObservableCollection<Configuration.SelectableVisionNode> nodes)
                 {
-                    var selectedNodes = new System.Collections.Generic.List<Configuration.VisionNodeIdentifier>();
-                    foreach (var item in listBoxNodes.SelectedItems)
-                    {
-                        if (item is Configuration.VisionNodeIdentifier node)
-                        {
-                            selectedNodes.Add(node);
-                        }
-                    }
-                    _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = selectedNodes;
+                    selectedNodes = nodes.Where(n => n.IsSelected).Select(n => n.Node).ToList();
+                    Utils.Logger.Log($"SaveMultimodalProviderSettings: Got {selectedNodes.Count} selected nodes from ItemsControl");
+                }
+                else if (_visionNodes != null && _visionNodes.Count > 0)
+                {
+                    // 备用方案：直接从 _visionNodes 集合获取
+                    selectedNodes = _visionNodes.Where(n => n.IsSelected).Select(n => n.Node).ToList();
+                    Utils.Logger.Log($"SaveMultimodalProviderSettings: Got {selectedNodes.Count} selected nodes from _visionNodes (fallback)");
+                }
+                else
+                {
+                    Utils.Logger.Log("SaveMultimodalProviderSettings: No vision nodes collection available, keeping existing selection");
+                    // 保持现有的选择，不覆盖
+                    selectedNodes = _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes ?? new List<Configuration.VisionNodeIdentifier>();
+                }
+                
+                _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = selectedNodes;
+                
+                // 记录保存的节点信息
+                foreach (var node in selectedNodes)
+                {
+                    Utils.Logger.Log($"SaveMultimodalProviderSettings: Saved node - {node.UniqueId} ({node.DisplayName})");
                 }
 
-                // 提示词现在是只读的，从 Prompt.json 读取，不需要保存
+                // 验证配置
+                ValidateConfiguration();
+                
+                // 标记有未保存的更改，确保设置会被持久化到磁盘
+                _hasUnsavedChanges = true;
+                
+                Utils.Logger.Log($"Multimodal provider settings saved successfully. Total selected nodes: {selectedNodes.Count}");
             }
             catch (Exception ex)
             {
-                Logger.Log($"Screenshot: Error saving multimodal provider settings: {ex.Message}");
+                Utils.Logger.Log($"Error saving multimodal provider settings: {ex.Message}");
             }
+        }
+
+        private void ValidateConfiguration()
+        {
+            try
+            {
+                var config = _plugin.Settings.Screenshot.MultimodalProvider;
+                var errorPanel = (StackPanel)this.FindName("Panel_Screenshot_ValidationErrors");
+                
+                if (errorPanel == null) return;
+
+                // 清除现有错误
+                errorPanel.Children.Clear();
+                errorPanel.Visibility = Visibility.Collapsed;
+
+                if (config == null) return;
+
+                bool hasErrors = false;
+
+                if (config.ProviderType == Configuration.MultimodalProviderType.Free)
+                {
+                    if (_plugin.Settings.Free?.EnableVision != true)
+                    {
+                        var errorMessage = LanguageHelper.Get("Screenshot.Validation.FreeVisionRequired", _plugin.Settings.Language) 
+                            ?? "前置多模态需要 Free 渠道启用视觉能力。请在 LLM 设置 -> Free 接口 中启用 EnableVision 选项。";
+                        AddValidationError(errorMessage);
+                        hasErrors = true;
+                    }
+                }
+                else if (config.ProviderType == Configuration.MultimodalProviderType.VisionChannels)
+                {
+                    if (config.SelectedNodes == null || config.SelectedNodes.Count == 0)
+                    {
+                        var errorMessage = LanguageHelper.Get("Screenshot.Validation.VisionNodeRequired", _plugin.Settings.Language) 
+                            ?? "使用视觉渠道时必须选择至少一个视觉节点。";
+                        AddValidationError(errorMessage);
+                        hasErrors = true;
+                    }
+                }
+
+                if (hasErrors)
+                {
+                    errorPanel.Visibility = Visibility.Visible;
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error validating multimodal configuration: {ex.Message}");
+            }
+        }
+
+        private void AddValidationError(string message)
+        {
+            var errorPanel = (StackPanel)this.FindName("Panel_Screenshot_ValidationErrors");
+            if (errorPanel == null) return;
+
+            var errorText = new TextBlock
+            {
+                Text = message,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x57, 0x22)), // #FF5722
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 2, 0, 2),
+                FontSize = 12
+            };
+
+            errorPanel.Children.Add(errorText);
         }
 
         #endregion

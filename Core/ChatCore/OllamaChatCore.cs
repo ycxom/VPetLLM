@@ -25,6 +25,214 @@ namespace VPetLLM.Core.ChatCore
         {
             return Chat(prompt, false);
         }
+
+        /// <summary>
+        /// 发送带图像的多模态消息
+        /// </summary>
+        /// <param name="prompt">文本提示</param>
+        /// <param name="imageData">图像数据</param>
+        /// <returns>响应内容</returns>
+        public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
+        {
+            try
+            {
+                // Handle conversation turn for record weight decrement
+                OnConversationTurn();
+                
+                if (!Settings.KeepContext)
+                {
+                    ClearContext();
+                }
+                
+                // 检查视觉能力是否启用
+                if (!_ollamaSetting.EnableVision)
+                {
+                    var visionError = "Ollama 未启用视觉能力，请在设置中启用 EnableVision";
+                    Utils.Logger.Log($"Ollama ChatWithImage 错误: {visionError}");
+                    ResponseHandler?.Invoke(visionError);
+                    return "";
+                }
+                
+                // 验证图像数据
+                if (imageData == null || imageData.Length == 0)
+                {
+                    var invalidImageError = "图像数据无效";
+                    Utils.Logger.Log($"Ollama ChatWithImage 错误: {invalidImageError}");
+                    ResponseHandler?.Invoke(invalidImageError);
+                    return "";
+                }
+                
+                Utils.Logger.Log($"Ollama ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+                
+                // 编码图像为 base64
+                var base64Image = Convert.ToBase64String(imageData);
+                
+                // 创建用户消息
+                var tempUserMessage = CreateUserMessage($"[图像] {prompt}");
+                if (tempUserMessage != null)
+                {
+                    // 保存图像数据到消息对象（用于历史记录）
+                    tempUserMessage.ImageData = imageData;
+                }
+                
+                // 构建历史记录
+                List<Message> history = GetCoreHistory();
+                // 如果有临时用户消息，添加到历史末尾用于API请求
+                if (tempUserMessage != null)
+                {
+                    history.Add(tempUserMessage);
+                }
+                // 在添加用户消息后注入重要记录
+                history = InjectRecordsIntoHistory(history);
+                
+                // 构建请求负载 - Ollama 格式需要在消息级别添加 images 数组
+                var messages = new List<object>();
+                foreach (var msg in history)
+                {
+                    var messageObj = new Dictionary<string, object>
+                    {
+                        ["role"] = msg.Role,
+                        ["content"] = msg.DisplayContent
+                    };
+                    
+                    // 如果消息包含图像，添加 images 数组
+                    if (msg.HasImage)
+                    {
+                        messageObj["images"] = new[] { Convert.ToBase64String(msg.ImageData) };
+                    }
+                    
+                    messages.Add(messageObj);
+                }
+                
+                var data = new
+                {
+                    model = _ollamaSetting.Model,
+                    messages = messages,
+                    stream = _ollamaSetting.EnableStreaming,
+                    options = _ollamaSetting.EnableAdvanced ? new
+                    {
+                        temperature = _ollamaSetting.Temperature,
+                        num_predict = _ollamaSetting.MaxTokens
+                    } : null
+                };
+                var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                
+                string message;
+                using (var client = GetClient())
+                {
+                    client.BaseAddress = new System.Uri(_ollamaSetting.Url);
+                    client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
+                    
+                    if (_ollamaSetting.EnableStreaming)
+                    {
+                        // 流式传输模式
+                        Utils.Logger.Log("Ollama ChatWithImage: 使用流式传输模式");
+                        var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
+                        {
+                            Content = content
+                        };
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        response.EnsureSuccessStatusCode();
+                        
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        {
+                            // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
+                            Utils.Logger.Log($"Ollama流式: 检测到完整命令: {cmd}");
+                            ResponseHandler?.Invoke(cmd);
+                        });
+                        
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) != null)
+                            {
+                                if (string.IsNullOrWhiteSpace(line))
+                                    continue;
+                                
+                                try
+                                {
+                                    var chunk = JObject.Parse(line);
+                                    var delta = chunk["message"]?["content"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        // 将新片段传递给流式处理器，检测完整命令
+                                        streamProcessor.AddChunk(delta);
+                                        // 通知流式文本更新（用于显示）
+                                        StreamingChunkHandler?.Invoke(delta);
+                                    }
+                                    
+                                    // 检查是否完成
+                                    if (chunk["done"]?.Value<bool>() == true)
+                                        break;
+                                }
+                                catch
+                                {
+                                    // 忽略解析错误，继续处理下一行
+                                }
+                            }
+                        }
+                        message = fullMessage.ToString();
+                        Utils.Logger.Log($"Ollama流式: 流式传输完成，总消息长度: {message.Length}");
+                        // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
+                    }
+                    else
+                    {
+                        // 非流式传输模式
+                        Utils.Logger.Log("Ollama ChatWithImage: 使用非流式传输模式");
+                        var response = await client.PostAsync("/api/chat", content);
+                        response.EnsureSuccessStatusCode();
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var responseObject = JObject.Parse(responseString);
+                        message = responseObject["message"]["content"].ToString();
+                        Utils.Logger.Log($"Ollama非流式: 收到完整消息，长度: {message.Length}");
+                        // 非流式模式下，一次性处理完整消息
+                        ResponseHandler?.Invoke(message);
+                    }
+                }
+                
+                // API调用成功后，才将用户消息和助手回复保存到历史记录
+                if (Settings.KeepContext)
+                {
+                    // 先保存用户消息（包含图像数据）
+                    if (tempUserMessage != null)
+                    {
+                        await HistoryManager.AddMessage(tempUserMessage);
+                    }
+                    // 再保存助手回复
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                    // 保存历史记录
+                    SaveHistory();
+                }
+                return "";
+            }
+            catch (TaskCanceledException tcEx)
+            {
+                Utils.Logger.Log($"Ollama ChatWithImage 请求超时: {tcEx.Message}");
+                var errorMessage = Utils.ErrorMessageHelper.GetOllamaTimeoutError(Settings) 
+                    ?? $"Ollama 请求超时: {tcEx.Message}";
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+            catch (HttpRequestException httpEx)
+            {
+                Utils.Logger.Log($"Ollama ChatWithImage 网络异常: {httpEx.Message}");
+                var errorMessage = Utils.ErrorMessageHelper.GetOllamaConnectionError(Settings) 
+                    ?? $"Ollama 网络异常: {httpEx.Message}";
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Ollama ChatWithImage 异常: {ex.Message}");
+                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+        }
+
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
             try

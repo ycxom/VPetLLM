@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace VPetLLM.Configuration
 {
@@ -82,6 +84,53 @@ namespace VPetLLM.Configuration
         public override int GetHashCode()
         {
             return UniqueId.GetHashCode();
+        }
+    }
+
+    /// <summary>
+    /// 可选择的视觉节点包装类，用于UI数据绑定
+    /// </summary>
+    public class SelectableVisionNode : INotifyPropertyChanged
+    {
+        /// <summary>
+        /// 包装的视觉节点标识符
+        /// </summary>
+        public VisionNodeIdentifier Node { get; set; } = new();
+
+        /// <summary>
+        /// 显示名称
+        /// </summary>
+        public string DisplayName => Node.DisplayName;
+
+        private bool _isSelected;
+        /// <summary>
+        /// 是否被选中
+        /// </summary>
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected != value)
+                {
+                    _isSelected = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 属性变更事件
+        /// </summary>
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        /// <summary>
+        /// 触发属性变更通知
+        /// </summary>
+        /// <param name="propertyName">属性名称</param>
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 
