@@ -94,11 +94,20 @@ namespace VPetLLM.Handlers
                 if (plugin is IActionPlugin actionPlugin)
                 {
                     var result = await actionPlugin.Function(arguments);
-                    var formattedResult = $"[Plugin Result: {pluginName}] {result}";
-                    VPetLLM.Instance.Log($"PluginHandler: Plugin function returned: {result}, formatted: {formattedResult}");
+                    VPetLLM.Instance.Log($"PluginHandler: Plugin function returned: {result}");
 
-                    // 聚合到2秒窗口，统一回灌，避免连续触发LLM
-                    ResultAggregator.Enqueue(formattedResult);
+                    // 只有当返回值非空时才回灌给 AI
+                    if (!string.IsNullOrEmpty(result))
+                    {
+                        var formattedResult = $"[Plugin Result: {pluginName}] {result}";
+                        VPetLLM.Instance.Log($"PluginHandler: Formatted result: {formattedResult}");
+                        // 聚合到2秒窗口，统一回灌，避免连续触发LLM
+                        ResultAggregator.Enqueue(formattedResult);
+                    }
+                    else
+                    {
+                        VPetLLM.Instance.Log($"PluginHandler: Plugin returned empty, skipping feedback to AI");
+                    }
                 }
             }
             else
