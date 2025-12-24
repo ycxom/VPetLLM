@@ -131,6 +131,20 @@ namespace VPetLLM.Utils
         {
             try
             {
+                // 方法1：直接从配置中读取DIY设置值（最可靠）
+                // 这避免了依赖TalkAPIIndex可能未正确更新的问题
+                var cGPTConfig = _plugin.MW?.Set?["CGPT"];
+                if (cGPTConfig != null)
+                {
+                    var diyValue = cGPTConfig[(LinePutScript.gstr)"DIY"] as string;
+                    if (diyValue == "VPetLLM")
+                    {
+                        return true;
+                    }
+                }
+
+                // 方法2：通过TalkBoxCurr检查（作为备用）
+                // TalkBoxCurr依赖于TalkAPIIndex，可能在某些情况下不准确
                 var talkBoxCurr = _plugin.MW?.TalkBoxCurr;
                 if (talkBoxCurr != null)
                 {
