@@ -1020,6 +1020,24 @@
                                     VerticalScrollBarVisibility="Auto">
                                 <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
                                     <StackPanel Style="{StaticResource SettingGroup}">
+                                        <!-- VPet TTS 插件检测警告 -->
+                                        <Border x:Name="Border_VPetTTSPluginWarning"
+                                                Background="#FFF3CD"
+                                                BorderBrush="#FFECB5"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="12,8"
+                                                Margin="0,0,0,16"
+                                                Visibility="Collapsed">
+                                            <StackPanel>
+                                                <TextBlock x:Name="TextBlock_VPetTTSPluginWarning"
+                                                           Text="{utils:Localize KeyPath=TTS.VPetTTSPluginDetected}"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="#856404"
+                                                           FontSize="13"/>
+                                            </StackPanel>
+                                        </Border>
+                                        
                                         <CheckBox x:Name="CheckBox_TTS_IsEnabled"
                                         Content="{utils:Localize KeyPath=TTS.Enable}"
                                         Margin="0,0,0,16"

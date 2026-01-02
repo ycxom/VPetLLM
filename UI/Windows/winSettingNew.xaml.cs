@@ -972,6 +972,9 @@ namespace VPetLLM.UI.Windows
 
             // 截图设置
             LoadScreenshotSettings();
+            
+            // 更新 VPet TTS 插件状态 UI
+            UpdateTTSPluginStatusUI();
         }
 
         /// <summary>
@@ -3054,6 +3057,46 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         System.Diagnostics.Debug.WriteLine($"[PluginSetting] 插件 {plugin.Name} 设置打开失败: {ex}");
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// 更新 VPet TTS 插件状态 UI
+        /// 当检测到 VPet.Plugin.VPetTTS 插件已启用时，显示警告并禁用内置 TTS 控件
+        /// </summary>
+        private void UpdateTTSPluginStatusUI()
+        {
+            try
+            {
+                var isPluginDetected = _plugin.IsVPetTTSPluginDetected;
+                
+                // 更新警告框可见性
+                if (this.FindName("Border_VPetTTSPluginWarning") is Border warningBorder)
+                {
+                    warningBorder.Visibility = isPluginDetected ? Visibility.Visible : Visibility.Collapsed;
+                }
+                
+                // 当插件检测到时，禁用 TTS 启用复选框
+                if (this.FindName("CheckBox_TTS_IsEnabled") is CheckBox ttsEnableCheckBox)
+                {
+                    if (isPluginDetected)
+                    {
+                        ttsEnableCheckBox.IsEnabled = false;
+                        ttsEnableCheckBox.IsChecked = false;
+                        // 同时更新设置
+                        _plugin.Settings.TTS.IsEnabled = false;
+                    }
+                    else
+                    {
+                        ttsEnableCheckBox.IsEnabled = true;
+                    }
+                }
+                
+                Logger.Log($"TTS 插件状态 UI 已更新: 插件检测到 = {isPluginDetected}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"更新 TTS 插件状态 UI 时发生错误: {ex.Message}");
             }
         }
 
