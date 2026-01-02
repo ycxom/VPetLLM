@@ -1825,7 +1825,7 @@ namespace VPetLLM.UI.Windows
                     else
                     {
                         // 回退到硬编码文本
-                        ttsStatusText.Text = $"⚠ 检测到 {enabledPluginNames} 插件已启用，内置TTS将被自动跳过（软禁用，不影响设置）";
+                        ttsStatusText.Text = $"⚠ 检测到 {enabledPluginNames} 插件已启用，内置TTS将被自动跳过";
                     }
                     ttsStatusText.Visibility = Visibility.Visible;
                 }
