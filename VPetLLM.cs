@@ -854,10 +854,6 @@ namespace VPetLLM
             // 此方法已弃用，使用 RegisterItemUseHook 代替
         }
 
-        // UseAction 类型枚举（已弃用）
-        private enum UseActionType { None, Func, Action }
-        private UseActionType _useActionType = UseActionType.None;
-
         /// <summary>
         /// 注销物品使用监听处理器（已弃用）
         /// </summary>
@@ -907,9 +903,6 @@ namespace VPetLLM
             //     Item.UseAction[itemType].Insert(0, OnItemUseHookFunc);
             // }
         }
-        
-        // 记录 Hook 类型
-        private string _useActionHookType = null;
 
         /// <summary>
         /// 注销物品使用 Hook
