@@ -1020,30 +1020,21 @@
                                     VerticalScrollBarVisibility="Auto">
                                 <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
                                     <StackPanel Style="{StaticResource SettingGroup}">
-                                        <!-- VPet TTS 插件检测警告 -->
-                                        <Border x:Name="Border_VPetTTSPluginWarning"
-                                                Background="#FFF3CD"
-                                                BorderBrush="#FFECB5"
-                                                BorderThickness="1"
-                                                CornerRadius="4"
-                                                Padding="12,8"
-                                                Margin="0,0,0,16"
-                                                Visibility="Collapsed">
-                                            <StackPanel>
-                                                <TextBlock x:Name="TextBlock_VPetTTSPluginWarning"
-                                                           Text="{utils:Localize KeyPath=TTS.VPetTTSPluginDetected}"
-                                                           TextWrapping="Wrap"
-                                                           Foreground="#856404"
-                                                           FontSize="13"/>
-                                            </StackPanel>
-                                        </Border>
-                                        
                                         <CheckBox x:Name="CheckBox_TTS_IsEnabled"
                                         Content="{utils:Localize KeyPath=TTS.Enable}"
-                                        Margin="0,0,0,16"
+                                        Margin="0,0,0,8"
                                         Style="{StaticResource ModernCheckBox}"/>
 
-                                        <StackPanel IsEnabled="{Binding ElementName=CheckBox_TTS_IsEnabled, Path=IsChecked}">
+                                        <!-- TTS插件状态提示（软禁用警告） -->
+                                        <TextBlock x:Name="TextBlock_TTS_PluginStatus"
+                                                   Foreground="#FF6B35"
+                                                   FontSize="12"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,16"
+                                                   Visibility="Collapsed"/>
+
+                                        <StackPanel IsEnabled="{Binding ElementName=CheckBox_TTS_IsEnabled, Path=IsChecked}"
+                                                    Margin="0,8,0,0">
                                             <Label Content="{utils:Localize KeyPath=TTS.Provider}"
                                             x:Name="Label_TTS_Provider"
                                             Style="{StaticResource SettingLabel}"/>

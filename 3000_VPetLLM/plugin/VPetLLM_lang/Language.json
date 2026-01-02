@@ -1342,17 +1342,11 @@
             "zh-hant": "TTS（語音合成）",
             "jp": "TTS（音声合成）"
         },
-        "VPetTTSPluginDetected": {
-            "en": "⚠️ VPet.Plugin.VPetTTS plugin detected and enabled. Built-in TTS has been automatically disabled to avoid conflicts.",
-            "zh-hans": "⚠️ 检测到 VPet.Plugin.VPetTTS 插件已启用，内置 TTS 功能已自动禁用以避免冲突。",
-            "zh-hant": "⚠️ 偵測到 VPet.Plugin.VPetTTS 插件已啟用，內建 TTS 功能已自動停用以避免衝突。",
-            "jp": "⚠️ VPet.Plugin.VPetTTS プラグインが検出され有効になっています。競合を避けるため、内蔵TTSは自動的に無効化されました。"
-        },
-        "VPetTTSPluginDetectedShort": {
-            "en": "VPet TTS Plugin Active",
-            "zh-hans": "VPet TTS 插件已启用",
-            "zh-hant": "VPet TTS 插件已啟用",
-            "jp": "VPet TTS プラグイン有効"
+        "PluginDetectedWarning": {
+            "en": "⚠ {0} plugin detected and enabled. Built-in TTS will be automatically skipped.",
+            "zh-hans": "⚠ 检测到 {0} 插件已启用，内置TTS将被自动跳过",
+            "zh-hant": "⚠ 偵測到 {0} 插件已啟用，內建TTS將被自動跳過",
+            "jp": "⚠ {0} プラグインが検出され有効になっています。内蔵TTSは自動的にスキップされます"
         },
         "Enable": {
             "en": "Enable TTS Voice Synthesis",

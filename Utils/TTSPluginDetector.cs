@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using VPet_Simulator.Windows.Interface;
 
 namespace VPetLLM.Utils
@@ -35,8 +36,52 @@ namespace VPetLLM.Utils
     }
 
     /// <summary>
+    /// 其他 TTS 插件检测结果（多个插件）
+    /// </summary>
+    public class OtherTTSPluginsDetectionResult
+    {
+        /// <summary>
+        /// 检测到的其他 TTS 插件列表
+        /// </summary>
+        public Dictionary<string, TTSPluginDetectionResult> DetectedPlugins { get; set; } = new Dictionary<string, TTSPluginDetectionResult>();
+
+        /// <summary>
+        /// 是否检测到其他已启用的 TTS 插件
+        /// </summary>
+        public bool HasOtherEnabledTTSPlugin
+        {
+            get
+            {
+                foreach (var plugin in DetectedPlugins.Values)
+                {
+                    if (plugin.ShouldDisableBuiltInTTS)
+                        return true;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 检测到的已启用插件名称列表（用于日志）
+        /// </summary>
+        public string EnabledPluginNames
+        {
+            get
+            {
+                var names = new List<string>();
+                foreach (var kvp in DetectedPlugins)
+                {
+                    if (kvp.Value.ShouldDisableBuiltInTTS)
+                        names.Add(kvp.Key);
+                }
+                return string.Join(", ", names);
+            }
+        }
+    }
+
+    /// <summary>
     /// TTS 插件检测器
-    /// 用于检测 VPet.Plugin.VPetTTS 插件是否已加载并启用
+    /// 用于检测各种 TTS 插件是否已加载并启用
     /// </summary>
     public static class TTSPluginDetector
     {
@@ -46,11 +91,73 @@ namespace VPetLLM.Utils
         private const string VPET_TTS_PLUGIN_NAME = "VPetTTS";
 
         /// <summary>
+        /// VPet.Plugin.EdgeTTS 插件的名称标识
+        /// </summary>
+        private const string EDGE_TTS_PLUGIN_NAME = "EdgeTTS";
+
+        /// <summary>
+        /// 已知的其他 TTS 插件名称列表（不包括 VPetLLM 自己）
+        /// </summary>
+        private static readonly string[] KNOWN_TTS_PLUGINS = new[]
+        {
+            VPET_TTS_PLUGIN_NAME,
+            EDGE_TTS_PLUGIN_NAME,
+        };
+
+        /// <summary>
         /// 检测 VPet.Plugin.VPetTTS 插件是否已启用
         /// </summary>
         /// <param name="mainWindow">VPet 主窗口接口</param>
         /// <returns>检测结果</returns>
         public static TTSPluginDetectionResult DetectVPetTTSPlugin(IMainWindow mainWindow)
+        {
+            return DetectSpecificPlugin(mainWindow, VPET_TTS_PLUGIN_NAME);
+        }
+
+        /// <summary>
+        /// 检测所有其他 TTS 插件
+        /// </summary>
+        /// <param name="mainWindow">VPet 主窗口接口</param>
+        /// <returns>检测结果</returns>
+        public static OtherTTSPluginsDetectionResult DetectAllOtherTTSPlugins(IMainWindow mainWindow)
+        {
+            var result = new OtherTTSPluginsDetectionResult();
+
+            try
+            {
+                if (mainWindow?.Plugins == null)
+                {
+                    Logger.Log("TTSPluginDetector: 插件列表为空");
+                    return result;
+                }
+
+                // 检测所有已知的 TTS 插件
+                foreach (var pluginName in KNOWN_TTS_PLUGINS)
+                {
+                    var detection = DetectSpecificPlugin(mainWindow, pluginName);
+                    if (detection.PluginExists)
+                    {
+                        result.DetectedPlugins[pluginName] = detection;
+                    }
+                }
+
+                if (result.HasOtherEnabledTTSPlugin)
+                {
+                    Logger.Log($"TTSPluginDetector: 检测到其他已启用的 TTS 插件: {result.EnabledPluginNames}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"TTSPluginDetector: 检测其他 TTS 插件时发生错误: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 检测特定插件
+        /// </summary>
+        private static TTSPluginDetectionResult DetectSpecificPlugin(IMainWindow mainWindow, string pluginName)
         {
             var result = new TTSPluginDetectionResult
             {
@@ -61,7 +168,6 @@ namespace VPetLLM.Utils
             {
                 if (mainWindow?.Plugins == null)
                 {
-                    Logger.Log("TTSPluginDetector: 插件列表为空");
                     return result;
                 }
 
@@ -71,11 +177,11 @@ namespace VPetLLM.Utils
                     try
                     {
                         // 检查插件名称是否匹配
-                        var pluginName = plugin.PluginName;
-                        if (string.Equals(pluginName, VPET_TTS_PLUGIN_NAME, StringComparison.OrdinalIgnoreCase))
+                        var currentPluginName = plugin.PluginName;
+                        if (string.Equals(currentPluginName, pluginName, StringComparison.OrdinalIgnoreCase))
                         {
                             result.PluginExists = true;
-                            Logger.Log($"TTSPluginDetector: 找到 {VPET_TTS_PLUGIN_NAME} 插件");
+                            Logger.Log($"TTSPluginDetector: 找到 {pluginName} 插件");
 
                             // 检查插件是否启用
                             result.PluginEnabled = CheckPluginEnabled(plugin);
@@ -95,7 +201,7 @@ namespace VPetLLM.Utils
 
                 if (!result.PluginExists)
                 {
-                    Logger.Log($"TTSPluginDetector: 未找到 {VPET_TTS_PLUGIN_NAME} 插件");
+                    Logger.Log($"TTSPluginDetector: 未找到 {pluginName} 插件");
                 }
             }
             catch (Exception ex)
@@ -150,15 +256,15 @@ namespace VPetLLM.Utils
                     }
                 }
 
-                // 如果无法获取 Enable 属性，假设插件已启用（因为它已被加载）
-                Logger.Log("TTSPluginDetector: 无法获取 Enable 属性，假设插件已启用");
-                return true;
+                // 如果无法获取 Enable 属性，假设插件未启用（保守策略）
+                Logger.Log("TTSPluginDetector: 无法获取 Enable 属性，假设插件未启用");
+                return false;
             }
             catch (Exception ex)
             {
                 Logger.Log($"TTSPluginDetector: 检查插件启用状态时发生错误: {ex.Message}");
-                // 出错时假设插件已启用（保守策略）
-                return true;
+                // 出错时假设插件未启用（保守策略）
+                return false;
             }
         }
 

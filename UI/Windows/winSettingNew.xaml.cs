@@ -343,6 +343,13 @@ namespace VPetLLM.UI.Windows
                 {
                     AttachImmediateSaveForChannelLists();
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+                
+                // 初始化时刷新TTS插件状态显示
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    var result = TTSPluginDetector.DetectAllOtherTTSPlugins(_plugin.MW);
+                    RefreshTTSPluginStatus(result.HasOtherEnabledTTSPlugin, result.EnabledPluginNames);
+                }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             };
             ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
             // OpenAI多节点配置 - 温度设置事件处理已移至多节点管理界面
@@ -1783,6 +1790,58 @@ namespace VPetLLM.UI.Windows
             Button_RefreshPlugins_Click(this, new RoutedEventArgs());
         }
 
+        /// <summary>
+        /// 刷新TTS插件状态显示
+        /// </summary>
+        /// <param name="hasEnabledPlugin">是否检测到已启用的TTS插件</param>
+        /// <param name="enabledPluginNames">已启用的插件名称列表</param>
+        public void RefreshTTSPluginStatus(bool hasEnabledPlugin, string enabledPluginNames)
+        {
+            try
+            {
+                // 确保在UI线程上执行
+                if (!Dispatcher.CheckAccess())
+                {
+                    Dispatcher.Invoke(() => RefreshTTSPluginStatus(hasEnabledPlugin, enabledPluginNames));
+                    return;
+                }
+
+                // 查找TTS状态提示文本
+                var ttsStatusText = this.FindName("TextBlock_TTS_PluginStatus") as TextBlock;
+                if (ttsStatusText == null)
+                    return;
+
+                if (hasEnabledPlugin)
+                {
+                    // 检测到其他TTS插件已启用 - 显示提示信息
+                    Logger.Log($"设置窗口: 检测到其他TTS插件已启用 ({enabledPluginNames})，显示软禁用提示");
+                    
+                    // 使用本地化字符串（如果可用）
+                    var localizedText = LocalizationService.Instance["TTS.PluginDetectedWarning"];
+                    if (!string.IsNullOrEmpty(localizedText))
+                    {
+                        ttsStatusText.Text = string.Format(localizedText, enabledPluginNames);
+                    }
+                    else
+                    {
+                        // 回退到硬编码文本
+                        ttsStatusText.Text = $"⚠ 检测到 {enabledPluginNames} 插件已启用，内置TTS将被自动跳过（软禁用，不影响设置）";
+                    }
+                    ttsStatusText.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    // 未检测到其他TTS插件 - 隐藏提示
+                    Logger.Log("设置窗口: 未检测到其他TTS插件，隐藏软禁用提示");
+                    ttsStatusText.Visibility = Visibility.Collapsed;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"刷新TTS插件状态时发生错误: {ex.Message}");
+            }
+        }
+
         private void PluginEnabled_Click(object sender, RoutedEventArgs e)
         {
             if (sender is CheckBox checkBox && checkBox.DataContext is UnifiedPluginItem item && item.LocalPlugin != null)
@@ -3062,37 +3121,23 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
         /// <summary>
         /// 更新 VPet TTS 插件状态 UI
-        /// 当检测到 VPet.Plugin.VPetTTS 插件已启用时，显示警告并禁用内置 TTS 控件
+        /// 当检测到 VPet.Plugin.VPetTTS 插件已启用时，显示警告（软禁用，不修改用户设置）
         /// </summary>
         private void UpdateTTSPluginStatusUI()
         {
             try
             {
-                var isPluginDetected = _plugin.IsVPetTTSPluginDetected;
+                // 使用 TTSPluginDetector 检测所有其他 TTS 插件
+                var result = TTSPluginDetector.DetectAllOtherTTSPlugins(_plugin.MW);
                 
-                // 更新警告框可见性
-                if (this.FindName("Border_VPetTTSPluginWarning") is Border warningBorder)
-                {
-                    warningBorder.Visibility = isPluginDetected ? Visibility.Visible : Visibility.Collapsed;
-                }
+                // 通过 RefreshTTSPluginStatus 更新 UI（使用 TextBlock_TTS_PluginStatus）
+                RefreshTTSPluginStatus(result.HasOtherEnabledTTSPlugin, result.EnabledPluginNames);
                 
-                // 当插件检测到时，禁用 TTS 启用复选框
-                if (this.FindName("CheckBox_TTS_IsEnabled") is CheckBox ttsEnableCheckBox)
-                {
-                    if (isPluginDetected)
-                    {
-                        ttsEnableCheckBox.IsEnabled = false;
-                        ttsEnableCheckBox.IsChecked = false;
-                        // 同时更新设置
-                        _plugin.Settings.TTS.IsEnabled = false;
-                    }
-                    else
-                    {
-                        ttsEnableCheckBox.IsEnabled = true;
-                    }
-                }
+                // 软禁用：只显示警告，不修改用户的 TTS 设置
+                // TTS 会在运行时通过 TTSService 的检测委托自动跳过
+                // 用户的设置保持不变，方便在禁用其他 TTS 插件后立即恢复
                 
-                Logger.Log($"TTS 插件状态 UI 已更新: 插件检测到 = {isPluginDetected}");
+                Logger.Log($"TTS 插件状态 UI 已更新: 插件检测到 = {result.HasOtherEnabledTTSPlugin} (软禁用模式，不修改设置)");
             }
             catch (Exception ex)
             {

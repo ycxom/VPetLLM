@@ -40,7 +40,6 @@ namespace VPetLLM
         
         // VPet TTS 插件检测
         private bool _vpetTTSPluginDetected = false;
-        private TTSPluginDetectionResult? _ttsPluginDetectionResult;
         
         /// <summary>
         /// 获取 VPet TTS 插件是否被检测到
@@ -618,46 +617,69 @@ namespace VPetLLM
         {
             try
             {
+                // 检测所有其他 TTS 插件
+                var allPluginsResult = TTSPluginDetector.DetectAllOtherTTSPlugins(MW);
+
                 // 设置实时检测委托，每次调用 TTS 时都会检测插件状态
-                TTSService?.SetVPetTTSPluginChecker(() => CheckVPetTTSPluginEnabled());
+                TTSService?.SetVPetTTSPluginChecker(() => CheckAnyTTSPluginEnabled());
 
                 // 执行一次初始检测并记录日志
-                var result = TTSPluginDetector.DetectVPetTTSPlugin(MW);
-                _ttsPluginDetectionResult = result;
-                _vpetTTSPluginDetected = result.ShouldDisableBuiltInTTS;
-
-                if (result.PluginExists)
+                if (allPluginsResult.HasOtherEnabledTTSPlugin)
                 {
-                    if (result.PluginEnabled)
-                    {
-                        Logger.Log($"检测到 VPet.Plugin.VPetTTS 插件已启用 (版本: {result.PluginVersion})，内置 TTS 将被跳过");
-                    }
-                    else
-                    {
-                        Logger.Log($"检测到 VPet.Plugin.VPetTTS 插件但未启用 (版本: {result.PluginVersion})，保持内置 TTS 功能");
-                    }
+                    Logger.Log($"检测到其他已启用的 TTS 插件 ({allPluginsResult.EnabledPluginNames})，内置 TTS 将被跳过");
+                    _vpetTTSPluginDetected = true;
                 }
                 else
                 {
-                    Logger.Log("未检测到 VPet.Plugin.VPetTTS 插件，保持内置 TTS 功能");
+                    Logger.Log("未检测到其他已启用的 TTS 插件，保持内置 TTS 功能");
+                    _vpetTTSPluginDetected = false;
+                }
+
+                // 记录每个检测到的插件的详细信息
+                foreach (var kvp in allPluginsResult.DetectedPlugins)
+                {
+                    var pluginName = kvp.Key;
+                    var result = kvp.Value;
+                    if (result.PluginEnabled)
+                    {
+                        Logger.Log($"  - {pluginName} (版本: {result.PluginVersion}) - 已启用");
+                    }
+                    else
+                    {
+                        Logger.Log($"  - {pluginName} (版本: {result.PluginVersion}) - 未启用");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"检测 VPet.Plugin.VPetTTS 插件时发生错误: {ex.Message}");
+                Logger.Log($"检测 TTS 插件时发生错误: {ex.Message}");
                 _vpetTTSPluginDetected = false;
             }
         }
 
         /// <summary>
-        /// 实时检测 VPet.Plugin.VPetTTS 插件是否启用
+        /// 实时检测是否有任何 TTS 插件启用
         /// </summary>
-        private bool CheckVPetTTSPluginEnabled()
+        private bool CheckAnyTTSPluginEnabled()
         {
             try
             {
-                var result = TTSPluginDetector.DetectVPetTTSPlugin(MW);
-                return result.ShouldDisableBuiltInTTS;
+                var result = TTSPluginDetector.DetectAllOtherTTSPlugins(MW);
+                var hasEnabledPlugin = result.HasOtherEnabledTTSPlugin;
+                
+                // 如果检测结果与上次不同，更新状态并通知UI
+                if (hasEnabledPlugin != _vpetTTSPluginDetected)
+                {
+                    _vpetTTSPluginDetected = hasEnabledPlugin;
+                    
+                    // 通知设置窗口更新UI
+                    Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        SettingWindow?.RefreshTTSPluginStatus(hasEnabledPlugin, result.EnabledPluginNames);
+                    }), System.Windows.Threading.DispatcherPriority.Background);
+                }
+                
+                return hasEnabledPlugin;
             }
             catch
             {
