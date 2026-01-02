@@ -570,6 +570,10 @@ namespace VPetLLM
                 RegisterTakeItemHandleEvent();
                 Utils.Logger.Log("Purchase event listener registered.");
                 
+                // 注册物品使用监听 - 通过 Hook Item.UseAction 静态字典
+                RegisterItemUseHook();
+                Utils.Logger.Log("Item use hook registered.");
+                
                 // 初始化语音输入快捷键
                 InitializeVoiceInputHotkey();
                 
@@ -649,6 +653,7 @@ namespace VPetLLM
             if (MW != null)
             {
                 UnregisterTakeItemHandleEvent();
+                UnregisterItemUseHook();
             }
             
             // 清理服务
@@ -764,6 +769,213 @@ namespace VPetLLM
             // 没有来源信息，假设为用户手动购买
             Utils.Logger.Log("Using fallback Event_TakeItem (no source information available)");
             OnTakeItemHandle(food, 1, "unknown");
+        }
+
+        /// <summary>
+        /// 注册物品使用监听处理器
+        /// 通过 Item.UseAction 注册自定义处理器来监听物品使用事件
+        /// </summary>
+        private void RegisterItemUseHandler()
+        {
+            // 此方法已弃用，使用 RegisterItemUseHook 代替
+        }
+
+        // UseAction 类型枚举（已弃用）
+        private enum UseActionType { None, Func, Action }
+        private UseActionType _useActionType = UseActionType.None;
+
+        /// <summary>
+        /// 注销物品使用监听处理器（已弃用）
+        /// </summary>
+        private void UnregisterItemUseHandler()
+        {
+            // 此方法已弃用
+        }
+
+        // 用于追踪最近的 TakeItemHandle 事件
+        private DateTime _lastTakeItemHandleTime = DateTime.MinValue;
+        private string _lastTakeItemHandleSource = null;
+        private string _lastTakeItemHandleName = null;
+        private readonly object _takeItemLock = new object();
+        private const int TAKE_ITEM_WINDOW_MS = 100; // 100ms 时间窗口
+
+        // 已注册 Hook 的物品类型列表
+        private readonly string[] _hookedItemTypes = { "Food", "Toy", "Tool", "Mail", "Item" };
+
+        /// <summary>
+        /// 注册物品使用 Hook - 通过 Hook Item.UseAction 静态字典
+        /// 用于监听用户从物品栏使用物品的事件
+        /// 
+        /// 注意：Item.UseAction 在 NuGet 包 1.1.0.58 中不存在，此功能暂时禁用
+        /// 
+        /// 技术背景：
+        /// - Item.UseAction 是 VPet 源码中的静态字典 (Dictionary&lt;string, List&lt;Func&lt;Item, bool&gt;&gt;&gt;)
+        /// - 当用户在物品栏点击使用物品时，Item.Use() 方法会遍历 UseAction 中的处理器
+        /// - 通过向 UseAction 注册自定义处理器，可以监听所有物品使用事件
+        /// - 但此 API 在当前 NuGet 包版本中不可用
+        /// 
+        /// 等待条件：VPet 发布包含 Item.UseAction 的新 NuGet 包版本
+        /// 相关源码位置：VPet/VPet-Simulator.Windows.Interface/Mod/Item.cs
+        /// </summary>
+        private void RegisterItemUseHook()
+        {
+            // TODO: 等待 VPet 更新 NuGet 包后启用此功能
+            // Item.UseAction 在 NuGet 包 1.1.0.58 中不存在
+            // 此功能需要等待 VPet 发布包含 UseAction 的新版本
+            Utils.Logger.Log("Item use hook is disabled: Item.UseAction not available in NuGet package 1.1.0.58");
+            Utils.Logger.Log("To enable this feature, wait for VPet to release a new NuGet package with UseAction support");
+            
+            // 启用后的实现方案：
+            // foreach (var itemType in _hookedItemTypes)
+            // {
+            //     if (!Item.UseAction.ContainsKey(itemType))
+            //         Item.UseAction[itemType] = new List<Func<Item, bool>>();
+            //     Item.UseAction[itemType].Insert(0, OnItemUseHookFunc);
+            // }
+        }
+        
+        // 记录 Hook 类型
+        private string _useActionHookType = null;
+
+        /// <summary>
+        /// 注销物品使用 Hook
+        /// </summary>
+        private void UnregisterItemUseHook()
+        {
+            // 功能已禁用，无需注销
+        }
+
+        /// <summary>
+        /// 物品使用 Hook 处理器（Action 类型，无返回值）
+        /// </summary>
+        private void OnItemUseHookAction(Item item)
+        {
+            OnItemUseHookInternal(item);
+        }
+        
+        /// <summary>
+        /// 物品使用 Hook 处理器（Func 类型，返回 bool）
+        /// </summary>
+        private bool OnItemUseHookFunc(Item item)
+        {
+            OnItemUseHookInternal(item);
+            return false; // 返回 false 让其他处理器继续执行
+        }
+        
+        /// <summary>
+        /// 物品使用 Hook 内部处理逻辑
+        /// </summary>
+        private void OnItemUseHookInternal(Item item)
+        {
+            try
+            {
+                // 检查是否为默认插件
+                if (!IsVPetLLMDefaultPlugin())
+                {
+                    return; // 不是默认插件，直接返回
+                }
+                
+                Utils.Logger.Log($"Item use detected via hook: {item.Name} (type: {item.ItemType}, count: {item.Count})");
+                
+                // 检查是否在时间窗口内有 TakeItemHandle 事件（区分购买和使用）
+                bool isFromPurchase = false;
+                lock (_takeItemLock)
+                {
+                    var timeSinceLastHandle = (DateTime.Now - _lastTakeItemHandleTime).TotalMilliseconds;
+                    
+                    // 如果在时间窗口内有 TakeItemHandle 事件，且物品名称匹配
+                    if (timeSinceLastHandle < TAKE_ITEM_WINDOW_MS && 
+                        _lastTakeItemHandleName == item.Name)
+                    {
+                        // 这是商店购买，不是物品栏使用
+                        isFromPurchase = true;
+                        Utils.Logger.Log($"OnItemUseHook: {item.Name} - matched TakeItemHandle (source: {_lastTakeItemHandleSource}), treating as purchase");
+                    }
+                }
+                
+                // 只处理物品栏使用，不处理购买
+                if (!isFromPurchase)
+                {
+                    // 通知 AI 物品被使用
+                    // 使用 Task.Run 在后台线程处理，避免阻塞 UI 线程
+                    var itemName = item.Name;
+                    var food = item as Food;
+                    
+                    Task.Run(() =>
+                    {
+                        try
+                        {
+                            if (_purchaseService != null && food != null)
+                            {
+                                // 使用 "use" 来源标记物品使用
+                                _purchaseService.HandlePurchase(food, 1, "use");
+                            }
+                            else if (food == null)
+                            {
+                                Utils.Logger.Log($"OnItemUseHook: Item {itemName} is not a Food, skipping purchase service");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Utils.Logger.Log($"Error in OnItemUseHook background task: {ex.Message}");
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"Error in OnItemUseHook: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 注册物品使用事件监听器（已弃用，保留兼容）
+        /// 通过 Event_TakeItem 监听物品使用，并使用时间窗口区分来源
+        /// </summary>
+        private void RegisterItemUseEventHandler()
+        {
+            // 此方法已弃用，使用 RegisterItemUseHook 代替
+            Utils.Logger.Log("RegisterItemUseEventHandler is deprecated, use RegisterItemUseHook instead");
+        }
+
+        /// <summary>
+        /// 注销物品使用事件监听器（已弃用，保留兼容）
+        /// </summary>
+        private void UnregisterItemUseEventHandler()
+        {
+            // 此方法已弃用，使用 UnregisterItemUseHook 代替
+            Utils.Logger.Log("UnregisterItemUseEventHandler is deprecated, use UnregisterItemUseHook instead");
+        }
+
+        /// <summary>
+        /// Event_TakeItem 事件处理器（已弃用）
+        /// 检测物品使用来源（物品栏 vs 商店购买）
+        /// </summary>
+        private void OnEventTakeItem(Food food)
+        {
+            // 此方法已弃用，使用 OnItemUseHook 代替
+        }
+
+        /// <summary>
+        /// 物品使用事件处理器（Func 类型，返回 bool）- 已弃用
+        /// </summary>
+        private bool OnItemUseFuncHandler(Item item)
+        {
+            return false;
+        }
+
+        /// <summary>
+        /// 物品使用事件处理器（Action 类型，无返回值）- 已弃用
+        /// </summary>
+        private void OnItemUseActionHandler(Item item)
+        {
+        }
+
+        /// <summary>
+        /// 物品使用事件内部处理逻辑 - 已弃用
+        /// </summary>
+        private void OnItemUseInternal(Item item)
+        {
         }
 
         public void UpdateChatCore(IChatCore newChatCore)

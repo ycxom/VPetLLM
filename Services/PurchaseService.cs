@@ -4,7 +4,7 @@ using VPetLLM.Utils;
 namespace VPetLLM.Services
 {
     /// <summary>
-    /// 购买事件服务实现
+    /// 购买事件服务实现 - 支持通用物品系统
     /// </summary>
     public class PurchaseService : IPurchaseService
     {
@@ -57,7 +57,10 @@ namespace VPetLLM.Services
                 // 使用PurchaseSourceDetector模块检测购买来源
                 var purchaseSource = PurchaseSourceDetector.DetectPurchaseSource(source);
                 string sourceDescription = PurchaseSourceDetector.GetPurchaseSourceDescription(purchaseSource);
-                Logger.Log($"Purchase source detected: {sourceDescription} (from: {source})");
+                
+                // 获取物品类型（使用反射兼容新旧版本）
+                string itemType = GetItemType(food);
+                Logger.Log($"Purchase source detected: {sourceDescription} (from: {source}, itemType: {itemType})");
 
                 // 判断是否应该触发AI反馈
                 if (!PurchaseSourceDetector.ShouldTriggerAIFeedback(source))
@@ -73,7 +76,7 @@ namespace VPetLLM.Services
                 }
 
                 // 添加到批处理队列
-                AddToPurchaseBatch(food, count);
+                AddToPurchaseBatch(food, count, itemType);
             }
             catch (Exception ex)
             {
@@ -82,11 +85,38 @@ namespace VPetLLM.Services
             }
         }
 
-        private void AddToPurchaseBatch(Food food, int count = 1)
+        /// <summary>
+        /// 获取物品类型（兼容新旧版本）
+        /// </summary>
+        private string GetItemType(Food food)
+        {
+            try
+            {
+                // 尝试获取 ItemType 属性（新版本 VPet）
+                var itemTypeProperty = food.GetType().GetProperty("ItemType");
+                if (itemTypeProperty != null)
+                {
+                    var value = itemTypeProperty.GetValue(food) as string;
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        return value;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"GetItemType reflection failed: {ex.Message}");
+            }
+            
+            // 默认返回 "Food"
+            return "Food";
+        }
+
+        private void AddToPurchaseBatch(Food food, int count, string itemType)
         {
             lock (_purchaseLock)
             {
-                var existingItem = _pendingPurchases.FirstOrDefault(p => p.Name == food.Name);
+                var existingItem = _pendingPurchases.FirstOrDefault(p => p.Name == food.Name && p.ItemType == itemType);
                 if (existingItem != null)
                 {
                     existingItem.Quantity += count;
@@ -95,15 +125,20 @@ namespace VPetLLM.Services
                 }
                 else
                 {
-                    _pendingPurchases.Add(new PurchaseItem
+                    var purchaseItem = new PurchaseItem
                     {
                         Name = food.Name,
-                        Type = food.Type,
+                        ItemType = itemType,
+                        FoodType = food.Type,
                         Price = food.Price,
                         PurchaseTime = DateTime.Now,
-                        Quantity = count
-                    });
-                    Logger.Log($"Added new purchase item: {food.Name} x{count}");
+                        Quantity = count,
+                        Description = food.Desc ?? "",
+                        OriginalFood = food
+                    };
+                    
+                    _pendingPurchases.Add(purchaseItem);
+                    Logger.Log($"Added new purchase item: {food.Name} x{count} (type: {itemType})");
                 }
 
                 ResetPurchaseTimer();
@@ -193,14 +228,14 @@ namespace VPetLLM.Services
                 var firstItem = purchases[0];
                 return template
                     .Replace("{ItemName}", firstItem.Name)
-                    .Replace("{ItemType}", GetItemTypeName(firstItem.Type))
+                    .Replace("{ItemType}", GetItemTypeName(firstItem.ItemType, firstItem.FoodType))
                     .Replace("{ItemPrice}", firstItem.Price.ToString("F2"))
                     .Replace("{EmotionState}", GetCurrentEmotionState());
             }
 
             var itemList = new List<string>();
             double totalPrice = 0;
-            var itemsByType = purchases.GroupBy(p => p.Type).ToList();
+            var itemsByType = purchases.GroupBy(p => p.ItemType).ToList();
 
             foreach (var purchase in purchases)
             {
@@ -215,7 +250,7 @@ namespace VPetLLM.Services
             foreach (var typeGroup in itemsByType)
             {
                 int totalQuantity = typeGroup.Sum(p => p.Quantity);
-                string typeName = GetItemTypeName(typeGroup.Key);
+                string typeName = GetItemTypeName(typeGroup.Key, typeGroup.First().FoodType);
                 typeStats.Add($"{typeName}({totalQuantity}个)");
             }
 
@@ -236,19 +271,49 @@ namespace VPetLLM.Services
             return message;
         }
 
-        private string GetItemTypeName(Food.FoodType type)
+        /// <summary>
+        /// 获取物品类型名称（支持通用 Item 系统）
+        /// </summary>
+        private string GetItemTypeName(string itemType, Food.FoodType? foodType = null)
         {
-            string key = type switch
+            // 如果是 Food 类型且有具体的 FoodType，使用更详细的分类
+            if (itemType == "Food" && foodType.HasValue)
             {
-                Food.FoodType.Food => "ItemType.Food",
-                Food.FoodType.Drink => "ItemType.Drink",
-                Food.FoodType.Drug => "ItemType.Drug",
-                Food.FoodType.Gift => "ItemType.Gift",
+                string key = foodType.Value switch
+                {
+                    Food.FoodType.Food => "ItemType.Food",
+                    Food.FoodType.Drink => "ItemType.Drink",
+                    Food.FoodType.Drug => "ItemType.Drug",
+                    Food.FoodType.Gift => "ItemType.Gift",
+                    _ => "ItemType.General"
+                };
+
+                string result = LanguageHelper.Get(key, _settings.Language);
+                if (!string.IsNullOrEmpty(result) && !result.Contains("["))
+                {
+                    return result;
+                }
+                return foodType.Value.ToString().ToLower();
+            }
+            
+            // 通用 Item 类型处理
+            string itemKey = itemType switch
+            {
+                "Food" => "ItemType.Food",
+                "Tool" => "ItemType.Tool",
+                "Toy" => "ItemType.Toy",
+                "Item" => "ItemType.Item",
                 _ => "ItemType.General"
             };
 
-            string result = LanguageHelper.Get(key, _settings.Language);
-            return string.IsNullOrEmpty(result) || result.Contains("[") ? type.ToString().ToLower() : result;
+            string itemResult = LanguageHelper.Get(itemKey, _settings.Language);
+            if (!string.IsNullOrEmpty(itemResult) && !itemResult.Contains("["))
+            {
+                return itemResult;
+            }
+            
+            // 降级：返回原始类型名
+            return itemType.ToLower();
         }
 
         private string GetCurrentEmotionState()

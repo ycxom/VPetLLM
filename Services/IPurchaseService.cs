@@ -3,7 +3,7 @@ using VPet_Simulator.Windows.Interface;
 namespace VPetLLM.Services
 {
     /// <summary>
-    /// 购买物品信息
+    /// 购买物品信息 - 支持通用物品系统
     /// </summary>
     public class PurchaseItem
     {
@@ -13,9 +13,14 @@ namespace VPetLLM.Services
         public string Name { get; set; } = "";
         
         /// <summary>
-        /// 物品类型
+        /// 物品类型（通用字符串类型，支持 Item、Food、Tool、Toy 等）
         /// </summary>
-        public Food.FoodType Type { get; set; }
+        public string ItemType { get; set; } = "Food";
+        
+        /// <summary>
+        /// 食物类型（仅当 ItemType 为 Food 时有效，保持向后兼容）
+        /// </summary>
+        public Food.FoodType? FoodType { get; set; }
         
         /// <summary>
         /// 物品价格
@@ -31,15 +36,25 @@ namespace VPetLLM.Services
         /// 购买数量
         /// </summary>
         public int Quantity { get; set; } = 1;
+        
+        /// <summary>
+        /// 物品描述
+        /// </summary>
+        public string Description { get; set; } = "";
+        
+        /// <summary>
+        /// 原始食物引用（用于向后兼容）
+        /// </summary>
+        public Food? OriginalFood { get; set; }
     }
 
     /// <summary>
-    /// 购买事件服务接口
+    /// 购买事件服务接口 - 支持通用物品系统
     /// </summary>
     public interface IPurchaseService : IDisposable
     {
         /// <summary>
-        /// 处理购买事件
+        /// 处理购买事件（Food 版本）
         /// </summary>
         /// <param name="food">购买的食物</param>
         /// <param name="count">购买数量</param>

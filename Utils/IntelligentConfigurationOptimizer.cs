@@ -123,6 +123,20 @@ namespace VPetLLM.Utils
         {
             try
             {
+                // 跳过特殊类型，这些类型有复杂的构造函数或依赖
+                var skipTypes = new[]
+                {
+                    "FloatingSidebarSettings",
+                    "ScreenshotSettings",
+                    "TouchFeedbackSettings"
+                };
+                
+                if (skipTypes.Contains(property.PropertyType.Name))
+                {
+                    // 这些类型已经在 Setting 构造函数中正确初始化
+                    return;
+                }
+
                 if (currentValue == null)
                 {
                     // 创建新的类实例
@@ -151,12 +165,33 @@ namespace VPetLLM.Utils
             if (obj == null) return;
 
             var objType = obj.GetType();
+            
+            // 跳过特殊类型的递归检查
+            var skipTypes = new[]
+            {
+                "FloatingSidebarSettings",
+                "ScreenshotSettings",
+                "TouchFeedbackSettings",
+                "SidebarButton"
+            };
+            
+            if (skipTypes.Contains(objType.Name))
+            {
+                return;
+            }
+            
             var properties = objType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
             foreach (var property in properties)
             {
                 var currentValue = property.GetValue(obj);
                 var propertyType = property.PropertyType;
+
+                // 跳过特殊类型
+                if (skipTypes.Contains(propertyType.Name))
+                {
+                    continue;
+                }
 
                 // 检查是否为列表类型
                 if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(List<>))

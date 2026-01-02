@@ -272,6 +272,14 @@ namespace VPetLLM.Core
                     
                     parts.Add(PromptHelper.Get("Available_Items_Prefix", lang)
                                 .Replace("{ItemList}", simplifiedList + fuzzySearchHint));
+                    
+                    // 添加物品栏信息（桌宠已拥有的物品）
+                    var inventorySummary = searchService.GetInventorySummary(lang);
+                    if (!string.IsNullOrEmpty(inventorySummary) && inventorySummary != (lang == "zh" ? "物品栏为空" : "Inventory is empty"))
+                    {
+                        parts.Add(PromptHelper.Get("Available_Inventory_Prefix", lang)
+                                    .Replace("{InventoryList}", inventorySummary));
+                    }
                 }
             }
 

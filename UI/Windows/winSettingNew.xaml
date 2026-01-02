@@ -1025,357 +1025,357 @@
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernCheckBox}"/>
 
-                                <StackPanel IsEnabled="{Binding ElementName=CheckBox_TTS_IsEnabled, Path=IsChecked}">
-                                    <Label Content="{utils:Localize KeyPath=TTS.Provider}"
+                                        <StackPanel IsEnabled="{Binding ElementName=CheckBox_TTS_IsEnabled, Path=IsChecked}">
+                                            <Label Content="{utils:Localize KeyPath=TTS.Provider}"
                                             x:Name="Label_TTS_Provider"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_Provider"
+                                            <ComboBox x:Name="ComboBox_TTS_Provider"
                                             Margin="0,0,0,16"
                                             SelectionChanged="ComboBox_TTS_Provider_SelectionChanged"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="URL" Tag="URL" IsSelected="True"/>
-                                        <ComboBoxItem Content="OpenAI" Tag="OpenAI"/>
-                                        <ComboBoxItem Content="DIY" Tag="DIY"/>
-                                        <ComboBoxItem Content="GPT-SoVITS" Tag="GPT-SoVITS"/>
-                                        <ComboBoxItem Content="Free" Tag="Free"/>
-                                        <ComboBox.ItemContainerStyle>
-                                            <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
-                                                <Setter Property="Padding" Value="12,8"/>
-                                                <Setter Property="FontSize" Value="14"/>
-                                                <Setter Property="ContentTemplate">
-                                                    <Setter.Value>
-                                                        <DataTemplate>
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <Border x:Name="ItemIcon"
+                                                <ComboBoxItem Content="URL" Tag="URL" IsSelected="True"/>
+                                                <ComboBoxItem Content="OpenAI" Tag="OpenAI"/>
+                                                <ComboBoxItem Content="DIY" Tag="DIY"/>
+                                                <ComboBoxItem Content="GPT-SoVITS" Tag="GPT-SoVITS"/>
+                                                <ComboBoxItem Content="Free" Tag="Free"/>
+                                                <ComboBox.ItemContainerStyle>
+                                                    <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                                                        <Setter Property="Padding" Value="12,8"/>
+                                                        <Setter Property="FontSize" Value="14"/>
+                                                        <Setter Property="ContentTemplate">
+                                                            <Setter.Value>
+                                                                <DataTemplate>
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <Border x:Name="ItemIcon"
                                                                         Background="{StaticResource AccentBrush}"
                                                                         CornerRadius="3"
                                                                         Width="18"
                                                                         Height="18"
                                                                         Margin="0,0,8,0">
-                                                                    <TextBlock x:Name="ItemIconText"
+                                                                            <TextBlock x:Name="ItemIconText"
                                                                             Text="🔊"
                                                                             FontSize="9"
                                                                             Foreground="White"
                                                                             HorizontalAlignment="Center"
                                                                             VerticalAlignment="Center"/>
-                                                                </Border>
-                                                                <TextBlock Text="{Binding}"
+                                                                        </Border>
+                                                                        <TextBlock Text="{Binding}"
                                                                         VerticalAlignment="Center"/>
-                                                            </StackPanel>
-                                                            <DataTemplate.Triggers>
-                                                                <DataTrigger Binding="{Binding}" Value="URL">
-                                                                    <Setter TargetName="ItemIconText" Property="Text" Value="🌐"/>
-                                                                    <Setter TargetName="ItemIcon" Property="Background" Value="#FF6B35"/>
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding}" Value="OpenAI">
-                                                                    <Setter TargetName="ItemIconText" Property="Text" Value="AI"/>
-                                                                    <Setter TargetName="ItemIcon" Property="Background" Value="#10A37F"/>
-                                                                </DataTrigger>
-                                                            </DataTemplate.Triggers>
-                                                        </DataTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </ComboBox.ItemContainerStyle>
-                                    </ComboBox>
+                                                                    </StackPanel>
+                                                                    <DataTemplate.Triggers>
+                                                                        <DataTrigger Binding="{Binding}" Value="URL">
+                                                                            <Setter TargetName="ItemIconText" Property="Text" Value="🌐"/>
+                                                                            <Setter TargetName="ItemIcon" Property="Background" Value="#FF6B35"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding}" Value="OpenAI">
+                                                                            <Setter TargetName="ItemIconText" Property="Text" Value="AI"/>
+                                                                            <Setter TargetName="ItemIcon" Property="Background" Value="#10A37F"/>
+                                                                        </DataTrigger>
+                                                                    </DataTemplate.Triggers>
+                                                                </DataTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
+                                                </ComboBox.ItemContainerStyle>
+                                            </ComboBox>
 
-                                    <CheckBox x:Name="CheckBox_TTS_OnlyPlayAIResponse"
+                                            <CheckBox x:Name="CheckBox_TTS_OnlyPlayAIResponse"
                                             Content="{utils:Localize KeyPath=TTS.OnlyPlayAIResponse}"
                                             Margin="0,0,0,16"
                                             IsChecked="True"
                                             Style="{StaticResource ModernCheckBox}"/>
 
-                                    <CheckBox x:Name="CheckBox_TTS_UseQueueDownload"
+                                            <CheckBox x:Name="CheckBox_TTS_UseQueueDownload"
                                             Content="{utils:Localize KeyPath=TTS.UseQueueDownload}"
                                             Margin="0,0,0,16"
                                             IsChecked="False"
                                             Style="{StaticResource ModernCheckBox}"/>
 
-                                    <StackPanel Orientation="Horizontal"
+                                            <StackPanel Orientation="Horizontal"
                                             Margin="0,0,0,12">
-                                        <TextBlock Text="{utils:Localize KeyPath=TTS.Volume, Suffix=:}"
+                                                <TextBlock Text="{utils:Localize KeyPath=TTS.Volume, Suffix=:}"
                                                 Width="80"
                                                 VerticalAlignment="Center"
                                                 x:Name="TextBlock_TTS_Volume"
                                                 Foreground="{StaticResource PrimaryTextBrush}"
                                                 FontSize="14"/>
-                                        <Slider x:Name="Slider_TTS_Volume"
+                                                <Slider x:Name="Slider_TTS_Volume"
                                                 Minimum="0"
                                                 Maximum="100"
                                                 Value="100"
                                                 Width="125"
                                                 Margin="10,0"
                                                 VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TextBlock_TTS_VolumeValue"
+                                                <TextBlock x:Name="TextBlock_TTS_VolumeValue"
                                                 Width="40"
                                                 VerticalAlignment="Center"
                                                 Foreground="{StaticResource SecondaryTextBrush}"
                                                 FontSize="14"/>
-                                    </StackPanel>
+                                            </StackPanel>
 
-                                    <StackPanel Orientation="Horizontal"
+                                            <StackPanel Orientation="Horizontal"
                                             Margin="0,0,0,12">
-                                        <TextBlock Width="80"
+                                                <TextBlock Width="80"
                                                 VerticalAlignment="Center"
                                                 x:Name="TextBlock_TTS_VolumeGain"
                                                 Foreground="{StaticResource PrimaryTextBrush}"
                                                 FontSize="14"/>
-                                        <Slider x:Name="Slider_TTS_VolumeGain"
+                                                <Slider x:Name="Slider_TTS_VolumeGain"
                                                 Minimum="-20"
                                                 Maximum="40"
                                                 Value="0"
                                                 Width="125"
                                                 Margin="10,0"
                                                 VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TextBlock_TTS_VolumeGainValue"
+                                                <TextBlock x:Name="TextBlock_TTS_VolumeGainValue"
                                                 Width="50"
                                                 VerticalAlignment="Center"
                                                 Foreground="{StaticResource SecondaryTextBrush}"
                                                 FontSize="14"/>
-                                        <TextBlock Text="dB"
+                                                <TextBlock Text="dB"
                                                 VerticalAlignment="Center"
                                                 Foreground="{StaticResource SecondaryTextBrush}"
                                                 FontSize="12"
                                                 Margin="2,0,0,0"/>
-                                    </StackPanel>
+                                            </StackPanel>
 
-                                    <StackPanel Orientation="Horizontal"
+                                            <StackPanel Orientation="Horizontal"
                                             Margin="0,0,0,16">
-                                        <TextBlock Text="{utils:Localize KeyPath=TTS.Speed, Suffix=:}"
+                                                <TextBlock Text="{utils:Localize KeyPath=TTS.Speed, Suffix=:}"
                                                 Width="80"
                                                 VerticalAlignment="Center"
                                                 x:Name="TextBlock_TTS_Speed"
                                                 Foreground="{StaticResource PrimaryTextBrush}"
                                                 FontSize="14"/>
-                                        <Slider x:Name="Slider_TTS_Speed"
+                                                <Slider x:Name="Slider_TTS_Speed"
                                                 Minimum="0.5"
                                                 Maximum="2.0"
                                                 Value="1"
                                                 Width="125"
                                                 Margin="10,0"
                                                 VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TextBlock_TTS_SpeedValue"
+                                                <TextBlock x:Name="TextBlock_TTS_SpeedValue"
                                                 Width="40"
                                                 VerticalAlignment="Center"
                                                 Foreground="{StaticResource SecondaryTextBrush}"
                                                 FontSize="14"/>
-                                    </StackPanel>
+                                            </StackPanel>
 
-                                    <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
-                                        <Button x:Name="Button_TTS_Test"
+                                            <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
+                                                <Button x:Name="Button_TTS_Test"
                                                 Click="Button_TTS_Test_Click"
                                                 Style="{StaticResource ModernButton}"/>
-                                    </WrapPanel>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </ScrollViewer>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </ScrollViewer>
 
-                    <ScrollViewer Grid.Column="1"
+                            <ScrollViewer Grid.Column="1"
                             VerticalScrollBarVisibility="Auto">
-                        <Border Style="{StaticResource CardContainer}">
-                            <StackPanel Style="{StaticResource SettingGroup}">
-                                <!-- URL TTS 配置 -->
-                                <StackPanel x:Name="Panel_TTS_URL"
+                                <Border Style="{StaticResource CardContainer}">
+                                    <StackPanel Style="{StaticResource SettingGroup}">
+                                        <!-- URL TTS 配置 -->
+                                        <StackPanel x:Name="Panel_TTS_URL"
                                         Visibility="Visible">
-                                    <TextBlock x:Name="TextBlock_TTS_URL_Config"
+                                            <TextBlock x:Name="TextBlock_TTS_URL_Config"
                                             Text="URL TTS 配置"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label x:Name="Label_TTS_URL_BaseUrl"
+                                            <Label x:Name="Label_TTS_URL_BaseUrl"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_URL_BaseUrl"
+                                            <TextBox x:Name="TextBox_TTS_URL_BaseUrl"
                                             Text="https://www.example.com"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label x:Name="Label_TTS_URL_Voice"
+                                            <Label x:Name="Label_TTS_URL_Voice"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_URL_Voice"
+                                            <TextBox x:Name="TextBox_TTS_URL_Voice"
                                             Text="36"
                                             Margin="0,0,0,8"
                                             Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="请输入语音模型ID，用于切换不同的语音模型（如：36为女声1，37为男声1等）"
+                                            <TextBlock Text="请输入语音模型ID，用于切换不同的语音模型（如：36为女声1，37为男声1等）"
                                             x:Name="TextBlock_TTS_URL_Voice_Tip"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label x:Name="Label_TTS_URL_RequestMethod"
+                                            <Label x:Name="Label_TTS_URL_RequestMethod"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_URL_RequestMethod"
+                                            <ComboBox x:Name="ComboBox_TTS_URL_RequestMethod"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="GET" Tag="GET" IsSelected="True"/>
-                                        <ComboBoxItem Content="POST" Tag="POST"/>
-                                    </ComboBox>
+                                                <ComboBoxItem Content="GET" Tag="GET" IsSelected="True"/>
+                                                <ComboBoxItem Content="POST" Tag="POST"/>
+                                            </ComboBox>
 
-                                    <TextBlock Text="URL TTS支持GET和POST请求方法，支持多种语音类型。"
+                                            <TextBlock Text="URL TTS支持GET和POST请求方法，支持多种语音类型。"
                                             x:Name="TextBlock_TTS_URL_Description"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
-                                </StackPanel>
+                                        </StackPanel>
 
-                                <!-- OpenAI TTS 配置 -->
-                                <StackPanel x:Name="Panel_TTS_OpenAI"
+                                        <!-- OpenAI TTS 配置 -->
+                                        <StackPanel x:Name="Panel_TTS_OpenAI"
                                         Visibility="Collapsed">
-                                    <TextBlock x:Name="TextBlock_TTS_OpenAI_Config"
+                                            <TextBlock x:Name="TextBlock_TTS_OpenAI_Config"
                                             Text="OpenAI TTS 配置"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label x:Name="Label_TTS_OpenAI_BaseUrl"
+                                            <Label x:Name="Label_TTS_OpenAI_BaseUrl"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_OpenAI_BaseUrl"
+                                            <TextBox x:Name="TextBox_TTS_OpenAI_BaseUrl"
                                             Text="https://api.fish.audio/v1/tts"
                                             Margin="0,0,0,8"
                                             Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="请输入完整的TTS API地址，包含完整路径（如：https://api.fish.audio/v1/tts）"
+                                            <TextBlock Text="请输入完整的TTS API地址，包含完整路径（如：https://api.fish.audio/v1/tts）"
                                             x:Name="TextBlock_TTS_OpenAI_BaseUrl_Tip"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label x:Name="Label_TTS_OpenAI_ApiKey"
+                                            <Label x:Name="Label_TTS_OpenAI_ApiKey"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_OpenAI_ApiKey"
+                                            <TextBox x:Name="TextBox_TTS_OpenAI_ApiKey"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label x:Name="Label_TTS_OpenAI_Model"
+                                            <Label x:Name="Label_TTS_OpenAI_Model"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <Grid Margin="0,0,0,16">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <ComboBox x:Name="ComboBox_TTS_OpenAI_Model"
+                                            <Grid Margin="0,0,0,16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="ComboBox_TTS_OpenAI_Model"
                                                 Grid.Column="0"
                                                 IsEditable="True"
                                                 Text="tts-1"
                                                 Margin="0,0,8,0"
                                                 Style="{StaticResource ModernComboBox}"/>
-                                        <Button x:Name="Button_TTS_OpenAI_RefreshModels"
+                                                <Button x:Name="Button_TTS_OpenAI_RefreshModels"
                                                 Grid.Column="1"
                                                 Content="刷新"
                                                 Click="Button_TTS_OpenAI_RefreshModels_Click"
                                                 Style="{StaticResource SecondaryButton}"
                                                 Padding="8,4"
                                                 FontSize="12"/>
-                                    </Grid>
+                                            </Grid>
 
-                                    <Label x:Name="Label_TTS_OpenAI_Voice"
+                                            <Label x:Name="Label_TTS_OpenAI_Voice"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_OpenAI_Voice"
+                                            <ComboBox x:Name="ComboBox_TTS_OpenAI_Voice"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="alloy" Tag="alloy" IsSelected="True"/>
-                                        <ComboBoxItem Content="echo" Tag="echo"/>
-                                        <ComboBoxItem Content="fable" Tag="fable"/>
-                                        <ComboBoxItem Content="onyx" Tag="onyx"/>
-                                        <ComboBoxItem Content="nova" Tag="nova"/>
-                                        <ComboBoxItem Content="shimmer" Tag="shimmer"/>
-                                    </ComboBox>
+                                                <ComboBoxItem Content="alloy" Tag="alloy" IsSelected="True"/>
+                                                <ComboBoxItem Content="echo" Tag="echo"/>
+                                                <ComboBoxItem Content="fable" Tag="fable"/>
+                                                <ComboBoxItem Content="onyx" Tag="onyx"/>
+                                                <ComboBoxItem Content="nova" Tag="nova"/>
+                                                <ComboBoxItem Content="shimmer" Tag="shimmer"/>
+                                            </ComboBox>
 
-                                    <Label x:Name="Label_TTS_OpenAI_Format"
+                                            <Label x:Name="Label_TTS_OpenAI_Format"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_OpenAI_Format"
+                                            <ComboBox x:Name="ComboBox_TTS_OpenAI_Format"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="mp3" Tag="mp3" IsSelected="True"/>
-                                        <ComboBoxItem Content="opus" Tag="opus"/>
-                                        <ComboBoxItem Content="aac" Tag="aac"/>
-                                        <ComboBoxItem Content="flac" Tag="flac"/>
-                                    </ComboBox>
+                                                <ComboBoxItem Content="mp3" Tag="mp3" IsSelected="True"/>
+                                                <ComboBoxItem Content="opus" Tag="opus"/>
+                                                <ComboBoxItem Content="aac" Tag="aac"/>
+                                                <ComboBoxItem Content="flac" Tag="flac"/>
+                                            </ComboBox>
 
-                                    <TextBlock Text="支持OpenAI TTS API格式的服务，如fish.audio等。需要提供有效的API Key。"
+                                            <TextBlock Text="支持OpenAI TTS API格式的服务，如fish.audio等。需要提供有效的API Key。"
                                             x:Name="TextBlock_TTS_OpenAI_Description"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
-                                </StackPanel>
-                                <!-- DIY TTS 配置 -->
-                                <StackPanel x:Name="Panel_TTS_DIY"
+                                        </StackPanel>
+                                        <!-- DIY TTS 配置 -->
+                                        <StackPanel x:Name="Panel_TTS_DIY"
                                         Visibility="Collapsed">
-                                    <TextBlock x:Name="TextBlock_TTS_DIY_Config"
+                                            <TextBlock x:Name="TextBlock_TTS_DIY_Config"
                                             Text="DIY TTS 配置"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,8"/>
 
-                                    <TextBlock x:Name="TextBlock_TTS_DIY_Description"
+                                            <TextBlock x:Name="TextBlock_TTS_DIY_Description"
                                             Text="自定义 TTS API 配置，支持灵活的请求定制"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <!-- 请求方法和 URL -->
-                                    <Label Content="请求配置" Style="{StaticResource SettingLabel}"/>
-                                    <Grid Margin="0,0,0,16">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <ComboBox x:Name="ComboBox_TTS_DIY_Method"
+                                            <!-- 请求方法和 URL -->
+                                            <Label Content="请求配置" Style="{StaticResource SettingLabel}"/>
+                                            <Grid Margin="0,0,0,16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="100"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="ComboBox_TTS_DIY_Method"
                                                 Grid.Column="0"
                                                 Margin="0,0,8,0"
                                                 Style="{StaticResource ModernComboBox}">
-                                            <ComboBoxItem Content="POST" IsSelected="True"/>
-                                            <ComboBoxItem Content="GET"/>
-                                        </ComboBox>
-                                        <TextBox x:Name="TextBox_TTS_DIY_BaseUrl"
+                                                    <ComboBoxItem Content="POST" IsSelected="True"/>
+                                                    <ComboBoxItem Content="GET"/>
+                                                </ComboBox>
+                                                <TextBox x:Name="TextBox_TTS_DIY_BaseUrl"
                                                 Grid.Column="1"
                                                 Style="{StaticResource ModernTextBox}"
                                                 Text="https://api.example.com/tts"/>
-                                    </Grid>
+                                            </Grid>
 
-                                    <!-- Content-Type -->
-                                    <Label Content="Content-Type" Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_DIY_ContentType"
+                                            <!-- Content-Type -->
+                                            <Label Content="Content-Type" Style="{StaticResource SettingLabel}"/>
+                                            <TextBox x:Name="TextBox_TTS_DIY_ContentType"
                                             Style="{StaticResource ModernTextBox}"
                                             Text="application/json"
                                             Margin="0,0,0,16"/>
 
-                                    <!-- 自定义请求头 -->
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Label Content="自定义请求头 (Headers)" Style="{StaticResource SettingLabel}"/>
-                                        <Button x:Name="Button_TTS_DIY_AddHeader"
+                                            <!-- 自定义请求头 -->
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Label Content="自定义请求头 (Headers)" Style="{StaticResource SettingLabel}"/>
+                                                <Button x:Name="Button_TTS_DIY_AddHeader"
                                                 Grid.Column="1"
                                                 Content="+ 添加"
                                                 Click="Button_TTS_DIY_AddHeader_Click"
                                                 Style="{StaticResource ModernButton}"
                                                 Padding="12,4"/>
-                                    </Grid>
-                                    <DataGrid x:Name="DataGrid_TTS_DIY_Headers"
+                                            </Grid>
+                                            <DataGrid x:Name="DataGrid_TTS_DIY_Headers"
                                             AutoGenerateColumns="False"
                                             CanUserAddRows="False"
                                             Height="150"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernDataGrid}">
-                                        <DataGrid.Columns>
-                                            <DataGridCheckBoxColumn Header="启用" Binding="{Binding IsEnabled}" Width="60"/>
-                                            <DataGridTextColumn Header="Key" Binding="{Binding Key}" Width="*"/>
-                                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
-                                            <DataGridTemplateColumn Header="操作" Width="80">
-                                                <DataGridTemplateColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <Button Content="删除"
+                                                <DataGrid.Columns>
+                                                    <DataGridCheckBoxColumn Header="启用" Binding="{Binding IsEnabled}" Width="60"/>
+                                                    <DataGridTextColumn Header="Key" Binding="{Binding Key}" Width="*"/>
+                                                    <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
+                                                    <DataGridTemplateColumn Header="操作" Width="80">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="删除"
                                                                 Click="Button_TTS_DIY_DeleteHeader_Click"
                                                                 Style="{StaticResource ModernButton}"
                                                                 Padding="8,2"
                                                                 FontSize="12"/>
-                                                    </DataTemplate>
-                                                </DataGridTemplateColumn.CellTemplate>
-                                            </DataGridTemplateColumn>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
 
-                                    <!-- 请求体 -->
-                                    <Label Content="请求体 (Body)" Style="{StaticResource SettingLabel}"/>
-                                    <TextBlock Text="使用 {text} 作为文本占位符"
+                                            <!-- 请求体 -->
+                                            <Label Content="请求体 (Body)" Style="{StaticResource SettingLabel}"/>
+                                            <TextBlock Text="使用 {text} 作为文本占位符"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,8"/>
-                                    <TextBox x:Name="TextBox_TTS_DIY_RequestBody"
+                                            <TextBox x:Name="TextBox_TTS_DIY_RequestBody"
                                             Style="{StaticResource ModernTextBox}"
                                             AcceptsReturn="True"
                                             TextWrapping="Wrap"
@@ -1383,718 +1383,720 @@
                                             Height="120"
                                             FontFamily="Consolas"
                                             Margin="0,0,0,16">
-                                        <TextBox.Text><![CDATA[{
+                                                <TextBox.Text>
+                                                    <![CDATA[{
   "text": "{text}",
   "voice": "default",
   "format": "mp3"
-}]]></TextBox.Text>
-                                    </TextBox>
+}]]>
+                                                </TextBox.Text>
+                                            </TextBox>
 
-                                    <!-- 响应格式 -->
-                                    <Label Content="响应音频格式" Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_DIY_ResponseFormat"
+                                            <!-- 响应格式 -->
+                                            <Label Content="响应音频格式" Style="{StaticResource SettingLabel}"/>
+                                            <ComboBox x:Name="ComboBox_TTS_DIY_ResponseFormat"
                                             Style="{StaticResource ModernComboBox}"
                                             Margin="0,0,0,16">
-                                        <ComboBoxItem Content="mp3" IsSelected="True"/>
-                                        <ComboBoxItem Content="wav"/>
-                                        <ComboBoxItem Content="ogg"/>
-                                        <ComboBoxItem Content="flac"/>
-                                        <ComboBoxItem Content="aac"/>
-                                    </ComboBox>
+                                                <ComboBoxItem Content="mp3" IsSelected="True"/>
+                                                <ComboBoxItem Content="wav"/>
+                                                <ComboBoxItem Content="ogg"/>
+                                                <ComboBoxItem Content="flac"/>
+                                                <ComboBoxItem Content="aac"/>
+                                            </ComboBox>
 
-                                    <!-- 测试按钮 -->
-                                    <Button x:Name="Button_TTS_DIY_Test"
+                                            <!-- 测试按钮 -->
+                                            <Button x:Name="Button_TTS_DIY_Test"
                                             Content="🔊 测试 TTS"
                                             Click="Button_TTS_DIY_Test_Click"
                                             Style="{StaticResource ModernButton}"
                                             Margin="0,8,0,0"/>
-                                </StackPanel>
+                                        </StackPanel>
 
-                                <!-- GPT-SoVITS TTS 配置 -->
-                                <StackPanel x:Name="Panel_TTS_GPTSoVITS"
+                                        <!-- GPT-SoVITS TTS 配置 -->
+                                        <StackPanel x:Name="Panel_TTS_GPTSoVITS"
                                         Visibility="Collapsed">
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.Config}"
+                                            <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.Config}"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,8"/>
-                                    
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.Description}"
+
+                                            <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.Description}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <!-- API 模式选择 -->
-                                    <Label Content="API 模式"
+                                            <!-- API 模式选择 -->
+                                            <Label Content="API 模式"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_ApiMode"
+                                            <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_ApiMode"
                                             Margin="0,0,0,8"
                                             SelectionChanged="ComboBox_TTS_GPTSoVITS_ApiMode_SelectionChanged"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="整合包网页" Tag="WebUI" IsSelected="True"/>
-                                        <ComboBoxItem Content="API v2" Tag="ApiV2"/>
-                                    </ComboBox>
-                                    <TextBlock Text="整合包网页模式使用 /infer_single 端点；API v2 模式使用官方 /tts 端点"
+                                                <ComboBoxItem Content="整合包网页" Tag="WebUI" IsSelected="True"/>
+                                                <ComboBoxItem Content="API v2" Tag="ApiV2"/>
+                                            </ComboBox>
+                                            <TextBlock Text="整合包网页模式使用 /infer_single 端点；API v2 模式使用官方 /tts 端点"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.BaseUrl}"
+                                            <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.BaseUrl}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <Grid Margin="0,0,0,16">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_BaseUrl"
+                                            <Grid Margin="0,0,0,16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_BaseUrl"
                                                 Grid.Column="0"
                                                 Margin="0,0,8,0"
                                                 Style="{StaticResource ModernTextBox}"/>
-                                        <Button x:Name="Button_TTS_GPTSoVITS_DetectVersion"
+                                                <Button x:Name="Button_TTS_GPTSoVITS_DetectVersion"
                                                 Grid.Column="1"
                                                 Content="{utils:Localize KeyPath=TTS.GPTSoVITS.DetectVersion}"
                                                 Click="Button_TTS_GPTSoVITS_DetectVersion_Click"
                                                 Padding="12,6"
                                                 Style="{StaticResource ModernButton}"/>
-                                    </Grid>
+                                            </Grid>
 
-                                    <!-- API v2 专用设置面板 -->
-                                    <StackPanel x:Name="Panel_TTS_GPTSoVITS_ApiV2"
+                                            <!-- API v2 专用设置面板 -->
+                                            <StackPanel x:Name="Panel_TTS_GPTSoVITS_ApiV2"
                                             Visibility="Collapsed">
-                                        <TextBlock Text="API v2 设置"
+                                                <TextBlock Text="API v2 设置"
                                                 Style="{StaticResource SectionHeader}"
                                                 FontSize="14"
                                                 Margin="0,0,0,8"/>
 
-                                        <Label Content="参考音频路径 (必需)"
+                                                <Label Content="参考音频路径 (必需)"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_RefAudioPath"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_RefAudioPath"
                                                 Margin="0,0,0,8"
                                                 Style="{StaticResource ModernTextBox}"/>
-                                        <TextBlock Text="服务器上的参考音频文件路径，用于声音克隆"
+                                                <TextBlock Text="服务器上的参考音频文件路径，用于声音克隆"
                                                 Style="{StaticResource DescriptionText}"
                                                 Margin="0,0,0,16"/>
 
-                                        <Label Content="提示文本"
+                                                <Label Content="提示文本"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_PromptTextV2"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_PromptTextV2"
                                                 Margin="0,0,0,8"
                                                 Style="{StaticResource ModernTextBox}"/>
-                                        <TextBlock Text="参考音频对应的文本内容（可选）"
+                                                <TextBlock Text="参考音频对应的文本内容（可选）"
                                                 Style="{StaticResource DescriptionText}"
                                                 Margin="0,0,0,16"/>
 
-                                        <Label Content="提示语言"
+                                                <Label Content="提示语言"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_PromptLangV2"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_PromptLangV2"
                                                 Margin="0,0,0,16"
                                                 Style="{StaticResource ModernComboBox}">
-                                            <ComboBoxItem Content="中文" Tag="zh" IsSelected="True"/>
-                                            <ComboBoxItem Content="英文" Tag="en"/>
-                                            <ComboBoxItem Content="日文" Tag="ja"/>
-                                            <ComboBoxItem Content="韩文" Tag="ko"/>
-                                            <ComboBoxItem Content="粤语" Tag="yue"/>
-                                            <ComboBoxItem Content="自动" Tag="auto"/>
-                                        </ComboBox>
+                                                    <ComboBoxItem Content="中文" Tag="zh" IsSelected="True"/>
+                                                    <ComboBoxItem Content="英文" Tag="en"/>
+                                                    <ComboBoxItem Content="日文" Tag="ja"/>
+                                                    <ComboBoxItem Content="韩文" Tag="ko"/>
+                                                    <ComboBoxItem Content="粤语" Tag="yue"/>
+                                                    <ComboBoxItem Content="自动" Tag="auto"/>
+                                                </ComboBox>
 
-                                        <Label Content="合成文本语言"
+                                                <Label Content="合成文本语言"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_TextLangV2"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_TextLangV2"
                                                 Margin="0,0,0,16"
                                                 Style="{StaticResource ModernComboBox}">
-                                            <ComboBoxItem Content="中文" Tag="zh" IsSelected="True"/>
-                                            <ComboBoxItem Content="英文" Tag="en"/>
-                                            <ComboBoxItem Content="日文" Tag="ja"/>
-                                            <ComboBoxItem Content="韩文" Tag="ko"/>
-                                            <ComboBoxItem Content="粤语" Tag="yue"/>
-                                            <ComboBoxItem Content="自动" Tag="auto"/>
-                                            <ComboBoxItem Content="全中文" Tag="all_zh"/>
-                                            <ComboBoxItem Content="全日文" Tag="all_ja"/>
-                                            <ComboBoxItem Content="全韩文" Tag="all_ko"/>
-                                            <ComboBoxItem Content="全粤语" Tag="all_yue"/>
-                                        </ComboBox>
+                                                    <ComboBoxItem Content="中文" Tag="zh" IsSelected="True"/>
+                                                    <ComboBoxItem Content="英文" Tag="en"/>
+                                                    <ComboBoxItem Content="日文" Tag="ja"/>
+                                                    <ComboBoxItem Content="韩文" Tag="ko"/>
+                                                    <ComboBoxItem Content="粤语" Tag="yue"/>
+                                                    <ComboBoxItem Content="自动" Tag="auto"/>
+                                                    <ComboBoxItem Content="全中文" Tag="all_zh"/>
+                                                    <ComboBoxItem Content="全日文" Tag="all_ja"/>
+                                                    <ComboBoxItem Content="全韩文" Tag="all_ko"/>
+                                                    <ComboBoxItem Content="全粤语" Tag="all_yue"/>
+                                                </ComboBox>
 
-                                        <Label Content="文本切分方法"
+                                                <Label Content="文本切分方法"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_TextSplitMethodV2"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_TextSplitMethodV2"
                                                 Margin="0,0,0,16"
                                                 Style="{StaticResource ModernComboBox}">
-                                            <ComboBoxItem Content="不切" Tag="cut0"/>
-                                            <ComboBoxItem Content="凑四句一切" Tag="cut1"/>
-                                            <ComboBoxItem Content="凑50字一切" Tag="cut2"/>
-                                            <ComboBoxItem Content="按中文句号切" Tag="cut3"/>
-                                            <ComboBoxItem Content="按英文句号切" Tag="cut4"/>
-                                            <ComboBoxItem Content="按标点符号切" Tag="cut5" IsSelected="True"/>
-                                        </ComboBox>
+                                                    <ComboBoxItem Content="不切" Tag="cut0"/>
+                                                    <ComboBoxItem Content="凑四句一切" Tag="cut1"/>
+                                                    <ComboBoxItem Content="凑50字一切" Tag="cut2"/>
+                                                    <ComboBoxItem Content="按中文句号切" Tag="cut3"/>
+                                                    <ComboBoxItem Content="按英文句号切" Tag="cut4"/>
+                                                    <ComboBoxItem Content="按标点符号切" Tag="cut5" IsSelected="True"/>
+                                                </ComboBox>
 
-                                        <Label Content="输出格式"
+                                                <Label Content="输出格式"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_MediaType"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_MediaType"
                                                 Margin="0,0,0,16"
                                                 Style="{StaticResource ModernComboBox}">
-                                            <ComboBoxItem Content="WAV" Tag="wav" IsSelected="True"/>
-                                            <ComboBoxItem Content="OGG" Tag="ogg"/>
-                                            <ComboBoxItem Content="AAC" Tag="aac"/>
-                                            <ComboBoxItem Content="RAW" Tag="raw"/>
-                                        </ComboBox>
+                                                    <ComboBoxItem Content="WAV" Tag="wav" IsSelected="True"/>
+                                                    <ComboBoxItem Content="OGG" Tag="ogg"/>
+                                                    <ComboBoxItem Content="AAC" Tag="aac"/>
+                                                    <ComboBoxItem Content="RAW" Tag="raw"/>
+                                                </ComboBox>
 
-                                        <TextBlock Text="API v2 高级设置"
+                                                <TextBlock Text="API v2 高级设置"
                                                 Style="{StaticResource SectionHeader}"
                                                 FontSize="14"
                                                 Margin="0,8,0,8"/>
 
-                                        <Label Content="批处理大小"
+                                                <Label Content="批处理大小"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_BatchSize"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_BatchSize"
                                                 Margin="0,0,0,16"
                                                 Text="1"
                                                 Style="{StaticResource ModernTextBox}"/>
 
-                                        <Label Content="采样步数"
+                                                <Label Content="采样步数"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_SampleSteps"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_SampleSteps"
                                                 Margin="0,0,0,16"
                                                 Text="32"
                                                 Style="{StaticResource ModernTextBox}"/>
 
-                                        <Label Content="重复惩罚"
+                                                <Label Content="重复惩罚"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <TextBox x:Name="TextBox_TTS_GPTSoVITS_RepetitionPenalty"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_RepetitionPenalty"
                                                 Margin="0,0,0,16"
                                                 Text="1.35"
                                                 Style="{StaticResource ModernTextBox}"/>
 
-                                        <Label Content="流式模式"
+                                                <Label Content="流式模式"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_StreamingMode"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_StreamingMode"
                                                 Margin="0,0,0,8"
                                                 Style="{StaticResource ModernComboBox}">
-                                            <ComboBoxItem Content="禁用" Tag="0" IsSelected="True"/>
-                                            <ComboBoxItem Content="最佳质量" Tag="1"/>
-                                            <ComboBoxItem Content="中等质量" Tag="2"/>
-                                            <ComboBoxItem Content="快速响应" Tag="3"/>
-                                        </ComboBox>
-                                        <TextBlock Text="流式模式可加快首次响应速度，但可能影响音质"
+                                                    <ComboBoxItem Content="禁用" Tag="0" IsSelected="True"/>
+                                                    <ComboBoxItem Content="最佳质量" Tag="1"/>
+                                                    <ComboBoxItem Content="中等质量" Tag="2"/>
+                                                    <ComboBoxItem Content="快速响应" Tag="3"/>
+                                                </ComboBox>
+                                                <TextBlock Text="流式模式可加快首次响应速度，但可能影响音质"
                                                 Style="{StaticResource DescriptionText}"
                                                 Margin="0,0,0,16"/>
 
-                                        <CheckBox x:Name="CheckBox_TTS_GPTSoVITS_SuperSampling"
+                                                <CheckBox x:Name="CheckBox_TTS_GPTSoVITS_SuperSampling"
                                                 Content="启用超采样"
                                                 Margin="0,0,0,16"
                                                 Style="{StaticResource ModernCheckBox}"/>
 
-                                        <TextBlock Text="模型权重设置"
+                                                <TextBlock Text="模型权重设置"
                                                 Style="{StaticResource SectionHeader}"
                                                 FontSize="14"
                                                 Margin="0,8,0,8"/>
-                                        <TextBlock Text="指定服务器上的模型权重文件路径，留空则使用服务器默认模型"
+                                                <TextBlock Text="指定服务器上的模型权重文件路径，留空则使用服务器默认模型"
                                                 Style="{StaticResource DescriptionText}"
                                                 Margin="0,0,0,8"/>
 
-                                        <Label Content="GPT 模型权重路径"
+                                                <Label Content="GPT 模型权重路径"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <Grid Margin="0,0,0,8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox x:Name="TextBox_TTS_GPTSoVITS_GptWeightsPath"
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="TextBox_TTS_GPTSoVITS_GptWeightsPath"
                                                     Grid.Column="0"
                                                     Margin="0,0,8,0"
                                                     Style="{StaticResource ModernTextBox}"/>
-                                            <Button x:Name="Button_TTS_GPTSoVITS_ApplyGptWeights"
+                                                    <Button x:Name="Button_TTS_GPTSoVITS_ApplyGptWeights"
                                                     Grid.Column="1"
                                                     Content="应用"
                                                     Click="Button_TTS_GPTSoVITS_ApplyGptWeights_Click"
                                                     Padding="12,6"
                                                     Style="{StaticResource SecondaryButton}"/>
-                                        </Grid>
-                                        <TextBlock Text="例如: GPT_SoVITS/pretrained_models/xxx.ckpt"
+                                                </Grid>
+                                                <TextBlock Text="例如: GPT_SoVITS/pretrained_models/xxx.ckpt"
                                                 Style="{StaticResource DescriptionText}"
                                                 Margin="0,0,0,16"/>
 
-                                        <Label Content="SoVITS 模型权重路径"
+                                                <Label Content="SoVITS 模型权重路径"
                                               Style="{StaticResource SettingLabel}"/>
-                                        <Grid Margin="0,0,0,8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox x:Name="TextBox_TTS_GPTSoVITS_SovitsWeightsPath"
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="TextBox_TTS_GPTSoVITS_SovitsWeightsPath"
                                                     Grid.Column="0"
                                                     Margin="0,0,8,0"
                                                     Style="{StaticResource ModernTextBox}"/>
-                                            <Button x:Name="Button_TTS_GPTSoVITS_ApplySovitsWeights"
+                                                    <Button x:Name="Button_TTS_GPTSoVITS_ApplySovitsWeights"
                                                     Grid.Column="1"
                                                     Content="应用"
                                                     Click="Button_TTS_GPTSoVITS_ApplySovitsWeights_Click"
                                                     Padding="12,6"
                                                     Style="{StaticResource SecondaryButton}"/>
-                                        </Grid>
-                                        <TextBlock Text="例如: GPT_SoVITS/pretrained_models/xxx.pth"
+                                                </Grid>
+                                                <TextBlock Text="例如: GPT_SoVITS/pretrained_models/xxx.pth"
                                                 Style="{StaticResource DescriptionText}"
                                                 Margin="0,0,0,16"/>
-                                    </StackPanel>
+                                            </StackPanel>
 
-                                    <!-- WebUI 专用设置面板 -->
-                                    <StackPanel x:Name="Panel_TTS_GPTSoVITS_WebUI"
+                                            <!-- WebUI 专用设置面板 -->
+                                            <StackPanel x:Name="Panel_TTS_GPTSoVITS_WebUI"
                                             Visibility="Visible">
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Version}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Version}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Version"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Version"
                                             Margin="0,0,0,8"
                                             SelectionChanged="ComboBox_TTS_GPTSoVITS_Version_SelectionChanged"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="v2" Tag="v2"/>
-                                        <ComboBoxItem Content="v2Pro" Tag="v2Pro"/>
-                                        <ComboBoxItem Content="v2ProPlus" Tag="v2ProPlus"/>
-                                        <ComboBoxItem Content="v3" Tag="v3"/>
-                                        <ComboBoxItem Content="v4" Tag="v4" IsSelected="True"/>
-                                    </ComboBox>
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.VersionTip}"
+                                                    <ComboBoxItem Content="v2" Tag="v2"/>
+                                                    <ComboBoxItem Content="v2Pro" Tag="v2Pro"/>
+                                                    <ComboBoxItem Content="v2ProPlus" Tag="v2ProPlus"/>
+                                                    <ComboBoxItem Content="v3" Tag="v3"/>
+                                                    <ComboBoxItem Content="v4" Tag="v4" IsSelected="True"/>
+                                                </ComboBox>
+                                                <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.VersionTip}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Model}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Model}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Model"
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Model"
                                                 Grid.Column="0"
                                                 IsEditable="True"
                                                 Margin="0,0,8,0"
                                                 SelectionChanged="ComboBox_TTS_GPTSoVITS_Model_SelectionChanged"
                                                 Style="{StaticResource ModernComboBox}"/>
-                                        <Button x:Name="Button_TTS_GPTSoVITS_RefreshModels"
+                                                    <Button x:Name="Button_TTS_GPTSoVITS_RefreshModels"
                                                 Grid.Column="1"
                                                 Content="{utils:Localize KeyPath=TTS.GPTSoVITS.RefreshModels}"
                                                 Click="Button_TTS_GPTSoVITS_RefreshModels_Click"
                                                 Padding="12,6"
                                                 Style="{StaticResource SecondaryButton}"/>
-                                    </Grid>
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.ModelTip}"
+                                                </Grid>
+                                                <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.ModelTip}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Language}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Language}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Language"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Language"
                                             Margin="0,0,0,8"
                                             SelectionChanged="ComboBox_TTS_GPTSoVITS_Language_SelectionChanged"
                                             Style="{StaticResource ModernComboBox}"/>
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.LanguageTip}"
+                                                <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.LanguageTip}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Emotion}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Emotion}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Emotion"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_Emotion"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernComboBox}"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.TextLanguage}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.TextLanguage}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_TextLanguage"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_TextLanguage"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="中文" Tag="中文" IsSelected="True"/>
-                                        <ComboBoxItem Content="粤语" Tag="粤语"/>
-                                        <ComboBoxItem Content="英文" Tag="英文"/>
-                                        <ComboBoxItem Content="日文" Tag="日文"/>
-                                        <ComboBoxItem Content="韩文" Tag="韩文"/>
-                                        <ComboBoxItem Content="中英混合" Tag="中英混合"/>
-                                        <ComboBoxItem Content="粤英混合" Tag="粤英混合"/>
-                                        <ComboBoxItem Content="日英混合" Tag="日英混合"/>
-                                        <ComboBoxItem Content="韩英混合" Tag="韩英混合"/>
-                                        <ComboBoxItem Content="多语种混合" Tag="多语种混合"/>
-                                        <ComboBoxItem Content="多语种混合(粤语)" Tag="多语种混合(粤语)"/>
-                                    </ComboBox>
+                                                    <ComboBoxItem Content="中文" Tag="中文" IsSelected="True"/>
+                                                    <ComboBoxItem Content="粤语" Tag="粤语"/>
+                                                    <ComboBoxItem Content="英文" Tag="英文"/>
+                                                    <ComboBoxItem Content="日文" Tag="日文"/>
+                                                    <ComboBoxItem Content="韩文" Tag="韩文"/>
+                                                    <ComboBoxItem Content="中英混合" Tag="中英混合"/>
+                                                    <ComboBoxItem Content="粤英混合" Tag="粤英混合"/>
+                                                    <ComboBoxItem Content="日英混合" Tag="日英混合"/>
+                                                    <ComboBoxItem Content="韩英混合" Tag="韩英混合"/>
+                                                    <ComboBoxItem Content="多语种混合" Tag="多语种混合"/>
+                                                    <ComboBoxItem Content="多语种混合(粤语)" Tag="多语种混合(粤语)"/>
+                                                </ComboBox>
 
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.AdvancedSettings}"
+                                                <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.AdvancedSettings}"
                                             Style="{StaticResource SectionHeader}"
                                             FontSize="14"
                                             Margin="0,8,0,8"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.SplitMethod}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.SplitMethod}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_SplitMethod"
+                                                <ComboBox x:Name="ComboBox_TTS_GPTSoVITS_SplitMethod"
                                             Margin="0,0,0,8"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="不切" Tag="不切"/>
-                                        <ComboBoxItem Content="凑四句一切" Tag="凑四句一切"/>
-                                        <ComboBoxItem Content="凑50字一切" Tag="凑50字一切"/>
-                                        <ComboBoxItem Content="按中文句号。切" Tag="按中文句号。切"/>
-                                        <ComboBoxItem Content="按英文句号.切" Tag="按英文句号.切"/>
-                                        <ComboBoxItem Content="按标点符号切" Tag="按标点符号切" IsSelected="True"/>
-                                    </ComboBox>
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.SplitMethodTip}"
+                                                    <ComboBoxItem Content="不切" Tag="不切"/>
+                                                    <ComboBoxItem Content="凑四句一切" Tag="凑四句一切"/>
+                                                    <ComboBoxItem Content="凑50字一切" Tag="凑50字一切"/>
+                                                    <ComboBoxItem Content="按中文句号。切" Tag="按中文句号。切"/>
+                                                    <ComboBoxItem Content="按英文句号.切" Tag="按英文句号.切"/>
+                                                    <ComboBoxItem Content="按标点符号切" Tag="按标点符号切" IsSelected="True"/>
+                                                </ComboBox>
+                                                <TextBlock Text="{utils:Localize KeyPath=TTS.GPTSoVITS.SplitMethodTip}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.CutPunc}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.CutPunc}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_GPTSoVITS_CutPunc"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_CutPunc"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.TopK}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.TopK}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_GPTSoVITS_TopK"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_TopK"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.TopP}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.TopP}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_GPTSoVITS_TopP"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_TopP"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Temperature}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Temperature}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_GPTSoVITS_Temperature"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_Temperature"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Speed}"
+                                                <Label Content="{utils:Localize KeyPath=TTS.GPTSoVITS.Speed}"
                                           Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_TTS_GPTSoVITS_Speed"
+                                                <TextBox x:Name="TextBox_TTS_GPTSoVITS_Speed"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
-                                    </StackPanel>
-                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
 
-                                <!-- Free TTS 配置 -->
-                                <StackPanel x:Name="Panel_TTS_Free"
+                                        <!-- Free TTS 配置 -->
+                                        <StackPanel x:Name="Panel_TTS_Free"
                                         Visibility="Collapsed">
-                                    <TextBlock x:Name="TextBlock_TTS_Free_Config"
+                                            <TextBlock x:Name="TextBlock_TTS_Free_Config"
                                             Text="{utils:Localize KeyPath=TTS.FreeSettings, Default=Free TTS 配置}"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
-                                    
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Description, Default=Free TTS 使用内置的免费语音合成服务，无需配置 API Key。}"
+
+                                            <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Description, Default=Free TTS 使用内置的免费语音合成服务，无需配置 API Key。}"
                                             x:Name="TextBlock_TTS_Free_Description"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Provider, Default=感谢提供者 @ycxom}"
+                                            <TextBlock Text="{utils:Localize KeyPath=TTS.Free.Provider, Default=感谢提供者 @ycxom}"
                                             x:Name="TextBlock_TTS_Free_Provider"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </ScrollViewer>
-                </Grid>
-            </TabItem>
-            
-            <!-- ASR 子标签页 -->
-            <TabItem Header="{utils:Localize KeyPath=ASR.Tab, Default=语音输入}"
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </ScrollViewer>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- ASR 子标签页 -->
+                    <TabItem Header="{utils:Localize KeyPath=ASR.Tab, Default=语音输入}"
                     x:Name="Tab_ASR"
                     Style="{StaticResource ModernTabItem}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                    <ScrollViewer Grid.Column="0"
+                            <ScrollViewer Grid.Column="0"
                             VerticalScrollBarVisibility="Auto">
-                        <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
-                            <StackPanel Style="{StaticResource SettingGroup}">
-                                <CheckBox x:Name="CheckBox_ASR_IsEnabled"
+                                <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
+                                    <StackPanel Style="{StaticResource SettingGroup}">
+                                        <CheckBox x:Name="CheckBox_ASR_IsEnabled"
                                         Content="{utils:Localize KeyPath=ASR.Enable, Default=启用语音输入}"
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernCheckBox}">
-                                    <CheckBox.ToolTip>
-                                        <ToolTip>
-                                            <TextBlock Text="{utils:Localize KeyPath=ASR.EnableTooltip, Default=启用后可以使用快捷键进行语音输入}"/>
-                                        </ToolTip>
-                                    </CheckBox.ToolTip>
-                                </CheckBox>
+                                            <CheckBox.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock Text="{utils:Localize KeyPath=ASR.EnableTooltip, Default=启用后可以使用快捷键进行语音输入}"/>
+                                                </ToolTip>
+                                            </CheckBox.ToolTip>
+                                        </CheckBox>
 
-                                <StackPanel IsEnabled="{Binding ElementName=CheckBox_ASR_IsEnabled, Path=IsChecked}">
-                                    <Label Content="{utils:Localize KeyPath=ASR.Provider, Default=识别提供商}"
+                                        <StackPanel IsEnabled="{Binding ElementName=CheckBox_ASR_IsEnabled, Path=IsChecked}">
+                                            <Label Content="{utils:Localize KeyPath=ASR.Provider, Default=识别提供商}"
                                             x:Name="Label_ASR_Provider"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_ASR_Provider"
+                                            <ComboBox x:Name="ComboBox_ASR_Provider"
                                             Margin="0,0,0,16"
                                             SelectionChanged="ComboBox_ASR_Provider_SelectionChanged"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="OpenAI Whisper" Tag="OpenAI" IsSelected="True"/>
-                                        <ComboBoxItem Content="Soniox" Tag="Soniox"/>
-                                        <ComboBoxItem Content="Free" Tag="Free"/>
-                                    </ComboBox>
+                                                <ComboBoxItem Content="OpenAI Whisper" Tag="OpenAI" IsSelected="True"/>
+                                                <ComboBoxItem Content="Soniox" Tag="Soniox"/>
+                                                <ComboBoxItem Content="Free" Tag="Free"/>
+                                            </ComboBox>
 
-                                    <Label Content="{utils:Localize KeyPath=ASR.RecordingDevice, Default=输入设备}"
+                                            <Label Content="{utils:Localize KeyPath=ASR.RecordingDevice, Default=输入设备}"
                                             x:Name="Label_ASR_RecordingDevice"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <ComboBox x:Name="ComboBox_ASR_RecordingDevice"
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="ComboBox_ASR_RecordingDevice"
                                                 Grid.Column="0"
                                                 Margin="0,0,8,0"
                                                 Style="{StaticResource ModernComboBox}">
-                                            <ComboBoxItem Content="设备 #0 (默认)" Tag="0" IsSelected="True"/>
-                                        </ComboBox>
-                                        <Button x:Name="Button_ASR_RefreshDevices"
+                                                    <ComboBoxItem Content="设备 #0 (默认)" Tag="0" IsSelected="True"/>
+                                                </ComboBox>
+                                                <Button x:Name="Button_ASR_RefreshDevices"
                                                 Grid.Column="1"
                                                 Content="{utils:Localize KeyPath=ASR.RefreshDevices, Default=刷新设备}"
                                                 Click="Button_ASR_RefreshDevices_Click"
                                                 Padding="12,6"
                                                 Style="{StaticResource ModernButton}"/>
-                                    </Grid>
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.RecordingDeviceTip, Default=选择用于语音输入的麦克风设备}"
+                                            </Grid>
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.RecordingDeviceTip, Default=选择用于语音输入的麦克风设备}"
                                             x:Name="TextBlock_ASR_RecordingDevice_Tip"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <CheckBox x:Name="CheckBox_ASR_AutoSend"
+                                            <CheckBox x:Name="CheckBox_ASR_AutoSend"
                                             Content="{utils:Localize KeyPath=ASR.AutoSend, Default=识别完成后自动发送}"
                                             Margin="0,0,0,8"
                                             Style="{StaticResource ModernCheckBox}"/>
 
-                                    <CheckBox x:Name="CheckBox_ASR_ShowTranscriptionWindow"
+                                            <CheckBox x:Name="CheckBox_ASR_ShowTranscriptionWindow"
                                             Content="{utils:Localize KeyPath=ASR.ShowTranscriptionWindow, Default=显示识别结果窗口}"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernCheckBox}"/>
 
-                                    <Label Content="{utils:Localize KeyPath=ASR.Hotkey, Default=快捷键}"
+                                            <Label Content="{utils:Localize KeyPath=ASR.Hotkey, Default=快捷键}"
                                             x:Name="Label_ASR_Hotkey"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Grid.Column="0"
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0"
                                                 x:Name="TextBox_ASR_HotkeyDisplay"
                                                 IsReadOnly="True"
                                                 Style="{StaticResource ModernTextBox}"
                                                 ToolTip="当前快捷键"/>
-                                        <Button Grid.Column="1"
+                                                <Button Grid.Column="1"
                                                 x:Name="Button_ASR_CaptureHotkey"
                                                 Content="{utils:Localize KeyPath=ASR.CaptureHotkey, Default=捕获快捷键}"
                                                 Click="Button_ASR_CaptureHotkey_Click"
                                                 Margin="8,0,0,0"
                                                 Padding="12,6"
                                                 Style="{StaticResource ModernButton}"/>
-                                        <Button Grid.Column="2"
+                                                <Button Grid.Column="2"
                                                 x:Name="Button_ASR_ResetHotkey"
                                                 Content="{utils:Localize KeyPath=ASR.ResetHotkey, Default=还原默认}"
                                                 Click="Button_ASR_ResetHotkey_Click"
                                                 Margin="8,0,0,0"
                                                 Padding="12,6"
                                                 Style="{StaticResource ModernButton}"/>
-                                    </Grid>
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.HotkeyDescription, Default=点击捕获按钮后，按下您想要的快捷键组合}"
+                                            </Grid>
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.HotkeyDescription, Default=点击捕获按钮后，按下您想要的快捷键组合}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,8"/>
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.DefaultHotkey, Default=默认快捷键: Win + Alt + V}"
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.DefaultHotkey, Default=默认快捷键: Win + Alt + V}"
                                             Style="{StaticResource DescriptionText}"
                                             Foreground="#666666"
                                             FontSize="11"
                                             Margin="0,0,0,16"/>
 
-                                    <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
-                                        <Button x:Name="Button_ASR_Test"
+                                            <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
+                                                <Button x:Name="Button_ASR_Test"
                                                 Content="{utils:Localize KeyPath=ASR.TestButton, Default=测试语音输入}"
                                                 Click="Button_ASR_Test_Click"
                                                 Style="{StaticResource ModernButton}"/>
-                                    </WrapPanel>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </ScrollViewer>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </ScrollViewer>
 
-                    <ScrollViewer Grid.Column="1"
+                            <ScrollViewer Grid.Column="1"
                             VerticalScrollBarVisibility="Auto">
-                        <Border Style="{StaticResource CardContainer}">
-                            <StackPanel Style="{StaticResource SettingGroup}"
+                                <Border Style="{StaticResource CardContainer}">
+                                    <StackPanel Style="{StaticResource SettingGroup}"
 
                                 IsEnabled="{Binding ElementName=CheckBox_ASR_IsEnabled, Path=IsChecked}">
-                                <!-- OpenAI Whisper 配置 -->
-                                <StackPanel x:Name="Panel_ASR_OpenAI"
+                                        <!-- OpenAI Whisper 配置 -->
+                                        <StackPanel x:Name="Panel_ASR_OpenAI"
                                         Visibility="Visible">
-                                    <TextBlock x:Name="TextBlock_ASR_OpenAI_Config"
+                                            <TextBlock x:Name="TextBlock_ASR_OpenAI_Config"
                                             Text="{utils:Localize KeyPath=ASR.OpenAISettings, Default=OpenAI Whisper 配置}"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label x:Name="Label_ASR_OpenAI_BaseUrl"
+                                            <Label x:Name="Label_ASR_OpenAI_BaseUrl"
                                             Content="{utils:Localize KeyPath=ASR.OpenAI.BaseUrl, Default=API 地址}"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_ASR_OpenAI_BaseUrl"
+                                            <TextBox x:Name="TextBox_ASR_OpenAI_BaseUrl"
                                             Text="https://api.openai.com/v1"
                                             Margin="0,0,0,8"
                                             Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.OpenAI.BaseUrlTip, Default=请输入 API 基础地址（不含 /audio/transcriptions）}"
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.OpenAI.BaseUrlTip, Default=请输入 API 基础地址（不含 /audio/transcriptions）}"
                                             x:Name="TextBlock_ASR_OpenAI_BaseUrl_Tip"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label x:Name="Label_ASR_OpenAI_ApiKey"
+                                            <Label x:Name="Label_ASR_OpenAI_ApiKey"
                                             Content="{utils:Localize KeyPath=ASR.OpenAI.ApiKey, Default=API Key}"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_ASR_OpenAI_ApiKey"
+                                            <TextBox x:Name="TextBox_ASR_OpenAI_ApiKey"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label x:Name="Label_ASR_OpenAI_Model"
+                                            <Label x:Name="Label_ASR_OpenAI_Model"
                                             Content="{utils:Localize KeyPath=ASR.OpenAI.Model, Default=模型}"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_ASR_OpenAI_Model"
+                                            <ComboBox x:Name="ComboBox_ASR_OpenAI_Model"
                                             IsEditable="True"
                                             Text="whisper-1"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="whisper-1" Tag="whisper-1"/>
-                                        <ComboBoxItem Content="FunAudioLLM/SenseVoiceSmall" Tag="FunAudioLLM/SenseVoiceSmall"/>
-                                    </ComboBox>
+                                                <ComboBoxItem Content="whisper-1" Tag="whisper-1"/>
+                                                <ComboBoxItem Content="FunAudioLLM/SenseVoiceSmall" Tag="FunAudioLLM/SenseVoiceSmall"/>
+                                            </ComboBox>
 
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.OpenAI.Description, Default=支持 OpenAI Whisper API 格式的语音识别服务}"
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.OpenAI.Description, Default=支持 OpenAI Whisper API 格式的语音识别服务}"
                                             x:Name="TextBlock_ASR_OpenAI_Description"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,8"/>
 
-                                    <!-- 服务示例 -->
-                                    <TextBlock Style="{StaticResource SectionHeader}"
+                                            <!-- 服务示例 -->
+                                            <TextBlock Style="{StaticResource SectionHeader}"
                                             Margin="0,16,0,8">
                                         <Run Text="{utils:Localize KeyPath=ASR.Examples, Default=服务示例}" FontSize="14"/>
-                                    </TextBlock>
-                                    <TextBlock Style="{StaticResource DescriptionText}"
+                                            </TextBlock>
+                                            <TextBlock Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,4">
                                         <Run Text="• OpenAI: " FontWeight="SemiBold"/>
                                         <Run Text="https://api.openai.com/v1" Foreground="#2196F3"/>
                                         <Run Text=" | whisper-1"/>
-                                    </TextBlock>
-                                    <TextBlock Style="{StaticResource DescriptionText}"
+                                            </TextBlock>
+                                            <TextBlock Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,4">
                                         <Run Text="• SiliconFlow: " FontWeight="SemiBold"/>
                                         <Run Text="https://api.siliconflow.cn/v1" Foreground="#2196F3"/>
                                         <Run Text=" | FunAudioLLM/SenseVoiceSmall"/>
-                                    </TextBlock>
-                                    <TextBlock Style="{StaticResource DescriptionText}"
+                                            </TextBlock>
+                                            <TextBlock Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16">
                                         <Run Text="• 自定义: 任何兼容 OpenAI Whisper API 格式的服务"/>
-                                    </TextBlock>
-                                </StackPanel>
+                                            </TextBlock>
+                                        </StackPanel>
 
-                                <!-- Soniox 配置 -->
-                                <StackPanel x:Name="Panel_ASR_Soniox"
+                                        <!-- Soniox 配置 -->
+                                        <StackPanel x:Name="Panel_ASR_Soniox"
                                         Visibility="Collapsed">
-                                    <TextBlock x:Name="TextBlock_ASR_Soniox_Config"
+                                            <TextBlock x:Name="TextBlock_ASR_Soniox_Config"
                                             Text="{utils:Localize KeyPath=ASR.SonioxSettings, Default=Soniox 配置}"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label x:Name="Label_ASR_Soniox_BaseUrl"
+                                            <Label x:Name="Label_ASR_Soniox_BaseUrl"
                                             Content="{utils:Localize KeyPath=ASR.Soniox.BaseUrl, Default=API 地址}"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_ASR_Soniox_BaseUrl"
+                                            <TextBox x:Name="TextBox_ASR_Soniox_BaseUrl"
                                             Text="https://api.soniox.com"
                                             Margin="0,0,0,8"
                                             Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.BaseUrlTip, Default=请输入 Soniox API 基础地址（不含 /v1）}"
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.BaseUrlTip, Default=请输入 Soniox API 基础地址（不含 /v1）}"
                                             x:Name="TextBlock_ASR_Soniox_BaseUrl_Tip"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label x:Name="Label_ASR_Soniox_ApiKey"
+                                            <Label x:Name="Label_ASR_Soniox_ApiKey"
                                             Content="{utils:Localize KeyPath=ASR.Soniox.ApiKey, Default=API Key}"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <TextBox x:Name="TextBox_ASR_Soniox_ApiKey"
+                                            <TextBox x:Name="TextBox_ASR_Soniox_ApiKey"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <Label x:Name="Label_ASR_Soniox_Model"
+                                            <Label x:Name="Label_ASR_Soniox_Model"
                                             Content="{utils:Localize KeyPath=ASR.Soniox.Model, Default=模型}"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <ComboBox x:Name="ComboBox_ASR_Soniox_Model"
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="ComboBox_ASR_Soniox_Model"
                                                 Grid.Column="0"
                                                 IsEditable="True"
                                                 Text="stt-rt-v3"
                                                 Margin="0,0,8,0"
                                                 Style="{StaticResource ModernComboBox}">
-                                            <ComboBoxItem Content="stt-rt-v3 (Speech-to-Text Real-time v3)" Tag="stt-rt-v3"/>
-                                            <ComboBoxItem Content="stt-async-v3 (Speech-to-Text Async v3)" Tag="stt-async-v3"/>
-                                        </ComboBox>
-                                        <Button x:Name="Button_ASR_Soniox_RefreshModels"
+                                                    <ComboBoxItem Content="stt-rt-v3 (Speech-to-Text Real-time v3)" Tag="stt-rt-v3"/>
+                                                    <ComboBoxItem Content="stt-async-v3 (Speech-to-Text Async v3)" Tag="stt-async-v3"/>
+                                                </ComboBox>
+                                                <Button x:Name="Button_ASR_Soniox_RefreshModels"
                                                 Grid.Column="1"
                                                 Content="{utils:Localize KeyPath=ASR.Soniox.RefreshModels, Default=刷新模型列表}"
                                                 Click="Button_ASR_Soniox_RefreshModels_Click"
                                                 Padding="12,6"
                                                 Style="{StaticResource ModernButton}"/>
-                                    </Grid>
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.ModelTip, Default=选择 Soniox 语音识别模型，点击刷新按钮获取最新模型列表}"
+                                            </Grid>
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.ModelTip, Default=选择 Soniox 语音识别模型，点击刷新按钮获取最新模型列表}"
                                             x:Name="TextBlock_ASR_Soniox_Model_Tip"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <Label x:Name="Label_ASR_Soniox_Language"
+                                            <Label x:Name="Label_ASR_Soniox_Language"
                                             Content="{utils:Localize KeyPath=ASR.Soniox.Language, Default=语言}"
                                             Style="{StaticResource SettingLabel}"/>
-                                    <ComboBox x:Name="ComboBox_ASR_Soniox_Language"
+                                            <ComboBox x:Name="ComboBox_ASR_Soniox_Language"
                                             IsEditable="False"
                                             Margin="0,0,0,8"
                                             Style="{StaticResource ModernComboBox}">
-                                        <!-- 语言列表将根据选择的模型动态填充 -->
-                                    </ComboBox>
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.LanguageTip, Default=选择语音识别语言，语言列表根据所选模型动态更新}"
+                                                <!-- 语言列表将根据选择的模型动态填充 -->
+                                            </ComboBox>
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.LanguageTip, Default=选择语音识别语言，语言列表根据所选模型动态更新}"
                                             x:Name="TextBlock_ASR_Soniox_Language_Tip"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <CheckBox x:Name="CheckBox_ASR_Soniox_EnablePunctuation"
+                                            <CheckBox x:Name="CheckBox_ASR_Soniox_EnablePunctuation"
                                             Content="{utils:Localize KeyPath=ASR.Soniox.EnablePunctuation, Default=启用标点符号}"
                                             Margin="0,0,0,8"
                                             IsChecked="True"
                                             Style="{StaticResource ModernCheckBox}"/>
 
-                                    <CheckBox x:Name="CheckBox_ASR_Soniox_EnableProfanityFilter"
+                                            <CheckBox x:Name="CheckBox_ASR_Soniox_EnableProfanityFilter"
                                             Content="{utils:Localize KeyPath=ASR.Soniox.EnableProfanityFilter, Default=启用脏话过滤}"
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernCheckBox}"/>
 
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.Description, Default=Soniox 提供高精度的语音识别服务，支持多种语言}"
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.Soniox.Description, Default=Soniox 提供高精度的语音识别服务，支持多种语言}"
                                             x:Name="TextBlock_ASR_Soniox_Description"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
-                                </StackPanel>
+                                        </StackPanel>
 
-                                <!-- Free 配置 -->
-                                <StackPanel x:Name="Panel_ASR_Free"
+                                        <!-- Free 配置 -->
+                                        <StackPanel x:Name="Panel_ASR_Free"
                                         Visibility="Collapsed">
-                                    <TextBlock x:Name="TextBlock_ASR_Free_Config"
+                                            <TextBlock x:Name="TextBlock_ASR_Free_Config"
                                             Text="{utils:Localize KeyPath=ASR.FreeSettings, Default=Free ASR 配置}"
                                             Style="{StaticResource SectionHeader}"
                                             Margin="0,0,0,16"/>
 
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Free.Description, Default=Free ASR 使用内置的免费语音识别服务，无需配置 API Key。}"
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.Free.Description, Default=Free ASR 使用内置的免费语音识别服务，无需配置 API Key。}"
                                             x:Name="TextBlock_ASR_Free_Description"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
 
-                                    <TextBlock Text="{utils:Localize KeyPath=ASR.Free.Provider, Default=感谢提供者@虚拟桌宠模拟器制作组}"
+                                            <TextBlock Text="{utils:Localize KeyPath=ASR.Free.Provider, Default=感谢提供者@虚拟桌宠模拟器制作组}"
                                             x:Name="TextBlock_ASR_Free_Provider"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </ScrollViewer>
-                </Grid>
-            </TabItem>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </ScrollViewer>
+                        </Grid>
+                    </TabItem>
                 </TabControl>
             </TabItem>
-            
+
             <!-- Screenshot 独立标签页 -->
             <TabItem Header="{utils:Localize KeyPath=Screenshot.Tab, Default=截图与OCR}"
                     x:Name="Tab_Screenshot_Main"
@@ -2334,14 +2336,14 @@
                                                 Foreground="#FF5722"
                                                 Visibility="Collapsed"
                                                 Margin="0,0,0,8"/>
-                                        
+
                                         <!-- 验证错误显示面板 -->
                                         <StackPanel x:Name="Panel_Screenshot_ValidationErrors"
                                                     Visibility="Collapsed"
                                                     Margin="0,0,0,8">
                                             <!-- 错误消息将动态添加到这里 -->
                                         </StackPanel>
-                                        
+
                                         <TextBlock Text="{utils:Localize KeyPath=Screenshot.Multimodal.LoadBalanceTip, Default=选择多个节点时将随机选择一个进行请求，失败时自动切换到其他节点}"
                                                 Style="{StaticResource DescriptionText}"
                                                 Margin="0,0,0,16"/>
@@ -2352,7 +2354,7 @@
                     </ScrollViewer>
                 </Grid>
             </TabItem>
-            
+
             <TabItem Header="{utils:Localize KeyPath=Language.Tab}"
                     x:Name="Tab_Language"
                     Style="{StaticResource ModernTabItem}">
@@ -2521,7 +2523,7 @@
                                         <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.CompressionMode_Both}" Tag="Both"/>
                                     </ComboBox>
                                 </StackPanel>
-                                
+
                                 <!-- 消息数量阈值 -->
                                 <StackPanel Orientation="Horizontal"
                                         Margin="20,0,0,12">
@@ -2546,7 +2548,7 @@
                                             Foreground="{StaticResource SecondaryTextBrush}"
                                             FontSize="14"/>
                                 </StackPanel>
-                                
+
                                 <!-- Token数量阈值 -->
                                 <StackPanel Orientation="Horizontal"
                                         Margin="20,0,0,0">
@@ -2583,7 +2585,7 @@
                                      FontWeight="SemiBold"
                                      Margin="0,0,0,16"
                                      Foreground="{StaticResource PrimaryTextBrush}"/>
-                            
+
                             <!-- 记忆衰退轮数 -->
                             <StackPanel Orientation="Horizontal"
                                         Margin="0,0,0,12">
@@ -2658,7 +2660,7 @@
                                      FontWeight="SemiBold"
                                      Margin="0,0,0,16"
                                      Foreground="{StaticResource PrimaryTextBrush}"/>
-                            
+
                             <!-- 启用悬浮侧边栏 -->
                             <CheckBox x:Name="CheckBox_EnableFloatingSidebar"
                                     Content="{utils:Localize KeyPath=FloatingSidebar.Enable, Default=启用悬浮侧边栏}"
@@ -2670,7 +2672,7 @@
                                     </ToolTip>
                                 </CheckBox.ToolTip>
                             </CheckBox>
-                            
+
                             <!-- 自动隐藏 -->
                             <CheckBox x:Name="CheckBox_FloatingSidebar_AutoHide"
                                     Content="{utils:Localize KeyPath=FloatingSidebar.AutoHide, Default=自动隐藏}"
@@ -2683,7 +2685,7 @@
                                     </ToolTip>
                                 </CheckBox.ToolTip>
                             </CheckBox>
-                            
+
                             <!-- 侧边栏位置 -->
                             <StackPanel Orientation="Horizontal"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
@@ -2703,7 +2705,7 @@
                                     <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Bottom, Default=下方}" Tag="Bottom"/>
                                 </ComboBox>
                             </StackPanel>
-                            
+
                             <!-- 默认透明度 -->
                             <StackPanel Orientation="Horizontal"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
@@ -2725,7 +2727,7 @@
                                         Foreground="{StaticResource SecondaryTextBrush}"
                                         FontSize="14"/>
                             </StackPanel>
-                            
+
                             <!-- 非活动透明度 -->
                             <StackPanel Orientation="Horizontal"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
@@ -2747,7 +2749,7 @@
                                         Foreground="{StaticResource SecondaryTextBrush}"
                                         FontSize="14"/>
                             </StackPanel>
-                            
+
 
                         </StackPanel>
                     </Border>

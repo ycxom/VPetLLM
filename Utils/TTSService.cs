@@ -1,12 +1,45 @@
 using System.IO;
+using System.Reflection;
+using Newtonsoft.Json;
 using VPetLLM.Core;
 using VPetLLM.Core.TTSCore;
 using VPetLLM.Services;
 
 namespace VPetLLM.Utils
 {
+    /// <summary>
+    /// TTS插件状态数据模型
+    /// </summary>
+    public class TTSPluginStatus
+    {
+        /// <summary>
+        /// 插件是否启用
+        /// </summary>
+        public bool IsEnabled { get; set; }
+
+        /// <summary>
+        /// 插件版本
+        /// </summary>
+        public string Version { get; set; } = "";
+
+        /// <summary>
+        /// 最后更新时间
+        /// </summary>
+        public DateTime LastUpdate { get; set; }
+
+        /// <summary>
+        /// 插件名称
+        /// </summary>
+        public string PluginName { get; set; } = "";
+    }
+
     public class TTSService : ITTSService
     {
+        /// <summary>
+        /// TTS插件状态文件名
+        /// </summary>
+        private const string TTS_PLUGIN_STATUS_FILE = "vpet_tts_plugin_status.json";
+
         private IMediaPlayer? _mediaPlayer;
         private Setting.TTSSetting _ttsSettings;
         private Setting.ProxySetting? _proxySettings;
@@ -14,14 +47,96 @@ namespace VPetLLM.Utils
         private bool _isPlaying = false;
         private TaskCompletionSource<bool>? _currentPlaybackTask;
 
+        /// <summary>
+        /// TTS插件是否启用
+        /// </summary>
+        private bool _ttsPluginEnabled = false;
+
         public TTSService(Setting.TTSSetting settings, Setting.ProxySetting? proxySettings = null)
         {
             _ttsSettings = settings;
             _proxySettings = proxySettings;
             
-            // 初始化播放器（默认使用 mpv）
-            InitializePlayer();
+            // 检查TTS插件是否启用
+            CheckTTSPluginStatus();
+            
+            // 只有在插件未启用时才初始化内置TTS播放器
+            if (!_ttsPluginEnabled)
+            {
+                InitializePlayer();
+            }
+            else
+            {
+                Logger.Log("TTS: 检测到VPet TTS插件已启用，跳过内置TTS播放器初始化");
+            }
         }
+
+        /// <summary>
+        /// 检查TTS插件状态
+        /// </summary>
+        private void CheckTTSPluginStatus()
+        {
+            try
+            {
+                var dllPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                var statusFilePath = Path.Combine(dllPath ?? "", TTS_PLUGIN_STATUS_FILE);
+
+                if (File.Exists(statusFilePath))
+                {
+                    var statusJson = File.ReadAllText(statusFilePath);
+                    var status = JsonConvert.DeserializeObject<TTSPluginStatus>(statusJson);
+                    _ttsPluginEnabled = status?.IsEnabled ?? false;
+
+                    if (_ttsPluginEnabled)
+                    {
+                        Logger.Log($"TTS: 检测到VPet TTS插件已启用 (版本: {status?.Version}, 更新时间: {status?.LastUpdate})");
+                        Logger.Log("TTS: 内置TTS系统将停用，由TTS插件接管");
+                    }
+                }
+                else
+                {
+                    _ttsPluginEnabled = false;
+                    Logger.Log("TTS: 未检测到TTS插件状态文件，使用内置TTS系统");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"TTS: 检查插件状态时出错: {ex.Message}");
+                _ttsPluginEnabled = false;
+            }
+        }
+
+        /// <summary>
+        /// 刷新TTS插件状态
+        /// </summary>
+        public void RefreshTTSPluginStatus()
+        {
+            var previousStatus = _ttsPluginEnabled;
+            CheckTTSPluginStatus();
+
+            // 如果状态发生变化，进行相应处理
+            if (previousStatus != _ttsPluginEnabled)
+            {
+                if (_ttsPluginEnabled)
+                {
+                    // 插件启用，停止内置播放器
+                    Logger.Log("TTS: TTS插件状态变更为启用，停用内置TTS系统");
+                    _mediaPlayer?.Dispose();
+                    _mediaPlayer = null;
+                }
+                else
+                {
+                    // 插件停用，初始化内置播放器
+                    Logger.Log("TTS: TTS插件状态变更为停用，恢复内置TTS系统");
+                    InitializePlayer();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取TTS插件是否启用
+        /// </summary>
+        public bool IsTTSPluginEnabled => _ttsPluginEnabled;
 
         private void InitializePlayer()
         {
@@ -86,6 +201,13 @@ namespace VPetLLM.Utils
         /// <returns>音频文件路径，失败时返回null</returns>
         public async Task<string> DownloadTTSAudioAsync(string text)
         {
+            // 如果TTS插件启用，跳过内置TTS生成
+            if (_ttsPluginEnabled)
+            {
+                Logger.Log("TTS: TTS插件已启用，跳过内置TTS下载");
+                return null;
+            }
+
             if (!_ttsSettings.IsEnabled || string.IsNullOrWhiteSpace(text))
             {
                 return null;
@@ -183,6 +305,13 @@ namespace VPetLLM.Utils
         /// <returns></returns>
         public async Task<bool> StartPlayTextAsync(string text)
         {
+            // 如果TTS插件启用，跳过内置TTS播放
+            if (_ttsPluginEnabled)
+            {
+                Logger.Log("TTS: TTS插件已启用，跳过内置TTS播放");
+                return false;
+            }
+
             if (!_ttsSettings.IsEnabled || string.IsNullOrWhiteSpace(text))
             {
                 return false;
@@ -235,6 +364,13 @@ namespace VPetLLM.Utils
         /// <returns>可等待的播放任务</returns>
         public async Task<Task> StartPlayTextAsyncWithTask(string text)
         {
+            // 如果TTS插件启用，跳过内置TTS播放
+            if (_ttsPluginEnabled)
+            {
+                Logger.Log("TTS: TTS插件已启用，跳过内置TTS播放");
+                return Task.CompletedTask;
+            }
+
             if (!_ttsSettings.IsEnabled || string.IsNullOrWhiteSpace(text))
             {
                 return Task.CompletedTask;
@@ -287,6 +423,13 @@ namespace VPetLLM.Utils
         /// <returns></returns>
         public async Task<bool> PlayTextAsync(string text)
         {
+            // 如果TTS插件启用，跳过内置TTS播放
+            if (_ttsPluginEnabled)
+            {
+                Logger.Log("TTS: TTS插件已启用，跳过内置TTS播放");
+                return false;
+            }
+
             if (!_ttsSettings.IsEnabled || string.IsNullOrWhiteSpace(text))
             {
                 return false;
@@ -506,6 +649,13 @@ namespace VPetLLM.Utils
         /// </summary>
         public async Task<byte[]?> SynthesizeAsync(string text)
         {
+            // 如果TTS插件启用，跳过内置TTS合成
+            if (_ttsPluginEnabled)
+            {
+                Logger.Log("TTS: TTS插件已启用，跳过内置TTS合成");
+                return null;
+            }
+
             if (!_ttsSettings.IsEnabled || string.IsNullOrWhiteSpace(text))
             {
                 return null;

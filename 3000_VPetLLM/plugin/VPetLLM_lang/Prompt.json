@@ -55,6 +55,14 @@
         "en": "Purchase items with the 'buy' command. Requires the item name as a parameter. Supports fuzzy matching - you can use similar or partial names. Format: <|buy_begin|> Milk Tea <|buy_end|> or <|buy_begin|> milk <|buy_end|>",
         "zh": "通过 'buy' 指令购买物品。需提供物品名称作为参数。支持模糊匹配 - 可以使用相近或部分名称。格式：<|buy_begin|> 奶茶 <|buy_end|> 或 <|buy_begin|> 奶 <|buy_end|>"
     },
+    "Handler_UseItem_Description": {
+        "en": "Use items from your inventory with the 'use_item' command. Requires the item name as a parameter. Supports fuzzy matching. Format: <|use_item_begin|> item_name <|use_item_end|>. Example: <|use_item_begin|> Milk Tea <|use_item_end|>. Only items in your inventory can be used.",
+        "zh": "通过 'use_item' 指令使用背包中的物品。需提供物品名称作为参数。支持模糊匹配。格式：<|use_item_begin|> 物品名称 <|use_item_end|>。示例：<|use_item_begin|> 奶茶 <|use_item_end|>。只能使用背包中已有的物品。"
+    },
+    "Available_Inventory_Prefix": {
+        "en": "Your inventory (items you own): {InventoryList}. You can use items from your inventory with <|use_item_begin|> item_name <|use_item_end|>.",
+        "zh": "你的背包（已拥有的物品）：{InventoryList}。你可以使用 <|use_item_begin|> 物品名称 <|use_item_end|> 来使用背包中的物品。"
+    },
     "Handler_Move_Description": {
         "en": "Move with the 'move' command. Available parameters: 'x,y' (move to specified coordinates), 'random' (random move). Add the 'flash' parameter for movement without animation.\nFormat: <|move_begin|> 100, 200 <|move_end|> or <|move_begin|> random, flash <|move_end|>",
         "zh": "通过 'move' 指令移动。可用参数: 'x,y' (移动到指定坐标), 'random' (随机移动)。添加 'flash' 参数可实现无动画的闪现移动。\n格式：<|move_begin|> 100, 200 <|move_end|> 或 <|move_begin|> random, flash <|move_end|>"

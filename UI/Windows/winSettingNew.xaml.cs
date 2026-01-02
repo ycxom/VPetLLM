@@ -4997,6 +4997,20 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                // 确保 Screenshot 和其嵌套对象不为 null
+                if (_plugin.Settings.Screenshot == null)
+                {
+                    _plugin.Settings.Screenshot = new Configuration.ScreenshotSettings();
+                }
+                if (_plugin.Settings.Screenshot.OCR == null)
+                {
+                    _plugin.Settings.Screenshot.OCR = new Configuration.OCRSettings();
+                }
+                if (_plugin.Settings.Screenshot.MultimodalProvider == null)
+                {
+                    _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
+                }
+
                 var checkBoxEnabled = (CheckBox)this.FindName("CheckBox_Screenshot_Main_IsEnabled");
                 var comboBoxMode = (ComboBox)this.FindName("ComboBox_Screenshot_Main_ProcessingMode");
                 var checkBoxAutoSend = (CheckBox)this.FindName("CheckBox_Screenshot_Main_AutoSend");
@@ -5058,6 +5072,20 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                // 确保 Screenshot 和其嵌套对象不为 null
+                if (_plugin.Settings.Screenshot == null)
+                {
+                    _plugin.Settings.Screenshot = new Configuration.ScreenshotSettings();
+                }
+                if (_plugin.Settings.Screenshot.OCR == null)
+                {
+                    _plugin.Settings.Screenshot.OCR = new Configuration.OCRSettings();
+                }
+                if (_plugin.Settings.Screenshot.MultimodalProvider == null)
+                {
+                    _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
+                }
+
                 var checkBoxEnabled = (CheckBox)this.FindName("CheckBox_Screenshot_Main_IsEnabled");
                 var comboBoxMode = (ComboBox)this.FindName("ComboBox_Screenshot_Main_ProcessingMode");
                 var checkBoxAutoSend = (CheckBox)this.FindName("CheckBox_Screenshot_Main_AutoSend");

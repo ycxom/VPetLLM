@@ -2247,6 +2247,32 @@
             "jp": "顔"
         }
     },
+    "Inventory": {
+        "Empty": {
+            "en": "Inventory is empty",
+            "zh-hans": "物品栏为空",
+            "zh-hant": "物品欄為空",
+            "jp": "インベントリは空です"
+        },
+        "ItemCannotUse": {
+            "en": "This item cannot be used",
+            "zh-hans": "此物品无法使用",
+            "zh-hant": "此物品無法使用",
+            "jp": "このアイテムは使用できません"
+        },
+        "HasItem": {
+            "en": "Pet has this item",
+            "zh-hans": "宠物拥有此物品",
+            "zh-hant": "寵物擁有此物品",
+            "jp": "ペットはこのアイテムを持っています"
+        },
+        "NoItem": {
+            "en": "Pet doesn't have this item",
+            "zh-hans": "宠物没有此物品",
+            "zh-hant": "寵物沒有此物品",
+            "jp": "ペットはこのアイテムを持っていません"
+        }
+    },
     "ItemType": {
         "Food": {
             "en": "food",
@@ -2271,6 +2297,24 @@
             "zh-hans": "礼物",
             "zh-hant": "禮物",
             "jp": "ギフト"
+        },
+        "Tool": {
+            "en": "tool",
+            "zh-hans": "道具",
+            "zh-hant": "道具",
+            "jp": "道具"
+        },
+        "Toy": {
+            "en": "toy",
+            "zh-hans": "玩具",
+            "zh-hant": "玩具",
+            "jp": "おもちゃ"
+        },
+        "Item": {
+            "en": "item",
+            "zh-hans": "物品",
+            "zh-hant": "物品",
+            "jp": "アイテム"
         },
         "General": {
             "en": "item",

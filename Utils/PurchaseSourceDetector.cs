@@ -19,6 +19,7 @@ namespace VPetLLM.Utils
             VPetLLM,           // VPetLLM主动购买
             FriendGift,        // 朋友赠送
             FriendBuy,         // 朋友代购
+            Inventory,         // 物品栏使用
             Unknown            // 未知来源
         }
 
@@ -58,6 +59,12 @@ namespace VPetLLM.Utils
             if (source.StartsWith("friendbuy"))
             {
                 return PurchaseSource.FriendBuy;
+            }
+
+            // 物品栏使用
+            if (source == "inventory")
+            {
+                return PurchaseSource.Inventory;
             }
 
             // 用户手动购买（明确识别"betterbuy"）
@@ -112,7 +119,8 @@ namespace VPetLLM.Utils
             // 明确列出应该触发AI反馈的来源
             return source == PurchaseSource.UserManual ||
                    source == PurchaseSource.FriendGift ||
-                   source == PurchaseSource.FriendBuy;
+                   source == PurchaseSource.FriendBuy ||
+                   source == PurchaseSource.Inventory;
         }
 
         /// <summary>
@@ -127,6 +135,7 @@ namespace VPetLLM.Utils
                 PurchaseSource.VPetLLM => "VPetLLM智能购买",
                 PurchaseSource.FriendGift => "朋友赠送",
                 PurchaseSource.FriendBuy => "朋友代购",
+                PurchaseSource.Inventory => "物品栏使用",
                 PurchaseSource.Unknown => "未知来源",
                 _ => "未知来源"
             };

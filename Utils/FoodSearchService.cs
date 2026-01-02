@@ -6,28 +6,53 @@ using VPet_Simulator.Windows.Interface;
 namespace VPetLLM.Utils
 {
     /// <summary>
-    /// 食物搜索服务 - 使用向量检索和模糊搜索优化购物逻辑
+    /// 物品搜索服务 - 使用 VPet 原生 Item API（通过反射保持向后兼容）
+    /// 使用向量检索和模糊搜索优化购物逻辑
     /// 减少token使用，提高搜索准确性
     /// </summary>
     public class FoodSearchService
     {
         private readonly IMainWindow _mainWindow;
-        private List<FoodItem> _foodCache;
+        private List<ItemInfo> _itemCache;
         private DateTime _lastCacheUpdate;
         private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(5);
 
-        public class FoodItem
+        /// <summary>
+        /// 物品信息（使用原生 Item API）
+        /// </summary>
+        public class ItemInfo
         {
             public string Name { get; set; }
             public string TranslateName { get; set; }
-            public Food.FoodType Type { get; set; }
+            public string ItemType { get; set; }  // 直接使用 Item.ItemType
+            public Food.FoodType? FoodType { get; set; }  // 食物子类型
             public double Price { get; set; }
-            public Food OriginalFood { get; set; }
+            public Food OriginalFood { get; set; }  // 原始食物引用
+            public object OriginalItem { get; set; }  // 原始物品引用（使用 object 保持兼容性）
+            public bool CanUse { get; set; } = true;  // 直接使用 Item.CanUse
+            public int Count { get; set; } = 1;  // 物品数量
             
             // 用于向量检索的特征
             public string[] Keywords { get; set; }
             public string TypeName { get; set; }
         }
+
+        /// <summary>
+        /// 物品栏物品信息（桌宠拥有的物品）- 保持向后兼容
+        /// </summary>
+        public class InventoryItemInfo
+        {
+            public string Name { get; set; }
+            public string TranslateName { get; set; }
+            public string ItemType { get; set; }
+            public double Price { get; set; }
+            public bool CanUse { get; set; } = true;
+            public int Count { get; set; } = 1;
+            public object OriginalItem { get; set; }  // 原始 Item 引用
+        }
+
+        // 向后兼容的别名
+        public class FoodItem : ItemInfo { }
 
         public FoodSearchService(IMainWindow mainWindow)
         {
@@ -36,23 +61,151 @@ namespace VPetLLM.Utils
         }
 
         /// <summary>
-        /// 刷新食物缓存
+        /// 刷新物品缓存（直接使用原生 Item API）
         /// </summary>
         public void RefreshCache()
         {
-            _foodCache = _mainWindow.Foods.Select(f => new FoodItem
+            _itemCache = new List<ItemInfo>();
+            
+            // 添加所有 Food 物品（商店物品）
+            foreach (var food in _mainWindow.Foods)
             {
-                Name = f.Name,
-                TranslateName = f.TranslateName,
-                Type = f.Type,
-                Price = f.Price,
-                OriginalFood = f,
-                Keywords = ExtractKeywords(f.Name, f.TranslateName),
-                TypeName = GetTypeName(f.Type)
-            }).ToList();
+                _itemCache.Add(new ItemInfo
+                {
+                    Name = food.Name,
+                    TranslateName = food.TranslateName,
+                    ItemType = food.ItemType,  // 直接访问 Item 基类属性
+                    FoodType = food.Type,
+                    Price = food.Price,
+                    OriginalFood = food,
+                    OriginalItem = food,
+                    CanUse = food.CanUse,  // 直接访问 Item 基类属性
+                    Count = food.Count,    // 直接访问 Item 基类属性
+                    Keywords = ExtractKeywords(food.Name, food.TranslateName),
+                    TypeName = GetTypeName(food.ItemType, food.Type)
+                });
+            }
             
             _lastCacheUpdate = DateTime.Now;
-            Logger.Log($"FoodSearchService: 缓存已刷新，共 {_foodCache.Count} 个物品");
+            Logger.Log($"FoodSearchService: 缓存已刷新，共 {_itemCache.Count} 个物品");
+        }
+
+        /// <summary>
+        /// 获取物品栏中的物品列表（桌宠拥有的物品）- 直接使用 IMainWindow.Items
+        /// </summary>
+        public List<InventoryItemInfo> GetInventoryItems()
+        {
+            var inventoryItems = new List<InventoryItemInfo>();
+            
+            try
+            {
+                // 直接使用 IMainWindow.Items 属性（新版本 API）
+                var items = _mainWindow.Items;
+                if (items == null || !items.Any())
+                {
+                    return inventoryItems;
+                }
+
+                foreach (var item in items)
+                {
+                    // 检查 Visibility 属性（使用反射保持兼容性，因为该属性可能在某些版本中不存在）
+                    var visibilityProperty = item.GetType().GetProperty("Visibility");
+                    if (visibilityProperty != null)
+                    {
+                        var visibilityValue = visibilityProperty.GetValue(item);
+                        if (visibilityValue is bool visibility && !visibility)
+                        {
+                            continue; // 跳过不可见的物品
+                        }
+                    }
+
+                    inventoryItems.Add(new InventoryItemInfo
+                    {
+                        Name = item.Name,
+                        TranslateName = item.TranslateName,
+                        ItemType = item.ItemType,
+                        Price = item.Price,
+                        Count = item.Count,
+                        CanUse = item.CanUse,
+                        OriginalItem = item
+                    });
+                }
+
+                Logger.Log($"FoodSearchService: 获取物品栏成功，共 {inventoryItems.Count} 个物品");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"FoodSearchService: 获取物品栏失败: {ex.Message}");
+            }
+
+            return inventoryItems;
+        }
+
+        /// <summary>
+        /// 在物品栏中查找物品
+        /// </summary>
+        public InventoryItemInfo FindItemInInventory(string itemName)
+        {
+            var items = GetInventoryItems();
+            return items.FirstOrDefault(i =>
+                string.Equals(i.Name, itemName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(i.TranslateName, itemName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// 获取物品栏摘要（用于 AI 提示）- 使用反射保持向后兼容
+        /// </summary>
+        public string GetInventorySummary(string language = "zh")
+        {
+            var items = GetInventoryItems();
+            if (!items.Any())
+            {
+                return language == "zh" ? "物品栏为空" : "Inventory is empty";
+            }
+
+            var itemsByType = items.GroupBy(i => i.ItemType).ToList();
+            var parts = new List<string>();
+
+            foreach (var group in itemsByType)
+            {
+                var typeName = language == "zh" ? GetTypeNameChinese(group.Key.ToLower()) : group.Key;
+                var itemNames = string.Join(", ", group.Select(i => 
+                    $"{(!string.IsNullOrEmpty(i.TranslateName) ? i.TranslateName : i.Name)}x{i.Count}").Take(5));
+                var more = group.Count() > 5 ? $"...({group.Count() - 5} more)" : "";
+                parts.Add($"{typeName}: {itemNames}{more}");
+            }
+
+            return string.Join("; ", parts);
+        }
+
+        /// <summary>
+        /// 检查物品是否可用 - 使用反射保持向后兼容
+        /// </summary>
+        public bool CheckItemCanUse(string itemName)
+        {
+            CheckCacheExpiration();
+            
+            // 先检查商店物品缓存
+            var item = _itemCache.FirstOrDefault(i =>
+                string.Equals(i.Name, itemName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(i.TranslateName, itemName, StringComparison.OrdinalIgnoreCase));
+
+            if (item != null)
+            {
+                return item.CanUse;
+            }
+
+            // 再检查物品栏
+            var inventoryItem = FindItemInInventory(itemName);
+            return inventoryItem?.CanUse ?? true;
+        }
+
+        /// <summary>
+        /// 检查桌宠是否拥有某物品 - 使用反射保持向后兼容
+        /// </summary>
+        public bool HasItemInInventory(string itemName)
+        {
+            return FindItemInInventory(itemName) != null;
         }
 
         /// <summary>
@@ -105,18 +258,25 @@ namespace VPetLLM.Utils
         }
 
         /// <summary>
-        /// 获取类型名称
+        /// 获取类型名称（支持通用 Item 系统）
         /// </summary>
-        private string GetTypeName(Food.FoodType type)
+        private string GetTypeName(string itemType, Food.FoodType? foodType)
         {
-            return type switch
+            // 如果是 Food 类型且有具体的 FoodType
+            if (itemType == "Food" && foodType.HasValue)
             {
-                Food.FoodType.Food => "food",
-                Food.FoodType.Drink => "drink",
-                Food.FoodType.Drug => "drug",
-                Food.FoodType.Gift => "gift",
-                _ => "general"
-            };
+                return foodType.Value switch
+                {
+                    Food.FoodType.Food => "food",
+                    Food.FoodType.Drink => "drink",
+                    Food.FoodType.Drug => "drug",
+                    Food.FoodType.Gift => "gift",
+                    _ => "general"
+                };
+            }
+            
+            // 通用 Item 类型
+            return itemType?.ToLower() ?? "item";
         }
 
         /// <summary>
@@ -133,21 +293,21 @@ namespace VPetLLM.Utils
             Logger.Log($"FoodSearchService: 搜索物品 '{query}'");
 
             // 1. 精确匹配（最高优先级）
-            var exactMatch = _foodCache.FirstOrDefault(f =>
+            var exactMatch = _itemCache.FirstOrDefault(f =>
                 string.Equals(f.Name, query, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(f.TranslateName, query, StringComparison.OrdinalIgnoreCase));
 
             if (exactMatch != null)
             {
-                Logger.Log($"FoodSearchService: 精确匹配 '{exactMatch.Name}'");
+                Logger.Log($"FoodSearchService: 精确匹配 '{exactMatch.Name}' (type: {exactMatch.ItemType})");
                 return exactMatch.OriginalFood;
             }
 
             // 2. 关键词匹配
-            var keywordMatches = _foodCache
+            var keywordMatches = _itemCache
                 .Select(f => new
                 {
-                    Food = f,
+                    Item = f,
                     Score = CalculateKeywordScore(query.ToLower(), f.Keywords)
                 })
                 .Where(x => x.Score > 0)
@@ -157,15 +317,15 @@ namespace VPetLLM.Utils
             if (keywordMatches.Any())
             {
                 var best = keywordMatches.First();
-                Logger.Log($"FoodSearchService: 关键词匹配 '{best.Food.Name}' (得分: {best.Score})");
-                return best.Food.OriginalFood;
+                Logger.Log($"FoodSearchService: 关键词匹配 '{best.Item.Name}' (得分: {best.Score}, type: {best.Item.ItemType})");
+                return best.Item.OriginalFood;
             }
 
             // 3. 模糊匹配（编辑距离）
-            var fuzzyMatches = _foodCache
+            var fuzzyMatches = _itemCache
                 .Select(f => new
                 {
-                    Food = f,
+                    Item = f,
                     Score = CalculateFuzzyScore(query, f.Name, f.TranslateName)
                 })
                 .Where(x => x.Score > 0.5) // 相似度阈值
@@ -175,12 +335,56 @@ namespace VPetLLM.Utils
             if (fuzzyMatches.Any())
             {
                 var best = fuzzyMatches.First();
-                Logger.Log($"FoodSearchService: 模糊匹配 '{best.Food.Name}' (相似度: {best.Score:F2})");
-                return best.Food.OriginalFood;
+                Logger.Log($"FoodSearchService: 模糊匹配 '{best.Item.Name}' (相似度: {best.Score:F2}, type: {best.Item.ItemType})");
+                return best.Item.OriginalFood;
             }
 
             Logger.Log($"FoodSearchService: 未找到匹配的物品 '{query}'");
             return null;
+        }
+
+        /// <summary>
+        /// 按类型搜索食物
+        /// </summary>
+        public Food SearchFoodByType(string query, string itemType)
+        {
+            CheckCacheExpiration();
+            
+            if (string.IsNullOrWhiteSpace(query))
+                return null;
+
+            query = query.Trim();
+            var filteredCache = _itemCache.Where(i => 
+                string.Equals(i.ItemType, itemType, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (!filteredCache.Any())
+            {
+                Logger.Log($"FoodSearchService: 没有找到类型为 '{itemType}' 的物品");
+                return null;
+            }
+
+            // 精确匹配
+            var exactMatch = filteredCache.FirstOrDefault(f =>
+                string.Equals(f.Name, query, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(f.TranslateName, query, StringComparison.OrdinalIgnoreCase));
+
+            if (exactMatch != null)
+            {
+                return exactMatch.OriginalFood;
+            }
+
+            // 模糊匹配
+            var fuzzyMatches = filteredCache
+                .Select(f => new
+                {
+                    Item = f,
+                    Score = CalculateFuzzyScore(query, f.Name, f.TranslateName)
+                })
+                .Where(x => x.Score > 0.5)
+                .OrderByDescending(x => x.Score)
+                .ToList();
+
+            return fuzzyMatches.FirstOrDefault()?.Item.OriginalFood;
         }
 
         /// <summary>
@@ -263,13 +467,21 @@ namespace VPetLLM.Utils
         }
 
         /// <summary>
-        /// 按类型获取食物列表（用于生成简化的提示）
+        /// 按类型获取物品列表（用于生成简化的提示）
         /// </summary>
         public Dictionary<string, List<string>> GetFoodsByType()
         {
+            return GetItemsByType();
+        }
+
+        /// <summary>
+        /// 按类型获取物品列表（通用方法）
+        /// </summary>
+        public Dictionary<string, List<string>> GetItemsByType()
+        {
             CheckCacheExpiration();
             
-            return _foodCache
+            return _itemCache
                 .GroupBy(f => f.TypeName)
                 .ToDictionary(
                     g => g.Key,
@@ -282,10 +494,18 @@ namespace VPetLLM.Utils
         /// </summary>
         public string GetSimplifiedFoodListPrompt(string language = "zh")
         {
-            var foodsByType = GetFoodsByType();
+            return GetSimplifiedItemListPrompt(language);
+        }
+
+        /// <summary>
+        /// 获取简化的物品列表提示（通用方法）
+        /// </summary>
+        public string GetSimplifiedItemListPrompt(string language = "zh")
+        {
+            var itemsByType = GetItemsByType();
             var parts = new List<string>();
 
-            foreach (var kvp in foodsByType)
+            foreach (var kvp in itemsByType)
             {
                 var typeName = language == "zh" ? GetTypeNameChinese(kvp.Key) : kvp.Key;
                 var items = string.Join(",", kvp.Value.Take(5)); // 每类只显示前5个
@@ -307,6 +527,9 @@ namespace VPetLLM.Utils
                 "drink" => "饮料",
                 "drug" => "药品",
                 "gift" => "礼物",
+                "tool" => "道具",
+                "toy" => "玩具",
+                "item" => "物品",
                 _ => "其他"
             };
         }
@@ -316,8 +539,26 @@ namespace VPetLLM.Utils
         /// </summary>
         public int GetTotalFoodCount()
         {
+            return GetTotalItemCount();
+        }
+
+        /// <summary>
+        /// 获取所有物品数量
+        /// </summary>
+        public int GetTotalItemCount()
+        {
             CheckCacheExpiration();
-            return _foodCache.Count;
+            return _itemCache.Count;
+        }
+
+        /// <summary>
+        /// 获取指定类型的物品数量
+        /// </summary>
+        public int GetItemCountByType(string itemType)
+        {
+            CheckCacheExpiration();
+            return _itemCache.Count(i => 
+                string.Equals(i.ItemType, itemType, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

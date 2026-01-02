@@ -20,8 +20,8 @@
 		<PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.0" />
 		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
-		<PackageReference Include="VPet-Simulator.Windows.Interface" Version="1.1.0.50" />
-		<PackageReference Include="VPet-Simulator.Core" Version="1.1.0.50" />
+		<PackageReference Include="VPet-Simulator.Windows.Interface" Version="1.1.0.58" />
+		<PackageReference Include="VPet-Simulator.Core" Version="1.1.0.58" />
 	</ItemGroup>
 
 
