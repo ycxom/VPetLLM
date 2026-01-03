@@ -511,6 +511,10 @@ namespace VPetLLM.Handlers
                         Logger.Log($"SmartMessageProcessor: 音频 #{talkIndex} 不可用，仅显示气泡");
                         // 音频不可用，仅显示气泡
                         await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
+                        
+                        // 检查是否有外置 TTS 插件（如 VPetTTS）正在处理
+                        // 如果有，等待其播放完成
+                        await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
                     }
                 }
                 catch (Exception ex)
@@ -525,6 +529,94 @@ namespace VPetLLM.Handlers
             {
                 // 如果没有文本内容，直接执行动作
                 await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 等待外置 TTS 插件（如 VPetTTS）播放完成
+        /// 使用 VPetTTSCoordinator 监控状态
+        /// </summary>
+        private async Task WaitForExternalTTSCompleteAsync(string text)
+        {
+            try
+            {
+                // 检查是否有 VPetTTS 协调器可用
+                var coordinator = _plugin.VPetTTSCoordinator;
+                if (coordinator == null || !coordinator.IsVPetTTSAvailable())
+                {
+                    Logger.Log("SmartMessageProcessor: VPetTTS 协调器不可用，使用传统等待方式");
+                    // 回退到传统的 VPet 语音等待
+                    await WaitForVPetVoiceCompleteAsync().ConfigureAwait(false);
+                    return;
+                }
+
+                Logger.Log("SmartMessageProcessor: 开始等待 VPetTTS 播放完成...");
+
+                // 等待 VPetTTS 开始处理（最多等待 2 秒）
+                int waitForStartTime = 0;
+                int maxWaitForStart = 2000;
+                int checkInterval = 100;
+
+                while (waitForStartTime < maxWaitForStart)
+                {
+                    var stateInfo = coordinator.GetStateInfo();
+                    if (stateInfo.IsProcessing || stateInfo.IsDownloading || stateInfo.IsPlaying)
+                    {
+                        Logger.Log($"SmartMessageProcessor: VPetTTS 已开始处理 (Processing={stateInfo.IsProcessing}, Downloading={stateInfo.IsDownloading}, Playing={stateInfo.IsPlaying})");
+                        break;
+                    }
+                    await Task.Delay(checkInterval).ConfigureAwait(false);
+                    waitForStartTime += checkInterval;
+                }
+
+                if (waitForStartTime >= maxWaitForStart)
+                {
+                    Logger.Log("SmartMessageProcessor: 等待 VPetTTS 开始处理超时，可能 VPetTTS 未处理此文本");
+                    // 回退到传统等待
+                    await WaitForVPetVoiceCompleteAsync().ConfigureAwait(false);
+                    return;
+                }
+
+                // 等待 VPetTTS 播放完成（最多等待 60 秒）
+                int maxWaitTime = 60000;
+                int elapsedTime = 0;
+
+                while (elapsedTime < maxWaitTime)
+                {
+                    var stateInfo = coordinator.GetStateInfo();
+                    
+                    // 检查是否完成（不在处理、不在下载、不在播放）
+                    if (!stateInfo.IsProcessing && !stateInfo.IsDownloading && !stateInfo.IsPlaying)
+                    {
+                        Logger.Log($"SmartMessageProcessor: VPetTTS 播放完成，等待时间: {elapsedTime}ms");
+                        break;
+                    }
+
+                    // 检查是否有错误
+                    if (stateInfo.HasError)
+                    {
+                        Logger.Log($"SmartMessageProcessor: VPetTTS 发生错误: {stateInfo.LastError}");
+                        break;
+                    }
+
+                    await Task.Delay(checkInterval).ConfigureAwait(false);
+                    elapsedTime += checkInterval;
+                }
+
+                if (elapsedTime >= maxWaitTime)
+                {
+                    Logger.Log("SmartMessageProcessor: 等待 VPetTTS 播放完成超时");
+                }
+
+                // 额外等待一小段时间确保播放完全结束
+                await Task.Delay(200).ConfigureAwait(false);
+                Logger.Log("SmartMessageProcessor: VPetTTS 等待完成");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 等待外置 TTS 失败: {ex.Message}");
+                // 发生异常时回退到传统等待
+                await WaitForVPetVoiceCompleteAsync().ConfigureAwait(false);
             }
         }
 
@@ -658,9 +750,8 @@ namespace VPetLLM.Handlers
                 {
                     // 直接显示气泡
                     _plugin.MW.Main.Say(actualText);
-                    await Task.Delay(CalculateDisplayTime(actualText));
-                    // TTS关闭时等待 EdgeTTS 或其他 TTS 插件播放完成
-                    await WaitForVPetVoiceCompleteAsync();
+                    // TTS关闭时等待外置 TTS 插件（如 VPetTTS）播放完成
+                    await WaitForExternalTTSCompleteAsync(actualText).ConfigureAwait(false);
                 }
             }
         }
@@ -748,27 +839,8 @@ namespace VPetLLM.Handlers
                     // 如果内置TTS未启用，直接执行动作
                     await ExecuteActionAsync(segment.Content);
                     
-                    // 等待一小段时间让外置TTS有机会启动
-                    await Task.Delay(100).ConfigureAwait(false);
-                    
-                    // 检查是否有外置TTS正在运行（如EdgeTTS）
-                    // 通过检查 VPet 的 PlayingVoice 状态来判断
-                    bool hasExternalTTS = _plugin.MW?.Main?.PlayingVoice ?? false;
-                    
-                    if (hasExternalTTS)
-                    {
-                        // 外置TTS正在运行，等待语音完成
-                        Logger.Log($"SmartMessageProcessor: 检测到外置TTS正在运行，等待语音完成");
-                        await WaitForVPetVoiceWithSayInfoAsync();
-                        // 语音完成后不需要额外等待，直接继续
-                    }
-                    else
-                    {
-                        // 没有TTS运行，按计算时间等待气泡显示
-                        int displayTime = CalculateDisplayTime(talkText);
-                        Logger.Log($"SmartMessageProcessor: 无TTS运行，等待气泡显示 {displayTime}ms");
-                        await Task.Delay(displayTime).ConfigureAwait(false);
-                    }
+                    // 等待外置 TTS 插件（如 VPetTTS）播放完成
+                    await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
                 }
             }
             else

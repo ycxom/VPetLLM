@@ -41,10 +41,18 @@ namespace VPetLLM
         // VPet TTS 插件检测
         private bool _vpetTTSPluginDetected = false;
         
+        // VPetTTS 协调器
+        private VPetTTSCoordinator _vpetTTSCoordinator;
+        
         /// <summary>
         /// 获取 VPet TTS 插件是否被检测到
         /// </summary>
         public bool IsVPetTTSPluginDetected => _vpetTTSPluginDetected;
+
+        /// <summary>
+        /// 获取 VPetTTS 协调器（供外部使用）
+        /// </summary>
+        public VPetTTSCoordinator VPetTTSCoordinator => _vpetTTSCoordinator;
 
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
@@ -620,6 +628,24 @@ namespace VPetLLM
                 // 检测所有其他 TTS 插件
                 var allPluginsResult = TTSPluginDetector.DetectAllOtherTTSPlugins(MW);
 
+                // 初始化 VPetTTS 协调器
+                _vpetTTSCoordinator = new VPetTTSCoordinator(MW);
+                if (_vpetTTSCoordinator.Initialize())
+                {
+                    Logger.Log("VPetTTS 协调器初始化成功");
+                    
+                    // 订阅状态变化事件
+                    _vpetTTSCoordinator.StateChanged += OnVPetTTSStateChanged;
+                    _vpetTTSCoordinator.AvailabilityChanged += OnVPetTTSAvailabilityChanged;
+                    
+                    // 开始监听状态变化
+                    _vpetTTSCoordinator.StartMonitoring();
+                }
+                else
+                {
+                    Logger.Log("VPetTTS 协调器初始化失败（VPetTTS 插件可能未安装或版本不兼容）");
+                }
+
                 // 设置实时检测委托，每次调用 TTS 时都会检测插件状态
                 TTSService?.SetVPetTTSPluginChecker(() => CheckAnyTTSPluginEnabled());
 
@@ -654,6 +680,49 @@ namespace VPetLLM
             {
                 Logger.Log($"检测 TTS 插件时发生错误: {ex.Message}");
                 _vpetTTSPluginDetected = false;
+            }
+        }
+
+        /// <summary>
+        /// 处理 VPetTTS 状态变化事件
+        /// </summary>
+        private void OnVPetTTSStateChanged(object sender, VPetTTSStateChangedEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"VPetTTS 状态变化: {e.PropertyName} = {e.NewValue}");
+                
+                // 可以在这里添加更多的状态处理逻辑
+                // 例如：当 VPetTTS 开始播放时，暂停内置 TTS 等
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"处理 VPetTTS 状态变化时发生错误: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 处理 VPetTTS 可用性变化事件
+        /// </summary>
+        private void OnVPetTTSAvailabilityChanged(object sender, VPetTTSAvailabilityChangedEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"VPetTTS 可用性变化: IsAvailable={e.IsAvailable}, IsEnabled={e.IsEnabled}, Reason={e.Reason}");
+                
+                // 更新检测状态
+                _vpetTTSPluginDetected = e.IsAvailable && e.IsEnabled;
+                
+                // 通知设置窗口更新 UI
+                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    SettingWindow?.RefreshTTSPluginStatus(_vpetTTSPluginDetected, 
+                        _vpetTTSPluginDetected ? "VPetTTS" : "");
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"处理 VPetTTS 可用性变化时发生错误: {ex.Message}");
             }
         }
 
@@ -750,6 +819,15 @@ namespace VPetLLM
             {
                 UnregisterTakeItemHandleEvent();
                 UnregisterItemUseHook();
+            }
+            
+            // 清理 VPetTTS 协调器
+            if (_vpetTTSCoordinator != null)
+            {
+                _vpetTTSCoordinator.StateChanged -= OnVPetTTSStateChanged;
+                _vpetTTSCoordinator.AvailabilityChanged -= OnVPetTTSAvailabilityChanged;
+                _vpetTTSCoordinator.Dispose();
+                _vpetTTSCoordinator = null;
             }
             
             // 清理服务

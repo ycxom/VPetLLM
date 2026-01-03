@@ -88,7 +88,7 @@
                 <Setter Property="LineHeight" Value="18"/>
             </Style>
 
-            <!-- 现代化密码框样式 -->
+            <!-- 现代化密码框样式 --> 
             <Style x:Key="ModernPasswordBox" TargetType="PasswordBox">
                 <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
                 <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
