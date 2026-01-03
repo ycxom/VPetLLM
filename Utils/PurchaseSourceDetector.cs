@@ -61,8 +61,9 @@ namespace VPetLLM.Utils
                 return PurchaseSource.FriendBuy;
             }
 
-            // 物品栏使用
-            if (source == "inventory")
+            // 物品栏使用（支持 "inventory" 和 "item" 两种来源标记）
+            // "item" 是 VPet 新版本中从物品栏使用食物时的来源标记
+            if (source == "inventory" || source == "item")
             {
                 return PurchaseSource.Inventory;
             }
