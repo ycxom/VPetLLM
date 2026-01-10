@@ -95,6 +95,9 @@ namespace VPetLLM
                 Utils.Logger.Log($"初始化Free配置失败: {ex.Message}");
             }
             
+            // 初始化 Free ASR/TTS 认证委托
+            InitializeFreeAuthProviders(mainwin);
+            
             switch (Settings.Provider)
             {
                 case global::VPetLLM.Setting.LLMType.Ollama:
@@ -138,6 +141,57 @@ namespace VPetLLM
             
             // 初始化默认插件检查器
             _defaultPluginChecker = new DefaultPluginChecker(this);
+        }
+
+        /// <summary>
+        /// 初始化 Free ASR/TTS 认证委托
+        /// </summary>
+        private void InitializeFreeAuthProviders(IMainWindow mainwin)
+        {
+            try
+            {
+                // 设置获取 SteamID 的委托
+                Func<ulong> getSteamId = () =>
+                {
+                    try { return mainwin?.SteamID ?? 0; } catch { return 0; }
+                };
+
+                // 设置获取 AuthKey 的委托
+                Func<Task<int>> getAuthKey = async () =>
+                {
+                    try { return mainwin != null ? await mainwin.GenerateAuthKey() : 0; } catch { return 0; }
+                };
+
+                // 设置获取 ModId 的委托（从 VPet MOD 系统动态获取）
+                Func<string> getModId = () =>
+                {
+                    try
+                    {
+                        var dllPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                        if (string.IsNullOrEmpty(dllPath)) return "";
+                        
+                        foreach (var mod in mainwin.OnModInfo)
+                        {
+                            if (mod.Path != null && dllPath.StartsWith(mod.Path.FullName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (mod.ItemID > 0)
+                                    return mod.ItemID.ToString();
+                            }
+                        }
+                        return "";
+                    }
+                    catch { return ""; }
+                };
+
+                // 初始化共享签名助手（只需调用一次）
+                Utils.RequestSignatureHelper.Init(getSteamId, getAuthKey, getModId);
+
+                Utils.Logger.Log("Free ASR/TTS 认证委托初始化完成");
+            }
+            catch (Exception ex)
+            {
+                Utils.Logger.Log($"初始化 Free ASR/TTS 认证委托失败: {ex.Message}");
+            }
         }
 
         /// <summary>

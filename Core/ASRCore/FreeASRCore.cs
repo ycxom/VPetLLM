@@ -20,6 +20,14 @@ namespace VPetLLM.Core.ASRCore
         private string _apiUrl;
         private string _model;
 
+        /// <summary>
+        /// 设置认证信息获取委托（由 VPetLLM 主类在初始化时调用）
+        /// </summary>
+        public static void SetAuthProviders(Func<ulong> getSteamId, Func<Task<int>> getAuthKey, Func<string>? getModId = null)
+        {
+            Utils.RequestSignatureHelper.Init(getSteamId, getAuthKey, getModId);
+        }
+
         public FreeASRCore(Setting settings) : base(settings)
         {
             LoadConfig();
@@ -84,6 +92,9 @@ namespace VPetLLM.Core.ASRCore
                     Content = content
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+                
+                // 添加签名头
+                await Utils.RequestSignatureHelper.AddSignatureAsync(request);
 
                 var startTime = DateTime.Now;
                 using var client = CreateHttpClient();
@@ -129,14 +140,12 @@ namespace VPetLLM.Core.ASRCore
                     return "";
                 }
 
-                // 第一步：Hex解码
                 var hexBytes = new byte[encodedString.Length / 2];
                 for (int i = 0; i < hexBytes.Length; i++)
                 {
                     hexBytes[i] = Convert.ToByte(encodedString.Substring(i * 2, 2), 16);
                 }
 
-                // 第二步：Base64解码
                 var base64String = Encoding.UTF8.GetString(hexBytes);
                 var finalBytes = Convert.FromBase64String(base64String);
                 var result = Encoding.UTF8.GetString(finalBytes);

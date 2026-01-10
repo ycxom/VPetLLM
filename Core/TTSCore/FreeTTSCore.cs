@@ -19,6 +19,14 @@ namespace VPetLLM.Core.TTSCore
         private string _apiUrl;
         private string _model;
 
+        /// <summary>
+        /// 设置认证信息获取委托（由 VPetLLM 主类在初始化时调用）
+        /// </summary>
+        public static void SetAuthProviders(Func<ulong> getSteamId, Func<Task<int>> getAuthKey, Func<string>? getModId = null)
+        {
+            Utils.RequestSignatureHelper.Init(getSteamId, getAuthKey, getModId);
+        }
+
         public FreeTTSCore(Setting settings) : base(settings)
         {
             LoadConfig();
@@ -66,7 +74,6 @@ namespace VPetLLM.Core.TTSCore
 
                 Utils.Logger.Log($"TTS (Free): 发送请求，文本长度: {text.Length}");
 
-                // 构建请求体
                 var requestBody = new
                 {
                     text = text,
@@ -79,7 +86,14 @@ namespace VPetLLM.Core.TTSCore
 
                 var startTime = DateTime.Now;
                 using var client = CreateHttpClient();
-                var response = await client.PostAsync(_apiUrl, content);
+                
+                using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl)
+                {
+                    Content = content
+                };
+                await Utils.RequestSignatureHelper.AddSignatureAsync(request);
+                
+                var response = await client.SendAsync(request);
                 var elapsed = (DateTime.Now - startTime).TotalSeconds;
 
                 Utils.Logger.Log($"TTS (Free): 响应接收完成，耗时 {elapsed:F2} 秒, 状态: {response.StatusCode}");
@@ -89,7 +103,6 @@ namespace VPetLLM.Core.TTSCore
                     var errorContent = await response.Content.ReadAsStringAsync();
                     Utils.Logger.Log($"TTS (Free): API 错误: {response.StatusCode} - {errorContent}");
 
-                    // 尝试解析错误消息（符合文档中的错误响应格式）
                     try
                     {
                         var errorObj = JObject.Parse(errorContent);
@@ -104,7 +117,6 @@ namespace VPetLLM.Core.TTSCore
                     return Array.Empty<byte>();
                 }
 
-                // 成功响应：二进制音频数据（Content-Type: audio/wav）
                 var audioData = await response.Content.ReadAsByteArrayAsync();
                 Utils.Logger.Log($"TTS (Free): 音频生成成功，大小: {audioData.Length} bytes");
 
@@ -133,10 +145,9 @@ namespace VPetLLM.Core.TTSCore
 
         public override string GetAudioFormat()
         {
-            return "wav"; // 固定返回 WAV 格式
+            return "wav";
         }
 
-        // 该API服务由 @ycxom 提供，我们无法支持大量请求，若您拿到并且正确响应，还请不要泄露与滥用，作为 VPetLLM 为 VPet 大量AI对话Mod的其中一个免费提供AI对话服务的Mod，还请您善待，谢谢！
         private string DecodeString(string encodedString)
         {
             try
@@ -146,14 +157,12 @@ namespace VPetLLM.Core.TTSCore
                     return "";
                 }
 
-                // 第一步：Hex解码
                 var hexBytes = new byte[encodedString.Length / 2];
                 for (int i = 0; i < hexBytes.Length; i++)
                 {
                     hexBytes[i] = Convert.ToByte(encodedString.Substring(i * 2, 2), 16);
                 }
 
-                // 第二步：Base64解码
                 var base64String = Encoding.UTF8.GetString(hexBytes);
                 var finalBytes = Convert.FromBase64String(base64String);
                 var result = Encoding.UTF8.GetString(finalBytes);
