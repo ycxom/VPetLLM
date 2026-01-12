@@ -2973,7 +2973,9 @@
                                 Background="{StaticResource BackgroundBrush}"
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
-                                ScrollViewer.CanContentScroll="False"
+                                VirtualizingStackPanel.IsVirtualizing="True"
+                                VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                ScrollViewer.CanContentScroll="True"
                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                     </DockPanel>

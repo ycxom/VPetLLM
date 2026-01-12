@@ -811,7 +811,8 @@ namespace VPetLLM.UI.Windows
             LoadFreeProviderInfo();
             
             ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
-            ((ListBox)this.FindName("LogBox")).ItemsSource = Logger.Logs;
+            // 异步加载日志，避免日志过多时阻塞 UI
+            LoadLogsAsync();
 
             // Proxy settings
             if (_plugin.Settings.Proxy == null)
@@ -1690,6 +1691,25 @@ namespace VPetLLM.UI.Windows
         {
             Logger.Clear();
         }
+
+        /// <summary>
+        /// 异步加载日志到 LogBox，避免日志过多时阻塞 UI
+        /// </summary>
+        private async void LoadLogsAsync()
+        {
+            var logBox = (ListBox)this.FindName("LogBox");
+            if (logBox == null) return;
+
+            // 先显示加载状态（可选）
+            logBox.ItemsSource = null;
+
+            // 使用 Dispatcher 延迟绑定，让 UI 有机会先渲染
+            await Dispatcher.InvokeAsync(() =>
+            {
+                logBox.ItemsSource = Logger.Logs;
+            }, System.Windows.Threading.DispatcherPriority.Background);
+        }
+
         private async void Button_AddTool_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
