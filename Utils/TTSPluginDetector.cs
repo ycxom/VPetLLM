@@ -80,8 +80,30 @@ namespace VPetLLM.Utils
     }
 
     /// <summary>
+    /// 缓存的检测结果
+    /// </summary>
+    public class CachedDetectionResult
+    {
+        /// <summary>
+        /// 检测结果
+        /// </summary>
+        public TTSPluginDetectionResult Result { get; set; }
+        
+        /// <summary>
+        /// 缓存时间
+        /// </summary>
+        public DateTime CacheTime { get; set; }
+        
+        /// <summary>
+        /// 批次ID
+        /// </summary>
+        public string BatchId { get; set; }
+    }
+
+    /// <summary>
     /// TTS 插件检测器
     /// 用于检测各种 TTS 插件是否已加载并启用
+    /// 优化：支持缓存机制，减少重复检测调用
     /// </summary>
     public static class TTSPluginDetector
     {
@@ -105,6 +127,21 @@ namespace VPetLLM.Utils
         };
 
         /// <summary>
+        /// 插件检测结果缓存
+        /// </summary>
+        private static readonly Dictionary<string, CachedDetectionResult> _cache = new Dictionary<string, CachedDetectionResult>();
+        
+        /// <summary>
+        /// 缓存访问锁
+        /// </summary>
+        private static readonly object _cacheLock = new object();
+        
+        /// <summary>
+        /// 缓存超时时间（毫秒）
+        /// </summary>
+        private static int _cacheTimeoutMs = 5000;
+
+        /// <summary>
         /// 检测 VPet.Plugin.VPetTTS 插件是否已启用
         /// </summary>
         /// <param name="mainWindow">VPet 主窗口接口</param>
@@ -115,11 +152,137 @@ namespace VPetLLM.Utils
         }
 
         /// <summary>
+        /// 使用缓存检测特定插件
+        /// </summary>
+        /// <param name="mainWindow">VPet 主窗口接口</param>
+        /// <param name="pluginName">插件名称</param>
+        /// <param name="batchId">批次ID</param>
+        /// <returns>检测结果</returns>
+        public static TTSPluginDetectionResult DetectWithCache(IMainWindow mainWindow, string pluginName, string batchId)
+        {
+            lock (_cacheLock)
+            {
+                var cacheKey = pluginName.ToLowerInvariant();
+                
+                // 检查缓存是否命中
+                if (_cache.TryGetValue(cacheKey, out var cached))
+                {
+                    var isValidBatch = cached.BatchId == batchId;
+                    var isNotExpired = DateTime.Now - cached.CacheTime < TimeSpan.FromMilliseconds(_cacheTimeoutMs);
+                    
+                    if (isValidBatch && isNotExpired)
+                    {
+                        Logger.Log($"TTSPluginDetector: 缓存命中 - {pluginName}, 批次: {batchId}");
+                        return cached.Result;
+                    }
+                    else
+                    {
+                        Logger.Log($"TTSPluginDetector: 缓存过期或批次不匹配 - {pluginName}, 当前批次: {batchId}, 缓存批次: {cached.BatchId}");
+                    }
+                }
+                else
+                {
+                    Logger.Log($"TTSPluginDetector: 缓存未命中 - {pluginName}");
+                }
+                
+                // 缓存未命中或已过期，重新检测
+                Logger.Log($"TTSPluginDetector: 重新检测插件 - {pluginName}");
+                var result = DetectSpecificPlugin(mainWindow, pluginName);
+                
+                // 更新缓存
+                _cache[cacheKey] = new CachedDetectionResult
+                {
+                    Result = result,
+                    CacheTime = DateTime.Now,
+                    BatchId = batchId
+                };
+                
+                Logger.Log($"TTSPluginDetector: 缓存已更新 - {pluginName}, 批次: {batchId}");
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// 清除指定批次的缓存
+        /// </summary>
+        /// <param name="batchId">批次ID</param>
+        public static void ClearBatchCache(string batchId)
+        {
+            lock (_cacheLock)
+            {
+                var keysToRemove = new List<string>();
+                foreach (var kvp in _cache)
+                {
+                    if (kvp.Value.BatchId == batchId)
+                    {
+                        keysToRemove.Add(kvp.Key);
+                    }
+                }
+                
+                foreach (var key in keysToRemove)
+                {
+                    _cache.Remove(key);
+                }
+                
+                if (keysToRemove.Count > 0)
+                {
+                    Logger.Log($"TTSPluginDetector: 已清除批次 {batchId} 的 {keysToRemove.Count} 个缓存项");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 清除所有缓存
+        /// </summary>
+        public static void ClearAllCache()
+        {
+            lock (_cacheLock)
+            {
+                var count = _cache.Count;
+                _cache.Clear();
+                Logger.Log($"TTSPluginDetector: 已清除所有缓存，共 {count} 个项目");
+            }
+        }
+
+        /// <summary>
+        /// 设置缓存超时时间
+        /// </summary>
+        /// <param name="timeoutMs">超时时间（毫秒）</param>
+        public static void SetCacheTimeout(int timeoutMs)
+        {
+            _cacheTimeoutMs = Math.Max(1000, timeoutMs); // 最小1秒
+            Logger.Log($"TTSPluginDetector: 缓存超时时间已设置为 {_cacheTimeoutMs}ms");
+        }
+
+        /// <summary>
+        /// 获取缓存统计信息
+        /// </summary>
+        /// <returns>缓存项数量</returns>
+        public static int GetCacheCount()
+        {
+            lock (_cacheLock)
+            {
+                return _cache.Count;
+            }
+        }
+
+        /// <summary>
         /// 检测所有其他 TTS 插件
         /// </summary>
         /// <param name="mainWindow">VPet 主窗口接口</param>
         /// <returns>检测结果</returns>
         public static OtherTTSPluginsDetectionResult DetectAllOtherTTSPlugins(IMainWindow mainWindow)
+        {
+            return DetectAllOtherTTSPluginsWithCache(mainWindow, null);
+        }
+
+        /// <summary>
+        /// 使用缓存检测所有其他 TTS 插件
+        /// </summary>
+        /// <param name="mainWindow">VPet 主窗口接口</param>
+        /// <param name="batchId">批次ID，为null时不使用缓存</param>
+        /// <returns>检测结果</returns>
+        public static OtherTTSPluginsDetectionResult DetectAllOtherTTSPluginsWithCache(IMainWindow mainWindow, string batchId)
         {
             var result = new OtherTTSPluginsDetectionResult();
 
@@ -134,7 +297,19 @@ namespace VPetLLM.Utils
                 // 检测所有已知的 TTS 插件
                 foreach (var pluginName in KNOWN_TTS_PLUGINS)
                 {
-                    var detection = DetectSpecificPlugin(mainWindow, pluginName);
+                    TTSPluginDetectionResult detection;
+                    
+                    if (!string.IsNullOrEmpty(batchId))
+                    {
+                        // 使用缓存检测
+                        detection = DetectWithCache(mainWindow, pluginName, batchId);
+                    }
+                    else
+                    {
+                        // 直接检测，不使用缓存
+                        detection = DetectSpecificPlugin(mainWindow, pluginName);
+                    }
+                    
                     if (detection.PluginExists)
                     {
                         result.DetectedPlugins[pluginName] = detection;

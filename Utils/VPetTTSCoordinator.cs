@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using VPet_Simulator.Windows.Interface;
 
@@ -58,6 +60,180 @@ namespace VPetLLM.Utils
     }
 
     /// <summary>
+    /// TTS 操作时序记录
+    /// </summary>
+    public class TTSOperationTiming
+    {
+        public string RequestId { get; set; } = "";
+        public string Text { get; set; } = "";
+        public DateTime StartTime { get; set; }
+        public DateTime? ProcessingStartTime { get; set; }
+        public DateTime? DownloadingStartTime { get; set; }
+        public DateTime? PlayingStartTime { get; set; }
+        public DateTime? CompletedTime { get; set; }
+        public DateTime? ErrorTime { get; set; }
+        public string ErrorMessage { get; set; } = "";
+        public VPetTTSOperationStage CurrentStage { get; set; } = VPetTTSOperationStage.Idle;
+        public VPetTTSOperationStage PreviousStage { get; set; } = VPetTTSOperationStage.Idle;
+        
+        /// <summary>
+        /// 获取当前阶段的持续时间（毫秒）
+        /// </summary>
+        public int GetCurrentStageDurationMs()
+        {
+            var stageStartTime = GetStageStartTime(CurrentStage);
+            if (stageStartTime.HasValue)
+            {
+                return (int)(DateTime.Now - stageStartTime.Value).TotalMilliseconds;
+            }
+            return 0;
+        }
+        
+        /// <summary>
+        /// 获取总操作时间（毫秒）
+        /// </summary>
+        public int GetTotalDurationMs()
+        {
+            var endTime = CompletedTime ?? ErrorTime ?? DateTime.Now;
+            return (int)(endTime - StartTime).TotalMilliseconds;
+        }
+        
+        /// <summary>
+        /// 获取指定阶段的开始时间
+        /// </summary>
+        private DateTime? GetStageStartTime(VPetTTSOperationStage stage)
+        {
+            return stage switch
+            {
+                VPetTTSOperationStage.Processing => ProcessingStartTime,
+                VPetTTSOperationStage.Downloading => DownloadingStartTime,
+                VPetTTSOperationStage.Playing => PlayingStartTime,
+                VPetTTSOperationStage.Completed => CompletedTime,
+                VPetTTSOperationStage.Error => ErrorTime,
+                _ => StartTime
+            };
+        }
+    }
+
+    /// <summary>
+    /// TTS 状态转换超时检测器
+    /// </summary>
+    public class TTSTimeoutDetector
+    {
+        private readonly Dictionary<VPetTTSOperationStage, int> _stageTimeouts;
+        private readonly Dictionary<string, TTSOperationTiming> _activeOperations;
+        private readonly object _lockObject = new object();
+
+        public TTSTimeoutDetector()
+        {
+            _stageTimeouts = new Dictionary<VPetTTSOperationStage, int>
+            {
+                { VPetTTSOperationStage.Processing, 10000 },   // 10秒
+                { VPetTTSOperationStage.Downloading, 30000 },  // 30秒
+                { VPetTTSOperationStage.Playing, 60000 },      // 60秒
+            };
+            _activeOperations = new Dictionary<string, TTSOperationTiming>();
+        }
+
+        /// <summary>
+        /// 检测超时操作
+        /// </summary>
+        public List<TTSOperationTiming> DetectTimeouts()
+        {
+            var timeouts = new List<TTSOperationTiming>();
+            
+            lock (_lockObject)
+            {
+                foreach (var operation in _activeOperations.Values)
+                {
+                    if (_stageTimeouts.TryGetValue(operation.CurrentStage, out int timeoutMs))
+                    {
+                        if (operation.GetCurrentStageDurationMs() > timeoutMs)
+                        {
+                            timeouts.Add(operation);
+                        }
+                    }
+                }
+            }
+            
+            return timeouts;
+        }
+
+        /// <summary>
+        /// 更新操作状态
+        /// </summary>
+        public void UpdateOperation(string requestId, VPetTTSOperationStage newStage, string text = "", string errorMessage = "")
+        {
+            lock (_lockObject)
+            {
+                if (!_activeOperations.TryGetValue(requestId, out var operation))
+                {
+                    operation = new TTSOperationTiming
+                    {
+                        RequestId = requestId,
+                        Text = text,
+                        StartTime = DateTime.Now
+                    };
+                    _activeOperations[requestId] = operation;
+                }
+
+                operation.PreviousStage = operation.CurrentStage;
+                operation.CurrentStage = newStage;
+
+                // 更新阶段时间戳
+                var now = DateTime.Now;
+                switch (newStage)
+                {
+                    case VPetTTSOperationStage.Processing:
+                        operation.ProcessingStartTime = now;
+                        break;
+                    case VPetTTSOperationStage.Downloading:
+                        operation.DownloadingStartTime = now;
+                        break;
+                    case VPetTTSOperationStage.Playing:
+                        operation.PlayingStartTime = now;
+                        break;
+                    case VPetTTSOperationStage.Completed:
+                        operation.CompletedTime = now;
+                        break;
+                    case VPetTTSOperationStage.Error:
+                        operation.ErrorTime = now;
+                        operation.ErrorMessage = errorMessage;
+                        break;
+                }
+
+                // 完成或错误时移除活跃操作
+                if (newStage == VPetTTSOperationStage.Completed || newStage == VPetTTSOperationStage.Error)
+                {
+                    _activeOperations.Remove(requestId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取活跃操作
+        /// </summary>
+        public List<TTSOperationTiming> GetActiveOperations()
+        {
+            lock (_lockObject)
+            {
+                return new List<TTSOperationTiming>(_activeOperations.Values);
+            }
+        }
+
+        /// <summary>
+        /// 清理操作记录
+        /// </summary>
+        public void CleanupOperation(string requestId)
+        {
+            lock (_lockObject)
+            {
+                _activeOperations.Remove(requestId);
+            }
+        }
+    }
+
+    /// <summary>
     /// VPetTTS 协调器
     /// 用于 VPetLLM 与 VPetTTS 插件之间的状态协调
     /// </summary>
@@ -70,6 +246,12 @@ namespace VPetLLM.Utils
         private bool _isMonitoring;
         private bool _isDisposed;
         private readonly object _lockObject = new object();
+        
+        // 监控和超时检测
+        private readonly TTSTimeoutDetector _timeoutDetector;
+        private System.Threading.Timer _monitoringTimer;
+        private VPetTTSStateInfo _lastStateInfo;
+        private readonly List<TTSOperationTiming> _recentOperations;
 
         // 缓存的反射信息
         private System.Reflection.PropertyInfo _ttsStateProperty;
@@ -95,6 +277,8 @@ namespace VPetLLM.Utils
         public VPetTTSCoordinator(IMainWindow mainWindow)
         {
             _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+            _timeoutDetector = new TTSTimeoutDetector();
+            _recentOperations = new List<TTSOperationTiming>();
         }
 
         /// <summary>
@@ -315,8 +499,14 @@ namespace VPetLLM.Utils
                         availabilityChangedEvent.AddEventHandler(_ttsState, dynamicHandler);
                     }
 
+                    // 启动监控定时器
+                    _monitoringTimer = new System.Threading.Timer(OnMonitoringTick, null, 1000, 1000); // 每秒检查一次
+                    
+                    // 初始化状态
+                    _lastStateInfo = GetStateInfo();
+
                     _isMonitoring = true;
-                    Logger.Log("VPetTTSCoordinator: 开始监听 VPetTTS 状态变化");
+                    Logger.Log("VPetTTSCoordinator: 开始监听 VPetTTS 状态变化和超时检测");
                 }
                 catch (Exception ex)
                 {
@@ -334,9 +524,222 @@ namespace VPetLLM.Utils
             {
                 if (!_isMonitoring) return;
 
+                // 停止监控定时器
+                _monitoringTimer?.Dispose();
+                _monitoringTimer = null;
+
                 _isMonitoring = false;
                 Logger.Log("VPetTTSCoordinator: 停止监听 VPetTTS 状态变化");
             }
+        }
+
+        /// <summary>
+        /// 监控定时器回调
+        /// </summary>
+        private void OnMonitoringTick(object state)
+        {
+            try
+            {
+                // 检测超时操作
+                var timeouts = _timeoutDetector.DetectTimeouts();
+                foreach (var timeout in timeouts)
+                {
+                    Logger.Log($"VPetTTSCoordinator: 检测到超时操作 - RequestId: {timeout.RequestId}, " +
+                              $"Stage: {timeout.CurrentStage}, Duration: {timeout.GetCurrentStageDurationMs()}ms");
+                    
+                    // 触发超时恢复
+                    HandleOperationTimeout(timeout);
+                }
+
+                // 检测状态变化
+                var currentState = GetStateInfo();
+                if (_lastStateInfo != null)
+                {
+                    DetectStateTransitions(_lastStateInfo, currentState);
+                }
+                _lastStateInfo = currentState;
+
+                // 清理旧的操作记录（保留最近100个）
+                lock (_lockObject)
+                {
+                    if (_recentOperations.Count > 100)
+                    {
+                        _recentOperations.RemoveRange(0, _recentOperations.Count - 100);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"VPetTTSCoordinator: 监控定时器异常: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 检测状态转换
+        /// </summary>
+        private void DetectStateTransitions(VPetTTSStateInfo oldState, VPetTTSStateInfo newState)
+        {
+            // 使用旧状态的文本内容作为请求ID，确保一致性
+            var operationText = !string.IsNullOrEmpty(oldState.CurrentText) ? oldState.CurrentText : newState.CurrentText;
+            
+            // 检测处理状态变化
+            if (oldState.IsProcessing != newState.IsProcessing)
+            {
+                var stage = newState.IsProcessing ? VPetTTSOperationStage.Processing : VPetTTSOperationStage.Idle;
+                UpdateCurrentOperationStage(stage, operationText);
+                Logger.Log($"VPetTTSCoordinator: TTS处理状态变化 - {oldState.IsProcessing} -> {newState.IsProcessing}");
+            }
+
+            // 检测下载状态变化
+            if (oldState.IsDownloading != newState.IsDownloading)
+            {
+                var stage = newState.IsDownloading ? VPetTTSOperationStage.Downloading : VPetTTSOperationStage.Idle;
+                UpdateCurrentOperationStage(stage, operationText);
+                Logger.Log($"VPetTTSCoordinator: TTS下载状态变化 - {oldState.IsDownloading} -> {newState.IsDownloading}");
+            }
+
+            // 检测播放状态变化
+            if (oldState.IsPlaying != newState.IsPlaying)
+            {
+                var stage = newState.IsPlaying ? VPetTTSOperationStage.Playing : VPetTTSOperationStage.Completed;
+                UpdateCurrentOperationStage(stage, operationText);
+                Logger.Log($"VPetTTSCoordinator: TTS播放状态变化 - {oldState.IsPlaying} -> {newState.IsPlaying}");
+            }
+
+            // 检测错误状态变化
+            if (oldState.HasError != newState.HasError && newState.HasError)
+            {
+                UpdateCurrentOperationStage(VPetTTSOperationStage.Error, operationText, newState.LastError);
+                Logger.Log($"VPetTTSCoordinator: TTS错误状态变化 - Error: {newState.LastError}");
+            }
+        }
+
+        /// <summary>
+        /// 更新当前操作阶段
+        /// </summary>
+        private void UpdateCurrentOperationStage(VPetTTSOperationStage stage, string text = "", string errorMessage = "")
+        {
+            // 使用文本内容的哈希作为请求ID（同一文本的不同阶段使用相同ID）
+            var textHash = text?.GetHashCode() ?? 0;
+            var requestId = $"tts_{textHash}";
+            
+            // 如果是新的文本，清理之前的操作
+            if (!string.IsNullOrEmpty(text) && stage == VPetTTSOperationStage.Processing)
+            {
+                // 清理可能存在的旧操作
+                _timeoutDetector.CleanupOperation(requestId);
+            }
+            
+            _timeoutDetector.UpdateOperation(requestId, stage, text, errorMessage);
+        }
+
+        /// <summary>
+        /// 处理操作超时
+        /// </summary>
+        private void HandleOperationTimeout(TTSOperationTiming timeout)
+        {
+            try
+            {
+                Logger.Log($"VPetTTSCoordinator: 处理超时操作 - RequestId: {timeout.RequestId}, " +
+                          $"Stage: {timeout.CurrentStage}, Text: {(timeout.Text?.Length > 50 ? timeout.Text.Substring(0, 50) : timeout.Text ?? "")}...");
+
+                // 记录超时操作
+                lock (_lockObject)
+                {
+                    _recentOperations.Add(timeout);
+                }
+
+                // 清理超时操作
+                _timeoutDetector.CleanupOperation(timeout.RequestId);
+
+                // 触发超时恢复建议
+                var recoveryMessage = GenerateRecoveryMessage(timeout);
+                Logger.Log($"VPetTTSCoordinator: 超时恢复建议 - {recoveryMessage}");
+
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"VPetTTSCoordinator: 处理超时操作失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 生成恢复建议消息
+        /// </summary>
+        private string GenerateRecoveryMessage(TTSOperationTiming timeout)
+        {
+            return timeout.CurrentStage switch
+            {
+                VPetTTSOperationStage.Processing => "TTS处理超时，建议检查网络连接或重启VPetTTS插件",
+                VPetTTSOperationStage.Downloading => "TTS下载超时，建议检查网络连接或更换TTS提供商",
+                VPetTTSOperationStage.Playing => "TTS播放超时，建议检查音频设备或重启VPetTTS插件",
+                _ => "TTS操作超时，建议重启VPetTTS插件或检查系统资源"
+            };
+        }
+
+        /// <summary>
+        /// 获取超时检测器
+        /// </summary>
+        public TTSTimeoutDetector GetTimeoutDetector()
+        {
+            return _timeoutDetector;
+        }
+
+        /// <summary>
+        /// 获取最近的操作记录
+        /// </summary>
+        public List<TTSOperationTiming> GetRecentOperations()
+        {
+            lock (_lockObject)
+            {
+                return new List<TTSOperationTiming>(_recentOperations);
+            }
+        }
+
+        /// <summary>
+        /// 获取详细的时序记录
+        /// </summary>
+        public string GetDetailedTimingLog()
+        {
+            var log = new System.Text.StringBuilder();
+            log.AppendLine("=== VPetTTS 操作时序记录 ===");
+            
+            var recentOps = GetRecentOperations();
+            if (recentOps.Count == 0)
+            {
+                log.AppendLine("无最近操作记录");
+            }
+            else
+            {
+                foreach (var op in recentOps.TakeLast(10)) // 显示最近10个操作
+                {
+                    log.AppendLine($"RequestId: {op.RequestId}");
+                    log.AppendLine($"  文本: {(op.Text?.Length > 30 ? op.Text.Substring(0, 30) : op.Text ?? "")}...");
+                    log.AppendLine($"  开始时间: {op.StartTime:HH:mm:ss.fff}");
+                    log.AppendLine($"  当前阶段: {op.CurrentStage}");
+                    log.AppendLine($"  总耗时: {op.GetTotalDurationMs()}ms");
+                    if (!string.IsNullOrEmpty(op.ErrorMessage))
+                    {
+                        log.AppendLine($"  错误信息: {op.ErrorMessage}");
+                    }
+                    log.AppendLine();
+                }
+            }
+            
+            var activeOps = _timeoutDetector.GetActiveOperations();
+            if (activeOps.Count > 0)
+            {
+                log.AppendLine("=== 活跃操作 ===");
+                foreach (var op in activeOps)
+                {
+                    log.AppendLine($"RequestId: {op.RequestId}");
+                    log.AppendLine($"  当前阶段: {op.CurrentStage}");
+                    log.AppendLine($"  阶段耗时: {op.GetCurrentStageDurationMs()}ms");
+                    log.AppendLine();
+                }
+            }
+            
+            return log.ToString();
         }
 
         // 动态事件处理方法（用于反射订阅）
@@ -462,6 +865,7 @@ namespace VPetLLM.Utils
             if (_isDisposed) return;
 
             StopMonitoring();
+            _monitoringTimer?.Dispose();
             _ttsState = null;
             _ttsCoordinator = null;
             _vpetTTSPlugin = null;
