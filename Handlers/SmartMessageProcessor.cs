@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Text.RegularExpressions;
 using VPetLLM.Utils;
+using VPetLLM.Configuration;
 using System.Linq;
 
 namespace VPetLLM.Handlers
@@ -16,6 +17,8 @@ namespace VPetLLM.Handlers
         private readonly VPetLLM _plugin;
         private readonly ActionProcessor _actionProcessor;
         private readonly BubbleManager _bubbleManager;
+        private readonly TTSRequestSerializer _ttsSerializer;
+        private VPetTTSStateMonitor _stateMonitor;
         private bool _isProcessing = false;
         private readonly object _processingLock = new object();
 
@@ -24,12 +27,52 @@ namespace VPetLLM.Handlers
             _plugin = plugin;
             _actionProcessor = plugin.ActionProcessor;
             _bubbleManager = new BubbleManager(plugin);
+            _ttsSerializer = new TTSRequestSerializer();
+            
+            // 设置序列化器的SmartMessageProcessor引用
+            _ttsSerializer.SetSmartMessageProcessor(this);
+            
+            // 初始化VPetTTS状态监控器（如果检测到VPetTTS插件）
+            InitializeVPetTTSStateMonitor();
+            
+            Logger.Log("SmartMessageProcessor: 初始化完成，TTS序列化器已启用");
         }
         
         /// <summary>
         /// 获取气泡管理器
         /// </summary>
         public BubbleManager BubbleManager => _bubbleManager;
+        
+        /// <summary>
+        /// 初始化VPetTTS状态监控器
+        /// </summary>
+        private void InitializeVPetTTSStateMonitor()
+        {
+            try
+            {
+                if (_plugin.IsVPetTTSPluginDetected)
+                {
+                    var vpetTTSPlugin = GetVPetTTSPlugin();
+                    if (vpetTTSPlugin != null)
+                    {
+                        _stateMonitor = new VPetTTSStateMonitor(vpetTTSPlugin);
+                        Logger.Log("SmartMessageProcessor: VPetTTS状态监控器已初始化");
+                    }
+                    else
+                    {
+                        Logger.Log("SmartMessageProcessor: 无法获取VPetTTS插件实例，状态监控器未初始化");
+                    }
+                }
+                else
+                {
+                    Logger.Log("SmartMessageProcessor: 未检测到VPetTTS插件，跳过状态监控器初始化");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 初始化VPetTTS状态监控器失败: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// 获取当前是否正在处理消息
@@ -451,7 +494,7 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 使用智能队列处理talk动作片段
-        /// 简化版：恢复原始的避让机制，VPetLLM内置TTS检测并避让VPetTTS
+        /// 集成TTS请求序列化器，确保VPetLLM与VPetTTS的正确协调
         /// </summary>
         private async Task ProcessTalkSegmentWithQueueAsync(MessageSegment segment, List<TTSDownloadTask> downloadTasks, int talkIndex)
         {
@@ -463,21 +506,37 @@ namespace VPetLLM.Handlers
             if (!string.IsNullOrEmpty(talkText))
             {
                 var operationStartTime = DateTime.Now;
-                string audioFile = null;
-                bool ttsSucceeded = false;
                 
                 try
                 {
-                    // 检查是否有VPetTTS插件，如果有则避让
+                    // 检查是否有VPetTTS插件，如果有则使用序列化处理
                     if (_plugin.IsVPetTTSPluginDetected)
                     {
-                        Logger.Log($"SmartMessageProcessor: 检测到VPetTTS插件，VPetLLM内置TTS避让");
-                        // 直接执行动作，让VPetTTS处理
-                        await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
-                        await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
+                        Logger.Log($"SmartMessageProcessor: 检测到VPetTTS插件，使用TTS序列化处理");
+                        
+                        // 使用TTS请求序列化器确保按顺序处理
+                        var success = await _ttsSerializer.ProcessTTSRequestAsync(talkText, segment.Content);
+                        
+                        if (success)
+                        {
+                            var serializationDuration = (int)(DateTime.Now - operationStartTime).TotalMilliseconds;
+                            Logger.Log($"SmartMessageProcessor: TTS序列化处理成功，总耗时: {serializationDuration}ms");
+                        }
+                        else
+                        {
+                            Logger.Log($"SmartMessageProcessor: TTS序列化处理失败，回退到传统处理");
+                            // 回退到传统处理方式
+                            await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
+                            await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
+                        }
+                        
                         return;
                     }
 
+                    // 原有的内置TTS处理逻辑（当没有VPetTTS插件时）
+                    string audioFile = null;
+                    bool ttsSucceeded = false;
+                    
                     // 首先检查是否有流式处理预下载的音频
                     var predownloadedAudio = StreamingCommandProcessor.GetAndRemovePredownloadedAudio(segment.Content);
                     if (!string.IsNullOrEmpty(predownloadedAudio))
@@ -550,7 +609,8 @@ namespace VPetLLM.Handlers
 
         /// <summary>
         /// 等待外置 TTS 插件（如 VPetTTS）播放完成
-        /// 简化版：恢复传统等待机制，不依赖复杂的协调器
+        /// 使用VPetTTSStateMonitor提供更精确的状态检测
+        /// 完全依赖进度检测，不使用固定超时
         /// </summary>
         private async Task WaitForExternalTTSCompleteAsync(string text)
         {
@@ -558,8 +618,29 @@ namespace VPetLLM.Handlers
             {
                 Logger.Log("SmartMessageProcessor: 开始等待外置TTS播放完成...");
                 
-                // 直接使用传统的 VPet 语音等待
-                await WaitForVPetVoiceCompleteAsync().ConfigureAwait(false);
+                // 优先使用状态监控器（完全依赖进度检测，不传入超时参数）
+                if (_stateMonitor != null && TTSCoordinationSettings.Instance.EnableStateMonitor)
+                {
+                    Logger.Log("SmartMessageProcessor: 使用VPetTTS状态监控器等待播放完成（基于进度检测）");
+                    // 不传入超时参数，使用默认的5分钟最大超时作为安全保护
+                    // 实际完成判断完全依赖进度检测：3秒内进度无变化才判断失败
+                    var completed = await _stateMonitor.WaitForPlaybackCompleteAsync();
+                    
+                    if (completed)
+                    {
+                        Logger.Log("SmartMessageProcessor: VPetTTS播放完成");
+                    }
+                    else
+                    {
+                        Logger.Log("SmartMessageProcessor: VPetTTS状态监控器检测到播放异常，继续处理下一个请求");
+                    }
+                }
+                else
+                {
+                    // 回退到传统的 VPet 语音等待
+                    Logger.Log("SmartMessageProcessor: 状态监控器不可用，使用传统等待");
+                    await WaitForVPetVoiceCompleteAsync().ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {
@@ -584,16 +665,23 @@ namespace VPetLLM.Handlers
         /// <summary>
         /// 等待 VPet 主程序的语音播放完成（EdgeTTS 或其他 TTS 插件）
         /// 优化：减少轮询频率，利用VPet新的SayInfo架构提供的状态信息
+        /// 修复：正确处理VPetTTS插件协作，当检测到外部TTS插件时应该等待而不是跳过
         /// </summary>
         private async Task WaitForVPetVoiceCompleteAsync()
         {
             try
             {
-                // 检查是否启用了 VPetLLM 的 TTS
-                if (_plugin.Settings.TTS.IsEnabled)
+                // 检查是否启用了 VPetLLM 的 TTS 且没有检测到外部 TTS 插件
+                if (_plugin.Settings.TTS.IsEnabled && !_plugin.IsVPetTTSPluginDetected)
                 {
-                    Logger.Log("SmartMessageProcessor: VPetLLM TTS 已启用，跳过 VPet 语音等待");
+                    Logger.Log("SmartMessageProcessor: VPetLLM 内置 TTS 已启用且无外部 TTS 插件，跳过 VPet 语音等待");
                     return;
+                }
+
+                // 如果检测到外部 TTS 插件（如 VPetTTS），需要等待其播放完成
+                if (_plugin.IsVPetTTSPluginDetected)
+                {
+                    Logger.Log("SmartMessageProcessor: 检测到外部 TTS 插件，等待其播放完成");
                 }
 
                 // 检查 VPet 主程序是否正在播放语音
@@ -614,7 +702,8 @@ namespace VPetLLM.Handlers
         /// <summary>
         /// 利用VPet新SayInfo架构智能等待语音完成（优化版）
         /// 结合 PlayingVoice 状态和 SayInfo 事件，提供更精确的等待策略
-        /// 增加：为外置TTS额外添加等待时间
+        /// 增加：为外置TTS额外添加等待时间，并改进VPetTTS插件的播放状态检测
+        /// 修复：通过VPetTTS状态接口检测播放完成
         /// </summary>
         private async Task WaitForVPetVoiceWithSayInfoAsync()
         {
@@ -627,6 +716,7 @@ namespace VPetLLM.Handlers
 
                 Logger.Log("SmartMessageProcessor: 开始智能等待VPet语音播放完成");
 
+                // 第一阶段：等待VPet主程序的PlayingVoice状态
                 while (_plugin.MW.Main.PlayingVoice && elapsedTime < maxWaitTime)
                 {
                     await Task.Delay(checkInterval).ConfigureAwait(false);
@@ -646,9 +736,47 @@ namespace VPetLLM.Handlers
                     Logger.Log("SmartMessageProcessor: VPet 无语音播放，继续执行");
                 }
 
-                // 为外置TTS添加额外1秒等待时间，确保播放完全
-                Logger.Log("SmartMessageProcessor: 为外置TTS添加额外1秒等待时间");
-                await Task.Delay(1000).ConfigureAwait(false);
+                // 第二阶段：如果检测到VPetTTS插件，使用其状态接口进行精确检测
+                if (_plugin.IsVPetTTSPluginDetected)
+                {
+                    Logger.Log("SmartMessageProcessor: 检测到VPetTTS插件，使用状态接口检测播放完成");
+                    
+                    // 尝试获取VPetTTS插件的状态接口
+                    var vpetTTSPlugin = GetVPetTTSPlugin();
+                    if (vpetTTSPlugin != null)
+                    {
+                        int ttsWaitTime = 0;
+                        int ttsMaxWait = 15000; // VPetTTS专用等待时间：最多15秒
+                        
+                        // 使用VPetTTS的状态接口检测播放状态
+                        while (IsVPetTTSPlaying(vpetTTSPlugin) && ttsWaitTime < ttsMaxWait)
+                        {
+                            await Task.Delay(checkInterval).ConfigureAwait(false);
+                            ttsWaitTime += checkInterval;
+                        }
+                        
+                        if (ttsWaitTime > 0)
+                        {
+                            Logger.Log($"SmartMessageProcessor: VPetTTS播放完成，等待时间: {ttsWaitTime}ms");
+                        }
+                        else
+                        {
+                            Logger.Log("SmartMessageProcessor: VPetTTS未在播放，添加标准等待时间");
+                            await Task.Delay(1000).ConfigureAwait(false);
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log("SmartMessageProcessor: 无法获取VPetTTS状态接口，使用标准等待");
+                        await Task.Delay(2000).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    // 为其他外置TTS添加标准等待时间
+                    Logger.Log("SmartMessageProcessor: 为外置TTS添加额外1秒等待时间");
+                    await Task.Delay(1000).ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {
@@ -656,6 +784,62 @@ namespace VPetLLM.Handlers
                 // 发生异常时也添加额外等待时间，确保安全
                 Logger.Log("SmartMessageProcessor: 异常情况下为外置TTS添加额外等待");
                 await Task.Delay(2000).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 获取VPetTTS插件实例
+        /// </summary>
+        private object GetVPetTTSPlugin()
+        {
+            try
+            {
+                // 通过反射获取VPetTTS插件实例
+                var plugins = _plugin.MW.Plugins;
+                foreach (var plugin in plugins)
+                {
+                    if (plugin.PluginName == "VPetTTS")
+                    {
+                        return plugin;
+                    }
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 获取VPetTTS插件实例失败: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 检测VPetTTS是否正在播放
+        /// </summary>
+        private bool IsVPetTTSPlaying(object vpetTTSPlugin)
+        {
+            try
+            {
+                // 通过反射访问VPetTTS的TTSState.IsPlaying属性
+                var ttsStateProperty = vpetTTSPlugin.GetType().GetProperty("TTSState");
+                if (ttsStateProperty != null)
+                {
+                    var ttsState = ttsStateProperty.GetValue(vpetTTSPlugin);
+                    if (ttsState != null)
+                    {
+                        var isPlayingProperty = ttsState.GetType().GetProperty("IsPlaying");
+                        if (isPlayingProperty != null)
+                        {
+                            var isPlaying = (bool)isPlayingProperty.GetValue(ttsState);
+                            return isPlaying;
+                        }
+                    }
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 检测VPetTTS播放状态失败: {ex.Message}");
+                return false;
             }
         }
 
@@ -919,6 +1103,24 @@ namespace VPetLLM.Handlers
         private int CalculateDisplayTime(string text)
         {
             return Math.Max(text.Length * _plugin.Settings.SayTimeMultiplier, _plugin.Settings.SayTimeMin);
+        }
+        
+        /// <summary>
+        /// 内部方法：执行动作指令（供TTSRequestSerializer调用）
+        /// </summary>
+        /// <param name="actionContent">动作内容</param>
+        internal async Task ExecuteActionInternalAsync(string actionContent)
+        {
+            await ExecuteActionAsync(actionContent).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// 内部方法：等待外置TTS完成（供TTSRequestSerializer调用）
+        /// </summary>
+        /// <param name="text">TTS文本</param>
+        internal async Task WaitForExternalTTSInternalAsync(string text)
+        {
+            await WaitForExternalTTSCompleteAsync(text).ConfigureAwait(false);
         }
     }
 

@@ -346,11 +346,17 @@ namespace VPetLLM.Handlers
         {
             try
             {
-                // 检查是否启用了 VPetLLM 的 TTS
-                if (_plugin.Settings.TTS.IsEnabled)
+                // 检查是否启用了 VPetLLM 的 TTS 且没有检测到外部 TTS 插件
+                if (_plugin.Settings.TTS.IsEnabled && !_plugin.IsVPetTTSPluginDetected)
                 {
-                    Logger.Log("AnimationTimingCoordinator: VPetLLM TTS 已启用，跳过 VPet 语音等待");
+                    Logger.Log("AnimationTimingCoordinator: VPetLLM 内置 TTS 已启用且无外部 TTS 插件，跳过 VPet 语音等待");
                     return;
+                }
+
+                // 如果检测到外部 TTS 插件（如 VPetTTS），需要等待其播放完成
+                if (_plugin.IsVPetTTSPluginDetected)
+                {
+                    Logger.Log("AnimationTimingCoordinator: 检测到外部 TTS 插件，等待其播放完成");
                 }
 
                 // 检查 VPet 主程序是否正在播放语音
@@ -377,6 +383,13 @@ namespace VPetLLM.Handlers
                 {
                     Logger.Log("AnimationTimingCoordinator: 等待 VPet 语音播放超时");
                     throw new TimeoutException($"VPet语音播放超时 ({maxWaitTime}ms)");
+                }
+
+                // 如果检测到VPetTTS插件，增加额外等待时间
+                if (_plugin.IsVPetTTSPluginDetected && elapsedTime > 0)
+                {
+                    Logger.Log("AnimationTimingCoordinator: 检测到VPetTTS插件，添加额外等待时间");
+                    await Task.Delay(1000);
                 }
                 else if (elapsedTime > 0)
                 {

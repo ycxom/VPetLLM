@@ -460,7 +460,15 @@ namespace VPetLLM.Handlers
                             }
                             else
                             {
-                                Utils.Logger.Log($"StreamingCommandProcessor: TTS音频下载失败");
+                                // 检查是否是因为VPetTTS插件避让导致的"下载失败"
+                                if (pluginInstance?.IsVPetTTSPluginDetected == true)
+                                {
+                                    Utils.Logger.Log($"StreamingCommandProcessor: 检测到VPetTTS插件，VPetLLM内置TTS正常避让");
+                                }
+                                else
+                                {
+                                    Utils.Logger.Log($"StreamingCommandProcessor: TTS音频下载失败");
+                                }
                             }
                         }
                         catch (Exception ex)
