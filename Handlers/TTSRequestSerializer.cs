@@ -193,6 +193,7 @@ namespace VPetLLM.Handlers
                 Logger.Log("TTSRequestSerializer: 开始等待外置TTS播放完成...");
                 
                 // 通过SmartMessageProcessor实例等待外置TTS
+                // 注意：会话跟踪已在 SmartMessageProcessor.WaitForExternalTTSCompleteAsync 中实现
                 if (_smartMessageProcessor != null)
                 {
                     await _smartMessageProcessor.WaitForExternalTTSInternalAsync(text);

@@ -97,7 +97,7 @@ namespace VPetLLM.UI.Windows
                     _streamingState = StreamingState.Streaming;
             }
 
-            // 首次响应：快速停止思考动画
+            // 首次响应：快速停止思考动画，更新状态灯为输出中
             if (isFirstResponse)
             {
                 _isThinking = false;
@@ -107,6 +107,9 @@ namespace VPetLLM.UI.Windows
                     _thinkingCancellationTokenSource = null;
                     try { cts.Cancel(); cts.Dispose(); } catch { }
                 }
+                
+                // 更新状态灯为输出中
+                _plugin.FloatingSidebarManager?.SetOutputtingStatus();
             }
 
             // 在后台线程处理消息，避免阻塞UI
@@ -114,11 +117,14 @@ namespace VPetLLM.UI.Windows
             {
                 try
                 {
-                    await _messageProcessor.ProcessMessageAsync(response, !isFirstResponse);
+                    // 流式处理模式：不自动设置Idle状态，由StreamingCommandProcessor统一管理
+                    await _messageProcessor.ProcessMessageAsync(response, !isFirstResponse, autoSetIdleOnComplete: false);
                 }
                 catch (Exception ex)
                 {
                     Logger.Log($"HandleResponse: 处理错误: {ex.Message}");
+                    // 更新状态灯为错误状态
+                    _plugin.FloatingSidebarManager?.SetErrorStatus();
                     _ = Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
                         try { _plugin.MW.Main.Say(response); } catch { }
@@ -137,6 +143,10 @@ namespace VPetLLM.UI.Windows
 
             OnSendMessage?.Invoke(text);
             Logger.Log($"Responded called with text: {text}");
+            
+            // 更新状态灯为处理中
+            // 注意：不在这里调用 BeginActiveSession()，会话跟踪由 StreamingCommandProcessor 和 ResultAggregator 管理
+            _plugin.FloatingSidebarManager?.SetProcessingStatus();
             
             // 重置流式处理状态，为新对话做准备
             ResetStreamingState();
@@ -204,6 +214,8 @@ namespace VPetLLM.UI.Windows
             catch (Exception e)
             {
                 Logger.Log($"An error occurred in Responded: {e}");
+                // 更新状态灯为错误状态
+                _plugin.FloatingSidebarManager?.SetErrorStatus();
                 await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
             }
             finally
@@ -215,7 +227,10 @@ namespace VPetLLM.UI.Windows
                 // 重置流式处理状态，为下一次对话做准备
                 ResetStreamingState();
                 
-                Logger.Log("Responded: 思考动画已停止，流式状态已重置");
+                // 注意：不在这里调用 EndActiveSession()，会话跟踪由 StreamingCommandProcessor 管理
+                // StreamingCommandProcessor 会在所有命令处理完成后自动设置状态灯为 Idle
+                
+                Logger.Log("Responded: 思考动画已停止，状态灯由 StreamingCommandProcessor 管理");
             }
         }
 

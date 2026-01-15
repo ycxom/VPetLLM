@@ -94,7 +94,8 @@ namespace VPetLLM.Handlers
         /// </summary>
         /// <param name="response">AI回复内容</param>
         /// <param name="skipInitialization">是否跳过初始化（流式后续命令时为true）</param>
-        public async Task ProcessMessageAsync(string response, bool skipInitialization = false)
+        /// <param name="autoSetIdleOnComplete">处理完成后是否自动设置Idle状态（流式处理时应为false，由StreamingCommandProcessor统一管理）</param>
+        public async Task ProcessMessageAsync(string response, bool skipInitialization = false, bool autoSetIdleOnComplete = true)
         {
             if (string.IsNullOrWhiteSpace(response))
                 return;
@@ -105,9 +106,25 @@ namespace VPetLLM.Handlers
                 _isProcessing = true;
             }
 
+            // 开始消息处理会话，防止状态灯过早切换为Idle
+            // 无论是否跳过初始化，都需要维护会话（确保会话计数正确）
+            _plugin?.FloatingSidebarManager?.BeginActiveSession("SmartMessageProcessor");
+            Logger.Log("SmartMessageProcessor: 开始消息处理会话");
+            bool sessionStarted = true;
+
             try
             {
                 Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}, 跳过初始化: {skipInitialization}");
+                
+                // 设置状态灯为输出中（无论是首次响应还是后续命令）
+                try
+                {
+                    _plugin.FloatingSidebarManager?.SetOutputtingStatus();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"SmartMessageProcessor: 设置Outputting状态失败: {ex.Message}");
+                }
                 
                 // 只在首次响应时清理状态
                 if (!skipInitialization)
@@ -193,6 +210,32 @@ namespace VPetLLM.Handlers
                 lock (_processingLock)
                 {
                     _isProcessing = false;
+                }
+                
+                // 结束消息处理会话
+                if (sessionStarted)
+                {
+                    _plugin?.FloatingSidebarManager?.EndActiveSession("SmartMessageProcessor");
+                    Logger.Log("SmartMessageProcessor: 结束消息处理会话");
+                }
+                
+                // 只有在autoSetIdleOnComplete为true时才自动设置Idle状态
+                // 流式处理时由StreamingCommandProcessor统一管理状态灯
+                if (autoSetIdleOnComplete)
+                {
+                    try
+                    {
+                        _plugin.FloatingSidebarManager?.SetIdleStatus();
+                        Logger.Log("SmartMessageProcessor: 处理完成，状态灯已切换回Idle");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"SmartMessageProcessor: 切换状态灯失败: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    Logger.Log("SmartMessageProcessor: 处理完成，状态灯由调用方管理（流式处理模式）");
                 }
             }
         }
@@ -614,6 +657,11 @@ namespace VPetLLM.Handlers
         /// </summary>
         private async Task WaitForExternalTTSCompleteAsync(string text)
         {
+            // 开始TTS播放会话，确保等待播放完成
+            // 注意：这会与 ProcessMessageAsync 的会话嵌套，但这是正确的行为
+            _plugin?.FloatingSidebarManager?.BeginActiveSession("SmartMessageProcessor.TTS");
+            Logger.Log("SmartMessageProcessor: 开始TTS播放会话");
+            
             try
             {
                 Logger.Log("SmartMessageProcessor: 开始等待外置TTS播放完成...");
@@ -658,6 +706,12 @@ namespace VPetLLM.Handlers
                     // 最后的回退：固定等待时间
                     await Task.Delay(2000).ConfigureAwait(false);
                 }
+            }
+            finally
+            {
+                // 确保TTS播放会话结束
+                _plugin?.FloatingSidebarManager?.EndActiveSession("SmartMessageProcessor.TTS");
+                Logger.Log("SmartMessageProcessor: 结束TTS播放会话");
             }
         }
 
@@ -1001,6 +1055,28 @@ namespace VPetLLM.Handlers
         private async Task ProcessActionSegmentAsync(MessageSegment segment)
         {
             Logger.Log($"SmartMessageProcessor: 处理动作片段: {segment.Content}");
+            Logger.Log($"SmartMessageProcessor: ActionType = '{segment.ActionType}', 检查plugin条件...");
+            
+            // 如果是插件类型的动作，设置蓝色状态灯
+            // 支持 "plugin" 和 "plugin_xxx" 格式（不区分大小写）
+            bool isPluginAction = string.Equals(segment.ActionType, "plugin", StringComparison.OrdinalIgnoreCase) 
+                || (segment.ActionType?.StartsWith("plugin_", StringComparison.OrdinalIgnoreCase) ?? false);
+            
+            Logger.Log($"SmartMessageProcessor: isPluginAction = {isPluginAction}");
+            
+            if (isPluginAction)
+            {
+                try
+                {
+                    _plugin.FloatingSidebarManager?.SetPluginExecutingStatus();
+                    Logger.Log($"SmartMessageProcessor: 检测到plugin命令({segment.ActionType})，状态灯切换为蓝色");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"SmartMessageProcessor: 设置PluginExecuting状态失败: {ex.Message}");
+                }
+            }
+            
             await ExecuteActionAsync(segment.Content);
         }
 

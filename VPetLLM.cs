@@ -46,6 +46,11 @@ namespace VPetLLM
         /// </summary>
         public bool IsVPetTTSPluginDetected => _vpetTTSPluginDetected;
 
+        /// <summary>
+        /// 获取悬浮侧边栏管理器
+        /// </summary>
+        public FloatingSidebarManager? FloatingSidebarManager => _floatingSidebarManager;
+
         public VPetLLM(IMainWindow mainwin) : base(mainwin)
         {
             Instance = this;
@@ -1529,6 +1534,69 @@ namespace VPetLLM
             catch (Exception ex)
             {
                 Logger.Log($"Error refreshing floating sidebar: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 更新悬浮侧边栏状态灯
+        /// </summary>
+        /// <param name="status">新状态</param>
+        public void UpdateSidebarStatus(VPetLLMPlugin.UI.Controls.VPetLLMStatus status)
+        {
+            try
+            {
+                _floatingSidebarManager?.UpdateStatus(status);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error updating sidebar status: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 设置侧边栏为处理请求状态
+        /// </summary>
+        public void SetSidebarProcessingStatus()
+        {
+            UpdateSidebarStatus(VPetLLMPlugin.UI.Controls.VPetLLMStatus.Processing);
+        }
+
+        /// <summary>
+        /// 设置侧边栏为输出响应状态
+        /// </summary>
+        public void SetSidebarOutputtingStatus()
+        {
+            UpdateSidebarStatus(VPetLLMPlugin.UI.Controls.VPetLLMStatus.Outputting);
+        }
+
+        /// <summary>
+        /// 设置侧边栏为错误状态
+        /// </summary>
+        public void SetSidebarErrorStatus()
+        {
+            UpdateSidebarStatus(VPetLLMPlugin.UI.Controls.VPetLLMStatus.Error);
+        }
+
+        /// <summary>
+        /// 设置侧边栏为待机状态
+        /// </summary>
+        public void SetSidebarIdleStatus()
+        {
+            UpdateSidebarStatus(VPetLLMPlugin.UI.Controls.VPetLLMStatus.Idle);
+        }
+
+        /// <summary>
+        /// 测试侧边栏状态灯功能
+        /// </summary>
+        public void TestSidebarStatusLight()
+        {
+            try
+            {
+                _floatingSidebarManager?.TestStatusLight();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error testing sidebar status light: {ex.Message}");
             }
         }
     }

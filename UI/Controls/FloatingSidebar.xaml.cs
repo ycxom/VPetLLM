@@ -3,12 +3,41 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using VPetLLM.UI.Controls;
 using VPetLLM.Utils;
 
 namespace VPetLLMPlugin.UI.Controls
 {
+    /// <summary>
+    /// VPetLLM状态枚举
+    /// </summary>
+    public enum VPetLLMStatus
+    {
+        /// <summary>
+        /// 待机状态 - 透明
+        /// </summary>
+        Idle,
+        /// <summary>
+        /// 处理请求 - 黄色
+        /// </summary>
+        Processing,
+        /// <summary>
+        /// 输出响应 - 绿色
+        /// </summary>
+        Outputting,
+        /// <summary>
+        /// 插件执行中 - 蓝色
+        /// </summary>
+        PluginExecuting,
+        /// <summary>
+        /// 错误状态 - 红色
+        /// </summary>
+        Error
+    }
+
     /// <summary>
     /// 悬浮侧边栏 UserControl - 采用 DemoClock TimeClock 的实现方式
     /// 通过 MW.Main.UIGrid.Children.Insert() 插入到 VPet 主界面
@@ -19,6 +48,16 @@ namespace VPetLLMPlugin.UI.Controls
         private readonly Dictionary<string, SidebarButton> _buttons = new();
         private System.Timers.Timer _closeTimer;
         private bool _isClosing = false;
+        
+        // 添加层级切换状态管理
+        private bool _isInFrontLayer = true;
+        private bool _isLayerSwitching = false;
+        private readonly object _layerSwitchLock = new object();
+
+        // 状态灯相关
+        private VPetLLMStatus _currentStatus = VPetLLMStatus.Idle;
+        private System.Timers.Timer _errorResetTimer;
+        private readonly object _statusLock = new object();
 
         public event EventHandler<SidebarButtonClickedEventArgs>? ButtonClicked;
         public event EventHandler? SidebarClosed;
@@ -62,6 +101,15 @@ namespace VPetLLMPlugin.UI.Controls
             };
             _closeTimer.Elapsed += CloseTimer_Elapsed;
             
+            // 初始化错误重置定时器
+            _errorResetTimer = new System.Timers.Timer()
+            {
+                Interval = 5000, // 5秒
+                AutoReset = false,
+                Enabled = false
+            };
+            _errorResetTimer.Elapsed += ErrorResetTimer_Elapsed;
+            
             Opacity = DefaultOpacity;
             Logger.Log("FloatingSidebar UserControl initialized");
         }
@@ -77,6 +125,7 @@ namespace VPetLLMPlugin.UI.Controls
                 
                 // 插入控件到 VPet 主界面 (参考 DemoClock/TimeClock.xaml.cs)
                 _master.MW.Main.UIGrid.Children.Insert(0, this);
+                _isInFrontLayer = true; // 初始状态在前层
                 
                 // 监听主界面的鼠标事件
                 _master.MW.Main.MouseEnter += Main_MouseEnter;
@@ -92,11 +141,170 @@ namespace VPetLLMPlugin.UI.Controls
         }
 
         /// <summary>
+        /// 错误重置定时器触发 - 5秒后自动切换回待机状态
+        /// </summary>
+        private void ErrorResetTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            // 使用 BeginInvoke 避免阻塞
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (_currentStatus == VPetLLMStatus.Error)
+                    {
+                        UpdateStatusLight(VPetLLMStatus.Idle);
+                        Logger.Log("Status light auto-reset from Error to Idle after 5 seconds");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Error in ErrorResetTimer_Elapsed: {ex.Message}");
+                }
+            }));
+        }
+
+        /// <summary>
+        /// 更新状态灯 - 完全异步，不阻塞任何线程
+        /// </summary>
+        /// <param name="status">新状态</param>
+        public void UpdateStatusLight(VPetLLMStatus status)
+        {
+            try
+            {
+                if (_isClosing) 
+                {
+                    return;
+                }
+
+                Logger.Log($"UpdateStatusLight: Updating to {status}");
+
+                // 直接更新状态（无锁，因为只在UI线程读取）
+                _currentStatus = status;
+
+                // 计算颜色 - 只改变填充色和发光效果，边框始终保持白色可见
+                Color lightColor;
+                Color glowColor;
+                
+                switch (status)
+                {
+                    case VPetLLMStatus.Idle:
+                        lightColor = Colors.Transparent;
+                        glowColor = Colors.Transparent;
+                        break;
+                    case VPetLLMStatus.Processing:
+                        lightColor = Colors.Orange;
+                        glowColor = Colors.Yellow;
+                        break;
+                    case VPetLLMStatus.Outputting:
+                        lightColor = Colors.Lime;
+                        glowColor = Colors.LimeGreen;
+                        break;
+                    case VPetLLMStatus.PluginExecuting:
+                        lightColor = Colors.DodgerBlue;
+                        glowColor = Colors.DeepSkyBlue;
+                        break;
+                    case VPetLLMStatus.Error:
+                        lightColor = Colors.Red;
+                        glowColor = Colors.OrangeRed;
+                        // 启动5秒自动重置定时器
+                        _errorResetTimer.Start();
+                        break;
+                    default:
+                        lightColor = Colors.Transparent;
+                        glowColor = Colors.Transparent;
+                        break;
+                }
+
+                // 使用异步调度更新UI，完全不阻塞
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        if (_isClosing) return;
+                        
+                        // 只更新填充色和发光效果，不改变 Opacity，保持白色边框始终可见
+                        StatusLight.Fill = new SolidColorBrush(lightColor);
+                        StatusLightGlow.Color = glowColor;
+                        
+                        Logger.Log($"AnimateStatusLight: Colors set successfully");
+                        Logger.Log($"Status light updated to: {status}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error setting status light colors: {ex.Message}");
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error updating status light: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 内部方法：更新状态灯（在UI线程上执行）- 已废弃，保留兼容性
+        /// </summary>
+        private void UpdateStatusLightInternal(VPetLLMStatus status)
+        {
+            UpdateStatusLight(status);
+        }
+
+        /// <summary>
+        /// 动画更新状态灯颜色 - 已废弃，保留兼容性
+        /// </summary>
+        private void AnimateStatusLight(Color lightColor, Color glowColor, double opacity)
+        {
+            // 直接使用 BeginInvoke 更新
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (_isClosing) return;
+                    StatusLight.Fill = new SolidColorBrush(lightColor);
+                    StatusLightGlow.Color = glowColor;
+                    StatusLight.Opacity = opacity;
+                }
+                catch { }
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// 内部方法：设置状态灯颜色（在UI线程上执行）- 已废弃，保留兼容性
+        /// </summary>
+        private void AnimateStatusLightInternal(Color lightColor, Color glowColor, double opacity)
+        {
+            try
+            {
+                if (_isClosing) return;
+
+                StatusLight.Fill = new SolidColorBrush(lightColor);
+                StatusLightGlow.Color = glowColor;
+                StatusLight.Opacity = opacity;
+                
+                Logger.Log("AnimateStatusLight: Colors set successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error in AnimateStatusLightInternal: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 获取当前状态 - 无锁读取
+        /// </summary>
+        public VPetLLMStatus GetCurrentStatus()
+        {
+            return _currentStatus;
+        }
+
+        /// <summary>
         /// 定时器触发 - 切换到后层并降低透明度
+        /// 使用 Invoke 确保操作在同一帧内完成，避免位置跳动
         /// </summary>
         private void CloseTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            Dispatcher.Invoke(() =>
+            // 使用 Invoke 确保操作同步完成，避免位置跳动
+            Dispatcher.Invoke(new Action(() =>
             {
                 try
                 {
@@ -106,21 +314,44 @@ namespace VPetLLMPlugin.UI.Controls
                         return;
                     }
                     
-                    Opacity = DefaultOpacity;
-                    
-                    // 切换到后层 (参考 DemoClock)
-                    if (_master?.MW?.Main?.UIGrid?.Children.Contains(this) == true)
+                    // 使用锁防止并发操作
+                    lock (_layerSwitchLock)
                     {
-                        _master.MW.Main.UIGrid.Children.Remove(this);
-                        _master.MW.Main.UIGrid_Back.Children.Add(this);
-                        Logger.Log("FloatingSidebar moved to UIGrid_Back");
+                        // 如果已经在后层或正在切换，跳过操作
+                        if (!_isInFrontLayer || _isLayerSwitching)
+                        {
+                            return;
+                        }
+                        
+                        _isLayerSwitching = true;
+                        
+                        try
+                        {
+                            // 降低透明度
+                            Opacity = DefaultOpacity;
+                            
+                            // 切换到后层 (参考 DemoClock)
+                            if (_master?.MW?.Main?.UIGrid?.Children.Contains(this) == true)
+                            {
+                                _master.MW.Main.UIGrid.Children.Remove(this);
+                                _master.MW.Main.UIGrid_Back.Children.Add(this);
+                                _isInFrontLayer = false;
+                                Logger.Log("FloatingSidebar moved to UIGrid_Back");
+                            }
+                        }
+                        finally
+                        {
+                            _isLayerSwitching = false;
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     Logger.Log($"Error in CloseTimer_Elapsed: {ex.Message}");
+                    // 确保在异常情况下重置状态
+                    _isLayerSwitching = false;
                 }
-            });
+            }));
         }
 
         /// <summary>
@@ -165,27 +396,55 @@ namespace VPetLLMPlugin.UI.Controls
                 // 停止定时器
                 _closeTimer.Enabled = false;
                 
-                // 如果控件在后层，移动到前层（无论 PlaceAutoBack 设置如何）
-                if (_master?.MW?.Main?.UIGrid_Back?.Children.Contains(this) == true)
+                // 使用锁防止并发操作
+                lock (_layerSwitchLock)
                 {
-                    _master.MW.Main.UIGrid_Back.Children.Remove(this);
-                    _master.MW.Main.UIGrid.Children.Insert(0, this);
-                    Logger.Log("FloatingSidebar moved to UIGrid (front)");
+                    // 如果已经在前层或正在切换，跳过操作
+                    if (_isInFrontLayer || _isLayerSwitching)
+                    {
+                        // 即使已经在前层，也要恢复透明度
+                        if (_isInFrontLayer)
+                        {
+                            Opacity = ActiveOpacity;
+                        }
+                        return;
+                    }
+                    
+                    _isLayerSwitching = true;
+                    
+                    try
+                    {
+                        // 如果控件在后层，移动到前层
+                        if (_master?.MW?.Main?.UIGrid_Back?.Children.Contains(this) == true)
+                        {
+                            _master.MW.Main.UIGrid_Back.Children.Remove(this);
+                            _master.MW.Main.UIGrid.Children.Insert(0, this);
+                            _isInFrontLayer = true;
+                            Logger.Log("FloatingSidebar moved to UIGrid (front)");
+                        }
+                        // 如果控件不在任何 Grid 中，添加到前层
+                        else if (_master?.MW?.Main?.UIGrid?.Children.Contains(this) == false && 
+                                 _master?.MW?.Main?.UIGrid_Back?.Children.Contains(this) == false)
+                        {
+                            _master.MW.Main.UIGrid.Children.Insert(0, this);
+                            _isInFrontLayer = true;
+                            Logger.Log("FloatingSidebar added to UIGrid (front)");
+                        }
+                        
+                        // 恢复透明度
+                        Opacity = ActiveOpacity;
+                    }
+                    finally
+                    {
+                        _isLayerSwitching = false;
+                    }
                 }
-                // 如果控件不在任何 Grid 中，添加到前层
-                else if (_master?.MW?.Main?.UIGrid?.Children.Contains(this) == false && 
-                         _master?.MW?.Main?.UIGrid_Back?.Children.Contains(this) == false)
-                {
-                    _master.MW.Main.UIGrid.Children.Insert(0, this);
-                    Logger.Log("FloatingSidebar added to UIGrid (front)");
-                }
-                
-                // 恢复透明度
-                Opacity = ActiveOpacity;
             }
             catch (Exception ex)
             {
                 Logger.Log($"Error in BringToFront: {ex.Message}");
+                // 确保在异常情况下重置状态
+                _isLayerSwitching = false;
             }
         }
 
@@ -194,15 +453,20 @@ namespace VPetLLMPlugin.UI.Controls
         /// </summary>
         public void StartAutoBackTimer()
         {
-            // 只有在启用自动隐藏时才启动定时器
             if (PlaceAutoBack)
             {
-                _closeTimer.Interval = AutoBackDelay;
-                _closeTimer.Start();
+                lock (_layerSwitchLock)
+                {
+                    if (_isLayerSwitching)
+                    {
+                        return;
+                    }
+                    _closeTimer.Interval = AutoBackDelay;
+                    _closeTimer.Start();
+                }
             }
             else
             {
-                // 如果禁用自动隐藏，确保定时器停止
                 _closeTimer.Stop();
             }
         }
@@ -423,7 +687,10 @@ namespace VPetLLMPlugin.UI.Controls
                     MinWidth = 0;
                     MinHeight = 50;
                     
-                    // 调整关闭按钮位置（横向时在左侧）
+                    // 调整状态灯位置（横向时在左侧）
+                    StatusLight.Margin = new Thickness(2, 0, 4, 0);
+                    
+                    // 调整关闭按钮位置（横向时在状态灯右侧）
                     CloseButton.Margin = new Thickness(0, 0, 4, 0);
                     
                     // 调整按钮边距为横向
@@ -443,7 +710,10 @@ namespace VPetLLMPlugin.UI.Controls
                     MinWidth = 50;
                     MinHeight = 0;
                     
-                    // 调整关闭按钮位置（竖向时在顶部）
+                    // 调整状态灯位置（竖向时在顶部）
+                    StatusLight.Margin = new Thickness(0, 2, 0, 4);
+                    
+                    // 调整关闭按钮位置（竖向时在状态灯下方）
                     CloseButton.Margin = new Thickness(0, 0, 0, 2);
                     
                     // 调整按钮边距为竖向
@@ -472,6 +742,21 @@ namespace VPetLLMPlugin.UI.Controls
             try
             {
                 Visibility = Visibility.Visible;
+                
+                // 确保状态正确初始化
+                lock (_layerSwitchLock)
+                {
+                    // 检查当前实际位置并更新状态
+                    if (_master?.MW?.Main?.UIGrid?.Children.Contains(this) == true)
+                    {
+                        _isInFrontLayer = true;
+                    }
+                    else if (_master?.MW?.Main?.UIGrid_Back?.Children.Contains(this) == true)
+                    {
+                        _isInFrontLayer = false;
+                    }
+                }
+                
                 BringToFront();
                 Logger.Log("FloatingSidebar shown");
             }
@@ -538,17 +823,30 @@ namespace VPetLLMPlugin.UI.Controls
             try
             {
                 _isClosing = true;
+                
+                // 停止定时器并清理
                 _closeTimer?.Stop();
                 _closeTimer?.Dispose();
+                
+                _errorResetTimer?.Stop();
+                _errorResetTimer?.Dispose();
 
-                // 从 UIGrid 移除控件
-                if (_master?.MW?.Main?.UIGrid?.Children.Contains(this) == true)
+                // 使用锁确保清理过程的线程安全
+                lock (_layerSwitchLock)
                 {
-                    _master.MW.Main.UIGrid.Children.Remove(this);
-                }
-                if (_master?.MW?.Main?.UIGrid_Back?.Children.Contains(this) == true)
-                {
-                    _master.MW.Main.UIGrid_Back.Children.Remove(this);
+                    // 从 UIGrid 移除控件
+                    if (_master?.MW?.Main?.UIGrid?.Children.Contains(this) == true)
+                    {
+                        _master.MW.Main.UIGrid.Children.Remove(this);
+                    }
+                    if (_master?.MW?.Main?.UIGrid_Back?.Children.Contains(this) == true)
+                    {
+                        _master.MW.Main.UIGrid_Back.Children.Remove(this);
+                    }
+                    
+                    // 重置状态
+                    _isInFrontLayer = false;
+                    _isLayerSwitching = false;
                 }
 
                 // 取消事件订阅

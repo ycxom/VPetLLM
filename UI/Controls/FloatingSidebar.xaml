@@ -29,6 +29,23 @@
         </Border.Effect>
         <!-- 垂直布局容器 -->
         <StackPanel x:Name="VerticalLayoutPanel" Orientation="Vertical">
+            <!-- Status Light -->
+            <Ellipse x:Name="StatusLight" 
+                     Width="12" Height="12"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,4"
+                     Fill="Transparent"
+                     Stroke="White"
+                     StrokeThickness="1">
+                <Ellipse.Effect>
+                    <DropShadowEffect x:Name="StatusLightGlow"
+                                      Color="Transparent" 
+                                      Direction="0" 
+                                      ShadowDepth="0" 
+                                      BlurRadius="6" 
+                                      Opacity="0.9"/>
+                </Ellipse.Effect>
+            </Ellipse>
             <!-- Close Button -->
             <Button x:Name="CloseButton" 
                     HorizontalAlignment="Center"

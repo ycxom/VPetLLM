@@ -21,6 +21,10 @@ namespace VPetLLM.Handlers
         private FloatingSidebar? _sidebar;
         private DispatcherTimer? _settingsCheckTimer;
         private bool _isDisposed = false;
+        
+        // 活动会话计数器，用于跟踪是否有活动的处理
+        private int _activeSessionCount = 0;
+        private readonly object _sessionLock = new object();
 
         public bool IsVisible => _sidebar?.Visibility == Visibility.Visible;
         public FloatingSidebar? Sidebar => _sidebar;
@@ -198,18 +202,21 @@ namespace VPetLLM.Handlers
         {
             if (_sidebar == null) return;
 
+            // 使用 VerticalAlignment.Top 配合 Margin 来定位，避免层级切换时的位置跳动
+            // 因为 UIGrid 和 UIGrid_Back 都是 VerticalAlignment="Top" 的 Grid
             switch (settings.Position)
             {
                 case SidebarPosition.Left:
                     _sidebar.HorizontalAlignment = HorizontalAlignment.Left;
-                    _sidebar.VerticalAlignment = VerticalAlignment.Center;
-                    _sidebar.Margin = new Thickness(10 + settings.CustomOffsetX, settings.CustomOffsetY, 0, 0);
+                    _sidebar.VerticalAlignment = VerticalAlignment.Top;
+                    // 使用 Margin.Top 来实现垂直居中效果 (250 是 VPet 主界面高度 500 的一半)
+                    _sidebar.Margin = new Thickness(10 + settings.CustomOffsetX, 200 + settings.CustomOffsetY, 0, 0);
                     _sidebar.SetOrientation(System.Windows.Controls.Orientation.Vertical);
                     break;
                 case SidebarPosition.Right:
                     _sidebar.HorizontalAlignment = HorizontalAlignment.Right;
-                    _sidebar.VerticalAlignment = VerticalAlignment.Center;
-                    _sidebar.Margin = new Thickness(0, settings.CustomOffsetY, 10 + settings.CustomOffsetX, 0);
+                    _sidebar.VerticalAlignment = VerticalAlignment.Top;
+                    _sidebar.Margin = new Thickness(0, 200 + settings.CustomOffsetY, 10 + settings.CustomOffsetX, 0);
                     _sidebar.SetOrientation(System.Windows.Controls.Orientation.Vertical);
                     break;
                 case SidebarPosition.Top:
@@ -220,14 +227,15 @@ namespace VPetLLM.Handlers
                     break;
                 case SidebarPosition.Bottom:
                     _sidebar.HorizontalAlignment = HorizontalAlignment.Center;
-                    _sidebar.VerticalAlignment = VerticalAlignment.Bottom;
-                    _sidebar.Margin = new Thickness(settings.CustomOffsetX, 0, 0, 10 + settings.CustomOffsetY);
+                    _sidebar.VerticalAlignment = VerticalAlignment.Top;
+                    // 使用 Margin.Top 来定位到底部 (500 - 控件高度约50 - 10边距)
+                    _sidebar.Margin = new Thickness(settings.CustomOffsetX, 440 + settings.CustomOffsetY, 0, 0);
                     _sidebar.SetOrientation(System.Windows.Controls.Orientation.Horizontal);
                     break;
                 default:
                     _sidebar.HorizontalAlignment = HorizontalAlignment.Right;
-                    _sidebar.VerticalAlignment = VerticalAlignment.Center;
-                    _sidebar.Margin = new Thickness(0, settings.CustomOffsetY, 10, 0);
+                    _sidebar.VerticalAlignment = VerticalAlignment.Top;
+                    _sidebar.Margin = new Thickness(0, 200 + settings.CustomOffsetY, 10, 0);
                     _sidebar.SetOrientation(System.Windows.Controls.Orientation.Vertical);
                     break;
             }
@@ -310,6 +318,193 @@ namespace VPetLLM.Handlers
             catch (Exception ex)
             {
                 Logger.Log($"Error refreshing buttons: {ex.Message}");
+            }
+        }
+        /// <summary>
+        /// 更新VPetLLM状态灯
+        /// </summary>
+        /// <param name="status">新状态</param>
+        public void UpdateStatus(VPetLLMStatus status)
+        {
+            try
+            {
+                if (_sidebar != null && !_isDisposed)
+                {
+                    _sidebar.UpdateStatusLight(status);
+                    Logger.Log($"VPetLLM status updated to: {status}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error updating VPetLLM status: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 获取当前状态
+        /// </summary>
+        /// <returns>当前VPetLLM状态</returns>
+        public VPetLLMStatus GetCurrentStatus()
+        {
+            try
+            {
+                return _sidebar?.GetCurrentStatus() ?? VPetLLMStatus.Idle;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error getting current status: {ex.Message}");
+                return VPetLLMStatus.Idle;
+            }
+        }
+
+        /// <summary>
+        /// 示例：设置处理请求状态
+        /// 在VPetLLM开始处理用户请求时调用
+        /// </summary>
+        public void SetProcessingStatus()
+        {
+            UpdateStatus(VPetLLMStatus.Processing);
+        }
+
+        /// <summary>
+        /// 示例：设置输出响应状态
+        /// 在VPetLLM开始输出响应时调用
+        /// </summary>
+        public void SetOutputtingStatus()
+        {
+            UpdateStatus(VPetLLMStatus.Outputting);
+        }
+
+        /// <summary>
+        /// 示例：设置错误状态
+        /// 在VPetLLM遇到错误时调用
+        /// </summary>
+        public void SetErrorStatus()
+        {
+            UpdateStatus(VPetLLMStatus.Error);
+        }
+
+        /// <summary>
+        /// 设置插件执行状态
+        /// 在VPetLLM执行插件时调用，显示蓝色状态灯
+        /// </summary>
+        public void SetPluginExecutingStatus()
+        {
+            Logger.Log("FloatingSidebarManager: SetPluginExecutingStatus called");
+            UpdateStatus(VPetLLMStatus.PluginExecuting);
+        }
+
+        /// <summary>
+        /// 开始一个活动会话
+        /// 在开始处理用户输入或AI回复时调用
+        /// </summary>
+        /// <param name="source">调用源（可选），用于调试</param>
+        public void BeginActiveSession(string source = null)
+        {
+            lock (_sessionLock)
+            {
+                _activeSessionCount++;
+                var sourceInfo = string.IsNullOrEmpty(source) ? "" : $", source = {source}";
+                Logger.Log($"FloatingSidebarManager: BeginActiveSession, count = {_activeSessionCount}{sourceInfo}");
+            }
+        }
+
+        /// <summary>
+        /// 结束一个活动会话
+        /// 在处理完成时调用，如果没有其他活动会话则设置Idle状态
+        /// </summary>
+        /// <param name="source">调用源（可选），用于调试</param>
+        public void EndActiveSession(string source = null)
+        {
+            bool shouldSetIdle = false;
+            lock (_sessionLock)
+            {
+                if (_activeSessionCount > 0)
+                {
+                    _activeSessionCount--;
+                }
+                shouldSetIdle = _activeSessionCount == 0;
+                var sourceInfo = string.IsNullOrEmpty(source) ? "" : $", source = {source}";
+                Logger.Log($"FloatingSidebarManager: EndActiveSession, count = {_activeSessionCount}, shouldSetIdle = {shouldSetIdle}{sourceInfo}");
+            }
+            
+            if (shouldSetIdle)
+            {
+                UpdateStatus(VPetLLMStatus.Idle);
+            }
+        }
+
+        /// <summary>
+        /// 获取当前活动会话数
+        /// </summary>
+        public int ActiveSessionCount
+        {
+            get
+            {
+                lock (_sessionLock)
+                {
+                    return _activeSessionCount;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 示例：设置待机状态
+        /// 在VPetLLM完成操作或空闲时调用
+        /// 注意：优先使用 EndActiveSession() 来管理状态，此方法会强制设置Idle
+        /// </summary>
+        public void SetIdleStatus()
+        {
+            // 重置活动会话计数器
+            lock (_sessionLock)
+            {
+                _activeSessionCount = 0;
+            }
+            UpdateStatus(VPetLLMStatus.Idle);
+        }
+
+        /// <summary>
+        /// 测试状态灯功能 - 循环显示所有状态
+        /// </summary>
+        public void TestStatusLight()
+        {
+            try
+            {
+                Logger.Log("Starting status light test...");
+                
+                // 使用定时器循环显示不同状态
+                var testTimer = new System.Timers.Timer(2000); // 每2秒切换一次
+                var statusIndex = 0;
+                var statuses = new[] { VPetLLMStatus.Processing, VPetLLMStatus.Outputting, VPetLLMStatus.Error, VPetLLMStatus.Idle };
+                
+                testTimer.Elapsed += (s, e) =>
+                {
+                    try
+                    {
+                        var status = statuses[statusIndex % statuses.Length];
+                        UpdateStatus(status);
+                        Logger.Log($"Test: Status changed to {status}");
+                        statusIndex++;
+                        
+                        // 测试完成后停止
+                        if (statusIndex >= statuses.Length * 2)
+                        {
+                            testTimer.Stop();
+                            testTimer.Dispose();
+                            Logger.Log("Status light test completed");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error in status light test: {ex.Message}");
+                    }
+                };
+                
+                testTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error starting status light test: {ex.Message}");
             }
         }
 

@@ -114,12 +114,28 @@ namespace VPetLLM.Utils
                 if (!string.IsNullOrEmpty(aggregated) && VPetLLM.Instance?.ChatCore != null)
                 {
                     Logger.Log($"ResultAggregator: 向AI回灌聚合内容: {aggregated}");
-                    await VPetLLM.Instance.ChatCore.Chat(aggregated, true);
+                    
+                    // 开始活动会话，防止状态灯过早切换为Idle
+                    VPetLLM.Instance.FloatingSidebarManager?.BeginActiveSession("ResultAggregator");
+                    Logger.Log("ResultAggregator: 开始回灌会话");
+                    
+                    try
+                    {
+                        await VPetLLM.Instance.ChatCore.Chat(aggregated, true);
+                    }
+                    finally
+                    {
+                        // 回灌完成后结束会话
+                        VPetLLM.Instance.FloatingSidebarManager?.EndActiveSession("ResultAggregator");
+                        Logger.Log("ResultAggregator: 回灌会话结束");
+                    }
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"ResultAggregator.Flush 异常: {ex.Message}, key={key}, aggregated={aggregated}");
+                // 确保异常时也结束会话
+                VPetLLM.Instance?.FloatingSidebarManager?.EndActiveSession("ResultAggregator");
             }
         }
     }

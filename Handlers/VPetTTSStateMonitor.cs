@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using VPetLLM.Utils;
@@ -145,7 +146,7 @@ namespace VPetLLM.Handlers
         
         /// <summary>
         /// 等待播放完成
-        /// 优化：完全依赖读取进度，如果3秒内进度没有变化才判断失败
+        /// 优化：使用事件驱动方式，订阅VPetTTS的PlaybackCompleted事件
         /// </summary>
         /// <param name="timeoutMs">最大超时时间（毫秒），作为安全保护，默认5分钟</param>
         /// <returns>是否成功完成</returns>
@@ -156,14 +157,102 @@ namespace VPetLLM.Handlers
             // 最大超时作为安全保护（默认5分钟）
             var maxTimeout = timeoutMs ?? 300000;
             var startTime = DateTime.Now;
+            
+            Logger.Log($"VPetTTSStateMonitor: 开始等待播放完成（事件驱动模式）");
+            
+            // 尝试使用事件驱动方式
+            var eventResult = await WaitForPlaybackCompleteViaEventsAsync(maxTimeout);
+            if (eventResult.HasValue)
+            {
+                var totalWaitTime = (DateTime.Now - startTime).TotalMilliseconds;
+                Logger.Log($"VPetTTSStateMonitor: 事件驱动等待完成，结果: {eventResult.Value}, 总等待时间: {totalWaitTime}ms");
+                return eventResult.Value;
+            }
+            
+            // 如果事件方式不可用，回退到轮询方式
+            Logger.Log($"VPetTTSStateMonitor: 事件方式不可用，回退到轮询模式");
+            return await WaitForPlaybackCompleteViaPollingAsync(maxTimeout);
+        }
+        
+        /// <summary>
+        /// 通过订阅VPetTTS事件等待播放完成（推荐方式）
+        /// </summary>
+        private async Task<bool?> WaitForPlaybackCompleteViaEventsAsync(int maxTimeout)
+        {
+            try
+            {
+                var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
+                if (ttsStateProperty == null) return null;
+                
+                var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
+                if (ttsState == null) return null;
+                
+                // 获取PlaybackCompleted事件
+                var playbackCompletedEvent = ttsState.GetType().GetEvent("PlaybackCompleted");
+                if (playbackCompletedEvent == null) return null;
+                
+                Logger.Log($"VPetTTSStateMonitor: 使用事件驱动方式，订阅PlaybackCompleted事件");
+                
+                var completionSource = new TaskCompletionSource<bool>();
+                EventHandler<object> handler = null;
+                
+                handler = (sender, args) =>
+                {
+                    Logger.Log($"VPetTTSStateMonitor: 收到PlaybackCompleted事件");
+                    completionSource.TrySetResult(true);
+                };
+                
+                // 订阅事件
+                var delegateType = playbackCompletedEvent.EventHandlerType;
+                var convertedHandler = Delegate.CreateDelegate(delegateType, handler.Target, handler.Method);
+                playbackCompletedEvent.AddEventHandler(ttsState, convertedHandler);
+                
+                try
+                {
+                    // 检查是否已经完成（避免竞态条件）
+                    if (!IsPlaying && IsPlaybackComplete())
+                    {
+                        Logger.Log($"VPetTTSStateMonitor: 播放已经完成，无需等待");
+                        return true;
+                    }
+                    
+                    // 等待事件或超时
+                    var timeoutTask = Task.Delay(maxTimeout);
+                    var completedTask = await Task.WhenAny(completionSource.Task, timeoutTask);
+                    
+                    if (completedTask == completionSource.Task)
+                    {
+                        return await completionSource.Task;
+                    }
+                    else
+                    {
+                        Logger.Log($"VPetTTSStateMonitor: 事件等待超时 ({maxTimeout}ms)");
+                        return false;
+                    }
+                }
+                finally
+                {
+                    // 取消订阅事件
+                    playbackCompletedEvent.RemoveEventHandler(ttsState, convertedHandler);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"VPetTTSStateMonitor: 事件驱动方式失败: {ex.Message}");
+                return null;
+            }
+        }
+        
+        /// <summary>
+        /// 通过轮询方式等待播放完成（回退方案）
+        /// </summary>
+        private async Task<bool> WaitForPlaybackCompleteViaPollingAsync(int maxTimeout)
+        {
+            var startTime = DateTime.Now;
             var pollingInterval = GetPollingInterval();
             
-            // 等待播放开始的超时时间（5秒）
-            var startWaitTimeout = 5000;
-            // 进度无变化超时时间（3秒内进度没有变化才判断失败）
-            var progressStallTimeout = 3000;
-            
-            Logger.Log($"VPetTTSStateMonitor: 开始等待播放完成（基于进度检测）");
+            // 等待播放开始的超时时间（10秒）
+            var startWaitTimeout = 10000;
             
             // 第一阶段：等待播放开始（IsPlaying 变为 True）
             var startWaitBegin = DateTime.Now;
@@ -184,67 +273,34 @@ namespace VPetLLM.Handlers
             Logger.Log($"VPetTTSStateMonitor: 播放已开始，等待开始耗时: {startWaitTime}ms");
             
             // 第二阶段：等待播放完成
-            // 完全依赖进度检测，如果3秒内进度没有变化才判断失败
-            var lastProgress = GetPlaybackProgress();
-            var lastProgressChangeTime = DateTime.Now;
-            var lastHeartbeat = GetLastHeartbeatTime();
-            var lastHeartbeatChangeTime = DateTime.Now;
+            // 关键：必须等待 IsPlaying 从 True 变为 False 并保持稳定
+            // 不能仅依赖 IsPlaybackComplete，因为它在下载完成时就为 true
+            var lastIsPlayingState = true;
+            var stableStateStartTime = DateTime.Now;
+            var stableStateDuration = 500; // 状态稳定持续时间（毫秒）
             
             while ((DateTime.Now - startTime).TotalMilliseconds < maxTimeout)
             {
-                // 检查是否播放完成
-                if (IsPlaybackComplete())
+                var currentIsPlaying = IsPlaying;
+                
+                // 检测状态变化
+                if (currentIsPlaying != lastIsPlayingState)
                 {
-                    var totalWaitTime = (DateTime.Now - startTime).TotalMilliseconds;
-                    Logger.Log($"VPetTTSStateMonitor: 播放完成（IsPlaybackComplete=true），总等待时间: {totalWaitTime}ms");
-                    return true;
+                    Logger.Log($"VPetTTSStateMonitor: IsPlaying状态变化: {lastIsPlayingState} -> {currentIsPlaying}");
+                    lastIsPlayingState = currentIsPlaying;
+                    stableStateStartTime = DateTime.Now;
                 }
                 
-                // 检查 IsPlaying 状态
-                if (!IsPlaying)
+                // 如果 IsPlaying=false 并且状态已经稳定一段时间，认为播放完成
+                if (!currentIsPlaying)
                 {
-                    var totalWaitTime = (DateTime.Now - startTime).TotalMilliseconds;
-                    Logger.Log($"VPetTTSStateMonitor: 播放完成（IsPlaying=false），总等待时间: {totalWaitTime}ms");
-                    return true;
-                }
-                
-                // 检查进度变化
-                var currentProgress = GetPlaybackProgress();
-                if (currentProgress.Progress != lastProgress.Progress || 
-                    currentProgress.PositionMs != lastProgress.PositionMs)
-                {
-                    lastProgress = currentProgress;
-                    lastProgressChangeTime = DateTime.Now;
-                }
-                
-                // 检查心跳变化
-                var currentHeartbeat = GetLastHeartbeatTime();
-                if (currentHeartbeat != DateTime.MinValue && currentHeartbeat != lastHeartbeat)
-                {
-                    lastHeartbeat = currentHeartbeat;
-                    lastHeartbeatChangeTime = DateTime.Now;
-                }
-                
-                // 判断是否有活动（进度变化或心跳变化）
-                var timeSinceLastProgressChange = (DateTime.Now - lastProgressChangeTime).TotalMilliseconds;
-                var timeSinceLastHeartbeatChange = (DateTime.Now - lastHeartbeatChangeTime).TotalMilliseconds;
-                
-                // 如果进度和心跳都超过3秒没有变化，判断播放已完成或异常
-                if (timeSinceLastProgressChange > progressStallTimeout && 
-                    timeSinceLastHeartbeatChange > progressStallTimeout)
-                {
-                    // 再次确认 IsPlaying 状态和 IsPlaybackComplete 状态
-                    if (!IsPlaying || IsPlaybackComplete())
+                    var stableDuration = (DateTime.Now - stableStateStartTime).TotalMilliseconds;
+                    if (stableDuration >= stableStateDuration)
                     {
                         var totalWaitTime = (DateTime.Now - startTime).TotalMilliseconds;
-                        Logger.Log($"VPetTTSStateMonitor: 播放完成（进度停滞后确认状态变化），总等待时间: {totalWaitTime}ms");
+                        Logger.Log($"VPetTTSStateMonitor: 播放完成（IsPlaying=false且稳定{stableDuration}ms），总等待时间: {totalWaitTime}ms");
                         return true;
                     }
-                    
-                    // 进度停滞超过3秒且状态仍为播放中，认为播放已完成（可能是状态更新延迟）
-                    var totalWaitTime2 = (DateTime.Now - startTime).TotalMilliseconds;
-                    Logger.Log($"VPetTTSStateMonitor: 进度停滞超过{progressStallTimeout}ms，判断播放已完成，总等待时间: {totalWaitTime2}ms");
-                    return true;
                 }
                 
                 await Task.Delay(pollingInterval);

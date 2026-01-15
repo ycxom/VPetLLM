@@ -422,6 +422,91 @@ namespace VPetLLM.Handlers
                         if (_commandQueue.Count == 0)
                         {
                             _isProcessing = false;
+                            
+                            // 队列为空，所有命令处理完成
+                            // 使用智能等待策略检查是否需要设置Idle状态
+                            _ = Task.Run(async () =>
+                            {
+                                // 初始等待500ms，让可能的回灌有时间触发
+                                await Task.Delay(500).ConfigureAwait(false);
+                                
+                                // 最多等待5秒，每500ms检查一次（增加等待时间以适应回灌延迟）
+                                int maxWaitMs = 5000;
+                                int elapsedMs = 500;
+                                
+                                while (elapsedMs < maxWaitMs)
+                                {
+                                    bool hasActivity;
+                                    lock (_lock)
+                                    {
+                                        hasActivity = _commandQueue.Count > 0 || _isProcessing;
+                                    }
+                                    
+                                    // 如果检测到新活动，说明有回灌触发了新的处理，退出等待
+                                    if (hasActivity)
+                                    {
+                                        Utils.Logger.Log("StreamingCommandProcessor: 检测到新活动，退出Idle等待");
+                                        return;
+                                    }
+                                    
+                                    // 检查全局活动会话数（关键：检测回灌是否正在进行）
+                                    var activeSessionCount = pluginInstance?.FloatingSidebarManager?.ActiveSessionCount ?? 0;
+                                    if (activeSessionCount > 0)
+                                    {
+                                        Utils.Logger.Log($"StreamingCommandProcessor: 检测到活动会话({activeSessionCount})，继续等待");
+                                        await Task.Delay(500).ConfigureAwait(false);
+                                        elapsedMs += 500;
+                                        continue;
+                                    }
+                                    
+                                    // 检查SmartMessageProcessor是否在处理
+                                    var processor = pluginInstance?.TalkBox?.MessageProcessor;
+                                    if (processor != null && processor.IsProcessing)
+                                    {
+                                        // 还在处理中，继续等待
+                                        await Task.Delay(500).ConfigureAwait(false);
+                                        elapsedMs += 500;
+                                        continue;
+                                    }
+                                    
+                                    // 没有活动，可以设置Idle
+                                    break;
+                                }
+                                
+                                // 最终检查
+                                bool shouldSetIdle;
+                                lock (_lock)
+                                {
+                                    shouldSetIdle = _commandQueue.Count == 0 && !_isProcessing;
+                                }
+                                
+                                // 再次检查活动会话数
+                                var finalActiveSessionCount = pluginInstance?.FloatingSidebarManager?.ActiveSessionCount ?? 0;
+                                if (finalActiveSessionCount > 0)
+                                {
+                                    Utils.Logger.Log($"StreamingCommandProcessor: 最终检查发现活动会话({finalActiveSessionCount})，跳过设置Idle");
+                                    return;
+                                }
+                                
+                                if (shouldSetIdle)
+                                {
+                                    var processor = pluginInstance?.TalkBox?.MessageProcessor;
+                                    if (processor == null || !processor.IsProcessing)
+                                    {
+                                        Utils.Logger.Log("StreamingCommandProcessor: 所有命令处理完成，设置状态灯为Idle");
+                                        pluginInstance?.FloatingSidebarManager?.SetIdleStatus();
+                                    }
+                                    else
+                                    {
+                                        Utils.Logger.Log("StreamingCommandProcessor: SmartMessageProcessor仍在处理中，跳过设置Idle");
+                                    }
+                                }
+                                else
+                                {
+                                    Utils.Logger.Log("StreamingCommandProcessor: 检测到新命令或正在处理，跳过设置Idle");
+                                }
+                            });
+                            
                             break;
                         }
                         commandTask = _commandQueue.Dequeue();
