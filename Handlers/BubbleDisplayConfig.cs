@@ -102,6 +102,24 @@ namespace VPetLLM.Handlers
         }
         
         /// <summary>
+        /// 基于 VPet 实际打印速度计算显示时间
+        /// VPet MessageBar: 每 150ms 显示 2-3 个字符（平均 2.5 个）
+        /// 公式: (text.Length / 2.5) * 150 + 300 毫秒缓冲
+        /// </summary>
+        /// <param name="text">文本内容</param>
+        /// <returns>预估显示时间（毫秒），最小 500ms</returns>
+        public static int CalculateActualDisplayTime(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return 500;
+            
+            // 公式: (字符数 / 2.5) * 150ms + 300ms 缓冲
+            int estimatedMs = (int)((text.Length / 2.5) * 150) + 300;
+            
+            // 最小 500ms
+            return Math.Max(500, estimatedMs);
+        }
+        
+        /// <summary>
         /// 根据 TTS 音频时长调整显示时间
         /// </summary>
         public int AdjustForTTS(int baseDisplayTime, int audioDuration)

@@ -570,7 +570,22 @@ namespace VPetLLM.Handlers
                             Logger.Log($"SmartMessageProcessor: TTS序列化处理失败，回退到传统处理");
                             // 回退到传统处理方式
                             await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
-                            await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
+                            // 检查是否有外置 TTS 插件
+                            if (_plugin.IsVPetTTSPluginDetected)
+                            {
+                                await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
+                            }
+                            else
+                            {
+                                // TTS 全部关闭：等待气泡打印完成
+                                var msgBar = _plugin.MW?.Main?.MsgBar;
+                                if (msgBar != null)
+                                {
+                                    int maxWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(talkText);
+                                    Logger.Log($"SmartMessageProcessor: TTS关闭，等待气泡打印完成，预估时间: {maxWaitMs}ms");
+                                    await MessageBarHelper.WaitForPrintCompleteAsync(msgBar, maxWaitMs).ConfigureAwait(false);
+                                }
+                            }
                         }
                         
                         return;
@@ -626,7 +641,22 @@ namespace VPetLLM.Handlers
                         
                         // 回退到传统处理方式
                         await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
-                        await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
+                        // 检查是否有外置 TTS 插件
+                        if (_plugin.IsVPetTTSPluginDetected)
+                        {
+                            await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
+                        }
+                        else if (!_plugin.Settings.TTS.IsEnabled)
+                        {
+                            // TTS 全部关闭：等待气泡打印完成
+                            var msgBar = _plugin.MW?.Main?.MsgBar;
+                            if (msgBar != null)
+                            {
+                                int maxWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(talkText);
+                                Logger.Log($"SmartMessageProcessor: TTS关闭，等待气泡打印完成，预估时间: {maxWaitMs}ms");
+                                await MessageBarHelper.WaitForPrintCompleteAsync(msgBar, maxWaitMs).ConfigureAwait(false);
+                            }
+                        }
                     }
 
                     // 记录总操作时间
@@ -1038,8 +1068,23 @@ namespace VPetLLM.Handlers
                     // 如果内置TTS未启用，直接执行动作
                     await ExecuteActionAsync(segment.Content);
                     
-                    // 等待外置 TTS 插件（如 VPetTTS）播放完成
-                    await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
+                    // 检查是否有外置 TTS 插件（如 VPetTTS）
+                    if (_plugin.IsVPetTTSPluginDetected)
+                    {
+                        // 等待外置 TTS 插件播放完成
+                        await WaitForExternalTTSCompleteAsync(talkText).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // TTS 全部关闭：等待气泡打印完成（新增逻辑）
+                        var msgBar = _plugin.MW?.Main?.MsgBar;
+                        if (msgBar != null)
+                        {
+                            int maxWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(talkText);
+                            Logger.Log($"SmartMessageProcessor: TTS关闭，等待气泡打印完成，预估时间: {maxWaitMs}ms");
+                            await MessageBarHelper.WaitForPrintCompleteAsync(msgBar, maxWaitMs).ConfigureAwait(false);
+                        }
+                    }
                 }
             }
             else

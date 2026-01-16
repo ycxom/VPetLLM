@@ -534,6 +534,66 @@ namespace VPetLLM.Utils
         }
         
         /// <summary>
+        /// 检查气泡是否正在打印
+        /// 通过检测 ShowTimer.Enabled 状态判断气泡是否正在逐字打印
+        /// </summary>
+        /// <param name="msgBar">MessageBar 实例</param>
+        /// <returns>true 表示正在打印，false 表示打印完成或无法检测</returns>
+        public static bool IsBubblePrinting(object msgBar)
+        {
+            if (msgBar == null) return false;
+            
+            if (!_isInitialized)
+            {
+                Initialize(msgBar);
+            }
+            
+            try
+            {
+                if (_showTimerField != null)
+                {
+                    var showTimer = _showTimerField.GetValue(msgBar) as System.Timers.Timer;
+                    return showTimer?.Enabled ?? false;
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MessageBarHelper.IsBubblePrinting: 检测失败: {ex.Message}");
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// 等待气泡打印完成
+        /// 每 100ms 轮询检测状态直到打印完成或超时
+        /// </summary>
+        /// <param name="msgBar">MessageBar 实例</param>
+        /// <param name="maxWaitMs">最大等待时间（毫秒），默认 10000ms</param>
+        public static async Task WaitForPrintCompleteAsync(object msgBar, int maxWaitMs = 10000)
+        {
+            if (msgBar == null) return;
+            
+            int elapsed = 0;
+            const int checkInterval = 100;
+            
+            while (IsBubblePrinting(msgBar) && elapsed < maxWaitMs)
+            {
+                await Task.Delay(checkInterval).ConfigureAwait(false);
+                elapsed += checkInterval;
+            }
+            
+            if (elapsed >= maxWaitMs)
+            {
+                Logger.Log($"MessageBarHelper: 气泡打印等待超时: {maxWaitMs}ms");
+            }
+            else if (elapsed > 0)
+            {
+                Logger.Log($"MessageBarHelper: 气泡打印完成，等待时间: {elapsed}ms");
+            }
+        }
+        
+        /// <summary>
         /// 重置缓存（用于测试或重新初始化）
         /// </summary>
         public static void ResetCache()
