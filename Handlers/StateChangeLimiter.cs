@@ -1,4 +1,4 @@
-using System;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -18,20 +18,20 @@ namespace VPetLLM.Handlers
             // 如果当前值为0或负数，不允许减少
             if (currentValue <= 0 && requestedChange < 0)
             {
-                Utils.Logger.Log($"StateChangeLimiter: 当前值为 {currentValue}，拒绝负向变化 {requestedChange}");
+                Logger.Log($"StateChangeLimiter: 当前值为 {currentValue}，拒绝负向变化 {requestedChange}");
                 return 0;
             }
 
             // 计算20%的限制值
             double maxChange = Math.Abs(currentValue * 0.2);
-            
+
             // 对于正向变化
             if (requestedChange > 0)
             {
                 int limitedChange = (int)Math.Min(requestedChange, maxChange);
                 if (limitedChange != requestedChange)
                 {
-                    Utils.Logger.Log($"StateChangeLimiter: 正向变化从 {requestedChange} 限制到 {limitedChange} (当前值: {currentValue}, 20%限制: {maxChange})");
+                    Logger.Log($"StateChangeLimiter: 正向变化从 {requestedChange} 限制到 {limitedChange} (当前值: {currentValue}, 20%限制: {maxChange})");
                 }
                 return limitedChange;
             }
@@ -40,20 +40,20 @@ namespace VPetLLM.Handlers
             {
                 // 确保不会导致负数
                 double minAllowedChange = -currentValue;
-                
+
                 // 应用20%限制
                 double limitedByPercent = Math.Max(requestedChange, -maxChange);
-                
+
                 // 取两个限制中较小的（绝对值）
                 int limitedChange = (int)Math.Max(limitedByPercent, minAllowedChange);
-                
+
                 if (limitedChange != requestedChange)
                 {
-                    Utils.Logger.Log($"StateChangeLimiter: 负向变化从 {requestedChange} 限制到 {limitedChange} (当前值: {currentValue}, 20%限制: {-maxChange}, 防负数限制: {minAllowedChange})");
+                    Logger.Log($"StateChangeLimiter: 负向变化从 {requestedChange} 限制到 {limitedChange} (当前值: {currentValue}, 20%限制: {-maxChange}, 防负数限制: {minAllowedChange})");
                 }
                 return limitedChange;
             }
-            
+
             // 变化值为0，直接返回
             return 0;
         }

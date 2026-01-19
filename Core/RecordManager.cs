@@ -1,9 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core
 {
@@ -34,8 +31,8 @@ namespace VPetLLM.Core
             try
             {
                 // Validate content length
-                if (!string.IsNullOrWhiteSpace(content) && 
-                    _settings.Records != null && 
+                if (!string.IsNullOrWhiteSpace(content) &&
+                    _settings.Records != null &&
                     content.Length > _settings.Records.MaxRecordContentLength)
                 {
                     Logger.Log($"Record content exceeds maximum length ({_settings.Records.MaxRecordContentLength}), truncating");
@@ -43,11 +40,11 @@ namespace VPetLLM.Core
                 }
 
                 var recordId = _database.CreateRecord(content, weight);
-                
+
                 if (recordId > 0)
                 {
                     Logger.Log($"RecordManager: Created record #{recordId} with weight {weight}");
-                    
+
                     // Enforce records limit after creating new record
                     if (_settings.Records != null && _settings.Records.MaxRecordsLimit > 0)
                     {
@@ -58,7 +55,7 @@ namespace VPetLLM.Core
                         }
                     }
                 }
-                
+
                 return recordId;
             }
             catch (Exception ex)
@@ -117,9 +114,9 @@ namespace VPetLLM.Core
                 // If WeightDecayTurns = 3, decrement by 1/3 ≈ 0.333 (takes 3 turns to lose 1 weight)
                 var decayTurns = Math.Max(1, _settings.Records.WeightDecayTurns);
                 var decrementAmount = 1.0 / decayTurns;
-                
+
                 var decremented = _database.DecrementAllRecords(decrementAmount);
-                
+
                 if (decremented > 0)
                 {
                     Logger.Log($"RecordManager: Decremented {decremented} records by {decrementAmount:F3} on conversation turn (decay turns: {decayTurns})");
@@ -140,7 +137,7 @@ namespace VPetLLM.Core
             try
             {
                 var records = _database.GetActiveRecords();
-                
+
                 if (records == null || records.Count == 0)
                 {
                     return string.Empty;
@@ -191,7 +188,7 @@ namespace VPetLLM.Core
 
                 // Get records context
                 var recordsContext = GetRecordsContext();
-                
+
                 if (string.IsNullOrWhiteSpace(recordsContext))
                 {
                     return history;
@@ -199,7 +196,7 @@ namespace VPetLLM.Core
 
                 // Find the first user message position
                 var firstUserIndex = history.FindIndex(m => m.Role == "user");
-                
+
                 if (firstUserIndex == -1)
                 {
                     // No user messages, cannot inject
@@ -209,11 +206,11 @@ namespace VPetLLM.Core
 
                 // Create a new list with records injected
                 var modifiedHistory = new List<Message>(history);
-                
+
                 // Create a new message with records context prepended to the first user message
                 var firstUserMessage = modifiedHistory[firstUserIndex];
                 var modifiedContent = recordsContext + "\n" + firstUserMessage.Content;
-                
+
                 modifiedHistory[firstUserIndex] = new Message
                 {
                     Role = firstUserMessage.Role,
@@ -223,7 +220,7 @@ namespace VPetLLM.Core
                 };
 
                 Logger.Log($"RecordManager: Injected records into first user message at index {firstUserIndex}");
-                
+
                 return modifiedHistory;
             }
             catch (Exception ex)
@@ -292,7 +289,7 @@ namespace VPetLLM.Core
         {
             var docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var dataPath = Path.Combine(docPath, "VPetLLM", "Chat");
-            
+
             if (!Directory.Exists(dataPath))
             {
                 Directory.CreateDirectory(dataPath);

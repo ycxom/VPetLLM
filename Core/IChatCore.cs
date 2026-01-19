@@ -7,7 +7,7 @@ namespace VPetLLM
         Core.RecordManager RecordManager { get; }
         Task<string> Chat(string prompt);
         Task<string> Chat(string prompt, bool isFunctionCall);
-        
+
         /// <summary>
         /// 发送带图像的多模态消息
         /// </summary>
@@ -15,7 +15,7 @@ namespace VPetLLM
         /// <param name="imageData">图像数据</param>
         /// <returns>响应内容</returns>
         Task<string> ChatWithImage(string prompt, byte[] imageData);
-        
+
         void SetResponseHandler(Action<string> handler);
         void SaveHistory();
         void LoadHistory();

@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 using System.IO;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Configuration
 {
@@ -103,7 +103,7 @@ namespace VPetLLM.Configuration
         private T LoadSettings<T>() where T : class, ISettings
         {
             var filePath = GetSettingsFilePath<T>();
-            
+
             if (File.Exists(filePath))
             {
                 try
@@ -134,7 +134,7 @@ namespace VPetLLM.Configuration
         private void PersistSettings<T>(T settings) where T : class, ISettings
         {
             var filePath = GetSettingsFilePath<T>();
-            
+
             try
             {
                 var directory = Path.GetDirectoryName(filePath);

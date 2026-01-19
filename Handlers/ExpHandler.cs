@@ -1,5 +1,6 @@
 using LinePutScript.Localization.WPF;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Utils.Common;
 
 namespace VPetLLM.Handlers
 {
@@ -8,7 +9,7 @@ namespace VPetLLM.Handlers
         public string Keyword => "exp";
         public ActionType ActionType => ActionType.State;
         public ActionCategory Category => ActionCategory.StateBased;
-        public string Description => Utils.PromptHelper.Get("Handler_Exp_Description", VPetLLM.Instance.Settings.PromptLanguage);
+        public string Description => PromptHelper.Get("Handler_Exp_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public Task Execute(int value, IMainWindow mainWindow)
         {
@@ -18,7 +19,7 @@ namespace VPetLLM.Handlers
                 double currentValue = mainWindow.Core.Save.Exp;
                 value = StateChangeLimiter.LimitStateChange(value, currentValue);
             }
-            
+
             mainWindow.Core.Save.Exp += value;
             mainWindow.Main.LabelDisplayShowChangeNumber("经验 ".Translate() + (value > 0 ? "+" : "") + "{0:f0}", value);
             return Task.CompletedTask;

@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -13,7 +10,7 @@ namespace VPetLLM.Handlers
     {
         private readonly Dictionary<string, TTSOperationRecord> _operations = new Dictionary<string, TTSOperationRecord>();
         private readonly object _lockObject = new object();
-        
+
         /// <summary>
         /// TTS操作记录
         /// </summary>
@@ -27,24 +24,24 @@ namespace VPetLLM.Handlers
             public bool IsCompleted { get; set; }
             public bool IsSuccessful { get; set; }
             public string ErrorMessage { get; set; }
-            
+
             /// <summary>
             /// 总持续时间
             /// </summary>
             public TimeSpan TotalDuration => (PlaybackEndTime ?? DateTime.Now) - RequestTime;
-            
+
             /// <summary>
             /// 等待时间（从请求到播放开始）
             /// </summary>
             public TimeSpan? WaitTime => PlaybackStartTime.HasValue ? PlaybackStartTime.Value - RequestTime : null;
-            
+
             /// <summary>
             /// 播放时间（从播放开始到播放结束）
             /// </summary>
-            public TimeSpan? PlaybackDuration => PlaybackStartTime.HasValue && PlaybackEndTime.HasValue 
+            public TimeSpan? PlaybackDuration => PlaybackStartTime.HasValue && PlaybackEndTime.HasValue
                 ? PlaybackEndTime.Value - PlaybackStartTime.Value : null;
         }
-        
+
         /// <summary>
         /// 开始跟踪操作
         /// </summary>
@@ -65,7 +62,7 @@ namespace VPetLLM.Handlers
             }
             Logger.Log($"TTSOperationTracker: 开始跟踪操作 {operationId}, 文本长度: {text?.Length ?? 0}");
         }
-        
+
         /// <summary>
         /// 标记播放开始
         /// </summary>
@@ -86,7 +83,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 完成操作
         /// </summary>
@@ -103,13 +100,13 @@ namespace VPetLLM.Handlers
                     record.IsCompleted = true;
                     record.IsSuccessful = success;
                     record.ErrorMessage = errorMessage;
-                    
+
                     var totalTime = record.TotalDuration.TotalMilliseconds;
                     var playbackTime = record.PlaybackDuration?.TotalMilliseconds ?? 0;
-                    
+
                     Logger.Log($"TTSOperationTracker: 操作完成 {operationId}, 成功: {success}, " +
                               $"总时长: {totalTime:F0}ms, 播放时长: {playbackTime:F0}ms");
-                    
+
                     if (!success && !string.IsNullOrEmpty(errorMessage))
                     {
                         Logger.Log($"TTSOperationTracker: 操作失败原因: {errorMessage}");
@@ -121,7 +118,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 获取操作记录
         /// </summary>
@@ -134,7 +131,7 @@ namespace VPetLLM.Handlers
                 return _operations.TryGetValue(operationId, out var record) ? record : null;
             }
         }
-        
+
         /// <summary>
         /// 获取所有操作记录
         /// </summary>
@@ -146,7 +143,7 @@ namespace VPetLLM.Handlers
                 return _operations.Values.ToList();
             }
         }
-        
+
         /// <summary>
         /// 获取已完成的操作记录
         /// </summary>
@@ -158,7 +155,7 @@ namespace VPetLLM.Handlers
                 return _operations.Values.Where(op => op.IsCompleted).ToList();
             }
         }
-        
+
         /// <summary>
         /// 获取正在进行的操作记录
         /// </summary>
@@ -170,7 +167,7 @@ namespace VPetLLM.Handlers
                 return _operations.Values.Where(op => !op.IsCompleted).ToList();
             }
         }
-        
+
         /// <summary>
         /// 生成性能报告
         /// </summary>
@@ -181,7 +178,7 @@ namespace VPetLLM.Handlers
             {
                 var completedOps = _operations.Values.Where(op => op.IsCompleted).ToList();
                 var successfulOps = completedOps.Where(op => op.IsSuccessful).ToList();
-                
+
                 var report = new TTSPerformanceReport
                 {
                     TotalOperations = completedOps.Count,
@@ -190,34 +187,34 @@ namespace VPetLLM.Handlers
                     ErrorCount = completedOps.Count(op => !op.IsSuccessful),
                     GeneratedAt = DateTime.Now
                 };
-                
+
                 // 计算平均时间（只包括成功的操作）
                 if (successfulOps.Count > 0)
                 {
                     var waitTimes = successfulOps.Where(op => op.WaitTime.HasValue).Select(op => op.WaitTime.Value.TotalMilliseconds);
                     var totalTimes = successfulOps.Select(op => op.TotalDuration.TotalMilliseconds);
                     var playbackTimes = successfulOps.Where(op => op.PlaybackDuration.HasValue).Select(op => op.PlaybackDuration.Value.TotalMilliseconds);
-                    
+
                     report.AverageWaitTime = waitTimes.Any() ? waitTimes.Average() : 0;
                     report.AverageTotalTime = totalTimes.Average();
                     report.AveragePlaybackTime = playbackTimes.Any() ? playbackTimes.Average() : 0;
-                    
+
                     // 计算最小和最大时间
                     report.MinTotalTime = totalTimes.Min();
                     report.MaxTotalTime = totalTimes.Max();
-                    
+
                     if (waitTimes.Any())
                     {
                         report.MinWaitTime = waitTimes.Min();
                         report.MaxWaitTime = waitTimes.Max();
                     }
                 }
-                
+
                 Logger.Log($"TTSOperationTracker: 生成性能报告 - {report}");
                 return report;
             }
         }
-        
+
         /// <summary>
         /// 分析请求频率
         /// </summary>
@@ -229,14 +226,14 @@ namespace VPetLLM.Handlers
             {
                 var cutoffTime = DateTime.Now.AddMinutes(-timeWindowMinutes);
                 var recentOps = _operations.Values.Where(op => op.RequestTime >= cutoffTime).OrderBy(op => op.RequestTime).ToList();
-                
+
                 var analysis = new FrequencyAnalysis
                 {
                     TimeWindowMinutes = timeWindowMinutes,
                     TotalRequests = recentOps.Count,
                     RequestsPerMinute = recentOps.Count / (double)timeWindowMinutes
                 };
-                
+
                 // 计算请求间隔
                 if (recentOps.Count > 1)
                 {
@@ -246,22 +243,22 @@ namespace VPetLLM.Handlers
                         var interval = (recentOps[i].RequestTime - recentOps[i - 1].RequestTime).TotalMilliseconds;
                         intervals.Add(interval);
                     }
-                    
+
                     analysis.AverageIntervalMs = intervals.Average();
                     analysis.MinIntervalMs = intervals.Min();
                     analysis.MaxIntervalMs = intervals.Max();
-                    
+
                     // 检测过于频繁的请求（间隔小于1.5秒）
                     analysis.FrequentRequestCount = intervals.Count(interval => interval < 1500);
                 }
-                
+
                 Logger.Log($"TTSOperationTracker: 频率分析 - 时间窗口: {timeWindowMinutes}分钟, " +
                           $"请求数: {analysis.TotalRequests}, 平均间隔: {analysis.AverageIntervalMs:F0}ms");
-                
+
                 return analysis;
             }
         }
-        
+
         /// <summary>
         /// 清理旧的操作记录
         /// </summary>
@@ -273,17 +270,17 @@ namespace VPetLLM.Handlers
             {
                 var cutoffTime = DateTime.Now - maxAge;
                 var toRemove = _operations.Where(kvp => kvp.Value.RequestTime < cutoffTime).Select(kvp => kvp.Key).ToList();
-                
+
                 foreach (var key in toRemove)
                 {
                     _operations.Remove(key);
                 }
-                
+
                 Logger.Log($"TTSOperationTracker: 清理了 {toRemove.Count} 条旧记录");
                 return toRemove.Count;
             }
         }
-        
+
         /// <summary>
         /// 获取统计摘要
         /// </summary>
@@ -296,12 +293,12 @@ namespace VPetLLM.Handlers
                 var completed = _operations.Values.Count(op => op.IsCompleted);
                 var successful = _operations.Values.Count(op => op.IsCompleted && op.IsSuccessful);
                 var active = total - completed;
-                
+
                 return $"TTS操作跟踪 - 总计: {total}, 已完成: {completed}, 成功: {successful}, 进行中: {active}";
             }
         }
     }
-    
+
     /// <summary>
     /// TTS性能报告
     /// </summary>
@@ -319,14 +316,14 @@ namespace VPetLLM.Handlers
         public double MaxTotalTime { get; set; }
         public int ErrorCount { get; set; }
         public DateTime GeneratedAt { get; set; }
-        
+
         public override string ToString()
         {
             return $"TTS性能报告 - 总操作: {TotalOperations}, 成功率: {SuccessRate:P2}, " +
                    $"平均等待: {AverageWaitTime:F0}ms, 平均总时长: {AverageTotalTime:F0}ms, 错误: {ErrorCount}";
         }
     }
-    
+
     /// <summary>
     /// 频率分析结果
     /// </summary>
@@ -339,7 +336,7 @@ namespace VPetLLM.Handlers
         public double MinIntervalMs { get; set; }
         public double MaxIntervalMs { get; set; }
         public int FrequentRequestCount { get; set; }
-        
+
         public override string ToString()
         {
             return $"频率分析 - {TimeWindowMinutes}分钟内: {TotalRequests}个请求, " +

@@ -18,7 +18,7 @@ namespace VPetLLM.Core
         public T? GetService<T>() where T : class
         {
             var type = typeof(T);
-            
+
             lock (_lock)
             {
                 // 首先检查是否有已注册的实例
@@ -61,7 +61,7 @@ namespace VPetLLM.Core
             }
 
             var type = typeof(T);
-            
+
             lock (_lock)
             {
                 _services[type] = instance;
@@ -79,7 +79,7 @@ namespace VPetLLM.Core
             }
 
             var type = typeof(T);
-            
+
             lock (_lock)
             {
                 _factories[type] = () => factory();
@@ -92,7 +92,7 @@ namespace VPetLLM.Core
         public bool IsRegistered<T>() where T : class
         {
             var type = typeof(T);
-            
+
             lock (_lock)
             {
                 return _services.ContainsKey(type) || _factories.ContainsKey(type);
@@ -103,7 +103,7 @@ namespace VPetLLM.Core
         public bool Unregister<T>() where T : class
         {
             var type = typeof(T);
-            
+
             lock (_lock)
             {
                 var removedService = _services.Remove(type);

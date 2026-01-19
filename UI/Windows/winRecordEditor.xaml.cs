@@ -2,7 +2,8 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using VPetLLM.Core;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -48,11 +49,11 @@ namespace VPetLLM.UI.Windows
                 {
                     // Clamp weight to valid range
                     item.Weight = Math.Clamp(item.Weight, 0, 10);
-                    
+
                     // Update the original record
                     item.OriginalRecord.Content = item.Content;
                     item.OriginalRecord.Weight = item.Weight;
-                    
+
                     // Save to database
                     _plugin.ChatCore?.RecordManager?.UpdateRecord(item.OriginalRecord);
                 }
@@ -96,7 +97,7 @@ namespace VPetLLM.UI.Windows
                     // Delete from database
                     var database = new ImportantRecordsDatabase(GetDatabasePath());
                     database.DeleteRecord(selectedItem.Id);
-                    
+
                     // Remove from display
                     DisplayRecords.Remove(selectedItem);
                 }
@@ -107,7 +108,7 @@ namespace VPetLLM.UI.Windows
         {
             var langCode = _plugin.Settings.Language;
             Title = LanguageHelper.Get("RecordEditor.Title", langCode);
-            
+
             if (FindName("Column_Id") is DataGridTextColumn columnId)
             {
                 columnId.Header = LanguageHelper.Get("RecordEditor.Id", langCode);

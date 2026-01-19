@@ -1,8 +1,6 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -78,7 +76,7 @@ namespace VPetLLM.Handlers
 
                 // 直接调用 Item.Use() 方法
                 item.Use();
-                
+
                 Logger.Log($"UseItemHandler: 物品使用成功 - {item.Name} (type: {item.ItemType})");
             }
             catch (Exception ex)
@@ -209,13 +207,13 @@ namespace VPetLLM.Handlers
                     {
                         // 根据物品类型选择动画
                         string graphName = "gift";  // 默认使用礼物动画
-                        
+
                         // 如果是 Food 类型，获取对应的动画
                         if (item is Food food)
                         {
                             graphName = food.GetGraph();
                         }
-                        
+
                         Logger.Log($"UseItemHandler: 播放使用动画 - {graphName}");
                         mainWindow.DisplayFoodAnimation(graphName, item.ImageSource);
                     }

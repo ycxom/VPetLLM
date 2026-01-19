@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
-
 namespace VPetLLM.Core
 {
     /// <summary>
@@ -72,7 +69,7 @@ namespace VPetLLM.Core
 
             // 替换 [图像] 标记为占位符
             var result = content.Replace("[图像]", IMAGE_PLACEHOLDER);
-            
+
             // 如果内容没有变化且原消息有图片，在开头添加占位符
             if (result == content)
             {

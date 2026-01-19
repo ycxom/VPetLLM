@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Animation
 {
@@ -72,10 +69,10 @@ namespace VPetLLM.Handlers.Animation
             {
                 PruneOldSwitches(DateTime.Now);
                 var count = _recentSwitches.Count;
-                
+
                 if (count <= 1) return 0;
                 if (count >= FlickerThreshold * 2) return 100;
-                
+
                 // 线性映射到 0-100
                 return (int)((count - 1) * 100.0 / (FlickerThreshold * 2 - 1));
             }

@@ -1,8 +1,7 @@
-using System;
-using System.Linq;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -11,7 +10,7 @@ namespace VPetLLM.Handlers
         public ActionType ActionType => ActionType.Tool;
         public ActionCategory Category => ActionCategory.Unknown;
         public string Keyword => "tool";
-        public string Description => Utils.PromptHelper.Get("Handler_Tool_Description", VPetLLM.Instance.Settings.PromptLanguage);
+        public string Description => PromptHelper.Get("Handler_Tool_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
         public Task Execute(IMainWindow main)
         {
@@ -21,7 +20,7 @@ namespace VPetLLM.Handlers
         public async Task Execute(string value, IMainWindow main)
         {
             // 若处于单条 AI 回复的执行会话中，则豁免限流（允许该回复内多次工具联合调用）
-            var inMessageSession = global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value.HasValue;
+            var inMessageSession = global::VPetLLM.Utils.System.ExecutionContext.CurrentMessageId.Value.HasValue;
 
             // 跨消息限流：使用配置的参数
             if (!inMessageSession)

@@ -1,8 +1,8 @@
-using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Controls
 {
@@ -209,7 +209,7 @@ namespace VPetLLM.UI.Controls
                 DisplayName = "Clear History",
                 IconText = "🗑️",
                 ToolTip = LocalizationService.Instance["FloatingSidebar.ClearHistory"] ?? "清除聊天历史",
-                Action = (vpetLLM) => 
+                Action = (vpetLLM) =>
                 {
                     try
                     {
@@ -236,7 +236,7 @@ namespace VPetLLM.UI.Controls
                 DisplayName = "Toggle Chat",
                 IconText = "💬",
                 ToolTip = LocalizationService.Instance["FloatingSidebar.ToggleChat"] ?? "切换聊天功能",
-                Action = (vpetLLM) => 
+                Action = (vpetLLM) =>
                 {
                     try
                     {
@@ -263,7 +263,7 @@ namespace VPetLLM.UI.Controls
                 DisplayName = "Plugins",
                 IconText = "🔌",
                 ToolTip = LocalizationService.Instance["FloatingSidebar.Plugins"] ?? "插件管理",
-                Action = (vpetLLM) => 
+                Action = (vpetLLM) =>
                 {
                     try
                     {

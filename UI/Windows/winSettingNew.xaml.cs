@@ -1,7 +1,6 @@
- using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Windows;
@@ -11,11 +10,15 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using VPetLLM.Configuration;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
 using VPetLLM.UI.Controls;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Audio;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.Data;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.Plugin;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -64,7 +67,7 @@ namespace VPetLLM.UI.Windows
                     {
                         LocalizationService.Instance.ChangeLanguage(_plugin?.Settings?.Language ?? "zh-hans");
                     }
-                    
+
                     // 如果 DefaultPluginChecker 存在且插件已初始化，检查是否需要添加横幅
                     if (_plugin != null)
                     {
@@ -81,7 +84,7 @@ namespace VPetLLM.UI.Windows
                     // 如果检查默认插件状态时出错，使用默认标题
                     Logger.Log($"获取窗口标题时出错: {ex.Message}");
                 }
-                
+
                 // 返回默认标题
                 return WindowTitleConstants.GetDefaultModeTitle();
             }
@@ -216,7 +219,7 @@ namespace VPetLLM.UI.Windows
                     }
                     catch (Exception ex)
                     {
-                        Utils.Logger.Log($"Failed to get localized description for disabled plugin {plugin.Name}: {ex.Message}");
+                        Logger.Log($"Failed to get localized description for disabled plugin {plugin.Name}: {ex.Message}");
                         // 回退到原始描述
                         return plugin.Description;
                     }
@@ -291,30 +294,30 @@ namespace VPetLLM.UI.Windows
         {
             InitializeComponent();
             _plugin = plugin;
-            
+
             // 初始化触摸反馈设置控件
             InitializeTouchFeedbackSettings();
             _plugin.SettingWindow = this;
             LoadSettings();
             Closed += Window_Closed;
-            
+
             // 移除窗口激活事件监听，避免不必要的弹窗
             // this.Activated += WinSettingNew_Activated;
-            
+
             Loaded += (s, e) =>
             {
                 // 先确保语言资源已加载
                 LanguageHelper.ReloadLanguages();
-                
+
                 // 同步本地化服务的语言，确保 XAML 中 {utils:Localize} 初次加载和后续切换都正确刷新
                 LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
-                
+
                 // 更新UI语言
                 UpdateUIForLanguage();
-                
+
                 // 在语言资源完全加载后设置窗口标题
                 this.Title = WindowTitle;
-                
+
                 // 监听全局本地化变更，自动刷新手动赋值的 UI（如列头）
                 LocalizationService.Instance.PropertyChanged += (sender2, e2) =>
                 {
@@ -331,19 +334,19 @@ namespace VPetLLM.UI.Windows
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
                 // 标记界面已就绪，允许后续的立即保存
                 _isReadyToSave = true;
-                
+
                 // 在UI完全就绪后重新加载多模态提供商设置
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     LoadMultimodalProviderSettings();
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
-                
+
                 // 视觉树稳定后再挂载列表冒泡监听，避免初始化/布局阶段触发保存
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     AttachImmediateSaveForChannelLists();
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
-                
+
                 // 初始化时刷新TTS插件状态显示
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
@@ -469,14 +472,14 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_ASR_RecordingDevice")).SelectionChanged += Control_SelectionChanged;
             ((CheckBox)this.FindName("CheckBox_ASR_AutoSend")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_ASR_ShowTranscriptionWindow")).Click += Control_Click;
-            
+
             // OpenAI ASR settings
             ((TextBox)this.FindName("TextBox_ASR_OpenAI_ApiKey")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_ASR_OpenAI_BaseUrl")).TextChanged += Control_TextChanged;
             var comboBoxASROpenAIModel = (ComboBox)this.FindName("ComboBox_ASR_OpenAI_Model");
             comboBoxASROpenAIModel.SelectionChanged += Control_SelectionChanged;
             comboBoxASROpenAIModel.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(Control_TextChanged), true);
-            
+
             // Soniox ASR settings
             ((TextBox)this.FindName("TextBox_ASR_Soniox_ApiKey")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_ASR_Soniox_BaseUrl")).TextChanged += Control_TextChanged;
@@ -501,7 +504,7 @@ namespace VPetLLM.UI.Windows
             // 负载均衡开关点击即保存
             if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLBBind) cbGemLBBind.Click += LoadBalancing_CheckBox_Click;
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLBBind) cbOpenLBBind.Click += LoadBalancing_CheckBox_Click;
-            
+
             // 悬浮侧边栏设置事件绑定
             if (this.FindName("CheckBox_EnableFloatingSidebar") is CheckBox cbEnableSidebar) cbEnableSidebar.Click += Control_Click;
             if (this.FindName("CheckBox_FloatingSidebar_AutoHide") is CheckBox cbSidebarAutoHide) cbSidebarAutoHide.Click += Control_Click;
@@ -577,7 +580,7 @@ namespace VPetLLM.UI.Windows
                 LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
                 // 同时刷新代码后台赋值的控件
                 UpdateUIForLanguage();
-                
+
                 // 更新窗口标题（根据新语言）
                 this.Title = WindowTitle;
 
@@ -742,11 +745,11 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked = _plugin.Settings.SeparateChatByProvider;
             ((CheckBox)this.FindName("CheckBox_EnableRecords")).IsChecked = _plugin.Settings.Records?.EnableRecords ?? true;
-            
+
             // 加载记录器高级设置
             ((TextBox)this.FindName("TextBox_WeightDecayTurns")).Text = (_plugin.Settings.Records?.WeightDecayTurns ?? 1).ToString();
             ((TextBox)this.FindName("TextBox_MaxRecordsLimit")).Text = (_plugin.Settings.Records?.MaxRecordsLimit ?? 10).ToString();
-            
+
             ((CheckBox)this.FindName("CheckBox_EnableAction")).IsChecked = _plugin.Settings.EnableAction;
             ((CheckBox)this.FindName("CheckBox_EnableBuy")).IsChecked = _plugin.Settings.EnableBuy;
             ((CheckBox)this.FindName("CheckBox_EnableState")).IsChecked = _plugin.Settings.EnableState;
@@ -761,7 +764,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked = _plugin.Settings.EnableHistoryCompression;
             ((CheckBox)this.FindName("CheckBox_EnableVPetSettingsControl")).IsChecked = _plugin.Settings.EnableVPetSettingsControl;
             ((CheckBox)this.FindName("CheckBox_EnableMediaPlayback")).IsChecked = _plugin.Settings.EnableMediaPlayback;
-            
+
             // 加载压缩模式
             var compressionModeComboBox = (ComboBox)this.FindName("ComboBox_CompressionMode");
             foreach (ComboBoxItem item in compressionModeComboBox.Items)
@@ -772,7 +775,7 @@ namespace VPetLLM.UI.Windows
                     break;
                 }
             }
-            
+
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text = _plugin.Settings.HistoryCompressionThreshold.ToString();
             ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).Text = _plugin.Settings.HistoryCompressionTokenThreshold.ToString();
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
@@ -806,10 +809,10 @@ namespace VPetLLM.UI.Windows
             ((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
             ((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
             ((TextBox)this.FindName("TextBox_Free_MaxTokens")).Text = _plugin.Settings.Free.MaxTokens.ToString();
-            
+
             // 加载Free Chat配置的提供者信息
             LoadFreeProviderInfo();
-            
+
             ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
             // 异步加载日志，避免日志过多时阻塞 UI
             LoadLogsAsync();
@@ -963,10 +966,10 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_ASR_Soniox_ApiKey")).Text = _plugin.Settings.ASR.Soniox.ApiKey;
             ((TextBox)this.FindName("TextBox_ASR_Soniox_BaseUrl")).Text = _plugin.Settings.ASR.Soniox.BaseUrl;
             ((ComboBox)this.FindName("ComboBox_ASR_Soniox_Model")).Text = _plugin.Settings.ASR.Soniox.Model;
-            
+
             // 初始化 Soniox 语言列表（如果有 API Key，尝试自动加载）
             InitializeSonioxLanguages();
-            
+
             ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnablePunctuation")).IsChecked = _plugin.Settings.ASR.Soniox.EnablePunctuation;
             ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnableProfanityFilter")).IsChecked = _plugin.Settings.ASR.Soniox.EnableProfanityFilter;
 
@@ -980,7 +983,7 @@ namespace VPetLLM.UI.Windows
 
             // 截图设置
             LoadScreenshotSettings();
-            
+
             // 更新 VPet TTS 插件状态 UI
             UpdateTTSPluginStatusUI();
         }
@@ -993,13 +996,13 @@ namespace VPetLLM.UI.Windows
             try
             {
                 var settings = _plugin.Settings.FloatingSidebar;
-                
+
                 if (this.FindName("CheckBox_EnableFloatingSidebar") is CheckBox cbEnable)
                     cbEnable.IsChecked = settings.IsEnabled;
-                
+
                 if (this.FindName("CheckBox_FloatingSidebar_AutoHide") is CheckBox cbAutoHide)
                     cbAutoHide.IsChecked = settings.AutoHide;
-                
+
                 // 位置设置
                 if (this.FindName("ComboBox_FloatingSidebar_Position") is ComboBox cbPosition)
                 {
@@ -1012,7 +1015,7 @@ namespace VPetLLM.UI.Windows
                         }
                     }
                 }
-                
+
                 // 透明度设置
                 if (this.FindName("Slider_FloatingSidebar_DefaultOpacity") is Slider slDefaultOpacity)
                 {
@@ -1025,7 +1028,7 @@ namespace VPetLLM.UI.Windows
                     if (this.FindName("TextBlock_FloatingSidebar_DefaultOpacityValue") is TextBlock tbDefault)
                         tbDefault.Text = settings.DefaultOpacity.ToString("F2");
                 }
-                
+
                 if (this.FindName("Slider_FloatingSidebar_InactiveOpacity") is Slider slInactiveOpacity)
                 {
                     slInactiveOpacity.Value = settings.InactiveOpacity;
@@ -1040,7 +1043,7 @@ namespace VPetLLM.UI.Windows
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error loading floating sidebar settings: {ex.Message}");
+                Logger.Log($"Error loading floating sidebar settings: {ex.Message}");
             }
         }
 
@@ -1053,13 +1056,13 @@ namespace VPetLLM.UI.Windows
             {
                 var settings = _plugin.Settings.FloatingSidebar;
                 var wasEnabled = settings.IsEnabled;
-                
+
                 if (this.FindName("CheckBox_EnableFloatingSidebar") is CheckBox cbEnable)
                     settings.IsEnabled = cbEnable.IsChecked ?? false;
-                
+
                 if (this.FindName("CheckBox_FloatingSidebar_AutoHide") is CheckBox cbAutoHide)
                     settings.AutoHide = cbAutoHide.IsChecked ?? true;
-                
+
                 // 位置设置
                 if (this.FindName("ComboBox_FloatingSidebar_Position") is ComboBox cbPosition)
                 {
@@ -1071,17 +1074,17 @@ namespace VPetLLM.UI.Windows
                         }
                     }
                 }
-                
+
                 // 透明度设置
                 if (this.FindName("Slider_FloatingSidebar_DefaultOpacity") is Slider slDefaultOpacity)
                     settings.DefaultOpacity = slDefaultOpacity.Value;
-                
+
                 if (this.FindName("Slider_FloatingSidebar_InactiveOpacity") is Slider slInactiveOpacity)
                     settings.InactiveOpacity = slInactiveOpacity.Value;
-                
+
                 // 标记有未保存的更改，确保设置会被保存到文件
                 _hasUnsavedChanges = true;
-                
+
                 // 根据启用状态显示或隐藏侧边栏
                 if (settings.IsEnabled != wasEnabled)
                 {
@@ -1099,12 +1102,12 @@ namespace VPetLLM.UI.Windows
                     // 如果已启用，刷新配置
                     _plugin.RefreshFloatingSidebar();
                 }
-                
-                Utils.Logger.Log($"FloatingSidebar settings updated: IsEnabled={settings.IsEnabled}, AutoHide={settings.AutoHide}, Position={settings.Position}");
+
+                Logger.Log($"FloatingSidebar settings updated: IsEnabled={settings.IsEnabled}, AutoHide={settings.AutoHide}, Position={settings.Position}");
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error saving floating sidebar settings: {ex.Message}");
+                Logger.Log($"Error saving floating sidebar settings: {ex.Message}");
             }
         }
 
@@ -1189,11 +1192,11 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.SeparateChatByProvider = separateChatByProviderCheckBox.IsChecked ?? true;
             if (_plugin.Settings.Records == null) _plugin.Settings.Records = new Setting.RecordSettings();
             _plugin.Settings.Records.EnableRecords = enableRecordsCheckBox.IsChecked ?? true;
-            
+
             // 保存记录器高级设置
             var weightDecayTurnsTextBox = (TextBox)this.FindName("TextBox_WeightDecayTurns");
             var maxRecordsLimitTextBox = (TextBox)this.FindName("TextBox_MaxRecordsLimit");
-            
+
             if (int.TryParse(weightDecayTurnsTextBox.Text, out int decayTurns))
             {
                 _plugin.Settings.Records.WeightDecayTurns = Math.Max(1, Math.Min(10, decayTurns)); // 限制在1-10之间
@@ -1202,7 +1205,7 @@ namespace VPetLLM.UI.Windows
             {
                 _plugin.Settings.Records.MaxRecordsLimit = Math.Max(1, Math.Min(100, maxLimit)); // 限制在1-100之间
             }
-            
+
             _plugin.Settings.EnableAction = enableActionCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableBuy = enableBuyCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableState = enableStateCheckBox.IsChecked ?? true;
@@ -1217,7 +1220,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableHistoryCompression = ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked ?? false;
             _plugin.Settings.EnableVPetSettingsControl = ((CheckBox)this.FindName("CheckBox_EnableVPetSettingsControl")).IsChecked ?? false;
             _plugin.Settings.EnableMediaPlayback = ((CheckBox)this.FindName("CheckBox_EnableMediaPlayback")).IsChecked ?? true;
-            
+
             // 保存压缩模式
             var compressionModeComboBox = (ComboBox)this.FindName("ComboBox_CompressionMode");
             if (compressionModeComboBox.SelectedItem is ComboBoxItem selectedItem)
@@ -1227,13 +1230,13 @@ namespace VPetLLM.UI.Windows
                     _plugin.Settings.CompressionMode = mode;
                 }
             }
-            
+
             if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text, out int historyCompressionThreshold))
                 _plugin.Settings.HistoryCompressionThreshold = historyCompressionThreshold;
-            
+
             if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).Text, out int historyCompressionTokenThreshold))
                 _plugin.Settings.HistoryCompressionTokenThreshold = historyCompressionTokenThreshold;
-            
+
             _plugin.Settings.LogAutoScroll = logAutoScrollCheckBox.IsChecked ?? true;
             if (int.TryParse(maxLogCountTextBox.Text, out int maxLogCount))
                 _plugin.Settings.MaxLogCount = maxLogCount;
@@ -1259,7 +1262,7 @@ namespace VPetLLM.UI.Windows
             // 保存 OpenAI 负载均衡开关
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLB2)
                 _plugin.Settings.OpenAI.EnableLoadBalancing = cbOpenLB2.IsChecked ?? false;
-            
+
             // 保存 Free 设置
             if (freeEnableStreamingCheckBox != null)
                 _plugin.Settings.Free.EnableStreaming = freeEnableStreamingCheckBox.IsChecked ?? false;
@@ -1271,7 +1274,7 @@ namespace VPetLLM.UI.Windows
                 _plugin.Settings.Free.Temperature = freeTemperatureSlider.Value;
             if (freeMaxTokensTextBox != null && int.TryParse(freeMaxTokensTextBox.Text, out int freeMaxTokens))
                 _plugin.Settings.Free.MaxTokens = freeMaxTokens;
-            
+
             _plugin.Settings.Tools = new List<Setting.ToolSetting>((IEnumerable<Setting.ToolSetting>)toolsDataGrid.ItemsSource);
 
             // Proxy settings
@@ -1392,7 +1395,7 @@ namespace VPetLLM.UI.Windows
             // Soniox ASR 设置
             _plugin.Settings.ASR.Soniox.ApiKey = ((TextBox)this.FindName("TextBox_ASR_Soniox_ApiKey")).Text;
             _plugin.Settings.ASR.Soniox.BaseUrl = ((TextBox)this.FindName("TextBox_ASR_Soniox_BaseUrl")).Text;
-            
+
             // 获取 Soniox 模型 ID（从 Tag 获取，而不是显示文本）
             var sonioxModelComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Model");
             if (sonioxModelComboBox.SelectedItem is ComboBoxItem selectedModelItem)
@@ -1403,7 +1406,7 @@ namespace VPetLLM.UI.Windows
             {
                 _plugin.Settings.ASR.Soniox.Model = sonioxModelComboBox.Text;
             }
-            
+
             _plugin.Settings.ASR.Soniox.EnablePunctuation = ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnablePunctuation")).IsChecked ?? true;
             _plugin.Settings.ASR.Soniox.EnableProfanityFilter = ((CheckBox)this.FindName("CheckBox_ASR_Soniox_EnableProfanityFilter")).IsChecked ?? false;
 
@@ -1425,18 +1428,18 @@ namespace VPetLLM.UI.Windows
                 {
                     _plugin.Settings.Save();
                     _hasUnsavedChanges = false;
-                    Utils.Logger.Log("设置已保存到文件");
+                    Logger.Log("设置已保存到文件");
                 }
             }
 
             if (oldProvider != newProvider)
             {
                 // 提供商切换时的历史记录处理
-                Utils.Logger.Log($"提供商从 {oldProvider} 切换到 {newProvider}");
-                
+                Logger.Log($"提供商从 {oldProvider} 切换到 {newProvider}");
+
                 // 先保存当前历史到数据库（确保不丢失）
                 _plugin.ChatCore?.SaveHistory();
-                
+
                 // 创建新的ChatCore实例
                 IChatCore newChatCore = newProvider switch
                 {
@@ -1446,23 +1449,23 @@ namespace VPetLLM.UI.Windows
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
-                
+
                 // 新的ChatCore在构造时已经通过HistoryManager.LoadHistory()加载了历史
                 // 如果SeparateChatByProvider=false，会自动加载所有历史（包括旧提供商的）
                 // 如果SeparateChatByProvider=true，会加载新提供商的历史
                 // 因此不需要手动SetChatHistory，让HistoryManager自动处理即可
-                
-                Utils.Logger.Log($"新ChatCore已创建，历史记录已根据设置自动加载（SeparateChatByProvider={_plugin.Settings.SeparateChatByProvider}）");
+
+                Logger.Log($"新ChatCore已创建，历史记录已根据设置自动加载（SeparateChatByProvider={_plugin.Settings.SeparateChatByProvider}）");
                 _plugin.UpdateChatCore(newChatCore);
             }
             else
             {
                 // 如果提供商没变，也需要重新创建ChatCore以应用新的设置
-                Utils.Logger.Log($"提供商未变化，重新创建ChatCore以应用新设置");
-                
+                Logger.Log($"提供商未变化，重新创建ChatCore以应用新设置");
+
                 // 先保存当前历史
                 _plugin.ChatCore?.SaveHistory();
-                
+
                 IChatCore updatedChatCore = newProvider switch
                 {
                     Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
@@ -1471,7 +1474,7 @@ namespace VPetLLM.UI.Windows
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
-                
+
                 // 同样让HistoryManager自动加载历史
                 _plugin.UpdateChatCore(updatedChatCore);
             }
@@ -1532,8 +1535,8 @@ namespace VPetLLM.UI.Windows
                 {
                     MessageBox.Show(
                         ErrorMessageHelper.GetLocalizedMessage("RefreshOpenAIModels.NoNodeSelected", _plugin.Settings.Language, "请先选择一个OpenAI节点"),
-                        ErrorMessageHelper.GetLocalizedTitle("Warning", _plugin.Settings.Language, "警告"), 
-                        MessageBoxButton.OK, 
+                        ErrorMessageHelper.GetLocalizedTitle("Warning", _plugin.Settings.Language, "警告"),
+                        MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
                 }
@@ -1567,7 +1570,7 @@ namespace VPetLLM.UI.Windows
                 // 使用界面上选中的节点，而不是当前启用的节点
                 var selectedNode = GetSelectedGeminiNode();
                 Setting.GeminiSetting geminiSetting;
-                
+
                 if (selectedNode != null)
                 {
                     // 如果选中了节点，使用选中节点的配置
@@ -1835,7 +1838,7 @@ namespace VPetLLM.UI.Windows
                 {
                     // 检测到其他TTS插件已启用 - 显示提示信息
                     Logger.Log($"设置窗口: 检测到其他TTS插件已启用 ({enabledPluginNames})，显示软禁用提示");
-                    
+
                     // 使用本地化字符串（如果可用）
                     var localizedText = LocalizationService.Instance["TTS.PluginDetectedWarning"];
                     if (!string.IsNullOrEmpty(localizedText))
@@ -2197,7 +2200,7 @@ namespace VPetLLM.UI.Windows
             }
             if (FindName("CheckBox_EnableBuy") is CheckBox checkBoxEnableBuy) checkBoxEnableBuy.Content = LanguageHelper.Get("Advanced_Options.EnableBuy", langCode);
             if (FindName("CheckBox_EnableState") is CheckBox checkBoxEnableState) checkBoxEnableState.Content = LanguageHelper.Get("Advanced_Options.EnableState", langCode);
-            if (FindName("CheckBox_EnableExtendedState") is CheckBox checkBoxEnableExtendedState) 
+            if (FindName("CheckBox_EnableExtendedState") is CheckBox checkBoxEnableExtendedState)
             {
                 checkBoxEnableExtendedState.Content = LanguageHelper.Get("Advanced_Options.EnableExtendedState", langCode);
                 if (checkBoxEnableExtendedState.ToolTip is ToolTip toolTipExtState)
@@ -2208,7 +2211,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("CheckBox_EnableActionExecution") is CheckBox checkBoxEnableActionExecution) checkBoxEnableActionExecution.Content = LanguageHelper.Get("Advanced_Options.EnableActionExecution", langCode);
             if (FindName("CheckBox_EnableMove") is CheckBox checkBoxEnableMove) checkBoxEnableMove.Content = LanguageHelper.Get("Advanced_Options.EnableMove", langCode);
             if (FindName("CheckBox_EnableTime") is CheckBox checkBoxEnableTime) checkBoxEnableTime.Content = LanguageHelper.Get("Advanced_Options.EnableTime", langCode);
-            if (FindName("CheckBox_EnableBuyFeedback") is CheckBox checkBoxEnableBuyFeedback) 
+            if (FindName("CheckBox_EnableBuyFeedback") is CheckBox checkBoxEnableBuyFeedback)
             {
                 checkBoxEnableBuyFeedback.Content = LanguageHelper.Get("BuyInteraction.Enable", langCode);
                 if (checkBoxEnableBuyFeedback.ToolTip is ToolTip toolTip && toolTip.Content is TextBlock textBlock)
@@ -2225,7 +2228,7 @@ namespace VPetLLM.UI.Windows
                 }
             }
             if (FindName("CheckBox_EnableHistoryCompression") is CheckBox checkBoxEnableHistoryCompression) checkBoxEnableHistoryCompression.Content = LanguageHelper.Get("Advanced_Options.EnableHistoryCompression", langCode);
-            
+
             // 压缩模式
             if (FindName("TextBlock_CompressionMode") is TextBlock textBlockCompressionMode) textBlockCompressionMode.Text = LanguageHelper.Get("Advanced_Options.CompressionMode", langCode);
             if (FindName("ComboBox_CompressionMode") is ComboBox comboBoxCompressionMode)
@@ -2236,12 +2239,12 @@ namespace VPetLLM.UI.Windows
                     item.Content = LanguageHelper.Get($"Advanced_Options.CompressionMode_{tag}", langCode);
                 }
             }
-            
+
             // 消息数量阈值
             if (FindName("TextBlock_HistoryCompressionThreshold") is TextBlock textBlockHistoryCompressionThreshold) textBlockHistoryCompressionThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionThreshold", langCode);
             if (FindName("TextBlock_CurrentContextLengthLabel") is TextBlock textBlockCurrentContextLengthLabel) textBlockCurrentContextLengthLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentContextLength", langCode);
             if (FindName("TextBlock_CurrentContextLength") is TextBlock textBlockCurrentContextLength) textBlockCurrentContextLength.Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
-            
+
             // Token数量阈值
             if (FindName("TextBlock_HistoryCompressionTokenThreshold") is TextBlock textBlockHistoryCompressionTokenThreshold) textBlockHistoryCompressionTokenThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionTokenThreshold", langCode);
             if (FindName("TextBlock_CurrentTokenCountLabel") is TextBlock textBlockCurrentTokenCountLabel) textBlockCurrentTokenCountLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentTokenCount", langCode);
@@ -2464,13 +2467,13 @@ namespace VPetLLM.UI.Windows
                     touchFeedbackControl.RefreshLanguage();
                 }
             }
-            
+
             // 重新加载Free提供者信息（根据新语言）
             LoadFreeProviderInfo();
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CS4014", Justification = "异步刷新云端插件列表为有意的 fire-and-forget，不应阻塞UI")]
-private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
+        private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
 
@@ -2784,7 +2787,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             if (!uninstalled && !string.IsNullOrEmpty(plugin.LocalFilePath))
             {
                 string validFilePath = plugin.LocalFilePath;
-                
+
                 // 检查是否是目录路径
                 if (Directory.Exists(validFilePath))
                 {
@@ -2792,7 +2795,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     // 如果是目录路径，不要随便删除文件，而是跳到方法4使用插件名称定位
                     validFilePath = null;
                 }
-                
+
                 if (!string.IsNullOrEmpty(validFilePath) && File.Exists(validFilePath))
                 {
                     Logger.Log($"Fallback: Attempting to delete plugin file directly: {validFilePath}");
@@ -2816,7 +2819,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     _plugin.FailedPlugins.Remove(failedPlugin);
                     Logger.Log($"Removed failed plugin from memory: {pluginNameToFind}");
                 }
-                
+
                 // 从已加载插件列表中移除（如果还在的话）
                 if (localPlugin != null && _plugin.Plugins.Contains(localPlugin))
                 {
@@ -2830,8 +2833,8 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
             if (!uninstalled)
             {
-                string fileName = !string.IsNullOrEmpty(plugin.LocalFilePath) 
-                    ? Path.GetFileName(plugin.LocalFilePath) 
+                string fileName = !string.IsNullOrEmpty(plugin.LocalFilePath)
+                    ? Path.GetFileName(plugin.LocalFilePath)
                     : pluginNameToFind;
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {fileName}"),
                                 ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
@@ -2842,16 +2845,16 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             string pluginFilePath = plugin.FailedPlugin.FilePath;
             bool deleted = await _plugin.DeletePluginFile(pluginFilePath);
-            
+
             // 如果删除成功，立即从失败插件列表中移除
             if (deleted && plugin.FailedPlugin != null)
             {
                 _plugin.FailedPlugins.Remove(plugin.FailedPlugin);
                 Logger.Log($"Removed failed plugin from memory: {plugin.FailedPlugin.Name}");
             }
-            
+
             Button_RefreshPlugins_Click(this, new RoutedEventArgs());
-            
+
             if (!deleted)
             {
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),
@@ -3149,14 +3152,14 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 // 使用 TTSPluginDetector 检测所有其他 TTS 插件
                 var result = TTSPluginDetector.DetectAllOtherTTSPlugins(_plugin.MW);
-                
+
                 // 通过 RefreshTTSPluginStatus 更新 UI（使用 TextBlock_TTS_PluginStatus）
                 RefreshTTSPluginStatus(result.HasOtherEnabledTTSPlugin, result.EnabledPluginNames);
-                
+
                 // 软禁用：只显示警告，不修改用户的 TTS 设置
                 // TTS 会在运行时通过 TTSService 的检测委托自动跳过
                 // 用户的设置保持不变，方便在禁用其他 TTS 插件后立即恢复
-                
+
                 Logger.Log($"TTS 插件状态 UI 已更新: 插件检测到 = {result.HasOtherEnabledTTSPlugin} (软禁用模式，不修改设置)");
             }
             catch (Exception ex)
@@ -3256,7 +3259,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         private void LoadDIYTTSSettings()
         {
             var diySettings = _plugin.Settings.TTS.DIY;
-            
+
             // 加载请求方法
             var methodComboBox = FindName("ComboBox_TTS_DIY_Method") as ComboBox;
             if (methodComboBox != null)
@@ -3384,7 +3387,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
             var header = button?.DataContext as Setting.CustomHeader;
-            
+
             var headersDataGrid = FindName("DataGrid_TTS_DIY_Headers") as DataGrid;
             if (headersDataGrid?.ItemsSource is System.Collections.ObjectModel.ObservableCollection<Setting.CustomHeader> headers && header != null)
             {
@@ -3687,7 +3690,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 Temperature = 0.7,
                 MaxTokens = 2048
             };
-            
+
             _plugin.Settings.OpenAI.OpenAINodes.Add(newNode);
             RefreshOpenAINodesList();
             MarkUnsavedChanges();
@@ -4324,14 +4327,14 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             try
             {
                 var language = _plugin.Settings.Language ?? "zh-hans";
-                
+
                 // 加载Chat配置
-                var chatConfig = Utils.FreeConfigManager.GetChatConfig();
+                var chatConfig = FreeConfigManager.GetChatConfig();
                 if (chatConfig != null)
                 {
-                    var chatDescription = Utils.FreeConfigManager.GetDescription(chatConfig, language);
-                    var chatProvider = Utils.FreeConfigManager.GetProviderInfo(chatConfig, language);
-                    
+                    var chatDescription = FreeConfigManager.GetDescription(chatConfig, language);
+                    var chatProvider = FreeConfigManager.GetProviderInfo(chatConfig, language);
+
                     if (this.FindName("TextBlock_Chat_Free_Description") is TextBlock tbChatDesc && !string.IsNullOrEmpty(chatDescription))
                     {
                         tbChatDesc.Text = chatDescription;
@@ -4341,14 +4344,14 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         tbChatProv.Text = chatProvider;
                     }
                 }
-                
+
                 // 加载ASR配置
-                var asrConfig = Utils.FreeConfigManager.GetASRConfig();
+                var asrConfig = FreeConfigManager.GetASRConfig();
                 if (asrConfig != null)
                 {
-                    var asrDescription = Utils.FreeConfigManager.GetDescription(asrConfig, language);
-                    var asrProvider = Utils.FreeConfigManager.GetProviderInfo(asrConfig, language);
-                    
+                    var asrDescription = FreeConfigManager.GetDescription(asrConfig, language);
+                    var asrProvider = FreeConfigManager.GetProviderInfo(asrConfig, language);
+
                     if (this.FindName("TextBlock_ASR_Free_Description") is TextBlock tbAsrDesc && !string.IsNullOrEmpty(asrDescription))
                     {
                         tbAsrDesc.Text = asrDescription;
@@ -4358,14 +4361,14 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         tbAsrProv.Text = asrProvider;
                     }
                 }
-                
+
                 // 加载TTS配置
-                var ttsConfig = Utils.FreeConfigManager.GetTTSConfig();
+                var ttsConfig = FreeConfigManager.GetTTSConfig();
                 if (ttsConfig != null)
                 {
-                    var ttsDescription = Utils.FreeConfigManager.GetDescription(ttsConfig, language);
-                    var ttsProvider = Utils.FreeConfigManager.GetProviderInfo(ttsConfig, language);
-                    
+                    var ttsDescription = FreeConfigManager.GetDescription(ttsConfig, language);
+                    var ttsProvider = FreeConfigManager.GetProviderInfo(ttsConfig, language);
+
                     if (this.FindName("TextBlock_TTS_Free_Description") is TextBlock tbTtsDesc && !string.IsNullOrEmpty(ttsDescription))
                     {
                         tbTtsDesc.Text = ttsDescription;
@@ -4388,7 +4391,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 // 先保存当前设置
                 SaveSettings();
-                
+
                 // 显示语音输入窗口
                 _plugin.ShowVoiceInputWindow();
             }
@@ -4415,7 +4418,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 SaveSettings();
 
                 // 创建临时 ASR 服务来获取模型列表
-                var asrService = new Utils.ASRService(_plugin.Settings);
+                var asrService = new ASRService(_plugin.Settings);
                 _sonioxModels = await asrService.FetchSonioxModels();
                 asrService.Dispose();
 
@@ -4568,7 +4571,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 // 如果已经有 API Key，尝试自动加载模型列表
                 if (!string.IsNullOrWhiteSpace(_plugin.Settings.ASR.Soniox.ApiKey))
                 {
-                    var asrService = new Utils.ASRService(_plugin.Settings);
+                    var asrService = new ASRService(_plugin.Settings);
                     _sonioxModels = await asrService.FetchSonioxModels();
                     asrService.Dispose();
 
@@ -4612,7 +4615,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                         // 根据当前选择的模型更新语言列表
                         var selectedModelId = _plugin.Settings.ASR.Soniox.Model;
                         var modelInfo = _sonioxModels.FirstOrDefault(m => m.Id == selectedModelId);
-                        
+
                         if (modelInfo != null && modelInfo.Languages.Count > 0)
                         {
                             languageComboBox.Items.Clear();
@@ -4697,7 +4700,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 comboBox.Items.Clear();
 
                 var deviceCount = NAudio.Wave.WaveInEvent.DeviceCount;
-                
+
                 if (deviceCount == 0)
                 {
                     var item = new ComboBoxItem
@@ -4759,29 +4762,29 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             try
             {
                 Logger.Log("ASR: Opening hotkey capture window...");
-                
+
                 // 创建并显示捕获窗口
                 var captureWindow = new HotkeyCapture
                 {
                     Owner = this
                 };
-                
+
                 var result = captureWindow.ShowDialog();
-                
+
                 if (result == true && captureWindow.IsCaptured)
                 {
                     // 保存捕获的快捷键
                     _plugin.Settings.ASR.HotkeyModifiers = captureWindow.CapturedModifiers;
                     _plugin.Settings.ASR.HotkeyKey = captureWindow.CapturedKey;
-                    
+
                     Logger.Log($"ASR: Hotkey captured - Modifiers: {captureWindow.CapturedModifiers}, Key: {captureWindow.CapturedKey}");
-                    
+
                     // 保存设置
                     SaveSettings();
-                    
+
                     // 更新显示
                     UpdateHotkeyDisplay();
-                    
+
                     Logger.Log("ASR: Hotkey saved successfully");
                 }
                 else
@@ -4801,19 +4804,19 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             try
             {
                 Logger.Log("ASR: Resetting hotkey to default...");
-                
+
                 // 还原为默认快捷键: Win + Alt + V
                 _plugin.Settings.ASR.HotkeyModifiers = "Win+Alt";
                 _plugin.Settings.ASR.HotkeyKey = "V";
-                
+
                 // 保存设置
                 SaveSettings();
-                
+
                 // 更新显示
                 UpdateHotkeyDisplay();
-                
+
                 Logger.Log("ASR: Hotkey reset to default (Win+Alt+V)");
-                
+
                 MessageBox.Show(
                     LanguageHelper.Get("ASR.HotkeyResetSuccess", _plugin.Settings.Language) ?? "快捷键已还原为默认值: Win + Alt + V",
                     LanguageHelper.Get("Success", _plugin.Settings.Language) ?? "成功",
@@ -4834,7 +4837,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 var modifiers = _plugin.Settings.ASR.HotkeyModifiers;
                 var key = _plugin.Settings.ASR.HotkeyKey;
-                
+
                 if (string.IsNullOrEmpty(modifiers) && string.IsNullOrEmpty(key))
                 {
                     textBox.Text = LanguageHelper.Get("ASR.NoHotkey", _plugin.Settings.Language) ?? "未设置";
@@ -4858,7 +4861,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             var comboBox = sender as ComboBox;
             var selectedItem = comboBox?.SelectedItem as ComboBoxItem;
             var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
-            
+
             // 如果切换到前置多模态模式，需要先加载已保存的多模态提供商设置
             // 然后再保存处理模式变更，避免覆盖已保存的多模态提供商配置
             if (mode == "PreprocessingMultimodal")
@@ -4934,27 +4937,27 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             try
             {
                 Logger.Log("Screenshot: Opening hotkey capture window...");
-                
+
                 var captureWindow = new HotkeyCapture
                 {
                     Owner = this
                 };
-                
+
                 var result = captureWindow.ShowDialog();
-                
+
                 if (result == true && captureWindow.IsCaptured)
                 {
                     _plugin.Settings.Screenshot.HotkeyModifiers = captureWindow.CapturedModifiers;
                     _plugin.Settings.Screenshot.HotkeyKey = captureWindow.CapturedKey;
-                    
+
                     Logger.Log($"Screenshot: Hotkey captured - Modifiers: {captureWindow.CapturedModifiers}, Key: {captureWindow.CapturedKey}");
-                    
+
                     SaveSettings();
                     UpdateScreenshotHotkeyDisplay();
-                    
+
                     // 更新快捷键注册
                     _plugin.UpdateScreenshotHotkey();
-                    
+
                     Logger.Log("Screenshot: Hotkey saved successfully");
                 }
                 else
@@ -4974,18 +4977,18 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             try
             {
                 Logger.Log("Screenshot: Resetting hotkey to default...");
-                
+
                 _plugin.Settings.Screenshot.HotkeyModifiers = "Win+Alt";
                 _plugin.Settings.Screenshot.HotkeyKey = "S";
-                
+
                 SaveSettings();
                 UpdateScreenshotHotkeyDisplay();
-                
+
                 // 更新快捷键注册
                 _plugin.UpdateScreenshotHotkey();
-                
+
                 Logger.Log("Screenshot: Hotkey reset to default (Win+Alt+S)");
-                
+
                 MessageBox.Show(
                     LanguageHelper.Get("Screenshot.HotkeyResetSuccess", _plugin.Settings.Language) ?? "快捷键已还原为默认值: Win + Alt + S",
                     LanguageHelper.Get("Success", _plugin.Settings.Language) ?? "成功",
@@ -5020,7 +5023,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 var modifiers = _plugin.Settings.Screenshot.HotkeyModifiers;
                 var key = _plugin.Settings.Screenshot.HotkeyKey;
-                
+
                 if (string.IsNullOrEmpty(modifiers) && string.IsNullOrEmpty(key))
                 {
                     textBox.Text = LanguageHelper.Get("Screenshot.NoHotkey", _plugin.Settings.Language) ?? "未设置";
@@ -5161,10 +5164,10 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                 // 保存多模态提供商设置
                 SaveMultimodalProviderSettings();
-                
+
                 // 确保设置被持久化到磁盘
                 _plugin.Settings.Save();
-                Utils.Logger.Log("Screenshot settings saved to disk");
+                Logger.Log("Screenshot settings saved to disk");
             }
             catch (Exception ex)
             {
@@ -5236,10 +5239,10 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                 // 注意：这里不调用 SaveMultimodalProviderSettings()
                 // 因为我们刚刚加载了已保存的多模态提供商设置，不需要再保存
-                
+
                 // 确保设置被持久化到磁盘
                 _plugin.Settings.Save();
-                Utils.Logger.Log("Screenshot settings saved to disk (without multimodal provider settings)");
+                Logger.Log("Screenshot settings saved to disk (without multimodal provider settings)");
             }
             catch (Exception ex)
             {
@@ -5256,21 +5259,21 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 {
                     return;
                 }
-                
+
                 // 如果正在加载设置，不触发保存
                 if (_isLoadingMultimodalSettings)
                 {
-                    Utils.Logger.Log("ComboBox_Screenshot_MultimodalProvider_SelectionChanged: Skipping save during load");
+                    Logger.Log("ComboBox_Screenshot_MultimodalProvider_SelectionChanged: Skipping save during load");
                     return;
                 }
-                
+
                 UpdateMultimodalProviderPanel();
                 SaveMultimodalProviderSettings();
                 _plugin.Settings.Save(); // 确保立即持久化到磁盘
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error in multimodal provider selection changed: {ex.Message}");
+                Logger.Log($"Error in multimodal provider selection changed: {ex.Message}");
             }
         }
 
@@ -5283,13 +5286,13 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 {
                     return;
                 }
-                
+
                 // 如果正在加载设置，不触发保存
                 if (_isLoadingMultimodalSettings)
                 {
                     return;
                 }
-                
+
                 if (sender is CheckBox checkBox && checkBox.DataContext is Configuration.SelectableVisionNode wrapper)
                 {
                     wrapper.IsSelected = true;
@@ -5299,7 +5302,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error in vision node checkbox checked: {ex.Message}");
+                Logger.Log($"Error in vision node checkbox checked: {ex.Message}");
             }
         }
 
@@ -5312,13 +5315,13 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 {
                     return;
                 }
-                
+
                 // 如果正在加载设置，不触发保存
                 if (_isLoadingMultimodalSettings)
                 {
                     return;
                 }
-                
+
                 if (sender is CheckBox checkBox && checkBox.DataContext is Configuration.SelectableVisionNode wrapper)
                 {
                     wrapper.IsSelected = false;
@@ -5328,7 +5331,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error in vision node checkbox unchecked: {ex.Message}");
+                Logger.Log($"Error in vision node checkbox unchecked: {ex.Message}");
             }
         }
 
@@ -5343,13 +5346,13 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                 if (comboBox == null)
                 {
-                    Utils.Logger.Log("Warning: ComboBox_Screenshot_Main_Multimodal_Provider not found in UpdateMultimodalProviderPanel");
+                    Logger.Log("Warning: ComboBox_Screenshot_Main_Multimodal_Provider not found in UpdateMultimodalProviderPanel");
                     return;
                 }
-                
+
                 if (visionNodesPanel == null)
                 {
-                    Utils.Logger.Log("Warning: Panel_Screenshot_Main_VisionNodes not found in UpdateMultimodalProviderPanel");
+                    Logger.Log("Warning: Panel_Screenshot_Main_VisionNodes not found in UpdateMultimodalProviderPanel");
                     return;
                 }
 
@@ -5383,9 +5386,9 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 var visionNodesControl = (ItemsControl)this.FindName("ItemsControl_Screenshot_VisionNodes");
                 var noNodesText = (TextBlock)this.FindName("TextBlock_Screenshot_Main_NoVisionNodes");
 
-                if (visionNodesControl == null) 
+                if (visionNodesControl == null)
                 {
-                    Utils.Logger.Log("Warning: ItemsControl_Screenshot_VisionNodes not found");
+                    Logger.Log("Warning: ItemsControl_Screenshot_VisionNodes not found");
                     return;
                 }
 
@@ -5395,24 +5398,24 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 {
                     var preprocessingService = new Services.PreprocessingMultimodal(_plugin.Settings, _plugin);
                     availableNodes = preprocessingService.GetAvailableVisionNodes();
-                    Utils.Logger.Log($"RefreshVisionNodesList: Found {availableNodes.Count} available vision nodes");
+                    Logger.Log($"RefreshVisionNodesList: Found {availableNodes.Count} available vision nodes");
                 }
                 catch (Exception ex)
                 {
-                    Utils.Logger.Log($"Error creating PreprocessingMultimodal service: {ex.Message}");
+                    Logger.Log($"Error creating PreprocessingMultimodal service: {ex.Message}");
                     availableNodes = new List<Configuration.VisionNodeIdentifier>();
                 }
 
                 var selectedNodes = _plugin.Settings.Screenshot.MultimodalProvider?.SelectedNodes ?? new System.Collections.Generic.List<Configuration.VisionNodeIdentifier>();
-                Utils.Logger.Log($"RefreshVisionNodesList: Saved selection has {selectedNodes.Count} nodes");
+                Logger.Log($"RefreshVisionNodesList: Saved selection has {selectedNodes.Count} nodes");
                 foreach (var node in selectedNodes)
                 {
-                    Utils.Logger.Log($"RefreshVisionNodesList: Saved node - {node.UniqueId}");
+                    Logger.Log($"RefreshVisionNodesList: Saved node - {node.UniqueId}");
                 }
 
                 // 清除并重建集合
                 _visionNodes.Clear();
-                
+
                 if (availableNodes.Count == 0)
                 {
                     if (noNodesText != null) noNodesText.Visibility = Visibility.Visible;
@@ -5426,7 +5429,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     foreach (var node in availableNodes)
                     {
                         var isSelected = selectedNodes.Any(n => n.UniqueId == node.UniqueId);
-                        Utils.Logger.Log($"RefreshVisionNodesList: Node {node.UniqueId} - IsSelected = {isSelected}");
+                        Logger.Log($"RefreshVisionNodesList: Node {node.UniqueId} - IsSelected = {isSelected}");
                         var wrapper = new Configuration.SelectableVisionNode
                         {
                             Node = node,
@@ -5437,12 +5440,12 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
 
                     visionNodesControl.ItemsSource = _visionNodes;
                 }
-                
-                Utils.Logger.Log($"RefreshVisionNodesList: Completed with {_visionNodes.Count} nodes in collection");
+
+                Logger.Log($"RefreshVisionNodesList: Completed with {_visionNodes.Count} nodes in collection");
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error refreshing vision nodes list: {ex.Message}");
+                Logger.Log($"Error refreshing vision nodes list: {ex.Message}");
             }
         }
 
@@ -5450,16 +5453,16 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
             // 检查是否由外部调用者已经设置了加载标志
             bool wasAlreadyLoading = _isLoadingMultimodalSettings;
-            
+
             // 设置加载标志，防止在加载过程中触发保存
             _isLoadingMultimodalSettings = true;
-            
+
             try
             {
                 // 确保窗口已完全加载
                 if (!_isReadyToSave)
                 {
-                    Utils.Logger.Log("LoadMultimodalProviderSettings: Window not ready, deferring load");
+                    Logger.Log("LoadMultimodalProviderSettings: Window not ready, deferring load");
                     return;
                 }
 
@@ -5469,30 +5472,30 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 if (_plugin.Settings.Screenshot.MultimodalProvider == null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
-                    Utils.Logger.Log("LoadMultimodalProviderSettings: Created new MultimodalProviderConfig");
+                    Logger.Log("LoadMultimodalProviderSettings: Created new MultimodalProviderConfig");
                 }
-                
+
                 // 确保SelectedNodes列表被正确初始化
                 if (_plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes == null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = new List<Configuration.VisionNodeIdentifier>();
-                    Utils.Logger.Log("LoadMultimodalProviderSettings: Created new SelectedNodes list");
+                    Logger.Log("LoadMultimodalProviderSettings: Created new SelectedNodes list");
                 }
-                
+
                 // 记录当前保存的配置
                 var savedProviderType = _plugin.Settings.Screenshot.MultimodalProvider.ProviderType;
                 var savedNodes = _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes;
-                Utils.Logger.Log($"LoadMultimodalProviderSettings: Saved ProviderType = {savedProviderType}, SelectedNodes count = {savedNodes.Count}");
+                Logger.Log($"LoadMultimodalProviderSettings: Saved ProviderType = {savedProviderType}, SelectedNodes count = {savedNodes.Count}");
                 foreach (var node in savedNodes)
                 {
-                    Utils.Logger.Log($"LoadMultimodalProviderSettings: Saved node - {node.UniqueId}");
+                    Logger.Log($"LoadMultimodalProviderSettings: Saved node - {node.UniqueId}");
                 }
 
                 // 加载提供商类型
                 if (comboBoxProvider != null)
                 {
                     var providerType = _plugin.Settings.Screenshot.MultimodalProvider?.ProviderType.ToString() ?? "Free";
-                    Utils.Logger.Log($"LoadMultimodalProviderSettings: Setting ComboBox to {providerType}");
+                    Logger.Log($"LoadMultimodalProviderSettings: Setting ComboBox to {providerType}");
                     foreach (ComboBoxItem item in comboBoxProvider.Items)
                     {
                         if (item.Tag?.ToString() == providerType)
@@ -5504,18 +5507,18 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 }
                 else
                 {
-                    Utils.Logger.Log("Warning: ComboBox_Screenshot_Main_Multimodal_Provider not found during load");
+                    Logger.Log("Warning: ComboBox_Screenshot_Main_Multimodal_Provider not found during load");
                 }
 
                 // 加载并设置视觉节点
                 RefreshVisionNodesList();
                 UpdateMultimodalProviderPanel();
-                
-                Utils.Logger.Log("Multimodal provider settings loaded successfully");
+
+                Logger.Log("Multimodal provider settings loaded successfully");
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error loading multimodal provider settings: {ex.Message}");
+                Logger.Log($"Error loading multimodal provider settings: {ex.Message}");
             }
             finally
             {
@@ -5534,10 +5537,10 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 // 如果正在加载设置，不执行保存
                 if (_isLoadingMultimodalSettings)
                 {
-                    Utils.Logger.Log("SaveMultimodalProviderSettings: Skipping save during load");
+                    Logger.Log("SaveMultimodalProviderSettings: Skipping save during load");
                     return;
                 }
-                
+
                 var comboBoxProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_Multimodal_Provider");
                 var visionNodesControl = (ItemsControl)this.FindName("ItemsControl_Screenshot_VisionNodes");
 
@@ -5545,7 +5548,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
                 }
-                
+
                 // 确保SelectedNodes列表被正确初始化
                 if (_plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes == null)
                 {
@@ -5560,49 +5563,49 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                     _plugin.Settings.Screenshot.MultimodalProvider.ProviderType = providerType == "VisionChannels"
                         ? Configuration.MultimodalProviderType.VisionChannels
                         : Configuration.MultimodalProviderType.Free;
-                    Utils.Logger.Log($"SaveMultimodalProviderSettings: ProviderType = {providerType}");
+                    Logger.Log($"SaveMultimodalProviderSettings: ProviderType = {providerType}");
                 }
 
                 // 保存选中的节点
                 List<Configuration.VisionNodeIdentifier> selectedNodes = new List<Configuration.VisionNodeIdentifier>();
-                
+
                 if (visionNodesControl?.ItemsSource is System.Collections.ObjectModel.ObservableCollection<Configuration.SelectableVisionNode> nodes)
                 {
                     selectedNodes = nodes.Where(n => n.IsSelected).Select(n => n.Node).ToList();
-                    Utils.Logger.Log($"SaveMultimodalProviderSettings: Got {selectedNodes.Count} selected nodes from ItemsControl");
+                    Logger.Log($"SaveMultimodalProviderSettings: Got {selectedNodes.Count} selected nodes from ItemsControl");
                 }
                 else if (_visionNodes != null && _visionNodes.Count > 0)
                 {
                     // 备用方案：直接从 _visionNodes 集合获取
                     selectedNodes = _visionNodes.Where(n => n.IsSelected).Select(n => n.Node).ToList();
-                    Utils.Logger.Log($"SaveMultimodalProviderSettings: Got {selectedNodes.Count} selected nodes from _visionNodes (fallback)");
+                    Logger.Log($"SaveMultimodalProviderSettings: Got {selectedNodes.Count} selected nodes from _visionNodes (fallback)");
                 }
                 else
                 {
-                    Utils.Logger.Log("SaveMultimodalProviderSettings: No vision nodes collection available, keeping existing selection");
+                    Logger.Log("SaveMultimodalProviderSettings: No vision nodes collection available, keeping existing selection");
                     // 保持现有的选择，不覆盖
                     selectedNodes = _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes ?? new List<Configuration.VisionNodeIdentifier>();
                 }
-                
+
                 _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = selectedNodes;
-                
+
                 // 记录保存的节点信息
                 foreach (var node in selectedNodes)
                 {
-                    Utils.Logger.Log($"SaveMultimodalProviderSettings: Saved node - {node.UniqueId} ({node.DisplayName})");
+                    Logger.Log($"SaveMultimodalProviderSettings: Saved node - {node.UniqueId} ({node.DisplayName})");
                 }
 
                 // 验证配置
                 ValidateConfiguration();
-                
+
                 // 标记有未保存的更改，确保设置会被持久化到磁盘
                 _hasUnsavedChanges = true;
-                
-                Utils.Logger.Log($"Multimodal provider settings saved successfully. Total selected nodes: {selectedNodes.Count}");
+
+                Logger.Log($"Multimodal provider settings saved successfully. Total selected nodes: {selectedNodes.Count}");
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error saving multimodal provider settings: {ex.Message}");
+                Logger.Log($"Error saving multimodal provider settings: {ex.Message}");
             }
         }
 
@@ -5612,7 +5615,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             {
                 var config = _plugin.Settings.Screenshot.MultimodalProvider;
                 var errorPanel = (StackPanel)this.FindName("Panel_Screenshot_ValidationErrors");
-                
+
                 if (errorPanel == null) return;
 
                 // 清除现有错误
@@ -5627,7 +5630,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 {
                     if (_plugin.Settings.Free?.EnableVision != true)
                     {
-                        var errorMessage = LanguageHelper.Get("Screenshot.Validation.FreeVisionRequired", _plugin.Settings.Language) 
+                        var errorMessage = LanguageHelper.Get("Screenshot.Validation.FreeVisionRequired", _plugin.Settings.Language)
                             ?? "前置多模态需要 Free 渠道启用视觉能力。请在 LLM 设置 -> Free 接口 中启用 EnableVision 选项。";
                         AddValidationError(errorMessage);
                         hasErrors = true;
@@ -5637,7 +5640,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
                 {
                     if (config.SelectedNodes == null || config.SelectedNodes.Count == 0)
                     {
-                        var errorMessage = LanguageHelper.Get("Screenshot.Validation.VisionNodeRequired", _plugin.Settings.Language) 
+                        var errorMessage = LanguageHelper.Get("Screenshot.Validation.VisionNodeRequired", _plugin.Settings.Language)
                             ?? "使用视觉渠道时必须选择至少一个视觉节点。";
                         AddValidationError(errorMessage);
                         hasErrors = true;
@@ -5651,7 +5654,7 @@ private void Button_RefreshPlugins_Click(object sender, RoutedEventArgs e)
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error validating multimodal configuration: {ex.Message}");
+                Logger.Log($"Error validating multimodal configuration: {ex.Message}");
             }
         }
 

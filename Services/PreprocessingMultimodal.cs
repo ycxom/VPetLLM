@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using VPetLLM.Configuration;
-using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
-using VPet_Simulator.Windows.Interface;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -39,7 +35,7 @@ namespace VPetLLM.Services
                 ? config.GetEffectivePrompt(lang)
                 : customPrompt;
 
-            Utils.Logger.Log($"PreprocessingMultimodal: 开始分析图片，大小: {imageData.Length} bytes");
+            Logger.Log($"PreprocessingMultimodal: 开始分析图片，大小: {imageData.Length} bytes");
 
             if (config.ProviderType == MultimodalProviderType.Free)
             {
@@ -61,12 +57,12 @@ namespace VPetLLM.Services
                 // 检查 Free 渠道是否启用视觉（前置多模态需要 Free 渠道具有视觉能力来分析图片）
                 if (_settings.Free?.EnableVision != true)
                 {
-                    var errorMessage = Utils.LanguageHelper.Get("Screenshot.Validation.FreeVisionRequired", _settings.Language) 
+                    var errorMessage = LanguageHelper.Get("Screenshot.Validation.FreeVisionRequired", _settings.Language)
                         ?? "前置多模态需要 Free 渠道启用视觉能力。请在 LLM 设置 -> Free 接口 中启用 EnableVision 选项。";
                     return PreprocessingResult.CreateFailure(errorMessage);
                 }
 
-                Utils.Logger.Log("PreprocessingMultimodal: 使用 Free 渠道进行图片分析");
+                Logger.Log("PreprocessingMultimodal: 使用 Free 渠道进行图片分析");
 
                 // 创建临时的 FreeChatCore 用于图片分析
                 var description = await CallChatWithImageForDescription(
@@ -74,7 +70,7 @@ namespace VPetLLM.Services
 
                 if (string.IsNullOrWhiteSpace(description))
                 {
-                    var errorMessage = Utils.LanguageHelper.Get("Screenshot.Validation.FreeChannelEmptyResponse", _settings.Language) 
+                    var errorMessage = LanguageHelper.Get("Screenshot.Validation.FreeChannelEmptyResponse", _settings.Language)
                         ?? "Free 渠道返回空描述";
                     return PreprocessingResult.CreateFailure(errorMessage);
                 }
@@ -83,8 +79,8 @@ namespace VPetLLM.Services
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"PreprocessingMultimodal: Free 渠道分析失败: {ex.Message}");
-                var errorPrefix = Utils.LanguageHelper.Get("Screenshot.Validation.FreeChannelAnalysisFailed", _settings.Language) 
+                Logger.Log($"PreprocessingMultimodal: Free 渠道分析失败: {ex.Message}");
+                var errorPrefix = LanguageHelper.Get("Screenshot.Validation.FreeChannelAnalysisFailed", _settings.Language)
                     ?? "Free 渠道分析失败";
                 return PreprocessingResult.CreateFailure($"{errorPrefix}: {ex.Message}");
             }
@@ -102,7 +98,7 @@ namespace VPetLLM.Services
             var validNodes = ValidateSelectedNodes(selectedNodes);
             if (validNodes.Count == 0)
             {
-                var errorMessage = Utils.LanguageHelper.Get("Screenshot.Validation.NoVisionNodesAvailable", _settings.Language) 
+                var errorMessage = LanguageHelper.Get("Screenshot.Validation.NoVisionNodesAvailable", _settings.Language)
                     ?? "没有可用的视觉节点，请在设置中选择至少一个启用视觉的节点";
                 return PreprocessingResult.CreateFailure(errorMessage);
             }
@@ -117,7 +113,7 @@ namespace VPetLLM.Services
                 var selectedIndex = _random.Next(availableNodes.Count);
                 var selectedNode = availableNodes[selectedIndex];
 
-                Utils.Logger.Log($"PreprocessingMultimodal: 尝试使用节点 {selectedNode.DisplayName}");
+                Logger.Log($"PreprocessingMultimodal: 尝试使用节点 {selectedNode.DisplayName}");
 
                 try
                 {
@@ -130,13 +126,13 @@ namespace VPetLLM.Services
                     }
 
                     // 空描述视为失败
-                    var emptyResponseMessage = Utils.LanguageHelper.Get("Screenshot.Validation.EmptyResponse", _settings.Language) 
+                    var emptyResponseMessage = LanguageHelper.Get("Screenshot.Validation.EmptyResponse", _settings.Language)
                         ?? "返回空描述";
                     failedNodes.Add($"{selectedNode.DisplayName}: {emptyResponseMessage}");
                 }
                 catch (Exception ex)
                 {
-                    Utils.Logger.Log($"PreprocessingMultimodal: 节点 {selectedNode.DisplayName} 失败: {ex.Message}");
+                    Logger.Log($"PreprocessingMultimodal: 节点 {selectedNode.DisplayName} 失败: {ex.Message}");
                     failedNodes.Add($"{selectedNode.DisplayName}: {ex.Message}");
                 }
 
@@ -145,7 +141,7 @@ namespace VPetLLM.Services
             }
 
             // 所有节点都失败
-            var allFailedMessage = Utils.LanguageHelper.Get("Screenshot.Validation.AllVisionNodesFailed", _settings.Language) 
+            var allFailedMessage = LanguageHelper.Get("Screenshot.Validation.AllVisionNodesFailed", _settings.Language)
                 ?? "所有视觉节点都失败";
             var errorDetails = string.Join("\n", failedNodes);
             return PreprocessingResult.CreateFailure($"{allFailedMessage}:\n{errorDetails}");
@@ -314,7 +310,7 @@ namespace VPetLLM.Services
             if (validNodes.Count < nodes.Count)
             {
                 var removedCount = nodes.Count - validNodes.Count;
-                Utils.Logger.Log($"PreprocessingMultimodal: 移除了 {removedCount} 个无效的视觉节点");
+                Logger.Log($"PreprocessingMultimodal: 移除了 {removedCount} 个无效的视觉节点");
             }
 
             return validNodes;

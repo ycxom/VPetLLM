@@ -4,6 +4,8 @@ using System.Net.Http;
 using System.Text;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
+using VPetLLM.Utils.Data;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core.ChatCore
 {
@@ -16,7 +18,7 @@ namespace VPetLLM.Core.ChatCore
         private string _apiKey;
         private string _apiUrl;
         private string _model;
-        
+
         // 保留硬编码的User-Agent
         private const string ENCODED_UA = "566c426c6445784d54563947636d566c58304a3558304a5a54513d3d";
 
@@ -50,17 +52,17 @@ namespace VPetLLM.Core.ChatCore
         {
             try
             {
-                var config = Utils.FreeConfigManager.GetChatConfig();
+                var config = FreeConfigManager.GetChatConfig();
                 if (config != null)
                 {
                     _apiKey = DecodeString(config["API_KEY"]?.ToString() ?? "");
                     _apiUrl = DecodeString(config["API_URL"]?.ToString() ?? "");
                     _model = config["Model"]?.ToString() ?? "";
-                    Utils.Logger.Log("FreeChatCore: 配置加载成功");
+                    Logger.Log("FreeChatCore: 配置加载成功");
                 }
                 else
                 {
-                    Utils.Logger.Log("FreeChatCore: 配置文件不存在，请等待配置下载完成后重启程序");
+                    Logger.Log("FreeChatCore: 配置文件不存在，请等待配置下载完成后重启程序");
                     _apiKey = "";
                     _apiUrl = "";
                     _model = "";
@@ -68,7 +70,7 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"FreeChatCore: 加载配置失败: {ex.Message}");
+                Logger.Log($"FreeChatCore: 加载配置失败: {ex.Message}");
                 _apiKey = "";
                 _apiUrl = "";
                 _model = "";
@@ -92,12 +94,12 @@ namespace VPetLLM.Core.ChatCore
             {
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
-                
+
                 if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
                 {
-                    var errorMessage = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded") 
+                    var errorMessage = ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded")
                         ?? "Free Chat 配置未加载，请等待配置下载完成后重启程序";
-                    Utils.Logger.Log(errorMessage);
+                    Logger.Log(errorMessage);
                     ResponseHandler?.Invoke(errorMessage);
                     return "";
                 }
@@ -105,8 +107,8 @@ namespace VPetLLM.Core.ChatCore
                 // 检查视觉能力是否启用
                 if (!_freeSetting.EnableVision)
                 {
-                    var visionError = "Free 接口未启用视觉能力，请在设置中启用 EnableVision";
-                    Utils.Logger.Log($"Free ChatWithImage 错误: {visionError}");
+                    var visionError = "Free 接口未启用视觉能力，请在设置中启用EnableVision";
+                    Logger.Log($"Free ChatWithImage 错误: {visionError}");
                     ResponseHandler?.Invoke(visionError);
                     return "";
                 }
@@ -116,7 +118,7 @@ namespace VPetLLM.Core.ChatCore
                     ClearContext();
                 }
 
-                Utils.Logger.Log($"Free ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+                Logger.Log($"Free ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
 
                 // 构建多模态消息内容
                 var base64Image = Convert.ToBase64String(imageData);
@@ -154,7 +156,7 @@ namespace VPetLLM.Core.ChatCore
                 if (_freeSetting.EnableStreaming)
                 {
                     // 流式传输模式
-                    Utils.Logger.Log("Free ChatWithImage: 使用流式传输模式");
+                    Logger.Log("Free ChatWithImage: 使用流式传输模式");
                     var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl)
                     {
                         Content = content
@@ -166,7 +168,7 @@ namespace VPetLLM.Core.ChatCore
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
                         {
-                            Utils.Logger.Log($"Free流式: 检测到完整命令: {cmd}");
+                            Logger.Log($"Free流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
                         });
 
@@ -198,15 +200,15 @@ namespace VPetLLM.Core.ChatCore
                             }
                         }
                         message = fullMessage.ToString();
-                        Utils.Logger.Log($"Free流式: 流式传输完成，总消息长度: {message.Length}");
+                        Logger.Log($"Free流式: 流式传输完成，总消息长度 {message.Length}");
                     }
                     else
                     {
                         var responseContent = await response.Content.ReadAsStringAsync();
-                        Utils.Logger.Log($"Free ChatWithImage API 错误: {response.StatusCode} - {responseContent}");
-                        message = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                        Logger.Log($"Free ChatWithImage API 错误: {response.StatusCode} - {responseContent}");
+                        message = ErrorMessageHelper.IsDebugMode(Settings)
                             ? $"API调用失败: {response.StatusCode} - {responseContent}"
-                            : await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Free");
+                            : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
                         ResponseHandler?.Invoke(message);
                         return "";
                     }
@@ -214,7 +216,7 @@ namespace VPetLLM.Core.ChatCore
                 else
                 {
                     // 非流式传输模式
-                    Utils.Logger.Log("Free ChatWithImage: 使用非流式传输模式");
+                    Logger.Log("Free ChatWithImage: 使用非流式传输模式");
                     var response = await _httpClient.PostAsync(_apiUrl, content);
                     var responseContent = await response.Content.ReadAsStringAsync();
 
@@ -222,15 +224,15 @@ namespace VPetLLM.Core.ChatCore
                     {
                         var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
                         message = responseObj?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "无回复";
-                        Utils.Logger.Log($"Free非流式: 收到完整消息，长度: {message.Length}");
+                        Logger.Log($"Free非流式: 收到完整消息，长度 {message.Length}");
                         ResponseHandler?.Invoke(message);
                     }
                     else
                     {
-                        Utils.Logger.Log($"Free ChatWithImage API 错误: {response.StatusCode} - {responseContent}");
-                        message = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                        Logger.Log($"Free ChatWithImage API 错误: {response.StatusCode} - {responseContent}");
+                        message = ErrorMessageHelper.IsDebugMode(Settings)
                             ? $"API调用失败: {response.StatusCode} - {responseContent}"
-                            : Utils.ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
+                            : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
                         ResponseHandler?.Invoke(message);
                         return "";
                     }
@@ -254,26 +256,26 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (HttpRequestException httpEx)
             {
-                Utils.Logger.Log($"Free ChatWithImage 网络异常: {httpEx.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                Logger.Log($"Free ChatWithImage 网络异常: {httpEx.Message}");
+                var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free ChatWithImage 网络异常: {httpEx.Message}\n{httpEx.StackTrace}"
-                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
+                    : ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (TaskCanceledException tcEx)
             {
-                Utils.Logger.Log($"Free ChatWithImage 请求超时: {tcEx.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                Logger.Log($"Free ChatWithImage 请求超时: {tcEx.Message}");
+                var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free ChatWithImage 请求超时: {tcEx.Message}\n{tcEx.StackTrace}"
-                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
+                    : ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Free ChatWithImage 异常: {ex.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
+                Logger.Log($"Free ChatWithImage 异常: {ex.Message}");
+                var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
@@ -285,12 +287,12 @@ namespace VPetLLM.Core.ChatCore
             {
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
-                
+
                 if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
                 {
-                    var errorMessage = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded") 
+                    var errorMessage = ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded")
                         ?? "Free Chat 配置未加载，请等待配置下载完成后重启程序";
-                    Utils.Logger.Log(errorMessage);
+                    Logger.Log(errorMessage);
                     ResponseHandler?.Invoke(errorMessage);
                     return "";
                 }
@@ -324,28 +326,28 @@ namespace VPetLLM.Core.ChatCore
 
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                
+
                 string message;
                 if (_freeSetting.EnableStreaming)
                 {
                     // 流式传输模式
-                    Utils.Logger.Log("Free: 使用流式传输模式");
+                    Logger.Log("Free: 使用流式传输模式");
                     var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl)
                     {
                         Content = content
                     };
                     var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-                    
+
                     if (response.IsSuccessStatusCode)
                     {
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
                         {
                             // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
-                            Utils.Logger.Log($"Free流式: 检测到完整命令: {cmd}");
+                            Logger.Log($"Free流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
                         });
-                        
+
                         using (var stream = await response.Content.ReadAsStreamAsync())
                         using (var reader = new System.IO.StreamReader(stream))
                         {
@@ -354,11 +356,11 @@ namespace VPetLLM.Core.ChatCore
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
-                                
+
                                 var jsonData = line.Substring(6).Trim();
                                 if (jsonData == "[DONE]")
                                     break;
-                                
+
                                 try
                                 {
                                     var chunk = JObject.Parse(jsonData);
@@ -379,13 +381,13 @@ namespace VPetLLM.Core.ChatCore
                             }
                         }
                         message = fullMessage.ToString();
-                        Utils.Logger.Log($"Free流式: 流式传输完成，总消息长度: {message.Length}");
+                        Logger.Log($"Free流式: 流式传输完成，总消息长度 {message.Length}");
                         // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                         if (string.IsNullOrEmpty(message))
                         {
                             message = "无回复";
                         }
-                        
+
                         // API调用成功后，才将用户消息和助手回复保存到历史记录
                         if (Settings.KeepContext)
                         {
@@ -401,46 +403,46 @@ namespace VPetLLM.Core.ChatCore
                     {
                         // 读取错误响应内容
                         var responseContent = await response.Content.ReadAsStringAsync();
-                        
+
                         // 检查是否是服务器错误
                         if (responseContent.Contains("Failed to retrieve proxy group") ||
                             responseContent.Contains("INTERNAL_SERVER_ERROR") ||
                             response.StatusCode == System.Net.HttpStatusCode.NotFound)
                         {
-                            Utils.Logger.Log($"Free API 服务器错误: {response.StatusCode} - {responseContent}");
+                            Logger.Log($"Free API 服务器错误: {response.StatusCode} - {responseContent}");
 
                             // 如果不是重试，尝试重试一次
                             if (!isRetry)
                             {
-                                Utils.Logger.Log("尝试重试 Free API 请求...");
+                                Logger.Log("尝试重试 Free API 请求...");
                                 await Task.Delay(2000); // 等待2秒后重试
                                 return await Chat(prompt, true);
                             }
 
                             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                             {
-                                message = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceMaintenance") 
+                                message = ErrorMessageHelper.GetFreeApiError(Settings, "ServiceMaintenance")
                                     ?? "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
                             }
                             else
                             {
-                                message = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable") 
+                                message = ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable")
                                     ?? "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
                             }
                         }
                         else
                         {
-                            Utils.Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
-                            message = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                            Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
+                            message = ErrorMessageHelper.IsDebugMode(Settings)
                                 ? $"API调用失败: {response.StatusCode} - {responseContent}"
-                                : await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Free");
+                                : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
                         }
                     }
                 }
                 else
                 {
                     // 非流式传输模式
-                    Utils.Logger.Log("Free: 使用非流式传输模式");
+                    Logger.Log("Free: 使用非流式传输模式");
                     var response = await _httpClient.PostAsync(_apiUrl, content);
                     var responseContent = await response.Content.ReadAsStringAsync();
 
@@ -448,10 +450,10 @@ namespace VPetLLM.Core.ChatCore
                     {
                         var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
                         message = responseObj?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "无回复";
-                        Utils.Logger.Log($"Free非流式: 收到完整消息，长度: {message.Length}");
+                        Logger.Log($"Free非流式: 收到完整消息，长度 {message.Length}");
                         // 非流式模式下，一次性处理完整消息
                         ResponseHandler?.Invoke(message);
-                        
+
                         // API调用成功后，才将用户消息和助手回复保存到历史记录
                         if (Settings.KeepContext)
                         {
@@ -470,33 +472,33 @@ namespace VPetLLM.Core.ChatCore
                             responseContent.Contains("INTERNAL_SERVER_ERROR") ||
                             response.StatusCode == System.Net.HttpStatusCode.NotFound)
                         {
-                            Utils.Logger.Log($"Free API 服务器错误: {response.StatusCode} - {responseContent}");
+                            Logger.Log($"Free API 服务器错误: {response.StatusCode} - {responseContent}");
 
                             // 如果不是重试，尝试重试一次
                             if (!isRetry)
                             {
-                                Utils.Logger.Log("尝试重试 Free API 请求...");
+                                Logger.Log("尝试重试 Free API 请求...");
                                 await Task.Delay(2000); // 等待2秒后重试
                                 return await Chat(prompt, true);
                             }
 
                             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                             {
-                                message = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceMaintenance") 
+                                message = ErrorMessageHelper.GetFreeApiError(Settings, "ServiceMaintenance")
                                     ?? "Free API 服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。";
                             }
                             else
                             {
-                                message = Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable") 
+                                message = ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable")
                                     ?? "Free API 服务暂时不可用，请稍后再试。这可能是由于服务器负载过高或维护导致的。";
                             }
                         }
                         else
                         {
-                            Utils.Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
-                            message = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                            Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
+                            message = ErrorMessageHelper.IsDebugMode(Settings)
                                 ? $"API调用失败: {response.StatusCode} - {responseContent}"
-                                : Utils.ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
+                                : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
                         }
                     }
                 }
@@ -506,35 +508,35 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (HttpRequestException httpEx)
             {
-                Utils.Logger.Log($"Free Chat 网络异常: {httpEx.Message}");
+                Logger.Log($"Free Chat 网络异常: {httpEx.Message}");
 
                 // 如果不是重试，尝试重试一次
                 if (!isRetry)
                 {
-                    Utils.Logger.Log("网络异常，尝试重试 Free API 请求...");
+                    Logger.Log("网络异常，尝试重试 Free API 请求...");
                     await Task.Delay(2000); // 等待2秒后重试
                     return await Chat(prompt, true);
                 }
 
-                var errorMessage = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free Chat 网络异常: {httpEx.Message}\n{httpEx.StackTrace}"
-                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
+                    : ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (TaskCanceledException tcEx)
             {
-                Utils.Logger.Log($"Free Chat 请求超时: {tcEx.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                Logger.Log($"Free Chat 请求超时: {tcEx.Message}");
+                var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free Chat 请求超时: {tcEx.Message}\n{tcEx.StackTrace}"
-                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
+                    : ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Free Chat 异常: {ex.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
+                Logger.Log($"Free Chat 异常: {ex.Message}");
+                var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
@@ -548,8 +550,8 @@ namespace VPetLLM.Core.ChatCore
             {
                 if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
                 {
-                    Utils.Logger.Log("Free Chat 配置未加载，总结功能不可用");
-                    return Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded") 
+                    Logger.Log("Free Chat 配置未加载，总结功能不可用");
+                    return ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded")
                         ?? "配置未加载，总结功能暂时不可用";
                 }
 
@@ -584,33 +586,33 @@ namespace VPetLLM.Core.ChatCore
                     if (responseContent.Contains("Failed to retrieve proxy group") ||
                         responseContent.Contains("INTERNAL_SERVER_ERROR"))
                     {
-                        Utils.Logger.Log($"Free Summarize 服务器内部错误: {responseContent}");
-                        return Utils.ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable") 
+                        Logger.Log($"Free Summarize 服务器内部错误: {responseContent}");
+                        return ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable")
                             ?? "Free API 服务暂时不可用，总结功能无法使用。";
                     }
 
-                    Utils.Logger.Log($"Free Summarize 错误: {response.StatusCode} - {responseContent}");
-                    return Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败";
+                    Logger.Log($"Free Summarize 错误: {response.StatusCode} - {responseContent}");
+                    return ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败";
                 }
             }
             catch (HttpRequestException httpEx)
             {
-                Utils.Logger.Log($"Free Summarize 网络异常: {httpEx.Message}");
-                return Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                Logger.Log($"Free Summarize 网络异常: {httpEx.Message}");
+                return ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free Summarize 网络异常: {httpEx.Message}"
-                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
+                    : ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
             }
             catch (TaskCanceledException tcEx)
             {
-                Utils.Logger.Log($"Free Summarize 请求超时: {tcEx.Message}");
-                return Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                Logger.Log($"Free Summarize 请求超时: {tcEx.Message}");
+                return ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free Summarize 请求超时: {tcEx.Message}"
-                    : Utils.ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
+                    : ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Free Summarize 异常: {ex.Message}");
-                return Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
+                Logger.Log($"Free Summarize 异常: {ex.Message}");
+                return ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
             }
         }
 
@@ -621,13 +623,13 @@ namespace VPetLLM.Core.ChatCore
                 new Message { Role = "system", Content = GetSystemMessage() }
             };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - Settings.HistoryCompressionThreshold)));
-            
+
             // Inject important records into history (only when explicitly requested, after user message is added)
             if (injectRecords)
             {
                 history = InjectRecordsIntoHistory(history);
             }
-            
+
             return history;
         }
 

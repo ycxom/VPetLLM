@@ -1,8 +1,7 @@
-using System;
-using System.Threading.Tasks;
 using System.Windows;
 using VPetLLM.Configuration;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -305,10 +304,10 @@ namespace VPetLLM.Services
                 if (result.Success)
                 {
                     Logger.Log($"Preprocessing completed successfully, provider: {result.UsedProvider}");
-                    
+
                     // 组合图片描述和用户问题
                     var combinedMessage = MessageCombiner.Combine(result.ImageDescription, userQuestion);
-                    
+
                     // 触发完成事件
                     Application.Current.Dispatcher.Invoke(() =>
                     {
@@ -325,7 +324,7 @@ namespace VPetLLM.Services
                 else
                 {
                     Logger.Log($"Preprocessing failed: {result.ErrorMessage}");
-                    
+
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         PreprocessingCompleted?.Invoke(this, new PreprocessingCompletedEventArgs
@@ -344,9 +343,9 @@ namespace VPetLLM.Services
             {
                 Logger.Log($"Error in preprocessing: {ex.Message}");
                 SetState(ScreenshotState.Idle);
-                
+
                 var errorResult = PreprocessingResult.CreateFailure($"前置处理异常: {ex.Message}");
-                
+
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     PreprocessingCompleted?.Invoke(this, new PreprocessingCompletedEventArgs

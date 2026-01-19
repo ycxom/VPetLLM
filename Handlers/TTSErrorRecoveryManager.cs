@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using VPetLLM.Utils;
 using VPetLLM.Configuration;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -17,12 +14,12 @@ namespace VPetLLM.Handlers
         private readonly Queue<RecoveryAction> _recoveryQueue = new Queue<RecoveryAction>();
         private volatile bool _isRecovering = false;
         private DateTime _lastRecoveryTime = DateTime.MinValue;
-        
+
         /// <summary>
         /// 错误恢复事件
         /// </summary>
         public event EventHandler<ErrorRecoveryEventArgs> ErrorRecovered;
-        
+
         /// <summary>
         /// 错误记录
         /// </summary>
@@ -35,7 +32,7 @@ namespace VPetLLM.Handlers
             public int Count { get; set; }
             public List<string> Details { get; set; } = new List<string>();
         }
-        
+
         /// <summary>
         /// 恢复动作
         /// </summary>
@@ -48,7 +45,7 @@ namespace VPetLLM.Handlers
             public DateTime ScheduledTime { get; set; }
             public int Priority { get; set; } // 数字越小优先级越高
         }
-        
+
         /// <summary>
         /// 恢复类型
         /// </summary>
@@ -61,7 +58,7 @@ namespace VPetLLM.Handlers
             ServiceReconnect,    // 服务重连
             FallbackMode         // 回退模式
         }
-        
+
         /// <summary>
         /// 检测并处理TTS异常状态
         /// </summary>
@@ -72,25 +69,25 @@ namespace VPetLLM.Handlers
             try
             {
                 Logger.Log($"TTSErrorRecoveryManager: 开始异常检测 - 操作ID: {context.OperationId}");
-                
+
                 var anomalies = DetectAnomalies(context);
                 if (anomalies.Count == 0)
                 {
                     Logger.Log("TTSErrorRecoveryManager: 未检测到异常");
                     return false;
                 }
-                
+
                 Logger.Log($"TTSErrorRecoveryManager: 检测到 {anomalies.Count} 个异常");
-                
+
                 // 记录异常
                 foreach (var anomaly in anomalies)
                 {
                     RecordError(anomaly.Type, anomaly.Message, anomaly.Details);
                 }
-                
+
                 // 执行恢复策略
                 var recoverySuccess = await ExecuteRecoveryAsync(anomalies, context);
-                
+
                 if (recoverySuccess)
                 {
                     Logger.Log("TTSErrorRecoveryManager: 异常恢复成功");
@@ -106,7 +103,7 @@ namespace VPetLLM.Handlers
                 {
                     Logger.Log("TTSErrorRecoveryManager: 异常恢复失败");
                 }
-                
+
                 return recoverySuccess;
             }
             catch (Exception ex)
@@ -115,14 +112,14 @@ namespace VPetLLM.Handlers
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 检测TTS操作异常
         /// </summary>
         private List<TTSAnomaly> DetectAnomalies(TTSOperationContext context)
         {
             var anomalies = new List<TTSAnomaly>();
-            
+
             // 1. 检测超时异常
             if (context.Duration > TTSCoordinationSettings.Instance.WaitTimeoutMs)
             {
@@ -133,7 +130,7 @@ namespace VPetLLM.Handlers
                     Details = $"操作ID: {context.OperationId}, 文本长度: {context.Text?.Length ?? 0}"
                 });
             }
-            
+
             // 2. 检测播放器异常退出
             if (context.HasPlayerError)
             {
@@ -144,7 +141,7 @@ namespace VPetLLM.Handlers
                     Details = context.PlayerErrorDetails ?? "未知播放器错误"
                 });
             }
-            
+
             // 3. 检测状态同步异常
             if (context.HasStateSyncError)
             {
@@ -155,7 +152,7 @@ namespace VPetLLM.Handlers
                     Details = context.StateSyncErrorDetails ?? "状态监控失败"
                 });
             }
-            
+
             // 4. 检测频繁重试
             if (context.RetryCount > 3)
             {
@@ -166,7 +163,7 @@ namespace VPetLLM.Handlers
                     Details = $"可能存在系统性问题"
                 });
             }
-            
+
             // 5. 检测资源泄漏
             if (context.HasResourceLeak)
             {
@@ -177,10 +174,10 @@ namespace VPetLLM.Handlers
                     Details = context.ResourceLeakDetails ?? "未释放的资源"
                 });
             }
-            
+
             return anomalies;
         }
-        
+
         /// <summary>
         /// 执行恢复策略
         /// </summary>
@@ -191,7 +188,7 @@ namespace VPetLLM.Handlers
                 Logger.Log("TTSErrorRecoveryManager: 已有恢复操作在进行中，跳过");
                 return false;
             }
-            
+
             // 防止频繁恢复
             var timeSinceLastRecovery = DateTime.Now - _lastRecoveryTime;
             if (timeSinceLastRecovery.TotalSeconds < 5)
@@ -199,17 +196,17 @@ namespace VPetLLM.Handlers
                 Logger.Log("TTSErrorRecoveryManager: 距离上次恢复时间过短，跳过");
                 return false;
             }
-            
+
             _isRecovering = true;
             _lastRecoveryTime = DateTime.Now;
-            
+
             try
             {
                 // 根据异常类型制定恢复策略
                 var recoveryActions = PlanRecoveryActions(anomalies, context);
-                
+
                 Logger.Log($"TTSErrorRecoveryManager: 计划执行 {recoveryActions.Count} 个恢复动作");
-                
+
                 // 按优先级执行恢复动作
                 var successCount = 0;
                 foreach (var action in recoveryActions)
@@ -218,7 +215,7 @@ namespace VPetLLM.Handlers
                     {
                         Logger.Log($"TTSErrorRecoveryManager: 执行恢复动作 - {action.Description}");
                         var success = await action.Action();
-                        
+
                         if (success)
                         {
                             successCount++;
@@ -234,10 +231,10 @@ namespace VPetLLM.Handlers
                         Logger.Log($"TTSErrorRecoveryManager: 恢复动作异常 - {action.Description}: {ex.Message}");
                     }
                 }
-                
+
                 var overallSuccess = successCount > 0;
                 Logger.Log($"TTSErrorRecoveryManager: 恢复完成，成功动作: {successCount}/{recoveryActions.Count}");
-                
+
                 return overallSuccess;
             }
             finally
@@ -245,14 +242,14 @@ namespace VPetLLM.Handlers
                 _isRecovering = false;
             }
         }
-        
+
         /// <summary>
         /// 制定恢复动作计划
         /// </summary>
         private List<RecoveryAction> PlanRecoveryActions(List<TTSAnomaly> anomalies, TTSOperationContext context)
         {
             var actions = new List<RecoveryAction>();
-            
+
             foreach (var anomaly in anomalies)
             {
                 switch (anomaly.Type)
@@ -266,7 +263,7 @@ namespace VPetLLM.Handlers
                             Action = () => ResetStateMonitorAsync()
                         });
                         break;
-                        
+
                     case "PlayerError":
                         actions.Add(new RecoveryAction
                         {
@@ -276,7 +273,7 @@ namespace VPetLLM.Handlers
                             Action = () => RestartPlayerAsync()
                         });
                         break;
-                        
+
                     case "StateSyncError":
                         actions.Add(new RecoveryAction
                         {
@@ -286,7 +283,7 @@ namespace VPetLLM.Handlers
                             Action = () => ResetStateSyncAsync()
                         });
                         break;
-                        
+
                     case "ExcessiveRetry":
                         actions.Add(new RecoveryAction
                         {
@@ -296,7 +293,7 @@ namespace VPetLLM.Handlers
                             Action = () => ClearRequestQueueAsync()
                         });
                         break;
-                        
+
                     case "ResourceLeak":
                         actions.Add(new RecoveryAction
                         {
@@ -308,7 +305,7 @@ namespace VPetLLM.Handlers
                         break;
                 }
             }
-            
+
             // 如果有多个严重异常，添加回退模式
             if (anomalies.Count >= 3)
             {
@@ -320,13 +317,13 @@ namespace VPetLLM.Handlers
                     Action = () => EnableFallbackModeAsync()
                 });
             }
-            
+
             // 按优先级排序
             actions.Sort((a, b) => a.Priority.CompareTo(b.Priority));
-            
+
             return actions;
         }
-        
+
         /// <summary>
         /// 重置状态监控器
         /// </summary>
@@ -345,7 +342,7 @@ namespace VPetLLM.Handlers
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 重启播放器
         /// </summary>
@@ -364,7 +361,7 @@ namespace VPetLLM.Handlers
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 重置状态同步
         /// </summary>
@@ -382,7 +379,7 @@ namespace VPetLLM.Handlers
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 清理请求队列
         /// </summary>
@@ -400,7 +397,7 @@ namespace VPetLLM.Handlers
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 重连TTS服务
         /// </summary>
@@ -418,7 +415,7 @@ namespace VPetLLM.Handlers
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 启用回退模式
         /// </summary>
@@ -436,7 +433,7 @@ namespace VPetLLM.Handlers
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 记录错误
         /// </summary>
@@ -450,7 +447,7 @@ namespace VPetLLM.Handlers
                     record.Count++;
                     record.LastOccurrence = DateTime.Now;
                     record.Details.Add($"{DateTime.Now:HH:mm:ss} - {details}");
-                    
+
                     // 限制详情记录数量
                     if (record.Details.Count > 10)
                     {
@@ -471,7 +468,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 获取错误统计报告
         /// </summary>
@@ -487,7 +484,7 @@ namespace VPetLLM.Handlers
                     LastRecoveryTime = _lastRecoveryTime,
                     ErrorSummary = new List<ErrorSummary>()
                 };
-                
+
                 foreach (var kvp in _errorHistory)
                 {
                     var record = kvp.Value;
@@ -501,11 +498,11 @@ namespace VPetLLM.Handlers
                         RecentDetails = record.Details.ToArray()
                     });
                 }
-                
+
                 return report;
             }
         }
-        
+
         /// <summary>
         /// 清理旧的错误记录
         /// </summary>
@@ -515,7 +512,7 @@ namespace VPetLLM.Handlers
             {
                 var cutoffTime = DateTime.Now - maxAge;
                 var keysToRemove = new List<string>();
-                
+
                 foreach (var kvp in _errorHistory)
                 {
                     if (kvp.Value.LastOccurrence < cutoffTime)
@@ -523,19 +520,19 @@ namespace VPetLLM.Handlers
                         keysToRemove.Add(kvp.Key);
                     }
                 }
-                
+
                 foreach (var key in keysToRemove)
                 {
                     _errorHistory.Remove(key);
                 }
-                
+
                 if (keysToRemove.Count > 0)
                 {
                     Logger.Log($"TTSErrorRecoveryManager: 清理了 {keysToRemove.Count} 个过期错误记录");
                 }
             }
         }
-        
+
         /// <summary>
         /// 触发错误恢复事件
         /// </summary>
@@ -551,7 +548,7 @@ namespace VPetLLM.Handlers
             }
         }
     }
-    
+
     /// <summary>
     /// TTS异常信息
     /// </summary>
@@ -561,7 +558,7 @@ namespace VPetLLM.Handlers
         public string Message { get; set; }
         public string Details { get; set; }
     }
-    
+
     /// <summary>
     /// TTS操作上下文
     /// </summary>
@@ -578,7 +575,7 @@ namespace VPetLLM.Handlers
         public bool HasResourceLeak { get; set; }
         public string ResourceLeakDetails { get; set; }
     }
-    
+
     /// <summary>
     /// 错误恢复事件参数
     /// </summary>
@@ -589,7 +586,7 @@ namespace VPetLLM.Handlers
         public bool RecoverySuccess { get; set; }
         public string Message { get; set; }
     }
-    
+
     /// <summary>
     /// TTS错误报告
     /// </summary>
@@ -601,7 +598,7 @@ namespace VPetLLM.Handlers
         public DateTime LastRecoveryTime { get; set; }
         public List<ErrorSummary> ErrorSummary { get; set; } = new List<ErrorSummary>();
     }
-    
+
     /// <summary>
     /// 错误摘要
     /// </summary>

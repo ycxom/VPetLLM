@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Windows;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils;
-using LinePutScript;
-using static VPet_Simulator.Core.GraphHelper;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -18,19 +15,19 @@ namespace VPetLLM.Handlers
         private readonly IMainWindow _mainWindow;
         private readonly List<TouchInteraction> _recentInteractions;
         private readonly object _lockObject = new object();
-        
+
         // 交互冷却时间（毫秒）
         private DateTime _lastInteractionTime = DateTime.MinValue;
-        
+
         // 连续交互计数
         private int _consecutiveTouchCount = 0;
         private DateTime _lastTouchTime = DateTime.MinValue;
-        
+
         // 智能过滤系统 - 跟踪VPetLLM动作执行状态
         private static bool _isVPetLLMActionInProgress = false;
         private static DateTime _lastVPetLLMActionTime = DateTime.MinValue;
         private static readonly object _actionStateLock = new object();
-        
+
         // 动作执行监听
         private static readonly List<TouchInteractionHandler> _allInstances = new List<TouchInteractionHandler>();
 
@@ -39,13 +36,13 @@ namespace VPetLLM.Handlers
             _plugin = plugin;
             _mainWindow = plugin.MW;
             _recentInteractions = new List<TouchInteraction>();
-            
+
             // 注册到全局实例列表
             lock (_actionStateLock)
             {
                 _allInstances.Add(this);
             }
-            
+
             // 延迟注册事件，确保Main已经初始化
             if (_plugin?.MW?.Main != null)
             {
@@ -105,13 +102,13 @@ namespace VPetLLM.Handlers
 
                 // 监听摸头事件
                 _plugin.MW.Main.Event_TouchHead += OnTouchHead;
-                
+
                 // 监听摸身体事件  
                 _plugin.MW.Main.Event_TouchBody += OnTouchBody;
-                
+
                 // 监听捏脸事件（通过Hook DisplayPinch方法）
                 HookDisplayPinch();
-                
+
                 Logger.Log("Touch events registered successfully.");
             }
             catch (Exception ex)
@@ -146,7 +143,7 @@ namespace VPetLLM.Handlers
 
         // 用于跟踪捏脸调用的时间戳，避免重复触发
         private DateTime _lastPinchCallTime = DateTime.MinValue;
-        
+
         /// <summary>
         /// Hook DisplayPinch方法来监听捏脸事件
         /// 这是最简单可靠的方法，因为无论如何触发捏脸，都会调用DisplayPinch
@@ -161,7 +158,7 @@ namespace VPetLLM.Handlers
                     Logger.Log("Pinch animation not available in current pet model.");
                     return;
                 }
-                
+
                 // 使用定时器定期检查Main.DisplayType来检测捏脸动画
                 var checkTimer = new System.Timers.Timer(100); // 每100ms检查一次
                 checkTimer.Elapsed += (s, e) =>
@@ -170,11 +167,11 @@ namespace VPetLLM.Handlers
                     {
                         if (_plugin?.MW?.Main?.DisplayType == null)
                             return;
-                        
+
                         var displayType = _plugin.MW.Main.DisplayType;
-                        
+
                         // 检查是否正在播放捏脸动画
-                        if (displayType.Name == "pinch" && 
+                        if (displayType.Name == "pinch" &&
                             displayType.Animat == VPet_Simulator.Core.GraphInfo.AnimatType.A_Start)
                         {
                             var now = DateTime.Now;
@@ -183,7 +180,7 @@ namespace VPetLLM.Handlers
                             {
                                 _lastPinchCallTime = now;
                                 Logger.Log("Detected pinch animation start, triggering VPetLLM feedback.");
-                                
+
                                 // 异步触发捏脸反馈
                                 System.Threading.Tasks.Task.Run(() => OnTouchPinch());
                             }
@@ -195,7 +192,7 @@ namespace VPetLLM.Handlers
                     }
                 };
                 checkTimer.Start();
-                
+
                 Logger.Log("Pinch detection timer started successfully.");
             }
             catch (Exception ex)
@@ -212,13 +209,13 @@ namespace VPetLLM.Handlers
             try
             {
                 var now = DateTime.Now;
-                
+
                 // 检查是否为默认插件
                 if (!_plugin.IsVPetLLMDefaultPlugin())
                 {
                     return;
                 }
-                
+
                 // 检查是否启用触摸反馈
                 if (!_plugin.Settings.TouchFeedback.EnableTouchFeedback)
                 {
@@ -241,7 +238,7 @@ namespace VPetLLM.Handlers
 
                 // 更新连续触摸计数
                 UpdateConsecutiveTouchCount(now);
-                
+
                 // 记录交互
                 var interaction = new TouchInteraction
                 {
@@ -263,7 +260,7 @@ namespace VPetLLM.Handlers
                 }
 
                 _lastInteractionTime = now;
-                
+
                 Logger.Log($"Processing {touchType} touch interaction (consecutive: {_consecutiveTouchCount})");
 
                 // 生成LLM反馈
@@ -289,7 +286,7 @@ namespace VPetLLM.Handlers
             {
                 _consecutiveTouchCount++;
             }
-            
+
             _lastTouchTime = now;
         }
 
@@ -307,9 +304,9 @@ namespace VPetLLM.Handlers
             {
                 // 构建触摸上下文提示
                 var touchPrompt = BuildTouchPrompt(interaction);
-                
+
                 Logger.Log($"Sending touch feedback through chat system: {touchPrompt}");
-                
+
                 // 通过现有的聊天系统处理触摸交互
                 // 这样可以保持对话上下文的连续性
                 await Application.Current.Dispatcher.InvokeAsync(() =>
@@ -346,20 +343,20 @@ namespace VPetLLM.Handlers
                     break;
             }
             var template = PromptHelper.Get(templateKey, _plugin.Settings.PromptLanguage);
-            
+
             // 如果没有找到特定模板，使用通用触摸模板
             if (string.IsNullOrEmpty(template))
             {
                 template = PromptHelper.Get("TouchFeedback_General", _plugin.Settings.PromptLanguage);
             }
-            
+
             // 如果还是没有找到，返回空字符串
             if (string.IsNullOrEmpty(template))
             {
                 Logger.Log("TouchInteractionHandler: No touch prompt template found in JSON");
                 return string.Empty;
             }
-            
+
             // 替换模板中的变量
             var context = new Dictionary<string, string>
             {
@@ -370,13 +367,13 @@ namespace VPetLLM.Handlers
                 { "PetName", _plugin.Settings.AiName },
                 { "UserName", _plugin.Settings.UserName }
             };
-            
+
             var prompt = template;
             foreach (var kvp in context)
             {
                 prompt = prompt.Replace($"{{{kvp.Key}}}", kvp.Value);
             }
-            
+
             // 标记为系统生成，便于与用户消息区分
             prompt = "[System] " + prompt;
             return prompt;
@@ -389,7 +386,7 @@ namespace VPetLLM.Handlers
         {
             string key;
             string defaultValue;
-            
+
             switch (touchType)
             {
                 case TouchType.Head:
@@ -407,15 +404,15 @@ namespace VPetLLM.Handlers
                 default:
                     return "unknown";
             }
-            
+
             var localizedArea = LanguageHelper.Get(key, language);
-            
+
             // 如果没有找到本地化文本，返回英文默认值
             if (string.IsNullOrEmpty(localizedArea))
             {
                 return defaultValue;
             }
-            
+
             return localizedArea;
         }
 
@@ -474,7 +471,7 @@ namespace VPetLLM.Handlers
                         Logger.Log("VPetLLM action in progress, ignoring touch event to avoid false trigger.");
                         return true;
                     }
-                    
+
                     // 检查距离上次VPetLLM动作的时间
                     var timeSinceLastAction = DateTime.Now - _lastVPetLLMActionTime;
                     if (timeSinceLastAction.TotalMilliseconds < 3000) // 3秒内
@@ -500,7 +497,7 @@ namespace VPetLLM.Handlers
                 return false; // 出错时不阻止交互
             }
         }
-        
+
         /// <summary>
         /// 通知VPetLLM开始执行动作（由SmartMessageProcessor调用）
         /// </summary>
@@ -513,7 +510,7 @@ namespace VPetLLM.Handlers
                 Logger.Log("VPetLLM action started - touch events will be filtered");
             }
         }
-        
+
         /// <summary>
         /// 通知VPetLLM完成动作执行（由SmartMessageProcessor调用）
         /// </summary>
@@ -539,7 +536,7 @@ namespace VPetLLM.Handlers
                 {
                     _allInstances.Remove(this);
                 }
-                
+
                 if (_plugin?.MW?.Main != null)
                 {
                     _plugin.MW.Main.Event_TouchHead -= OnTouchHead;

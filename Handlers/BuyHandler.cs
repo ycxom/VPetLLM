@@ -1,8 +1,6 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -19,7 +17,7 @@ namespace VPetLLM.Handlers
 
         private const string VPetLLMSource = "vpetllm";
         private const string FriendGiftSource = "friendgift";
-        
+
         // 物品搜索服务（延迟初始化）
         private static FoodSearchService _foodSearchService;
 
@@ -67,16 +65,16 @@ namespace VPetLLM.Handlers
 
                 // 直接使用 Food.ItemType 属性
                 string itemType = food.ItemType;
-                
+
                 // 播放购买动画
                 await PlayBuyAnimationAsync(mainWindow, food, itemType);
-                
+
                 // 使用物品
                 mainWindow.TakeItem(food);
-                
+
                 // 直接调用 IMainWindow.TakeItemHandle 方法
                 mainWindow.TakeItemHandle(food, 1, VPetLLMSource);
-                
+
                 Logger.Log($"BuyHandler: 购买完成 - {food.Name} (type: {itemType}), 剩余金钱: ${mainWindow.Core.Save.Money:F2}");
             }
             catch (Exception ex)
@@ -124,13 +122,13 @@ namespace VPetLLM.Handlers
 
                 // 直接使用 Food.ItemType 属性
                 string itemType = food.ItemType;
-                
+
                 // 播放动画
                 await PlayBuyAnimationAsync(mainWindow, food, itemType);
 
                 // 朋友赠送不扣钱，只添加物品并标记来源
                 mainWindow.TakeItemHandle(food, 1, FriendGiftSource);
-                
+
                 Logger.Log($"BuyHandler: 朋友赠送完成 - {food.Name} (来自 {friendName}), 不扣金钱");
             }
             catch (Exception ex)
@@ -160,13 +158,13 @@ namespace VPetLLM.Handlers
 
                 // 直接使用 Food.ItemType 属性
                 string itemType = food.ItemType;
-                
+
                 // 播放动画
                 await PlayBuyAnimationAsync(mainWindow, food, itemType);
 
                 // 朋友代为购买，扣朋友的钱，不扣当前用户的钱
                 mainWindow.TakeItemHandle(food, 1, $"friendbuy_{friendName}");
-                
+
                 Logger.Log($"BuyHandler: 朋友代购完成 - {food.Name} (由 {friendName} 支付), 不扣当前用户金钱");
             }
             catch (Exception ex)
@@ -200,7 +198,7 @@ namespace VPetLLM.Handlers
                             // 其他类型（Tool, Toy, Item）使用礼物动画
                             graphName = "gift";
                         }
-                        
+
                         Logger.Log($"BuyHandler: 调用DisplayFoodAnimation - 动画: {graphName}");
                         mainWindow.DisplayFoodAnimation(graphName, food.ImageSource);
                     }

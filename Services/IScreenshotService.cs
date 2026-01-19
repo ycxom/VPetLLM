@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-
 namespace VPetLLM.Services
 {
     /// <summary>
@@ -12,12 +9,12 @@ namespace VPetLLM.Services
         /// 空闲状态
         /// </summary>
         Idle,
-        
+
         /// <summary>
         /// 正在截图
         /// </summary>
         Capturing,
-        
+
         /// <summary>
         /// 正在处理
         /// </summary>

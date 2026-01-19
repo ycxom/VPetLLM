@@ -9,12 +9,12 @@ namespace VPetLLM.Services
         /// 空闲状态
         /// </summary>
         Idle,
-        
+
         /// <summary>
         /// 正在录音
         /// </summary>
         Recording,
-        
+
         /// <summary>
         /// 编辑状态（识别完成但未发送）
         /// </summary>

@@ -1,10 +1,7 @@
-using System;
 using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Handlers.Animation;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
+using VPetLLM.Utils.UI;
 
 namespace VPetLLM.Handlers
 {
@@ -159,7 +156,7 @@ namespace VPetLLM.Handlers
                 while (_stateTransitionQueue.TryDequeue(out var request))
                 {
                     Logger.Log($"StateManager: Processing queued state transition to {request.NewState} (action: {request.ActionName}) requested at {request.RequestTime:HH:mm:ss.fff}");
-                    
+
                     // Execute the state transition with the lock
                     await _transitionLock.WaitAsync();
                     try
@@ -216,7 +213,7 @@ namespace VPetLLM.Handlers
                 // Get the current state using helper method (tries field first, then property)
                 previousState = GetState(mainWindow);
                 var workingStateType = GetStateType(mainWindow);
-                
+
                 if (previousState == null || workingStateType == null)
                 {
                     Logger.Log("StateManager: State field/property not found, using fallback mode for older VPet versions");
@@ -314,7 +311,7 @@ namespace VPetLLM.Handlers
 
                 // Verify the state change using the verification helper
                 bool verificationPassed = VerifyStateAfterTransition(mainWindow, targetState, actionName);
-                
+
                 if (!verificationPassed)
                 {
                     Logger.Log($"StateManager: Warning - State verification failed after transition to {targetStateName}");
@@ -369,7 +366,7 @@ namespace VPetLLM.Handlers
             try
             {
                 var mainType = mainWindow.Main.GetType();
-                
+
                 // Try to find methods that might start work
                 var possibleMethods = new[]
                 {
@@ -449,24 +446,24 @@ namespace VPetLLM.Handlers
 
                     case "Work":
                         Logger.Log("StateManager: Fallback - Attempting to start work mode");
-                        
+
                         // Try to use WorkManager to start a default work
                         WorkManager.RefreshWorkLists(mainWindow);
                         var defaultWork = WorkManager.FindWork("", "work"); // Get first work
-                        
+
                         if (defaultWork != null && WorkManager.StartWork(mainWindow, defaultWork))
                         {
                             Logger.Log("StateManager: Fallback - Work mode started via StartWork");
                             break;
                         }
-                        
+
                         // If StartWork not available, try other methods
                         if (TryInvokeWorkMethod(mainWindow, "Work"))
                         {
                             Logger.Log("StateManager: Fallback - Work mode started via method invocation");
                             break;
                         }
-                        
+
                         // If no method found, fall back to animation
                         Logger.Log("StateManager: Fallback - No work method found, using animation (loop mode)");
                         try
@@ -493,24 +490,24 @@ namespace VPetLLM.Handlers
 
                     case "Study":
                         Logger.Log("StateManager: Fallback - Attempting to start study mode");
-                        
+
                         // Try to use WorkManager to start a default study
                         WorkManager.RefreshWorkLists(mainWindow);
                         var defaultStudy = WorkManager.FindWork("", "study"); // Get first study
-                        
+
                         if (defaultStudy != null && WorkManager.StartWork(mainWindow, defaultStudy))
                         {
                             Logger.Log("StateManager: Fallback - Study mode started via StartWork");
                             break;
                         }
-                        
+
                         // If StartWork not available, try other methods
                         if (TryInvokeWorkMethod(mainWindow, "Study"))
                         {
                             Logger.Log("StateManager: Fallback - Study mode started via method invocation");
                             break;
                         }
-                        
+
                         // If no method found, fall back to animation
                         Logger.Log("StateManager: Fallback - No study method found, using animation (loop mode)");
                         try
@@ -639,13 +636,13 @@ namespace VPetLLM.Handlers
             {
                 var currentState = GetState(mainWindow);
                 var workingStateType = GetStateType(mainWindow);
-                
+
                 if (currentState == null || workingStateType == null)
                 {
                     Logger.Log("StateManager: State field/property not found, cannot verify state");
                     return false;
                 }
-                
+
                 // Convert expectedState to the correct enum type if it's a string
                 object expectedStateValue = expectedState;
                 if (expectedState is string stateString)

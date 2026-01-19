@@ -1,7 +1,8 @@
 using System.Text.RegularExpressions;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Services;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -11,7 +12,7 @@ namespace VPetLLM.Handlers
         /// 获取所有已注册的 Handler（通过 HandlerRegistry）
         /// </summary>
         public IEnumerable<IActionHandler> Handlers => _handlerRegistry.GetAllHandlers();
-        
+
         private readonly IMainWindow _mainWindow;
         private readonly IHandlerRegistry _handlerRegistry;
         private Core.RecordManager _recordManager;
@@ -28,7 +29,7 @@ namespace VPetLLM.Handlers
             _handlerRegistry = handlerRegistry ?? throw new ArgumentNullException(nameof(handlerRegistry));
             RegisterHandlers();
         }
-        
+
         public void SetSettings(Setting settings)
         {
             _settings = settings;
@@ -53,7 +54,7 @@ namespace VPetLLM.Handlers
         public void RegisterHandlers()
         {
             _handlerRegistry.Clear();
-            
+
             // 注册核心 Handler
             _handlerRegistry.Register("happy", new HappyHandler());
             _handlerRegistry.Register("health", new HealthHandler());
@@ -64,20 +65,20 @@ namespace VPetLLM.Handlers
             _handlerRegistry.Register("move", new MoveHandler());
             _handlerRegistry.Register("say", new SayHandler());
             _handlerRegistry.Register("plugin", new PluginHandler());
-            
+
             // Add RecordCommandHandler if RecordManager is available
             if (_recordManager != null)
             {
                 _handlerRegistry.Register("record", new RecordCommandHandler(_recordManager));
                 _handlerRegistry.Register("record_modify", new RecordModifyCommandHandler(_recordManager));
             }
-            
+
             // Add VPetSettingsHandler if Settings is available
             if (_settings != null)
             {
                 _handlerRegistry.Register("vpet_settings", new VPetSettingsHandler(_settings));
             }
-            
+
             // Add PlayHandler if MediaPlaybackService is available
             if (_mediaPlaybackService != null)
             {
@@ -100,7 +101,7 @@ namespace VPetLLM.Handlers
 
             // Parse commands (only new format will be parsed)
             var commands = CommandFormatParser.Parse(response);
-            
+
             Logger.Log($"ActionProcessor: Detected format: {format}, found {commands.Count} commands in new format");
 
             foreach (var command in commands)
@@ -129,7 +130,7 @@ namespace VPetLLM.Handlers
                     {
                         var nestedCommand = nestedMatch.Groups[1].Value.ToLower();
                         var nestedValue = nestedMatch.Groups[2].Value;
-                        
+
                         handler = _handlerRegistry.GetHandler(nestedCommand);
                         if (handler != null)
                         {
@@ -182,19 +183,19 @@ namespace VPetLLM.Handlers
                 _ => false
             };
             if (handler.Keyword.ToLower() == "buy") isEnabled = settings.EnableBuy;
-            
+
             // Special handling for record commands - check if Records system is enabled
             if (handler.Keyword.ToLower() == "record" || handler.Keyword.ToLower() == "record_modify")
             {
                 isEnabled = settings.Records?.EnableRecords ?? true;
             }
-            
+
             // Special handling for play command - check if MediaPlayback is enabled
             if (handler.Keyword.ToLower() == "play")
             {
                 isEnabled = settings.EnableMediaPlayback;
             }
-            
+
             return isEnabled;
         }
     }

@@ -1,10 +1,8 @@
-using System;
-using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -20,7 +18,7 @@ namespace VPetLLM.UI.Windows
         public HotkeyCapture()
         {
             InitializeUI();
-            
+
             // 确保窗口获得焦点
             this.Loaded += (s, e) =>
             {
@@ -28,7 +26,7 @@ namespace VPetLLM.UI.Windows
                 this.Focus();
                 Logger.Log("HotkeyCapture: Window loaded and focused");
             };
-            
+
             // 绑定键盘事件
             this.KeyDown += Window_KeyDown;
         }
@@ -111,7 +109,7 @@ namespace VPetLLM.UI.Windows
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             Logger.Log($"HotkeyCapture: KeyDown - Key: {e.Key}, SystemKey: {e.SystemKey}, Modifiers: {Keyboard.Modifiers}");
-            
+
             e.Handled = true;
 
             // ESC 键取消
@@ -146,7 +144,7 @@ namespace VPetLLM.UI.Windows
                     _hotkeyDisplay.Text = string.Join(" + ", modifiers) + " + ?";
                     _hintText.Text = "请继续按下一个普通键";
                 }
-                
+
                 Logger.Log($"HotkeyCapture: Modifier key only, waiting for actual key. Current modifiers: {string.Join("+", modifiers)}");
                 return;
             }

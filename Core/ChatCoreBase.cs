@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core
 {
@@ -22,13 +23,13 @@ namespace VPetLLM.Core
         public abstract Task<string> Chat(string prompt);
         public abstract Task<string> Chat(string prompt, bool isFunctionCall);
         public abstract Task<string> Summarize(string systemPrompt, string userContent);
-        
+
         /// <summary>
         /// 发送带图像的多模态消息（默认实现：不支持）
         /// </summary>
         public virtual Task<string> ChatWithImage(string prompt, byte[] imageData)
         {
-            Utils.Logger.Log($"{Name} 不支持多模态消息");
+            Logger.Log($"{Name} 不支持多模态消息");
             ResponseHandler?.Invoke("当前模型不支持图像输入");
             return Task.FromResult("");
         }
@@ -83,7 +84,7 @@ namespace VPetLLM.Core
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error in OnConversationTurn: {ex.Message}");
+                Logger.Log($"Error in OnConversationTurn: {ex.Message}");
             }
         }
 
@@ -101,9 +102,9 @@ namespace VPetLLM.Core
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Error injecting records into history: {ex.Message}");
+                Logger.Log($"Error injecting records into history: {ex.Message}");
             }
-            
+
             return history;
         }
 
@@ -116,13 +117,13 @@ namespace VPetLLM.Core
             SystemMessageProvider = new SystemMessageProvider(settings, mainWindow, actionProcessor);
             ContextFilter = new ContextFilter();
             HistoryManager.SetSystemMessageProvider(SystemMessageProvider);
-            
+
             // Initialize RecordManager
             try
             {
                 RecordManager = new RecordManager(settings, Name);
-                Utils.Logger.Log($"RecordManager initialized for {Name}");
-                
+                Logger.Log($"RecordManager initialized for {Name}");
+
                 // Register RecordManager with ActionProcessor
                 if (actionProcessor != null)
                 {
@@ -131,7 +132,7 @@ namespace VPetLLM.Core
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Failed to initialize RecordManager: {ex.Message}");
+                Logger.Log($"Failed to initialize RecordManager: {ex.Message}");
                 // Create a dummy RecordManager to prevent null reference errors
                 RecordManager = null;
             }
@@ -200,7 +201,7 @@ namespace VPetLLM.Core
         {
             HistoryManager.GetHistory().Clear();
             HistoryManager.GetHistory().AddRange(editedHistory);
-            
+
             // 更新到数据库
             try
             {
@@ -210,7 +211,7 @@ namespace VPetLLM.Core
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"更新历史记录到数据库失败: {ex.Message}");
+                Logger.Log($"更新历史记录到数据库失败: {ex.Message}");
             }
         }
 
@@ -233,7 +234,7 @@ namespace VPetLLM.Core
         {
             HistoryManager.GetHistory().Clear();
             HistoryManager.GetHistory().AddRange(history);
-            
+
             // 更新到数据库
             try
             {
@@ -243,7 +244,7 @@ namespace VPetLLM.Core
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"更新历史记录到数据库失败: {ex.Message}");
+                Logger.Log($"更新历史记录到数据库失败: {ex.Message}");
             }
         }
 

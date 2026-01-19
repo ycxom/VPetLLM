@@ -11,22 +11,22 @@ namespace VPetLLM.Handlers
         /// State-related actions
         /// </summary>
         State,
-        
+
         /// <summary>
         /// Body/physical actions
         /// </summary>
         Body,
-        
+
         /// <summary>
         /// Talk/speech actions
         /// </summary>
         Talk,
-        
+
         /// <summary>
         /// Plugin-provided actions
         /// </summary>
         Plugin,
-        
+
         /// <summary>
         /// Tool/utility actions
         /// </summary>
@@ -45,14 +45,14 @@ namespace VPetLLM.Handlers
         /// These actions preserve the current WorkingState
         /// </summary>
         Interactive,
-        
+
         /// <summary>
         /// State-based actions that change both animation and WorkingState
         /// Examples: sleep, work, study
         /// These actions trigger state transitions through StateManager
         /// </summary>
         StateBased,
-        
+
         /// <summary>
         /// Unknown or fallback actions that default to animation-only behavior
         /// These actions are treated like Interactive actions for safety
@@ -70,23 +70,23 @@ namespace VPetLLM.Handlers
         /// Gets the keyword that triggers this action handler
         /// </summary>
         string Keyword { get; }
-        
+
         /// <summary>
         /// Gets the type of action this handler processes
         /// </summary>
         ActionType ActionType { get; }
-        
+
         /// <summary>
         /// Gets the category of this action (Interactive, StateBased, or Unknown)
         /// This determines whether the action changes VPet's WorkingState
         /// </summary>
         ActionCategory Category { get; }
-        
+
         /// <summary>
         /// Gets the description of this action handler for LLM prompts
         /// </summary>
         string Description { get; }
-        
+
         /// <summary>
         /// Executes the action with an integer parameter
         /// </summary>
@@ -94,7 +94,7 @@ namespace VPetLLM.Handlers
         /// <param name="mainWindow">The main window instance</param>
         /// <returns>A task representing the asynchronous operation</returns>
         Task Execute(int value, IMainWindow mainWindow);
-        
+
         /// <summary>
         /// Executes the action with a string parameter (action name)
         /// </summary>
@@ -102,14 +102,14 @@ namespace VPetLLM.Handlers
         /// <param name="mainWindow">The main window instance</param>
         /// <returns>A task representing the asynchronous operation</returns>
         Task Execute(string value, IMainWindow mainWindow);
-        
+
         /// <summary>
         /// Executes the action without parameters
         /// </summary>
         /// <param name="mainWindow">The main window instance</param>
         /// <returns>A task representing the asynchronous operation</returns>
         Task Execute(IMainWindow mainWindow);
-        
+
         /// <summary>
         /// Gets the duration of an animation in milliseconds
         /// </summary>

@@ -1,12 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Timers;
 using System.Windows;
 using System.Windows.Threading;
 using VPetLLM.Configuration;
 using VPetLLM.UI.Controls;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
 using VPetLLMPlugin.UI.Controls;
 
 namespace VPetLLM.Handlers
@@ -21,7 +18,7 @@ namespace VPetLLM.Handlers
         private FloatingSidebar? _sidebar;
         private DispatcherTimer? _settingsCheckTimer;
         private bool _isDisposed = false;
-        
+
         // 活动会话计数器，用于跟踪是否有活动的处理
         private int _activeSessionCount = 0;
         private readonly object _sessionLock = new object();
@@ -32,7 +29,7 @@ namespace VPetLLM.Handlers
         public FloatingSidebarManager(VPetLLM vpetLLM)
         {
             _vpetLLM = vpetLLM ?? throw new ArgumentNullException(nameof(vpetLLM));
-            
+
             SubscribeToSettingsWindowEvents();
             Logger.Log("FloatingSidebarManager initialized (UserControl mode)");
         }
@@ -48,20 +45,20 @@ namespace VPetLLM.Handlers
                 {
                     Interval = TimeSpan.FromMilliseconds(500)
                 };
-                
+
                 bool wasSettingsWindowOpen = false;
-                
+
                 _settingsCheckTimer.Tick += (s, e) =>
                 {
                     try
                     {
                         bool isSettingsWindowOpen = _vpetLLM.SettingWindow?.IsVisible == true;
-                        
+
                         if (wasSettingsWindowOpen && !isSettingsWindowOpen)
                         {
                             OnSettingsWindowClosed();
                         }
-                        
+
                         wasSettingsWindowOpen = isSettingsWindowOpen;
                     }
                     catch (Exception ex)
@@ -69,7 +66,7 @@ namespace VPetLLM.Handlers
                         Logger.Log($"Error checking settings window state: {ex.Message}");
                     }
                 };
-                
+
                 _settingsCheckTimer.Start();
             }
             catch (Exception ex)
@@ -86,10 +83,10 @@ namespace VPetLLM.Handlers
             try
             {
                 Logger.Log("Settings window closed, refreshing sidebar configuration");
-                
+
                 var settings = GetFloatingSidebarSettings();
                 ApplyConfiguration(settings);
-                
+
                 if (settings.IsEnabled && !IsVisible)
                 {
                     Show();
@@ -168,20 +165,20 @@ namespace VPetLLM.Handlers
                 CleanupSidebar();
 
                 _sidebar = new FloatingSidebar();
-                
+
                 // 应用配置
                 var settings = GetFloatingSidebarSettings();
                 _sidebar.DefaultOpacity = settings.InactiveOpacity;
                 _sidebar.ActiveOpacity = settings.DefaultOpacity;
                 _sidebar.PlaceAutoBack = settings.AutoHide;
                 _sidebar.AutoBackDelay = settings.AutoHideDelay * 1000;
-                
+
                 // 设置位置
                 ApplyPositionSettings(settings);
-                
+
                 // 初始化并插入到 VPet UIGrid
                 _sidebar.Initialize(_vpetLLM);
-                
+
                 // 订阅事件
                 _sidebar.ButtonClicked += OnButtonClicked;
                 _sidebar.SidebarClosed += OnSidebarClosed;
@@ -296,7 +293,7 @@ namespace VPetLLM.Handlers
                         button.IsEnabled = asrAvailable;
                         if (!asrAvailable)
                         {
-                            button.ToolTip = LocalizationService.Instance["FloatingSidebar.VoiceInputDisabled"] 
+                            button.ToolTip = LocalizationService.Instance["FloatingSidebar.VoiceInputDisabled"]
                                 ?? "语音输入未启用，请在设置中配置ASR";
                         }
                     }
@@ -306,7 +303,7 @@ namespace VPetLLM.Handlers
                         button.IsEnabled = screenshotAvailable;
                         if (!screenshotAvailable)
                         {
-                            button.ToolTip = LocalizationService.Instance["FloatingSidebar.ScreenshotDisabled"] 
+                            button.ToolTip = LocalizationService.Instance["FloatingSidebar.ScreenshotDisabled"]
                                 ?? "截图功能未启用，请在设置中配置截图";
                         }
                     }
@@ -427,7 +424,7 @@ namespace VPetLLM.Handlers
                 var sourceInfo = string.IsNullOrEmpty(source) ? "" : $", source = {source}";
                 Logger.Log($"FloatingSidebarManager: EndActiveSession, count = {_activeSessionCount}, shouldSetIdle = {shouldSetIdle}{sourceInfo}");
             }
-            
+
             if (shouldSetIdle)
             {
                 UpdateStatus(VPetLLMStatus.Idle);
@@ -471,12 +468,12 @@ namespace VPetLLM.Handlers
             try
             {
                 Logger.Log("Starting status light test...");
-                
+
                 // 使用定时器循环显示不同状态
                 var testTimer = new System.Timers.Timer(2000); // 每2秒切换一次
                 var statusIndex = 0;
                 var statuses = new[] { VPetLLMStatus.Processing, VPetLLMStatus.Outputting, VPetLLMStatus.Error, VPetLLMStatus.Idle };
-                
+
                 testTimer.Elapsed += (s, e) =>
                 {
                     try
@@ -485,7 +482,7 @@ namespace VPetLLM.Handlers
                         UpdateStatus(status);
                         Logger.Log($"Test: Status changed to {status}");
                         statusIndex++;
-                        
+
                         // 测试完成后停止
                         if (statusIndex >= statuses.Length * 2)
                         {
@@ -499,7 +496,7 @@ namespace VPetLLM.Handlers
                         Logger.Log($"Error in status light test: {ex.Message}");
                     }
                 };
-                
+
                 testTimer.Start();
             }
             catch (Exception ex)
@@ -521,10 +518,10 @@ namespace VPetLLM.Handlers
                 _sidebar.ActiveOpacity = settings.DefaultOpacity;
                 _sidebar.PlaceAutoBack = settings.AutoHide;
                 _sidebar.AutoBackDelay = settings.AutoHideDelay * 1000;
-                
+
                 ApplyPositionSettings(settings);
                 RefreshButtons();
-                
+
                 // 如果禁用了自动隐藏，确保控件在前层并且可点击
                 if (!settings.AutoHide)
                 {
@@ -577,7 +574,7 @@ namespace VPetLLM.Handlers
             try
             {
                 var settings = _vpetLLM.Settings?.FloatingSidebar;
-                
+
                 if (settings == null)
                 {
                     Logger.Log("FloatingSidebar settings is null, creating default settings");
@@ -607,7 +604,7 @@ namespace VPetLLM.Handlers
 
                 var allButtons = SidebarButton.GetDefaultButtons();
                 var button = allButtons.FirstOrDefault(b => b.ButtonId == e.ButtonId);
-                
+
                 if (button != null)
                 {
                     try

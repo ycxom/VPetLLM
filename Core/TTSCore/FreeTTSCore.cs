@@ -1,9 +1,10 @@
-using System;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Net.Http;
+using System.Text;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.Data;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core.TTSCore
 {
@@ -24,7 +25,7 @@ namespace VPetLLM.Core.TTSCore
         /// </summary>
         public static void SetAuthProviders(Func<ulong> getSteamId, Func<Task<int>> getAuthKey, Func<string>? getModId = null)
         {
-            Utils.RequestSignatureHelper.Init(getSteamId, getAuthKey, getModId);
+            RequestSignatureHelper.Init(getSteamId, getAuthKey, getModId);
         }
 
         public FreeTTSCore(Setting settings) : base(settings)
@@ -36,17 +37,17 @@ namespace VPetLLM.Core.TTSCore
         {
             try
             {
-                var config = Utils.FreeConfigManager.GetTTSConfig();
+                var config = FreeConfigManager.GetTTSConfig();
                 if (config != null)
                 {
                     _apiKey = DecodeString(config["API_KEY"]?.ToString() ?? "");
                     _apiUrl = DecodeString(config["API_URL"]?.ToString() ?? "");
                     _model = config["Model"]?.ToString() ?? "";
-                    Utils.Logger.Log("FreeTTSCore: 配置加载成功");
+                    Logger.Log("FreeTTSCore: 配置加载成功");
                 }
                 else
                 {
-                    Utils.Logger.Log("FreeTTSCore: 配置文件不存在，请等待配置下载完成后重启程序");
+                    Logger.Log("FreeTTSCore: 配置文件不存在，请等待配置下载完成后重启程序");
                     _apiKey = "";
                     _apiUrl = "";
                     _model = "";
@@ -54,7 +55,7 @@ namespace VPetLLM.Core.TTSCore
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"FreeTTSCore: 加载配置失败: {ex.Message}");
+                Logger.Log($"FreeTTSCore: 加载配置失败: {ex.Message}");
                 _apiKey = "";
                 _apiUrl = "";
                 _model = "";
@@ -67,12 +68,12 @@ namespace VPetLLM.Core.TTSCore
             {
                 if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
                 {
-                    Utils.Logger.Log("TTS (Free): 配置未加载，TTS功能不可用");
+                    Logger.Log("TTS (Free): 配置未加载，TTS功能不可用");
                     OnAudioGenerationError("Free TTS 配置未加载，请等待配置下载完成后重启程序");
                     return Array.Empty<byte>();
                 }
 
-                Utils.Logger.Log($"TTS (Free): 发送请求，文本长度: {text.Length}");
+                Logger.Log($"TTS (Free): 发送请求，文本长度: {text.Length}");
 
                 var requestBody = new
                 {
@@ -86,22 +87,22 @@ namespace VPetLLM.Core.TTSCore
 
                 var startTime = DateTime.Now;
                 using var client = CreateHttpClient();
-                
+
                 using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl)
                 {
                     Content = content
                 };
-                await Utils.RequestSignatureHelper.AddSignatureAsync(request);
-                
+                await RequestSignatureHelper.AddSignatureAsync(request);
+
                 var response = await client.SendAsync(request);
                 var elapsed = (DateTime.Now - startTime).TotalSeconds;
 
-                Utils.Logger.Log($"TTS (Free): 响应接收完成，耗时 {elapsed:F2} 秒, 状态: {response.StatusCode}");
+                Logger.Log($"TTS (Free): 响应接收完成，耗时 {elapsed:F2} 秒，状态 {response.StatusCode}");
 
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    Utils.Logger.Log($"TTS (Free): API 错误: {response.StatusCode} - {errorContent}");
+                    Logger.Log($"TTS (Free): API 错误: {response.StatusCode} - {errorContent}");
 
                     try
                     {
@@ -118,26 +119,26 @@ namespace VPetLLM.Core.TTSCore
                 }
 
                 var audioData = await response.Content.ReadAsByteArrayAsync();
-                Utils.Logger.Log($"TTS (Free): 音频生成成功，大小: {audioData.Length} bytes");
+                Logger.Log($"TTS (Free): 音频生成成功，大小 {audioData.Length} bytes");
 
                 OnAudioGenerated(audioData);
                 return audioData;
             }
             catch (TaskCanceledException ex)
             {
-                Utils.Logger.Log($"TTS (Free): 请求超时: {ex.Message}");
+                Logger.Log($"TTS (Free): 请求超时: {ex.Message}");
                 OnAudioGenerationError("请求超时，请检查网络连接");
                 return Array.Empty<byte>();
             }
             catch (HttpRequestException ex)
             {
-                Utils.Logger.Log($"TTS (Free): 网络错误: {ex.Message}");
+                Logger.Log($"TTS (Free): 网络错误: {ex.Message}");
                 OnAudioGenerationError($"网络错误: {ex.Message}");
                 return Array.Empty<byte>();
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"TTS (Free): 生成音频异常: {ex.Message}");
+                Logger.Log($"TTS (Free): 生成音频异常: {ex.Message}");
                 OnAudioGenerationError($"生成音频异常: {ex.Message}");
                 return Array.Empty<byte>();
             }

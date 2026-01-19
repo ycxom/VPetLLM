@@ -1,9 +1,8 @@
-using System;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Threading.Tasks;
 using LinePutScript.Localization.WPF;
 using Newtonsoft.Json.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core.ASRCore
 {
@@ -30,16 +29,16 @@ namespace VPetLLM.Core.ASRCore
                     baseUrl += "/v1";
                 }
                 var url = $"{baseUrl}/audio/transcriptions";
-                Utils.Logger.Log("{1}: API URL: {0}".Translate(url, "ASR (OpenAI)"));
+                Logger.Log("{1}: API URL: {0}".Translate(url, "ASR (OpenAI)"));
 
                 using var content = new MultipartFormDataContent();
-                
+
                 var audioContent = new ByteArrayContent(audioData);
                 audioContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
                 content.Add(audioContent, "file", "audio.wav");
-                
+
                 content.Add(new StringContent(_openAISetting.Model), "model");
-                
+
                 if (!string.IsNullOrWhiteSpace(Settings?.ASR?.Language))
                 {
                     content.Add(new StringContent(Settings.ASR.Language), "language");
@@ -51,39 +50,39 @@ namespace VPetLLM.Core.ASRCore
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _openAISetting.ApiKey);
 
-                Utils.Logger.Log("{2}: 发送请求，音频大小: {0} bytes, 模型: {1}".Translate(audioData.Length, _openAISetting.Model, "ASR (OpenAI)"));
-                
+                Logger.Log("{2}: 发送请求，音频大小: {0} bytes, 模型: {1}".Translate(audioData.Length, _openAISetting.Model, "ASR (OpenAI)"));
+
                 var startTime = DateTime.Now;
                 using var client = CreateHttpClient();
                 var response = await client.SendAsync(request);
                 var elapsed = (DateTime.Now - startTime).TotalSeconds;
-                
-                Utils.Logger.Log("{2}: 响应接收完成，耗时 {0:F2} 秒, 状态: {1}".Translate(elapsed, response.StatusCode,"ASR (OpenAI)"));
+
+                Logger.Log("{2}: 响应接收完成，耗时 {0:F2} 秒，状态 {1}".Translate(elapsed, response.StatusCode, "ASR (OpenAI)"));
                 var responseContent = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Utils.Logger.Log("{2}: API 错误: {0} - {1}".Translate(response.StatusCode, responseContent, "ASR (OpenAI)"));
+                    Logger.Log("{2}: API 错误: {0} - {1}".Translate(response.StatusCode, responseContent, "ASR (OpenAI)"));
                     throw new Exception("OpenAI API 错误: {0}".Translate(response.StatusCode));
                 }
 
-                Utils.Logger.Log("{1}: 响应内容: {0}".Translate(responseContent, "ASR (OpenAI)"));
+                Logger.Log("{1}: 响应内容: {0}".Translate(responseContent, "ASR (OpenAI)"));
                 var result = JObject.Parse(responseContent);
                 return result["text"]?.ToString() ?? "";
             }
             catch (TaskCanceledException ex)
             {
-                Utils.Logger.Log("{1}: 请求超时: {0}".Translate(ex.Message, "ASR (OpenAI)"));
-                throw new Exception("请求超时，请检查网络连接或尝试录制更短的音频".Translate());
+                Logger.Log("{1}: 请求超时: {0}".Translate(ex.Message, "ASR (OpenAI)"));
+                throw new Exception("请求超时，请检查网络连接或尝试录制更短的语音".Translate());
             }
             catch (HttpRequestException ex)
             {
-                Utils.Logger.Log("{1}: 网络错误: {0}".Translate(ex.Message, "ASR (OpenAI)"));
+                Logger.Log("{1}: 网络错误: {0}".Translate(ex.Message, "ASR (OpenAI)"));
                 throw new Exception("网络错误: {0}".Translate(ex.Message));
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log("{1}: 转录错误: {0}".Translate(ex.Message, "ASR (OpenAI)"));
+                Logger.Log("{1}: 转录错误: {0}".Translate(ex.Message, "ASR (OpenAI)"));
                 throw;
             }
         }

@@ -1,7 +1,5 @@
 using Microsoft.Data.Sqlite;
-using System;
-using System.Collections.Generic;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core
 {
@@ -221,13 +219,13 @@ namespace VPetLLM.Core
                 if (rowsAffected > 0)
                 {
                     Logger.Log($"Updated record #{id} weight to {newWeight}");
-                    
+
                     // Delete if weight is 0
                     if (newWeight == 0)
                     {
                         DeleteRecord(id);
                     }
-                    
+
                     return true;
                 }
                 else
@@ -283,13 +281,13 @@ namespace VPetLLM.Core
                 if (rowsAffected > 0)
                 {
                     Logger.Log($"Updated record #{id} content and weight to {weight}");
-                    
+
                     // Delete if weight is 0
                     if (weight == 0)
                     {
                         DeleteRecord(id);
                     }
-                    
+
                     return true;
                 }
                 else

@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using VPetLLM.UI.Controls;
 
 namespace VPetLLM.Configuration
@@ -80,7 +77,7 @@ namespace VPetLLM.Configuration
             // 设置默认启用的按钮
             var defaultButtons = SidebarButton.GetDefaultButtons();
             EnabledButtons = defaultButtons.Select(b => b.ButtonId).ToList();
-            
+
             // 设置默认按钮顺序
             ButtonOrder = defaultButtons.ToDictionary(b => b.ButtonId, b => b.Order);
         }

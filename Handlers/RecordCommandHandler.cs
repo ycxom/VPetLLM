@@ -1,9 +1,7 @@
-using System;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -41,11 +39,11 @@ namespace VPetLLM.Handlers
                 {
                     // Create command
                     var (content, weight) = ParseCreateCommand(commandValue);
-                    
+
                     if (!string.IsNullOrWhiteSpace(content))
                     {
                         var recordId = _recordManager.CreateRecord(content, weight);
-                        
+
                         if (recordId > 0)
                         {
                             Logger.Log($"RecordCommandHandler: Successfully created record #{recordId}");
@@ -64,11 +62,11 @@ namespace VPetLLM.Handlers
                 {
                     // Modify command
                     var (id, delta) = ParseModifyCommand(commandValue);
-                    
+
                     if (id > 0)
                     {
                         var success = _recordManager.ModifyRecordWeight(id, delta);
-                        
+
                         if (success)
                         {
                             Logger.Log($"RecordCommandHandler: Successfully modified record #{id} weight by {delta}");

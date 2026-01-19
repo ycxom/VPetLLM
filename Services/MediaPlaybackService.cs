@@ -1,10 +1,7 @@
-using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -15,22 +12,22 @@ namespace VPetLLM.Services
     public class MediaPlaybackService : IMediaPlaybackService
     {
         #region Windows API
-        
+
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
-        
+
         [DllImport("user32.dll")]
         private static extern bool IsIconic(IntPtr hWnd); // 检查窗口是否最小化
-        
+
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-        
+
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
-        
+
         private const int SW_RESTORE = 9;
         private const int SW_SHOW = 5;
-        
+
         #endregion
 
         private Process? _mpvProcess;
@@ -102,7 +99,7 @@ namespace VPetLLM.Services
             {
                 // 钳制音量
                 volume = ClampVolume(volume);
-                
+
                 Logger.Log($"MediaPlaybackService: 开始播放 {url}，音量: {volume}");
 
                 // 创建进程启动信息
@@ -179,14 +176,14 @@ namespace VPetLLM.Services
         {
             Logger.Log("MediaPlaybackService: mpv 进程已退出");
             StopWindowMonitor();
-            
+
             lock (_lock)
             {
                 _mpvProcess?.Dispose();
                 _mpvProcess = null;
                 CurrentUrl = null;
             }
-            
+
             OnPlaybackStateChanged(false, null, null);
         }
 
@@ -205,7 +202,7 @@ namespace VPetLLM.Services
         private void StartWindowMonitor()
         {
             StopWindowMonitor();
-            
+
             _monitorCts = new CancellationTokenSource();
             _monitorTask = Task.Run(() => MonitorWindowVisibility(_monitorCts.Token));
             Logger.Log("MediaPlaybackService: 窗口可见性监控已启动");
@@ -229,7 +226,7 @@ namespace VPetLLM.Services
                 try
                 {
                     await Task.Delay(_settings.WindowCheckIntervalMs, ct);
-                    
+
                     Process? process;
                     lock (_lock)
                     {
@@ -265,7 +262,7 @@ namespace VPetLLM.Services
                     Logger.Log($"MediaPlaybackService: 窗口监控错误: {ex.Message}");
                 }
             }
-            
+
             Logger.Log("MediaPlaybackService: 窗口可见性监控已停止");
         }
 

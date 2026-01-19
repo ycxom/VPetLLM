@@ -1,7 +1,6 @@
-using System;
 using System.Net;
 using System.Net.Http;
-using System.Threading.Tasks;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core
 {
@@ -12,7 +11,7 @@ namespace VPetLLM.Core
     {
         public abstract string Name { get; }
         protected Setting? Settings { get; }
-        
+
         public event EventHandler<byte[]>? AudioGenerated;
         public event EventHandler<string>? AudioGenerationError;
 
@@ -56,7 +55,7 @@ namespace VPetLLM.Core
         {
             if (Settings?.Proxy == null || !Settings.Proxy.IsEnabled)
             {
-                Utils.Logger.Log($"TTS ({Name}): 代理未启用");
+                Logger.Log($"TTS ({Name}): 代理未启用");
                 return null;
             }
 
@@ -64,13 +63,13 @@ namespace VPetLLM.Core
 
             if (!useProxy)
             {
-                Utils.Logger.Log($"TTS ({Name}): 不使用代理");
+                Logger.Log($"TTS ({Name}): 不使用代理");
                 return null;
             }
 
             if (Settings.Proxy.FollowSystemProxy)
             {
-                Utils.Logger.Log($"TTS ({Name}): 使用系统代理");
+                Logger.Log($"TTS ({Name}): 使用系统代理");
                 return WebRequest.GetSystemWebProxy();
             }
             else if (!string.IsNullOrWhiteSpace(Settings.Proxy.Address))
@@ -85,12 +84,12 @@ namespace VPetLLM.Core
                     }
 
                     var proxyUri = new Uri($"{protocol}://{Settings.Proxy.Address}");
-                    Utils.Logger.Log($"TTS ({Name}): 使用自定义代理: {proxyUri}");
+                    Logger.Log($"TTS ({Name}): 使用自定义代理 {proxyUri}");
                     return new WebProxy(proxyUri);
                 }
                 catch (Exception ex)
                 {
-                    Utils.Logger.Log($"TTS ({Name}): 代理配置错误: {ex.Message}");
+                    Logger.Log($"TTS ({Name}): 代理配置错误: {ex.Message}");
                     return null;
                 }
             }

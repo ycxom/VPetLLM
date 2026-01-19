@@ -1,7 +1,6 @@
-using System;
 using System.Net.Http;
 using System.Text.Json;
-using System.Threading.Tasks;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core.TTSCore
 {
@@ -69,13 +68,13 @@ namespace VPetLLM.Core.TTSCore
             if (response.IsSuccessStatusCode)
             {
                 var audioData = await response.Content.ReadAsByteArrayAsync();
-                Utils.Logger.Log($"TTS (GPT-SoVITS API v2): 接收音频数据，大小: {audioData.Length} 字节");
+                Logger.Log($"TTS (GPT-SoVITS API v2): 接收音频数据，大小: {audioData.Length} 字节");
                 return audioData;
             }
 
             // 失败时解析 JSON 错误响应
             var errorContent = await response.Content.ReadAsStringAsync();
-            Utils.Logger.Log($"TTS (GPT-SoVITS API v2): 错误响应: {errorContent}");
+            Logger.Log($"TTS (GPT-SoVITS API v2): 错误响应: {errorContent}");
 
             try
             {
@@ -109,11 +108,11 @@ namespace VPetLLM.Core.TTSCore
             // 只记录警告，不阻止请求（服务端会验证）
             if (!Array.Exists(validLangs, l => l == textLang))
             {
-                Utils.Logger.Log($"TTS (GPT-SoVITS API v2): 警告 - 文本语言 '{textLang}' 可能不受支持");
+                Logger.Log($"TTS (GPT-SoVITS API v2): 警告 - 文本语言 '{textLang}' 可能不受支持");
             }
             if (!Array.Exists(validLangs, l => l == promptLang))
             {
-                Utils.Logger.Log($"TTS (GPT-SoVITS API v2): 警告 - 提示语言 '{promptLang}' 可能不受支持");
+                Logger.Log($"TTS (GPT-SoVITS API v2): 警告 - 提示语言 '{promptLang}' 可能不受支持");
             }
         }
 
@@ -147,12 +146,12 @@ namespace VPetLLM.Core.TTSCore
                 // 移除可能的下划线或其他分隔符
                 text = text.TrimStart('_', '-', ' ');
 
-                Utils.Logger.Log($"TTS (GPT-SoVITS API v2): 从文件名提取 prompt_text: {text}");
+                Logger.Log($"TTS (GPT-SoVITS API v2): 从文件名提取 prompt_text: {text}");
                 return text;
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"TTS (GPT-SoVITS API v2): 提取 prompt_text 失败: {ex.Message}");
+                Logger.Log($"TTS (GPT-SoVITS API v2): 提取 prompt_text 失败: {ex.Message}");
                 return "";
             }
         }

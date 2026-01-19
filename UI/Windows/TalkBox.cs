@@ -1,10 +1,11 @@
 using Newtonsoft.Json;
-using System;
 using System.Net.Http;
 using System.Text;
 using System.Windows;
 using VPetLLM.Handlers;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
+using VPetLLM.Utils.UI;
 
 namespace VPetLLM.UI.Windows
 {
@@ -28,7 +29,7 @@ namespace VPetLLM.UI.Windows
         /// 获取消息处理器（用于流式处理等待）
         /// </summary>
         public SmartMessageProcessor MessageProcessor => _messageProcessor;
-        
+
         /// <summary>
         /// 获取气泡管理器（通过消息处理器）
         /// </summary>
@@ -42,7 +43,7 @@ namespace VPetLLM.UI.Windows
             {
                 _plugin.ChatCore.SetResponseHandler(HandleResponse);
             }
-            
+
             // 预初始化 MessageBarHelper
             _ = Application.Current.Dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.Background,
@@ -53,12 +54,12 @@ namespace VPetLLM.UI.Windows
                         var msgBar = _plugin.MW?.Main?.MsgBar;
                         if (msgBar != null)
                         {
-                            Utils.MessageBarHelper.PreInitialize(msgBar);
+                            MessageBarHelper.PreInitialize(msgBar);
                         }
                     }
                     catch { }
                 }));
-            
+
             Logger.Log("TalkBox created with BubbleManager integration.");
         }
 
@@ -107,7 +108,7 @@ namespace VPetLLM.UI.Windows
                     _thinkingCancellationTokenSource = null;
                     try { cts.Cancel(); cts.Dispose(); } catch { }
                 }
-                
+
                 // 更新状态灯为输出中
                 _plugin.FloatingSidebarManager?.SetOutputtingStatus();
             }
@@ -143,11 +144,11 @@ namespace VPetLLM.UI.Windows
 
             OnSendMessage?.Invoke(text);
             Logger.Log($"Responded called with text: {text}");
-            
+
             // 更新状态灯为处理中
             // 注意：不在这里调用 BeginActiveSession()，会话跟踪由 StreamingCommandProcessor 和 ResultAggregator 管理
             _plugin.FloatingSidebarManager?.SetProcessingStatus();
-            
+
             // 重置流式处理状态，为新对话做准备
             ResetStreamingState();
 
@@ -155,15 +156,15 @@ namespace VPetLLM.UI.Windows
             {
                 // 检查是否为 Debug 模式
                 bool isDebugMode = _plugin.Settings.Role == "VPetLLM_DeBug";
-                
+
                 if (isDebugMode)
                 {
                     Logger.Log("=== Debug 模式已激活 ===");
                     Logger.Log($"用户输入将直接作为 LLM 输出处理: {text}");
-                    
+
                     // 直接将用户输入作为 LLM 的输出处理
                     HandleResponse(text);
-                    
+
                     Logger.Log("Debug 模式处理完成");
                     return;
                 }
@@ -171,13 +172,13 @@ namespace VPetLLM.UI.Windows
                 // 输出当前动画状态用于调试
                 var currentAnimDesc = AnimationStateChecker.GetCurrentAnimationDescription(_plugin.MW);
                 Logger.Log($"TalkBox.Responded: 当前动画状态 = {currentAnimDesc}");
-                
+
                 // 检查是否为身体交互触发（带有[System]标记）
                 bool isBodyInteraction = text.StartsWith("[System]");
-                
+
                 // 检查VPet是否正在执行重要动画（包括用户交互动画如捏脸）
                 bool isPlayingImportantAnimation = AnimationStateChecker.IsPlayingImportantAnimation(_plugin.MW);
-                
+
                 if (isBodyInteraction)
                 {
                     // 身体交互触发：完全跳过思考动画和气泡
@@ -223,13 +224,13 @@ namespace VPetLLM.UI.Windows
                 // 停止思考动画（如果有的话）- 但不隐藏气泡，因为流式消息可能还在处理中
                 Logger.Log("Responded: 准备停止思考动画（仅停止动画，不隐藏气泡）");
                 StopThinkingAnimationWithoutHide();
-                
+
                 // 重置流式处理状态，为下一次对话做准备
                 ResetStreamingState();
-                
+
                 // 注意：不在这里调用 EndActiveSession()，会话跟踪由 StreamingCommandProcessor 管理
                 // StreamingCommandProcessor 会在所有命令处理完成后自动设置状态灯为 Idle
-                
+
                 Logger.Log("Responded: 思考动画已停止，状态灯由 StreamingCommandProcessor 管理");
             }
         }
@@ -242,9 +243,9 @@ namespace VPetLLM.UI.Windows
         public async Task SendChat(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return;
-            
+
             Logger.Log($"SendChat called with text: {text}");
-            
+
             // 重置流式处理状态
             ResetStreamingState();
 
@@ -252,7 +253,7 @@ namespace VPetLLM.UI.Windows
             {
                 // 检查VPet是否正在执行重要动画
                 bool isPlayingImportantAnimation = AnimationStateChecker.IsPlayingImportantAnimation(_plugin.MW);
-                
+
                 // 显示思考动画
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
@@ -294,9 +295,9 @@ namespace VPetLLM.UI.Windows
                 await SendChat(text);
                 return;
             }
-            
+
             Logger.Log($"SendChatWithImage called with text: {text}, image size: {imageData.Length}");
-            
+
             // 重置流式处理状态
             ResetStreamingState();
 
@@ -304,7 +305,7 @@ namespace VPetLLM.UI.Windows
             {
                 // 检查VPet是否正在执行重要动画
                 bool isPlayingImportantAnimation = AnimationStateChecker.IsPlayingImportantAnimation(_plugin.MW);
-                
+
                 // 显示思考动画
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
@@ -483,7 +484,7 @@ namespace VPetLLM.UI.Windows
                 while (_isThinking && !cts.Token.IsCancellationRequested)
                 {
                     var text = baseText + dots[i++ % dots.Length];
-                    
+
                     // 使用 BubbleManager 显示思考气泡
                     if (_isThinking)
                     {
@@ -504,7 +505,7 @@ namespace VPetLLM.UI.Windows
         {
             // 快速设置标志，阻止思考动画继续更新
             _isThinking = false;
-            
+
             // 取消思考动画任务
             var cts = _thinkingCancellationTokenSource;
             if (cts != null)
@@ -512,11 +513,11 @@ namespace VPetLLM.UI.Windows
                 _thinkingCancellationTokenSource = null;
                 try { cts.Cancel(); cts.Dispose(); } catch { }
             }
-            
+
             // 使用 BubbleManager 的 TimerCoordinator 停止定时器
             // 但不清理状态，保持气泡可见以便平滑过渡
             BubbleManager?.TimerCoordinator?.ForceStopAll();
-            
+
             // 使用低优先级异步清理流式状态
             Application.Current.Dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.Background,
@@ -527,7 +528,7 @@ namespace VPetLLM.UI.Windows
                         var msgBar = _plugin.MW.Main.MsgBar;
                         if (msgBar != null)
                         {
-                            Utils.MessageBarHelper.ClearStreamState(msgBar);
+                            MessageBarHelper.ClearStreamState(msgBar);
                         }
                     }
                     catch { }
@@ -542,7 +543,7 @@ namespace VPetLLM.UI.Windows
         {
             // 快速设置标志
             _isThinking = false;
-            
+
             // 取消思考动画任务
             var cts = _thinkingCancellationTokenSource;
             if (cts != null)
@@ -550,7 +551,7 @@ namespace VPetLLM.UI.Windows
                 _thinkingCancellationTokenSource = null;
                 try { cts.Cancel(); cts.Dispose(); } catch { }
             }
-            
+
             // 使用 BubbleManager 清理状态并隐藏气泡
             BubbleManager?.Clear();
             BubbleManager?.HideBubble();
@@ -563,13 +564,13 @@ namespace VPetLLM.UI.Windows
         {
             // 快速检查状态，避免不必要的操作
             if (!_isThinking) return;
-            
+
             try
             {
                 var msgBar = _plugin.MW.Main.MsgBar;
                 if (msgBar != null)
                 {
-                    Utils.MessageBarHelper.ShowBubbleQuick(msgBar, text, _plugin.MW.Core.Save.Name);
+                    MessageBarHelper.ShowBubbleQuick(msgBar, text, _plugin.MW.Core.Save.Name);
                 }
             }
             catch { /* 忽略显示错误，避免日志开销 */ }

@@ -7,7 +7,8 @@
     
         mc:Ignorable="d"
         Title="VPetLLM"
-    xmlns:utils="clr-namespace:VPetLLM.Utils"
+        xmlns:utils="clr-namespace:VPetLLM.Utils.Localization"
+        xmlns:converters="clr-namespace:VPetLLM.Utils.UI"
         Height="907"
         Width="1117"
         Background="{DynamicResource BackgroundBrush}">
@@ -16,7 +17,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="../Styles/Controls.xaml"/>
             </ResourceDictionary.MergedDictionaries>
-            <utils:BoolInverter x:Key="BoolInverter"/>
+            <converters:BoolInverter x:Key="BoolInverter"/>
 
             <!-- 现代化TabControl样式 -->
             <Style x:Key="ModernTabControl" TargetType="TabControl">
@@ -429,7 +430,7 @@
                                                     <GridViewColumn Header="{utils:Localize KeyPath=OpenAI.ApiKey}" Width="200">
                                                         <GridViewColumn.CellTemplate>
                                                             <DataTemplate>
-                                                                <PasswordBox utils:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay}"
+                                                                <PasswordBox converters:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay}"
                                                                             PasswordChar="*"
                                                                             BorderThickness="0"
                                                                             Background="Transparent"
@@ -643,7 +644,7 @@
                                                     <GridViewColumn Header="{utils:Localize KeyPath=Gemini.ApiKey}" Width="200">
                                                         <GridViewColumn.CellTemplate>
                                                             <DataTemplate>
-                                                                <PasswordBox utils:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay}"
+                                                                <PasswordBox converters:PasswordBoxHelper.BoundPassword="{Binding ApiKey, Mode=TwoWay}"
                                                                              PasswordChar="*"
                                                                              BorderThickness="0"
                                                                              Background="Transparent"

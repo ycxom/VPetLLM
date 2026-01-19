@@ -1,11 +1,10 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Audio;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -21,7 +20,7 @@ namespace VPetLLM.UI.Windows
 
         public event EventHandler<string>? TranscriptionCompleted;
         public event EventHandler? RecordingStopped;
-        
+
         // 公开IsRecording属性供外部检查
         public bool IsRecording => _isRecording;
 
@@ -67,11 +66,11 @@ namespace VPetLLM.UI.Windows
             {
                 // 获取工作区域（排除任务栏）
                 var workArea = SystemParameters.WorkArea;
-                
+
                 // 计算窗口位置
                 // X: 屏幕中央
                 Left = workArea.Left + (workArea.Width - ActualWidth) / 2;
-                
+
                 // Y: 屏幕底部，留出一些边距
                 Top = workArea.Bottom - ActualHeight - 20;
 
@@ -112,16 +111,16 @@ namespace VPetLLM.UI.Windows
             {
                 return;
             }
-            
+
             _isCancelled = true;
-            
+
             try
             {
                 Logger.Log("VoiceInput: Cancelling all operations...");
-                
+
                 // 取消所有异步操作
                 _cancellationTokenSource?.Cancel();
-                
+
                 // 停止录音
                 if (_isRecording)
                 {
@@ -160,13 +159,13 @@ namespace VPetLLM.UI.Windows
         {
             // 获取用户编辑后的文本
             var editedText = TranscriptionTextBox.Text?.Trim();
-            
+
             if (!string.IsNullOrEmpty(editedText))
             {
                 // 触发事件
                 TranscriptionCompleted?.Invoke(this, editedText);
             }
-            
+
             Close();
         }
 
@@ -216,7 +215,7 @@ namespace VPetLLM.UI.Windows
                 RecordButton.Content = LanguageHelper.Get("VoiceInput.StopRecording", _plugin.Settings.Language) ?? "停止录音";
                 StatusText.Text = LanguageHelper.Get("VoiceInput.Recording", _plugin.Settings.Language) ?? "正在录音...";
                 StatusHint.Text = LanguageHelper.Get("VoiceInput.RecordingHint", _plugin.Settings.Language) ?? "再次点击停止录音";
-                
+
                 // 显示录音动画
                 RecordingPulse.Visibility = Visibility.Visible;
                 StartPulseAnimation();
@@ -237,11 +236,11 @@ namespace VPetLLM.UI.Windows
                 RecordButton.Content = LanguageHelper.Get("VoiceInput.StartRecording", _plugin.Settings.Language) ?? "开始录音";
                 StatusText.Text = LanguageHelper.Get("VoiceInput.Processing", _plugin.Settings.Language) ?? "正在处理...";
                 StatusHint.Text = "";
-                
+
                 // 停止录音动画
                 RecordingPulse.Visibility = Visibility.Collapsed;
                 StopPulseAnimation();
-                
+
                 // 触发录音停止事件
                 RecordingStopped?.Invoke(this, EventArgs.Empty);
             });
@@ -384,7 +383,7 @@ namespace VPetLLM.UI.Windows
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
-            
+
             // 清理资源
             _cancellationTokenSource?.Dispose();
             _asrService?.Dispose();

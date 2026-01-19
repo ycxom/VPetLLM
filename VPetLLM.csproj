@@ -24,6 +24,13 @@
 		<PackageReference Include="VPet-Simulator.Core" Version="1.1.0.58" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<!-- 排除archive目录中的所有C#文件，防止编译冲突 -->
+		<Compile Remove="archive\**\*.cs" />
+	</ItemGroup>
+
+
+
 
 	<ItemGroup>
 	  <Compile Update="Properties\Settings.Designer.cs">

@@ -1,6 +1,6 @@
 using System.Windows;
 using VPetLLM.UI.Windows;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -60,7 +60,7 @@ namespace VPetLLM.Services
                 }
 
                 _voiceInputHotkey = new GlobalHotkey(windowHandle, VOICE_INPUT_HOTKEY_ID);
-                
+
                 uint modifiers = GlobalHotkey.ParseModifiers(_settings.ASR.HotkeyModifiers);
                 uint key = GlobalHotkey.ParseKey(_settings.ASR.HotkeyKey);
 
@@ -111,11 +111,11 @@ namespace VPetLLM.Services
                 case VoiceInputState.Idle:
                     StartRecording();
                     break;
-                    
+
                 case VoiceInputState.Recording:
                     StopRecording();
                     break;
-                    
+
                 case VoiceInputState.Editing:
                     CancelRecording();
                     StartRecording();
@@ -129,7 +129,7 @@ namespace VPetLLM.Services
             try
             {
                 Logger.Log("Starting voice input...");
-                
+
                 if (_currentVoiceInputWindow != null)
                 {
                     Logger.Log("Previous voice input window still exists, closing it first");
@@ -143,26 +143,26 @@ namespace VPetLLM.Services
                     }
                     _currentVoiceInputWindow = null;
                 }
-                
+
                 SetState(VoiceInputState.Recording);
-                
+
                 bool quickMode = _settings.ASR.AutoSend;
                 _currentVoiceInputWindow = new winVoiceInput(_plugin, quickMode);
-                
+
                 _currentVoiceInputWindow.Closed += (s, e) =>
                 {
                     _currentVoiceInputWindow = null;
                     SetState(VoiceInputState.Idle);
                     Logger.Log("Voice input window closed, state reset to Idle");
                 };
-                
+
                 _currentVoiceInputWindow.RecordingStopped += (s, e) =>
                 {
                     Logger.Log("Recording stopped, waiting for transcription...");
                 };
-                
+
                 _currentVoiceInputWindow.TranscriptionCompleted += OnWindowTranscriptionCompleted;
-                
+
                 _currentVoiceInputWindow.Show();
                 Logger.Log("Voice input window shown");
             }
@@ -177,7 +177,7 @@ namespace VPetLLM.Services
         private void OnWindowTranscriptionCompleted(object? sender, string transcription)
         {
             Logger.Log($"Transcription completed, text length: {transcription?.Length ?? 0}");
-            
+
             if (!string.IsNullOrWhiteSpace(transcription))
             {
                 Logger.Log("Transcription received, raising event");
@@ -197,21 +197,21 @@ namespace VPetLLM.Services
             try
             {
                 Logger.Log("Stopping voice input...");
-                
+
                 if (_currentVoiceInputWindow == null)
                 {
                     Logger.Log("No voice input window to stop, resetting state to Idle");
                     SetState(VoiceInputState.Idle);
                     return;
                 }
-                
+
                 if (!_currentVoiceInputWindow.IsRecording)
                 {
                     Logger.Log("Window is not recording, resetting state to Idle");
                     SetState(VoiceInputState.Idle);
                     return;
                 }
-                
+
                 _currentVoiceInputWindow.StopRecording();
             }
             catch (Exception ex)

@@ -1,6 +1,5 @@
-using System;
-using System.Threading.Tasks;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Audio;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -19,12 +18,12 @@ namespace VPetLLM.Handlers
             /// 等待TTS完成
             /// </summary>
             WaitForTTS,
-            
+
             /// <summary>
             /// 使用估算时间
             /// </summary>
             UseEstimatedTime,
-            
+
             /// <summary>
             /// 混合模式（TTS + 最小时间）
             /// </summary>
@@ -40,42 +39,42 @@ namespace VPetLLM.Handlers
             /// 实际等待时间（毫秒）
             /// </summary>
             public int ActualWaitTimeMs { get; set; }
-            
+
             /// <summary>
             /// 估算时间（毫秒）
             /// </summary>
             public int EstimatedTimeMs { get; set; }
-            
+
             /// <summary>
             /// TTS实际播放时间（毫秒）
             /// </summary>
             public int TTSPlaybackTimeMs { get; set; }
-            
+
             /// <summary>
             /// 是否应用了最小时间限制
             /// </summary>
             public bool AppliedMinTimeLimit { get; set; }
-            
+
             /// <summary>
             /// 是否TTS超时
             /// </summary>
             public bool TTSTimedOut { get; set; }
-            
+
             /// <summary>
             /// 使用的协调模式
             /// </summary>
             public CoordinationMode UsedMode { get; set; }
-            
+
             /// <summary>
             /// 开始时间
             /// </summary>
             public DateTime StartTime { get; set; }
-            
+
             /// <summary>
             /// 结束时间
             /// </summary>
             public DateTime EndTime { get; set; }
-            
+
             /// <summary>
             /// 总耗时（毫秒）
             /// </summary>
@@ -128,15 +127,15 @@ namespace VPetLLM.Handlers
                     case CoordinationMode.WaitForTTS:
                         await CoordinateWithTTSWait(actionContent, text, result);
                         break;
-                        
+
                     case CoordinationMode.UseEstimatedTime:
                         await CoordinateWithEstimatedTime(actionContent, text, result);
                         break;
-                        
+
                     case CoordinationMode.Hybrid:
                         await CoordinateWithHybridMode(actionContent, text, result);
                         break;
-                        
+
                     default:
                         Logger.Log($"AnimationTimingCoordinator: 未知协调模式 {usedMode}，使用混合模式");
                         await CoordinateWithHybridMode(actionContent, text, result);
@@ -171,15 +170,15 @@ namespace VPetLLM.Handlers
 
             // 启动动画
             var animationTask = ExecuteAnimation(actionContent);
-            
+
             // 等待VPetTTS完成
             var ttsStartTime = DateTime.Now;
             var ttsTask = WaitForVPetTTSComplete(text);
-            
+
             // 应用超时
             var timeoutTask = Task.Delay(_ttsTimeoutMs);
             var completedTask = await Task.WhenAny(ttsTask, timeoutTask);
-            
+
             if (completedTask == timeoutTask)
             {
                 Logger.Log($"AnimationTimingCoordinator: TTS等待超时 ({_ttsTimeoutMs}ms)");
@@ -191,13 +190,13 @@ namespace VPetLLM.Handlers
                 result.TTSPlaybackTimeMs = (int)(DateTime.Now - ttsStartTime).TotalMilliseconds;
                 Logger.Log($"AnimationTimingCoordinator: TTS播放完成，耗时: {result.TTSPlaybackTimeMs}ms");
             }
-            
+
             // 确保最小显示时间
             var minTimeTask = Task.Delay(_minDisplayDurationMs);
-            
+
             // 等待所有任务完成
             await Task.WhenAll(animationTask, minTimeTask);
-            
+
             result.ActualWaitTimeMs = Math.Max(result.TTSPlaybackTimeMs, _minDisplayDurationMs);
             result.AppliedMinTimeLimit = result.TTSPlaybackTimeMs < _minDisplayDurationMs;
         }
@@ -215,16 +214,16 @@ namespace VPetLLM.Handlers
 
             // 启动动画
             var animationTask = ExecuteAnimation(actionContent);
-            
+
             // 使用估算时间
             var displayTime = Math.Max(result.EstimatedTimeMs, _minDisplayDurationMs);
             result.AppliedMinTimeLimit = result.EstimatedTimeMs < _minDisplayDurationMs;
-            
+
             var timingTask = Task.Delay(displayTime);
-            
+
             // 等待动画和时序完成
             await Task.WhenAll(animationTask, timingTask);
-            
+
             result.ActualWaitTimeMs = displayTime;
             result.TTSPlaybackTimeMs = 0; // 不等待TTS
         }
@@ -242,17 +241,17 @@ namespace VPetLLM.Handlers
 
             // 启动动画
             var animationTask = ExecuteAnimation(actionContent);
-            
+
             // 同时启动TTS等待和估算时间
             var ttsStartTime = DateTime.Now;
             var ttsTask = WaitForVPetTTSComplete(text);
             var estimatedTimeTask = Task.Delay(result.EstimatedTimeMs);
             var minTimeTask = Task.Delay(_minDisplayDurationMs);
-            
+
             // 等待TTS完成或估算时间到达（取较短者）
             var ttsTimeoutTask = Task.Delay(_ttsTimeoutMs);
             var firstCompleted = await Task.WhenAny(ttsTask, estimatedTimeTask, ttsTimeoutTask);
-            
+
             if (firstCompleted == ttsTask)
             {
                 result.TTSPlaybackTimeMs = (int)(DateTime.Now - ttsStartTime).TotalMilliseconds;
@@ -269,10 +268,10 @@ namespace VPetLLM.Handlers
                 result.TTSPlaybackTimeMs = _ttsTimeoutMs;
                 Logger.Log($"AnimationTimingCoordinator: TTS超时 ({_ttsTimeoutMs}ms)");
             }
-            
+
             // 确保最小显示时间
             await Task.WhenAll(animationTask, minTimeTask);
-            
+
             result.ActualWaitTimeMs = Math.Max(
                 Math.Min(result.TTSPlaybackTimeMs, result.EstimatedTimeMs),
                 _minDisplayDurationMs
@@ -293,7 +292,7 @@ namespace VPetLLM.Handlers
                 {
                     // 使用现有的动作处理器执行动作
                     var actionQueue = _plugin.ActionProcessor.Process(actionContent, _plugin.Settings);
-                    
+
                     foreach (var action in actionQueue)
                     {
                         if (string.IsNullOrEmpty(action.Value))
@@ -326,7 +325,7 @@ namespace VPetLLM.Handlers
             try
             {
                 Logger.Log("AnimationTimingCoordinator: 开始等待外置TTS播放完成...");
-                
+
                 // 直接回退到传统的 VPet 语音等待
                 await WaitForVPetVoiceCompleteAsync();
             }

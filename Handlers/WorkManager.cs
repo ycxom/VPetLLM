@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -48,9 +45,9 @@ namespace VPetLLM.Handlers
                     List<VPet_Simulator.Core.GraphHelper.Work> works = null;
                     List<VPet_Simulator.Core.GraphHelper.Work> studies = null;
                     List<VPet_Simulator.Core.GraphHelper.Work> plays = null;
-                    
+
                     mainWindow.Main.WorkList(out works, out studies, out plays);
-                    
+
                     _cachedWorks = works?.Cast<object>().ToList() ?? new List<object>();
                     _cachedStudies = studies?.Cast<object>().ToList() ?? new List<object>();
                     _cachedPlays = plays?.Cast<object>().ToList() ?? new List<object>();
@@ -408,7 +405,7 @@ namespace VPetLLM.Handlers
             }
 
             var workName = GetWorkProperty(work, "NameTrans") ?? GetWorkProperty(work, "Name");
-            
+
             // If rate is 1, just use the original StartWork
             if (requestedRate <= 1)
             {
@@ -461,7 +458,7 @@ namespace VPetLLM.Handlers
                     Logger.Log($"WorkManager: Work is not VPet_Simulator.Core.GraphHelper.Work type, trying reflection");
                     var extensionType = typeof(VPet_Simulator.Windows.Interface.ExtensionFunction);
                     var doubleMethod = extensionType.GetMethod("Double", new[] { work.GetType(), typeof(int) });
-                    
+
                     if (doubleMethod != null)
                     {
                         var doubledWork = doubleMethod.Invoke(null, new object[] { work, clampedRate });

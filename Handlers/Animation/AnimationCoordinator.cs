@@ -1,9 +1,6 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Animation
 {
@@ -13,7 +10,7 @@ namespace VPetLLM.Handlers.Animation
     /// </summary>
     public class AnimationCoordinator : IDisposable
     {
-        private static readonly Lazy<AnimationCoordinator> _instance = 
+        private static readonly Lazy<AnimationCoordinator> _instance =
             new Lazy<AnimationCoordinator>(() => new AnimationCoordinator());
 
         /// <summary>单例实例</summary>

@@ -49,3 +49,7 @@
 
 # all debug
 *debug*
+!Utils/TTSDebugLogger.cs
+
+
+archive

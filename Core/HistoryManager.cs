@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using System.IO;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core
 {
@@ -19,10 +20,10 @@ namespace VPetLLM.Core
             _providerName = name;
             _chatCore = chatCore;
             _database = new ChatHistoryDatabase(GetDatabasePath());
-            
+
             // 迁移旧的 JSON 数据到 SQLite
             MigrateFromJsonIfNeeded();
-            
+
             LoadHistory();
         }
 
@@ -47,7 +48,7 @@ namespace VPetLLM.Core
                 {
                     _history = _database.GetAllHistory();
                 }
-                
+
                 Logger.Log($"从数据库加载了 {_history.Count} 条历史记录");
             }
             catch (Exception ex)
@@ -98,7 +99,7 @@ namespace VPetLLM.Core
             }
 
             _history.Add(message);
-            
+
             // 实时保存到数据库
             try
             {
@@ -137,7 +138,7 @@ namespace VPetLLM.Core
         public void ClearHistory()
         {
             _history.Clear();
-            
+
             // 从数据库中清除
             try
             {
@@ -191,7 +192,7 @@ namespace VPetLLM.Core
             };
             newHistory.AddRange(messagesToKeep);
             _history = newHistory;
-            
+
             // 更新数据库
             try
             {
@@ -224,7 +225,7 @@ namespace VPetLLM.Core
             {
                 var docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                 var dataPath = Path.Combine(docPath, "VPetLLM", "Chat");
-                
+
                 if (!Directory.Exists(dataPath))
                 {
                     return;
@@ -264,7 +265,7 @@ namespace VPetLLM.Core
                             // 从文件名提取提供商名称
                             var fileName = Path.GetFileNameWithoutExtension(jsonFile);
                             var provider = fileName.Replace("chat_history_", "").Replace("chat_history", "default");
-                            
+
                             _database.AddMessages(provider, messages);
                             Logger.Log($"已迁移 {messages.Count} 条消息从 {Path.GetFileName(jsonFile)}");
                         }

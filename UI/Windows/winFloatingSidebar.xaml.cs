@@ -1,11 +1,9 @@
-using System;
-using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using VPetLLM.UI.Controls;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLMPlugin.UI.Windows
 {
@@ -45,14 +43,14 @@ namespace VPetLLMPlugin.UI.Windows
             try
             {
                 _isClosing = true;
-                
+
                 // 清理按钮字典
                 _buttons.Clear();
-                
+
                 // 清理事件处理器
                 ButtonClicked = null;
                 SidebarClosed = null;
-                
+
                 Logger.Log("winFloatingSidebar resources cleaned up");
             }
             catch (Exception ex)
@@ -143,7 +141,7 @@ namespace VPetLLMPlugin.UI.Windows
 
                 for (int i = ButtonContainer.Children.Count - 1; i >= 0; i--)
                 {
-                    if (ButtonContainer.Children[i] is Button button && 
+                    if (ButtonContainer.Children[i] is Button button &&
                         button.Tag?.ToString() == buttonId)
                     {
                         ButtonContainer.Children.RemoveAt(i);
@@ -173,7 +171,7 @@ namespace VPetLLMPlugin.UI.Windows
                 }
 
                 var buttons = new List<Button>();
-                
+
                 foreach (UIElement child in ButtonContainer.Children)
                 {
                     if (child is Button button)
@@ -190,7 +188,7 @@ namespace VPetLLMPlugin.UI.Windows
                     {
                         continue;
                     }
-                    
+
                     var button = buttons.Find(b => b.Tag?.ToString() == buttonId);
                     if (button != null)
                     {
@@ -233,7 +231,7 @@ namespace VPetLLMPlugin.UI.Windows
             catch (Exception ex)
             {
                 Logger.Log($"Error setting transparency: {ex.Message}");
-                
+
                 // 降级处理：直接设置透明度，不使用动画
                 try
                 {
@@ -304,7 +302,7 @@ namespace VPetLLMPlugin.UI.Windows
                 }
 
                 Logger.Log("Sidebar close button clicked");
-                
+
                 try
                 {
                     SidebarClosed?.Invoke(this, EventArgs.Empty);
@@ -313,7 +311,7 @@ namespace VPetLLMPlugin.UI.Windows
                 {
                     Logger.Log($"Error invoking SidebarClosed event: {invokeEx.Message}");
                 }
-                
+
                 Hide();
             }
             catch (Exception ex)
@@ -348,7 +346,7 @@ namespace VPetLLMPlugin.UI.Windows
         protected override void OnLocationChanged(EventArgs e)
         {
             base.OnLocationChanged(e);
-            
+
             if (!_isDragging)
             {
                 return;

@@ -1,6 +1,7 @@
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core
 {
@@ -9,7 +10,7 @@ namespace VPetLLM.Core
         private readonly Setting _settings;
         private readonly IMainWindow _mainWindow;
         private readonly ActionProcessor _actionProcessor;
-        private Utils.FoodSearchService _foodSearchService;
+        private FoodSearchService _foodSearchService;
 
         public SystemMessageProvider(Setting settings, IMainWindow mainWindow, ActionProcessor actionProcessor)
         {
@@ -17,15 +18,15 @@ namespace VPetLLM.Core
             _mainWindow = mainWindow;
             _actionProcessor = actionProcessor;
         }
-        
+
         /// <summary>
         /// 获取或创建食物搜索服务
         /// </summary>
-        private Utils.FoodSearchService GetFoodSearchService()
+        private FoodSearchService GetFoodSearchService()
         {
             if (_foodSearchService == null)
             {
-                _foodSearchService = new Utils.FoodSearchService(_mainWindow);
+                _foodSearchService = new FoodSearchService(_mainWindow);
             }
             return _foodSearchService;
         }
@@ -36,7 +37,7 @@ namespace VPetLLM.Core
         private string GetStatusDescription(double percentage, string type)
         {
             var lang = _settings.PromptLanguage;
-            
+
             if (type == "hunger" || type == "thirst")
             {
                 // 对于饥饿度和口渴度，100%表示不饿/不渴
@@ -93,7 +94,7 @@ namespace VPetLLM.Core
                 else
                     return lang == "zh" ? "非常疲惫" : "exhausted";
             }
-            
+
             return "";
         }
 
@@ -118,7 +119,7 @@ namespace VPetLLM.Core
             if (_settings.EnableAction)
             {
                 parts.Add(PromptHelper.Get("Character_Setting", lang));
-                
+
                 // 只有在Records系统启用时才添加记忆系统规则
                 if (_settings.Records?.EnableRecords ?? true)
                 {
@@ -133,7 +134,7 @@ namespace VPetLLM.Core
                 if (_settings.EnableState && !_settings.ReduceInputTokenUsage)
                 {
                     var core = _mainWindow.Core;
-                    
+
                     // 计算各项百分比
                     var staminaPercent = core.Save.Strength / core.Save.StrengthMax * 100;
                     var healthPercent = core.Save.Health;
@@ -141,7 +142,7 @@ namespace VPetLLM.Core
                     var likabilityPercent = core.Save.Likability / core.Save.LikabilityMax * 100;
                     var hungerPercent = core.Save.StrengthFood / core.Save.StrengthMax * 100;
                     var thirstPercent = core.Save.StrengthDrink / core.Save.StrengthMax * 100;
-                    
+
                     // 获取状态描述
                     var staminaDesc = GetStatusDescription(staminaPercent, "stamina");
                     var healthDesc = GetStatusDescription(healthPercent, "health");
@@ -149,7 +150,7 @@ namespace VPetLLM.Core
                     var likabilityDesc = GetStatusDescription(likabilityPercent, "likability");
                     var hungerDesc = GetStatusDescription(hungerPercent, "hunger");
                     var thirstDesc = GetStatusDescription(thirstPercent, "thirst");
-                    
+
                     var status = PromptHelper.Get("Status_Prefix", lang)
                         .Replace("{Level}", core.Save.Level.ToString())
                         .Replace("{Money:F2}", core.Save.Money.ToString("F2"))
@@ -168,7 +169,7 @@ namespace VPetLLM.Core
 
                     parts.Add(status);
                 }
-                
+
 
                 // 只有在EnablePlugin开启时才添加插件动态信息
                 if (_settings.EnablePlugin)
@@ -191,26 +192,26 @@ namespace VPetLLM.Core
                     bool isEnabled = handler.ActionType switch
                     {
                         ActionType.State => _settings.EnableState,
-                        ActionType.Body => (handler.Keyword.ToLower() == "action" && _settings.EnableActionExecution) || 
+                        ActionType.Body => (handler.Keyword.ToLower() == "action" && _settings.EnableActionExecution) ||
                                           (handler.Keyword.ToLower() == "move" && _settings.EnableMove),
                         ActionType.Talk => true,
                         ActionType.Plugin => _settings.EnablePlugin,
                         ActionType.Tool => true, // Tool handlers are enabled by default
                         _ => false
                     };
-                    
+
                     // 特殊处理buy指令
                     if (handler.Keyword.ToLower() == "buy")
                     {
                         isEnabled = _settings.EnableBuy;
                     }
-                    
+
                     // 特殊处理record指令 - 检查Records系统是否启用
                     if (handler.Keyword.ToLower() == "record" || handler.Keyword.ToLower() == "record_modify")
                     {
                         isEnabled = _settings.Records?.EnableRecords ?? true;
                     }
-                    
+
                     // 特殊处理play指令 - 检查MediaPlayback是否启用
                     if (handler.Keyword.ToLower() == "play")
                     {
@@ -228,7 +229,7 @@ namespace VPetLLM.Core
                     parts.Add(PromptHelper.Get("Available_Commands_Prefix", lang)
                                 .Replace("{CommandList}", string.Join("\n", instructions)));
                 }
-                
+
                 // 只有在Records系统启用时才添加记录系统说明
                 if (_settings.Records?.EnableRecords ?? true)
                 {
@@ -238,7 +239,7 @@ namespace VPetLLM.Core
                         parts.Add(recordInstructions);
                     }
                 }
-                
+
                 // 只有在EnableVPetSettingsControl启用时才添加VPet设置控制命令说明
                 if (_settings.EnableVPetSettingsControl)
                 {
@@ -248,7 +249,7 @@ namespace VPetLLM.Core
                         parts.Add(vpetSettingsInstructions);
                     }
                 }
-                
+
                 // 只有在EnableActionExecution开启时才添加动画列表
                 if (_settings.EnableActionExecution)
                 {
@@ -264,15 +265,15 @@ namespace VPetLLM.Core
                     var searchService = GetFoodSearchService();
                     var simplifiedList = searchService.GetSimplifiedFoodListPrompt(lang);
                     var totalCount = searchService.GetTotalFoodCount();
-                    
+
                     // 添加提示：AI可以使用任何物品名称，系统会自动进行模糊匹配
-                    var fuzzySearchHint = lang == "zh" 
-                        ? $"（共{totalCount}个物品，支持模糊搜索，你可以使用任何相近的名称）" 
+                    var fuzzySearchHint = lang == "zh"
+                        ? $"（共{totalCount}个物品，支持模糊搜索，你可以使用任何相近的名称）"
                         : $"({totalCount} items total, fuzzy search supported, you can use similar names)";
-                    
+
                     parts.Add(PromptHelper.Get("Available_Items_Prefix", lang)
                                 .Replace("{ItemList}", simplifiedList + fuzzySearchHint));
-                    
+
                     // 添加物品栏信息（桌宠已拥有的物品）
                     var inventorySummary = searchService.GetInventorySummary(lang);
                     if (!string.IsNullOrEmpty(inventorySummary) && inventorySummary != (lang == "zh" ? "物品栏为空" : "Inventory is empty"))
@@ -334,7 +335,7 @@ namespace VPetLLM.Core
 
             var lang = _settings.PromptLanguage;
             var core = _mainWindow.Core;
-            
+
             // 计算各项百分比
             var staminaPercent = core.Save.Strength / core.Save.StrengthMax * 100;
             var healthPercent = core.Save.Health;
@@ -342,7 +343,7 @@ namespace VPetLLM.Core
             var likabilityPercent = core.Save.Likability / core.Save.LikabilityMax * 100;
             var hungerPercent = core.Save.StrengthFood / core.Save.StrengthMax * 100;
             var thirstPercent = core.Save.StrengthDrink / core.Save.StrengthMax * 100;
-            
+
             // 获取状态描述
             var staminaDesc = GetStatusDescription(staminaPercent, "stamina");
             var healthDesc = GetStatusDescription(healthPercent, "health");
@@ -350,7 +351,7 @@ namespace VPetLLM.Core
             var likabilityDesc = GetStatusDescription(likabilityPercent, "likability");
             var hungerDesc = GetStatusDescription(hungerPercent, "hunger");
             var thirstDesc = GetStatusDescription(thirstPercent, "thirst");
-            
+
             // 构建简洁的状态字符串（不再添加前缀，由 DisplayContent 的 JSON 格式标识）
             var statusParts = new List<string>
             {
@@ -363,7 +364,7 @@ namespace VPetLLM.Core
                 $"{lang switch { "zh" => "饱食", _ => "Hunger" }}:{hungerPercent:F0}%({hungerDesc})",
                 $"{lang switch { "zh" => "口渴", _ => "Thirst" }}:{thirstPercent:F0}%({thirstDesc})"
             };
-            
+
             // 如果启用了拓展状态获取，添加工作状态信息
             if (_settings.EnableExtendedState)
             {
@@ -373,10 +374,10 @@ namespace VPetLLM.Core
                     statusParts.Add(activityState);
                 }
             }
-            
+
             return string.Join(";", statusParts);
         }
-        
+
         /// <summary>
         /// 获取宠物当前活动状态（睡觉、工作、学习、玩耍等）
         /// </summary>
@@ -386,19 +387,19 @@ namespace VPetLLM.Core
             {
                 var lang = _settings.PromptLanguage;
                 var main = _mainWindow.Main;
-                
+
                 // 获取工作状态
                 var workingState = main.State;
-                
+
                 switch (workingState)
                 {
                     case VPet_Simulator.Core.Main.WorkingState.Sleep:
-                        return lang switch 
-                        { 
-                            "zh" => "活动:睡觉中", 
-                            _ => "Activity:Sleeping" 
+                        return lang switch
+                        {
+                            "zh" => "活动:睡觉中",
+                            _ => "Activity:Sleeping"
                         };
-                        
+
                     case VPet_Simulator.Core.Main.WorkingState.Work:
                         // 进一步判断是工作还是学习
                         if (main.NowWork != null)
@@ -406,58 +407,58 @@ namespace VPetLLM.Core
                             var workType = main.NowWork.Type;
                             if (workType == VPet_Simulator.Core.GraphHelper.Work.WorkType.Work)
                             {
-                                return lang switch 
-                                { 
-                                    "zh" => $"活动:工作中({main.NowWork.NameTrans})", 
-                                    _ => $"Activity:Working({main.NowWork.NameTrans})" 
+                                return lang switch
+                                {
+                                    "zh" => $"活动:工作中({main.NowWork.NameTrans})",
+                                    _ => $"Activity:Working({main.NowWork.NameTrans})"
                                 };
                             }
                             else if (workType == VPet_Simulator.Core.GraphHelper.Work.WorkType.Study)
                             {
-                                return lang switch 
-                                { 
-                                    "zh" => $"活动:学习中({main.NowWork.NameTrans})", 
-                                    _ => $"Activity:Studying({main.NowWork.NameTrans})" 
+                                return lang switch
+                                {
+                                    "zh" => $"活动:学习中({main.NowWork.NameTrans})",
+                                    _ => $"Activity:Studying({main.NowWork.NameTrans})"
                                 };
                             }
                             else
                             {
-                                return lang switch 
-                                { 
-                                    "zh" => $"活动:忙碌中({main.NowWork.NameTrans})", 
-                                    _ => $"Activity:Busy({main.NowWork.NameTrans})" 
+                                return lang switch
+                                {
+                                    "zh" => $"活动:忙碌中({main.NowWork.NameTrans})",
+                                    _ => $"Activity:Busy({main.NowWork.NameTrans})"
                                 };
                             }
                         }
-                        return lang switch 
-                        { 
-                            "zh" => "活动:工作中", 
-                            _ => "Activity:Working" 
+                        return lang switch
+                        {
+                            "zh" => "活动:工作中",
+                            _ => "Activity:Working"
                         };
-                        
+
                     case VPet_Simulator.Core.Main.WorkingState.Travel:
-                        return lang switch 
-                        { 
-                            "zh" => "活动:旅游中", 
-                            _ => "Activity:Traveling" 
+                        return lang switch
+                        {
+                            "zh" => "活动:旅游中",
+                            _ => "Activity:Traveling"
                         };
-                        
+
                     case VPet_Simulator.Core.Main.WorkingState.Nomal:
                         // 正常状态，检查是否在播放音乐或其他特殊动画
                         if (main.DisplayType.Name == "music")
                         {
-                            return lang switch 
-                            { 
-                                "zh" => "活动:听音乐", 
-                                _ => "Activity:Listening to music" 
+                            return lang switch
+                            {
+                                "zh" => "活动:听音乐",
+                                _ => "Activity:Listening to music"
                             };
                         }
-                        return lang switch 
-                        { 
-                            "zh" => "活动:空闲", 
-                            _ => "Activity:Idle" 
+                        return lang switch
+                        {
+                            "zh" => "活动:空闲",
+                            _ => "Activity:Idle"
                         };
-                        
+
                     default:
                         return "";
                 }

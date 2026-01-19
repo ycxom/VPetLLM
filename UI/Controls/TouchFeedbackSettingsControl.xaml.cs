@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Controls
 {
@@ -22,7 +23,7 @@ namespace VPetLLM.UI.Controls
             EnableTouchFeedbackCheckBox.IsChecked = settings.EnableTouchFeedback;
             TouchCooldownSlider.Value = settings.TouchCooldown;
             UpdateCooldownText();
-            
+
             // 根据主开关状态控制详细设置面板
             UpdateDetailSettingsVisibility(settings.EnableTouchFeedback);
         }
@@ -30,30 +31,30 @@ namespace VPetLLM.UI.Controls
         private void UpdateLanguage()
         {
             var langCode = _plugin.Settings.Language;
-            
+
             // 更新界面文本
             EnableTouchFeedbackCheckBox.Content = LanguageHelper.Get("TouchFeedback.Enable", langCode, "身体交互反馈");
-            
+
             // 更新说明文本
             var descriptionTextBlock = this.FindName("DescriptionTextBlock") as TextBlock;
             if (descriptionTextBlock != null)
             {
-                descriptionTextBlock.Text = LanguageHelper.Get("TouchFeedback.EnableDescription", langCode, 
+                descriptionTextBlock.Text = LanguageHelper.Get("TouchFeedback.EnableDescription", langCode,
                     "启用后，触摸VPet的头部或身体时会触发智能反馈");
             }
-            
+
             // 更新冷却时间标签
             var cooldownLabel = this.FindName("CooldownLabel") as TextBlock;
             if (cooldownLabel != null)
             {
                 cooldownLabel.Text = LanguageHelper.Get("TouchFeedback.TouchCooldown", langCode, "触摸冷却时间");
             }
-            
+
             // 更新说明文本
             var cooldownDescription = this.FindName("CooldownDescription") as TextBlock;
             if (cooldownDescription != null)
             {
-                cooldownDescription.Text = LanguageHelper.Get("TouchFeedback.CooldownDescription", langCode, 
+                cooldownDescription.Text = LanguageHelper.Get("TouchFeedback.CooldownDescription", langCode,
                     "冷却时间可防止过于频繁的交互，建议设置在1-3秒之间。");
             }
         }

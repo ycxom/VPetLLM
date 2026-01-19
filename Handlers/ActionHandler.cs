@@ -1,6 +1,8 @@
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Animation;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
+using VPetLLM.Utils.UI;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers
@@ -65,8 +67,8 @@ namespace VPetLLM.Handlers
                 return;
             }
 
-            Utils.Logger.Log($"ActionHandler: Executing action '{actionName}'");
-            
+            Logger.Log($"ActionHandler: Executing action '{actionName}'");
+
             var action = string.IsNullOrEmpty(actionName) ? "idel" : actionName;
 
             // Handle stopaction command - force stop current animation/work
@@ -81,11 +83,11 @@ namespace VPetLLM.Handlers
                         string stateName = "Unknown";
                         object currentStateValue = null;
                         System.Reflection.FieldInfo stateField = null;
-                        
+
                         // Get State field (VPet uses field, not property)
                         var mainType = mainWindow.Main.GetType();
                         stateField = mainType.GetField("State");
-                        
+
                         if (stateField != null)
                         {
                             currentStateValue = stateField.GetValue(mainWindow.Main);
@@ -116,7 +118,7 @@ namespace VPetLLM.Handlers
                                 catch (Exception workEx)
                                 {
                                     Logger.Log($"ActionHandler: Direct WorkTimer access failed: {workEx.Message}, trying reflection");
-                                    
+
                                     // Fallback to reflection
                                     var workTimerProperty = mainWindow.Main.GetType().GetProperty("WorkTimer");
                                     if (workTimerProperty != null)
@@ -144,7 +146,7 @@ namespace VPetLLM.Handlers
                             case "Sleep":
                                 // For sleep state, wake up properly with sleep end animation
                                 Logger.Log("ActionHandler: Stopping sleep state");
-                                
+
                                 // Set state to Nomal first
                                 if (stateField != null)
                                 {
@@ -152,7 +154,7 @@ namespace VPetLLM.Handlers
                                     var nomalState = Enum.Parse(workingStateType, "Nomal");
                                     stateField.SetValue(mainWindow.Main, nomalState);
                                 }
-                                
+
                                 // Play sleep end animation (C_End) then transition to normal
                                 try
                                 {
@@ -161,8 +163,8 @@ namespace VPetLLM.Handlers
                                     if (displayNomalProp != null)
                                     {
                                         var displayNomalAction = displayNomalProp.GetValue(mainWindow.Main) as Action;
-                                        mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.Sleep, 
-                                                               VPet_Simulator.Core.GraphInfo.AnimatType.C_End, 
+                                        mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.Sleep,
+                                                               VPet_Simulator.Core.GraphInfo.AnimatType.C_End,
                                                                displayNomalAction);
                                     }
                                     else
@@ -176,7 +178,7 @@ namespace VPetLLM.Handlers
                                     Logger.Log($"ActionHandler: Sleep end animation failed: {animEx.Message}");
                                     mainWindow.Main.DisplayToNomal();
                                 }
-                                
+
                                 Logger.Log("ActionHandler: stopaction completed");
                                 return;
 
@@ -210,7 +212,7 @@ namespace VPetLLM.Handlers
                 });
                 return;
             }
-            
+
             // 检查VPet是否正在执行重要动画
             if (AnimationStateChecker.IsPlayingImportantAnimation(mainWindow))
             {
@@ -231,7 +233,7 @@ namespace VPetLLM.Handlers
                         // Parse work name and optional rate using RateParser
                         string workNamePart = parts.Length >= 2 ? parts[1].Trim() : "";
                         string ratePart = parts.Length >= 3 ? parts[2].Trim() : "";
-                        
+
                         // If there are more than 3 parts, the work name might contain colons - rejoin them
                         if (parts.Length > 3)
                         {
@@ -239,9 +241,9 @@ namespace VPetLLM.Handlers
                             ratePart = parts[parts.Length - 1].Trim();
                             workNamePart = string.Join(":", parts.Skip(1).Take(parts.Length - 2)).Trim();
                         }
-                        
+
                         int rate = RateParser.ParseRate(ratePart, 1);
-                        
+
                         Logger.Log($"ActionHandler: Detected {actionType} request with name: {workNamePart}, rate: {rate}");
                         await HandleWorkAction(mainWindow, workNamePart, actionType, rate);
                         return;
@@ -256,7 +258,7 @@ namespace VPetLLM.Handlers
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
             {
                 bool actionTriggered = false;
-                
+
                 // Handle state-based actions
                 if (category == ActionCategory.StateBased)
                 {
@@ -473,7 +475,7 @@ namespace VPetLLM.Handlers
                             break;
                     }
                 }
-                
+
                 if (!actionTriggered)
                 {
                     Logger.Log($"ActionHandler: WARNING - Action '{action}' (category: {category}) failed to trigger");
@@ -482,7 +484,7 @@ namespace VPetLLM.Handlers
                 {
                     Logger.Log($"ActionHandler: Action '{action}' (category: {category}) completed successfully");
                 }
-                
+
                 await Task.Delay(1000);
             });
         }
@@ -514,7 +516,7 @@ namespace VPetLLM.Handlers
                 }
 
                 bool success;
-                
+
                 // Use StartWorkWithRate if rate > 1, otherwise use regular StartWork
                 if (rate > 1)
                 {

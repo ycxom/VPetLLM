@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core.ChatCore
 {
@@ -38,35 +39,35 @@ namespace VPetLLM.Core.ChatCore
             {
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
-                
+
                 if (!Settings.KeepContext)
                 {
                     ClearContext();
                 }
-                
+
                 // 检查视觉能力是否启用
                 if (!_ollamaSetting.EnableVision)
                 {
                     var visionError = "Ollama 未启用视觉能力，请在设置中启用 EnableVision";
-                    Utils.Logger.Log($"Ollama ChatWithImage 错误: {visionError}");
+                    Logger.Log($"Ollama ChatWithImage 错误: {visionError}");
                     ResponseHandler?.Invoke(visionError);
                     return "";
                 }
-                
+
                 // 验证图像数据
                 if (imageData == null || imageData.Length == 0)
                 {
                     var invalidImageError = "图像数据无效";
-                    Utils.Logger.Log($"Ollama ChatWithImage 错误: {invalidImageError}");
+                    Logger.Log($"Ollama ChatWithImage 错误: {invalidImageError}");
                     ResponseHandler?.Invoke(invalidImageError);
                     return "";
                 }
-                
-                Utils.Logger.Log($"Ollama ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
-                
+
+                Logger.Log($"Ollama ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+
                 // 编码图像为 base64
                 var base64Image = Convert.ToBase64String(imageData);
-                
+
                 // 创建用户消息
                 var tempUserMessage = CreateUserMessage($"[图像] {prompt}");
                 if (tempUserMessage != null)
@@ -74,7 +75,7 @@ namespace VPetLLM.Core.ChatCore
                     // 保存图像数据到消息对象（用于历史记录）
                     tempUserMessage.ImageData = imageData;
                 }
-                
+
                 // 构建历史记录
                 List<Message> history = GetCoreHistory();
                 // 如果有临时用户消息，添加到历史末尾用于API请求
@@ -84,7 +85,7 @@ namespace VPetLLM.Core.ChatCore
                 }
                 // 在添加用户消息后注入重要记录
                 history = InjectRecordsIntoHistory(history);
-                
+
                 // 构建请求负载 - Ollama 格式需要在消息级别添加 images 数组
                 var messages = new List<object>();
                 foreach (var msg in history)
@@ -94,16 +95,16 @@ namespace VPetLLM.Core.ChatCore
                         ["role"] = msg.Role,
                         ["content"] = msg.DisplayContent
                     };
-                    
+
                     // 如果消息包含图像，添加 images 数组
                     if (msg.HasImage)
                     {
                         messageObj["images"] = new[] { Convert.ToBase64String(msg.ImageData) };
                     }
-                    
+
                     messages.Add(messageObj);
                 }
-                
+
                 var data = new
                 {
                     model = _ollamaSetting.Model,
@@ -116,32 +117,32 @@ namespace VPetLLM.Core.ChatCore
                     } : null
                 };
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-                
+
                 string message;
                 using (var client = GetClient())
                 {
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
                     client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
-                    
+
                     if (_ollamaSetting.EnableStreaming)
                     {
                         // 流式传输模式
-                        Utils.Logger.Log("Ollama ChatWithImage: 使用流式传输模式");
+                        Logger.Log("Ollama ChatWithImage: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
                         {
                             Content = content
                         };
                         var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                         response.EnsureSuccessStatusCode();
-                        
+
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
                         {
                             // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
-                            Utils.Logger.Log($"Ollama流式: 检测到完整命令: {cmd}");
+                            Logger.Log($"Ollama流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
                         });
-                        
+
                         using (var stream = await response.Content.ReadAsStreamAsync())
                         using (var reader = new System.IO.StreamReader(stream))
                         {
@@ -150,7 +151,7 @@ namespace VPetLLM.Core.ChatCore
                             {
                                 if (string.IsNullOrWhiteSpace(line))
                                     continue;
-                                
+
                                 try
                                 {
                                     var chunk = JObject.Parse(line);
@@ -163,7 +164,7 @@ namespace VPetLLM.Core.ChatCore
                                         // 通知流式文本更新（用于显示）
                                         StreamingChunkHandler?.Invoke(delta);
                                     }
-                                    
+
                                     // 检查是否完成
                                     if (chunk["done"]?.Value<bool>() == true)
                                         break;
@@ -175,24 +176,24 @@ namespace VPetLLM.Core.ChatCore
                             }
                         }
                         message = fullMessage.ToString();
-                        Utils.Logger.Log($"Ollama流式: 流式传输完成，总消息长度: {message.Length}");
+                        Logger.Log($"Ollama流式: 流式传输完成，总消息长度: {message.Length}");
                         // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
                     else
                     {
                         // 非流式传输模式
-                        Utils.Logger.Log("Ollama ChatWithImage: 使用非流式传输模式");
+                        Logger.Log("Ollama ChatWithImage: 使用非流式传输模式");
                         var response = await client.PostAsync("/api/chat", content);
                         response.EnsureSuccessStatusCode();
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
                         message = responseObject["message"]["content"].ToString();
-                        Utils.Logger.Log($"Ollama非流式: 收到完整消息，长度: {message.Length}");
+                        Logger.Log($"Ollama非流式: 收到完整消息，长度: {message.Length}");
                         // 非流式模式下，一次性处理完整消息
                         ResponseHandler?.Invoke(message);
                     }
                 }
-                
+
                 // API调用成功后，才将用户消息和助手回复保存到历史记录
                 if (Settings.KeepContext)
                 {
@@ -210,24 +211,24 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (TaskCanceledException tcEx)
             {
-                Utils.Logger.Log($"Ollama ChatWithImage 请求超时: {tcEx.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.GetOllamaTimeoutError(Settings) 
+                Logger.Log($"Ollama ChatWithImage 请求超时: {tcEx.Message}");
+                var errorMessage = ErrorMessageHelper.GetOllamaTimeoutError(Settings)
                     ?? $"Ollama 请求超时: {tcEx.Message}";
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (HttpRequestException httpEx)
             {
-                Utils.Logger.Log($"Ollama ChatWithImage 网络异常: {httpEx.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.GetOllamaConnectionError(Settings) 
+                Logger.Log($"Ollama ChatWithImage 网络异常: {httpEx.Message}");
+                var errorMessage = ErrorMessageHelper.GetOllamaConnectionError(Settings)
                     ?? $"Ollama 网络异常: {httpEx.Message}";
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Ollama ChatWithImage 异常: {ex.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
+                Logger.Log($"Ollama ChatWithImage 异常: {ex.Message}");
+                var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
@@ -239,16 +240,16 @@ namespace VPetLLM.Core.ChatCore
             {
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
-                
+
                 if (!Settings.KeepContext)
                 {
                     ClearContext();
                 }
-                
+
                 // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
                 // 使用 CreateUserMessage 自动设置时间戳和状态信息
                 var tempUserMessage = CreateUserMessage(prompt);
-                
+
                 List<Message> history = GetCoreHistory();
                 // 如果有临时用户消息，添加到历史末尾用于API请求
                 if (tempUserMessage != null)
@@ -257,7 +258,7 @@ namespace VPetLLM.Core.ChatCore
                 }
                 // 在添加用户消息后注入重要记录
                 history = InjectRecordsIntoHistory(history);
-                
+
                 var data = new
                 {
                     model = _ollamaSetting.Model,
@@ -270,32 +271,32 @@ namespace VPetLLM.Core.ChatCore
                     } : null
                 };
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-                
+
                 string message;
                 using (var client = GetClient())
                 {
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
                     client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
-                    
+
                     if (_ollamaSetting.EnableStreaming)
                     {
                         // 流式传输模式
-                        Utils.Logger.Log("Ollama: 使用流式传输模式");
+                        Logger.Log("Ollama: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
                         {
                             Content = content
                         };
                         var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                         response.EnsureSuccessStatusCode();
-                        
+
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
                         {
                             // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
-                            Utils.Logger.Log($"Ollama流式: 检测到完整命令: {cmd}");
+                            Logger.Log($"Ollama流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
                         });
-                        
+
                         using (var stream = await response.Content.ReadAsStreamAsync())
                         using (var reader = new System.IO.StreamReader(stream))
                         {
@@ -304,7 +305,7 @@ namespace VPetLLM.Core.ChatCore
                             {
                                 if (string.IsNullOrWhiteSpace(line))
                                     continue;
-                                
+
                                 try
                                 {
                                     var chunk = JObject.Parse(line);
@@ -317,7 +318,7 @@ namespace VPetLLM.Core.ChatCore
                                         // 通知流式文本更新（用于显示）
                                         StreamingChunkHandler?.Invoke(delta);
                                     }
-                                    
+
                                     // 检查是否完成
                                     if (chunk["done"]?.Value<bool>() == true)
                                         break;
@@ -329,24 +330,24 @@ namespace VPetLLM.Core.ChatCore
                             }
                         }
                         message = fullMessage.ToString();
-                        Utils.Logger.Log($"Ollama流式: 流式传输完成，总消息长度: {message.Length}");
+                        Logger.Log($"Ollama流式: 流式传输完成，总消息长度: {message.Length}");
                         // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
                     else
                     {
                         // 非流式传输模式
-                        Utils.Logger.Log("Ollama: 使用非流式传输模式");
+                        Logger.Log("Ollama: 使用非流式传输模式");
                         var response = await client.PostAsync("/api/chat", content);
                         response.EnsureSuccessStatusCode();
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
                         message = responseObject["message"]["content"].ToString();
-                        Utils.Logger.Log($"Ollama非流式: 收到完整消息，长度: {message.Length}");
+                        Logger.Log($"Ollama非流式: 收到完整消息，长度: {message.Length}");
                         // 非流式模式下，一次性处理完整消息
                         ResponseHandler?.Invoke(message);
                     }
                 }
-                
+
                 // API调用成功后，才将用户消息和助手回复保存到历史记录
                 if (Settings.KeepContext)
                 {
@@ -364,24 +365,24 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (TaskCanceledException tcEx)
             {
-                Utils.Logger.Log($"Ollama Chat 请求超时: {tcEx.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.GetOllamaTimeoutError(Settings) 
+                Logger.Log($"Ollama Chat 请求超时: {tcEx.Message}");
+                var errorMessage = ErrorMessageHelper.GetOllamaTimeoutError(Settings)
                     ?? $"Ollama 请求超时: {tcEx.Message}\n{tcEx.StackTrace}";
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (HttpRequestException httpEx)
             {
-                Utils.Logger.Log($"Ollama Chat 网络异常: {httpEx.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.GetOllamaConnectionError(Settings) 
+                Logger.Log($"Ollama Chat 网络异常: {httpEx.Message}");
+                var errorMessage = ErrorMessageHelper.GetOllamaConnectionError(Settings)
                     ?? $"Ollama 网络异常: {httpEx.Message}\n{httpEx.StackTrace}";
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Ollama Chat 异常: {ex.Message}");
-                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
+                Logger.Log($"Ollama Chat 异常: {ex.Message}");
+                var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
@@ -404,14 +405,14 @@ namespace VPetLLM.Core.ChatCore
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
                     client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
                     var response = await client.PostAsync("/api/generate", content);
-                    
+
                     if (!response.IsSuccessStatusCode)
                     {
-                        var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Ollama");
-                        Utils.Logger.Log($"Ollama Summarize 错误: {errorMessage}");
-                        return Utils.ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败");
+                        var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Ollama");
+                        Logger.Log($"Ollama Summarize 错误: {errorMessage}");
+                        return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败");
                     }
-                    
+
                     var responseString = await response.Content.ReadAsStringAsync();
                     var responseObject = JObject.Parse(responseString);
                     return responseObject["response"].ToString();
@@ -419,20 +420,20 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (TaskCanceledException tcEx)
             {
-                Utils.Logger.Log($"Ollama Summarize 请求超时: {tcEx.Message}");
-                return Utils.ErrorMessageHelper.GetOllamaTimeoutError(Settings) 
+                Logger.Log($"Ollama Summarize 请求超时: {tcEx.Message}");
+                return ErrorMessageHelper.GetOllamaTimeoutError(Settings)
                     ?? $"Ollama Summarize 请求超时: {tcEx.Message}";
             }
             catch (HttpRequestException httpEx)
             {
-                Utils.Logger.Log($"Ollama Summarize 网络异常: {httpEx.Message}");
-                return Utils.ErrorMessageHelper.GetOllamaConnectionError(Settings) 
+                Logger.Log($"Ollama Summarize 网络异常: {httpEx.Message}");
+                return ErrorMessageHelper.GetOllamaConnectionError(Settings)
                     ?? $"Ollama Summarize 网络异常: {httpEx.Message}";
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"Ollama Summarize 异常: {ex.Message}");
-                return Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
+                Logger.Log($"Ollama Summarize 异常: {ex.Message}");
+                return ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
             }
         }
 
@@ -443,13 +444,13 @@ namespace VPetLLM.Core.ChatCore
                 new Message { Role = "system", Content = GetSystemMessage() }
             };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
-            
+
             // Inject important records into history (only when explicitly requested, after user message is added)
             if (injectRecords)
             {
                 history = InjectRecordsIntoHistory(history);
             }
-            
+
             return history;
         }
         /// <summary>
@@ -464,13 +465,13 @@ namespace VPetLLM.Core.ChatCore
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
                     client.Timeout = TimeSpan.FromSeconds(30); // 获取模型列表用较短超时
                     var response = client.GetAsync("/api/tags").Result;
-                    
+
                     if (!response.IsSuccessStatusCode)
                     {
-                        var errorMessage = Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Ollama").Result;
+                        var errorMessage = ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Ollama").Result;
                         throw new System.Exception(errorMessage);
                     }
-                    
+
                     var responseString = response.Content.ReadAsStringAsync().Result;
                     JObject responseObject;
                     try
@@ -479,7 +480,7 @@ namespace VPetLLM.Core.ChatCore
                     }
                     catch (JsonReaderException)
                     {
-                        var parseError = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                        var parseError = ErrorMessageHelper.IsDebugMode(Settings)
                             ? $"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}"
                             : "获取模型列表失败，服务器返回了无效的响应格式。";
                         throw new System.Exception(parseError);
@@ -494,7 +495,7 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (System.Exception ex) when (!(ex.Message.Contains("API") || ex.Message.Contains("获取模型")))
             {
-                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
+                var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
                 throw new System.Exception(errorMessage);
             }
         }

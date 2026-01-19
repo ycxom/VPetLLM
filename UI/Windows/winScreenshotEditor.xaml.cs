@@ -1,8 +1,7 @@
-using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Media.Imaging;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -31,7 +30,7 @@ namespace VPetLLM.UI.Windows
             _imageData = imageData ?? throw new ArgumentNullException(nameof(imageData));
 
             LoadImage();
-            
+
             // 设置默认提示词
             TextBoxPrompt.Text = "";
             UpdatePlaceholder();
@@ -68,8 +67,8 @@ namespace VPetLLM.UI.Windows
 
         private void UpdatePlaceholder()
         {
-            PlaceholderText.Visibility = string.IsNullOrEmpty(TextBoxPrompt.Text) 
-                ? Visibility.Visible 
+            PlaceholderText.Visibility = string.IsNullOrEmpty(TextBoxPrompt.Text)
+                ? Visibility.Visible
                 : Visibility.Collapsed;
         }
 
@@ -93,7 +92,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 var prompt = TextBoxPrompt.Text?.Trim();
-                
+
                 if (string.IsNullOrEmpty(prompt))
                 {
                     prompt = "请描述这张图片的内容。";

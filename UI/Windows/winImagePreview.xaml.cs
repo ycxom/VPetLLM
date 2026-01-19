@@ -1,9 +1,8 @@
-using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -13,7 +12,7 @@ namespace VPetLLM.UI.Windows
         {
             InitializeComponent();
             LoadImage(imageData);
-            
+
             // 在代码中注册 KeyDown 事件以支持 Escape 关闭
             PreviewKeyDown += (s, e) =>
             {

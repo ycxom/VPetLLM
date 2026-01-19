@@ -1,6 +1,5 @@
-using System;
-using System.Threading.Tasks;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Audio;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -19,12 +18,12 @@ namespace VPetLLM.Handlers
             /// 重试操作
             /// </summary>
             Retry,
-            
+
             /// <summary>
             /// 回退到默认处理
             /// </summary>
             Fallback,
-            
+
             /// <summary>
             /// 跳过失败的操作
             /// </summary>
@@ -67,16 +66,16 @@ namespace VPetLLM.Handlers
                 case FailureStrategy.Retry:
                     await RetryTTSOperation(actionContent, text, exception);
                     break;
-                    
+
                 case FailureStrategy.Fallback:
                     await ExecuteWithFallbackTiming(actionContent, text, exception);
                     break;
-                    
+
                 case FailureStrategy.Skip:
                     Logger.Log($"TTSFailureHandler: 跳过失败的TTS操作: {text}");
                     LogFailureDetails(text, exception, "操作已跳过");
                     break;
-                    
+
                 default:
                     Logger.Log($"TTSFailureHandler: 未知的失败处理策略: {_strategy}，使用回退策略");
                     await ExecuteWithFallbackTiming(actionContent, text, exception);
@@ -96,13 +95,13 @@ namespace VPetLLM.Handlers
             Logger.Log($"TTSFailureHandler: 开始重试TTS操作，最大重试次数: {_maxRetryAttempts}");
 
             Exception lastException = originalException;
-            
+
             for (int attempt = 1; attempt <= _maxRetryAttempts; attempt++)
             {
                 try
                 {
                     Logger.Log($"TTSFailureHandler: 重试第 {attempt} 次");
-                    
+
                     // 等待重试延迟
                     if (attempt > 1)
                     {
@@ -114,7 +113,7 @@ namespace VPetLLM.Handlers
                     {
                         await _plugin.TTSService.PlayTextAsync(text);
                         Logger.Log($"TTSFailureHandler: 重试第 {attempt} 次成功");
-                        
+
                         // 重试成功，执行动画
                         await ExecuteActionWithTiming(actionContent, text);
                         return;
@@ -142,7 +141,7 @@ namespace VPetLLM.Handlers
         private async Task ExecuteWithFallbackTiming(string actionContent, string text, Exception exception)
         {
             Logger.Log($"TTSFailureHandler: 使用回退时序执行操作");
-            
+
             // 记录失败详情和恢复建议
             LogFailureDetails(text, exception, "使用回退时序继续执行");
 
@@ -162,19 +161,19 @@ namespace VPetLLM.Handlers
             {
                 // 启动动画
                 var actionTask = ExecuteAction(actionContent);
-                
+
                 // 计算估算的显示时间
                 var estimatedDuration = CalculateEstimatedDuration(text);
                 var minDisplayDuration = GetMinDisplayDuration();
                 var displayDuration = Math.Max(estimatedDuration, minDisplayDuration);
-                
+
                 Logger.Log($"TTSFailureHandler: 使用估算时序 - 文本长度: {text?.Length ?? 0}, 估算时长: {estimatedDuration}ms, 最小时长: {minDisplayDuration}ms, 实际时长: {displayDuration}ms");
-                
+
                 // 等待动画和最小显示时间
                 var timingTask = Task.Delay(displayDuration);
-                
+
                 await Task.WhenAll(actionTask, timingTask);
-                
+
                 Logger.Log($"TTSFailureHandler: 回退时序执行完成");
             }
             catch (Exception ex)
@@ -196,7 +195,7 @@ namespace VPetLLM.Handlers
                 {
                     // 使用现有的动作处理器执行动作
                     var actionQueue = _plugin.ActionProcessor.Process(actionContent, _plugin.Settings);
-                    
+
                     foreach (var action in actionQueue)
                     {
                         if (string.IsNullOrEmpty(action.Value))
@@ -252,14 +251,14 @@ namespace VPetLLM.Handlers
             Logger.Log($"失败原因: {exception?.Message}");
             Logger.Log($"异常类型: {exception?.GetType().Name}");
             Logger.Log($"恢复操作: {recoveryAction}");
-            
+
             // 提供恢复建议
             var suggestions = GenerateRecoverySuggestions(exception);
             if (!string.IsNullOrEmpty(suggestions))
             {
                 Logger.Log($"恢复建议: {suggestions}");
             }
-            
+
             Logger.Log($"==================");
         }
 

@@ -1,7 +1,6 @@
 using Microsoft.Data.Sqlite;
-using Newtonsoft.Json;
 using System.IO;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core
 {
@@ -29,7 +28,7 @@ namespace VPetLLM.Core
                         {
                             // 设置 DLL 搜索路径
                             SetDllDirectory();
-                            
+
                             // 初始化 SQLite
                             SQLitePCL.Batteries.Init();
                             _isInitialized = true;
@@ -47,7 +46,7 @@ namespace VPetLLM.Core
 
             _dbPath = dbPath;
             _connectionString = $"Data Source={dbPath}";
-            
+
             // 设置图像存储目录
             var dbDirectory = Path.GetDirectoryName(dbPath);
             _imagesPath = Path.Combine(dbDirectory ?? "", "images");
@@ -55,7 +54,7 @@ namespace VPetLLM.Core
             {
                 Directory.CreateDirectory(_imagesPath);
             }
-            
+
             InitializeDatabase();
         }
 
@@ -69,10 +68,10 @@ namespace VPetLLM.Core
                 // 获取当前程序集所在目录
                 var assemblyPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
                 var assemblyDir = Path.GetDirectoryName(assemblyPath);
-                
+
                 // 检查 runtimes 目录
                 var runtimesPath = Path.Combine(assemblyDir, "runtimes", "win-x64", "native");
-                
+
                 if (Directory.Exists(runtimesPath))
                 {
                     // 将 runtimes 目录添加到 PATH
@@ -128,7 +127,7 @@ namespace VPetLLM.Core
                     CREATE INDEX IF NOT EXISTS idx_created_at ON chat_history(created_at);
                 ";
                 createTableCommand.ExecuteNonQuery();
-                
+
                 // 检查并添加 image_id 列（用于升级旧数据库）
                 try
                 {
@@ -271,14 +270,14 @@ namespace VPetLLM.Core
                         UnixTime = reader.IsDBNull(2) ? null : reader.GetInt64(2),
                         StatusInfo = reader.IsDBNull(3) ? null : reader.GetString(3)
                     };
-                    
+
                     // 加载图像数据
                     if (!reader.IsDBNull(4))
                     {
                         var imageId = reader.GetString(4);
                         message.ImageData = LoadImageFile(imageId);
                     }
-                    
+
                     messages.Add(message);
                 }
             }
@@ -319,14 +318,14 @@ namespace VPetLLM.Core
                         UnixTime = reader.IsDBNull(2) ? null : reader.GetInt64(2),
                         StatusInfo = reader.IsDBNull(3) ? null : reader.GetString(3)
                     };
-                    
+
                     // 加载图像数据
                     if (!reader.IsDBNull(4))
                     {
                         var imageId = reader.GetString(4);
                         message.ImageData = LoadImageFile(imageId);
                     }
-                    
+
                     messages.Add(message);
                 }
             }
@@ -352,7 +351,7 @@ namespace VPetLLM.Core
                 var getImagesCommand = connection.CreateCommand();
                 getImagesCommand.CommandText = "SELECT image_id FROM chat_history WHERE provider = @provider AND image_id IS NOT NULL";
                 getImagesCommand.Parameters.AddWithValue("@provider", provider);
-                
+
                 var imageIds = new List<string>();
                 using (var reader = getImagesCommand.ExecuteReader())
                 {
@@ -369,13 +368,13 @@ namespace VPetLLM.Core
 
                 var rowsAffected = command.ExecuteNonQuery();
                 Logger.Log($"清除了 {rowsAffected} 条历史记录 (提供商: {provider})");
-                
+
                 // 删除图像文件
                 foreach (var imageId in imageIds)
                 {
                     DeleteImageFile(imageId);
                 }
-                
+
                 if (imageIds.Count > 0)
                 {
                     Logger.Log($"清除了 {imageIds.Count} 个图像文件");
@@ -401,7 +400,7 @@ namespace VPetLLM.Core
                 // 先获取所有图像ID
                 var getImagesCommand = connection.CreateCommand();
                 getImagesCommand.CommandText = "SELECT image_id FROM chat_history WHERE image_id IS NOT NULL";
-                
+
                 var imageIds = new List<string>();
                 using (var reader = getImagesCommand.ExecuteReader())
                 {
@@ -417,13 +416,13 @@ namespace VPetLLM.Core
 
                 var rowsAffected = command.ExecuteNonQuery();
                 Logger.Log($"清除了所有历史记录，共 {rowsAffected} 条");
-                
+
                 // 删除所有图像文件
                 foreach (var imageId in imageIds)
                 {
                     DeleteImageFile(imageId);
                 }
-                
+
                 if (imageIds.Count > 0)
                 {
                     Logger.Log($"清除了 {imageIds.Count} 个图像文件");
@@ -450,7 +449,7 @@ namespace VPetLLM.Core
                 var getOldImagesCommand = connection.CreateCommand();
                 getOldImagesCommand.CommandText = "SELECT image_id FROM chat_history WHERE provider = @provider AND image_id IS NOT NULL";
                 getOldImagesCommand.Parameters.AddWithValue("@provider", provider);
-                
+
                 var oldImageIds = new HashSet<string>();
                 using (var reader = getOldImagesCommand.ExecuteReader())
                 {
@@ -501,19 +500,19 @@ namespace VPetLLM.Core
                 }
 
                 transaction.Commit();
-                
+
                 // 删除不再使用的旧图像文件
                 var orphanedImages = oldImageIds.Except(newImageIds).ToList();
                 foreach (var imageId in orphanedImages)
                 {
                     DeleteImageFile(imageId);
                 }
-                
+
                 if (orphanedImages.Count > 0)
                 {
                     Logger.Log($"清理了 {orphanedImages.Count} 个不再使用的图像文件");
                 }
-                
+
                 Logger.Log($"更新了历史记录 (提供商: {provider})，共 {messages.Count} 条");
             }
             catch (Exception ex)
@@ -571,7 +570,7 @@ namespace VPetLLM.Core
 
                 File.WriteAllBytes(imagePath, imageData);
                 Logger.Log($"保存图像文件: {imageId}.png ({imageData.Length} bytes)");
-                
+
                 return imageId;
             }
             catch (Exception ex)

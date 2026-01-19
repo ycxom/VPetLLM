@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using System.IO;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM
 {
@@ -46,7 +47,7 @@ namespace VPetLLM
         public bool EnableLiveMode { get; set; } = false;
         public bool LimitStateChanges { get; set; } = true;
         public bool EnableVPetSettingsControl { get; set; } = false;
-        
+
         // 流式传输批处理优化设置
         public bool EnableStreamingBatch { get; set; } = true;
         public int StreamingBatchWindowMs { get; set; } = 100;
@@ -74,24 +75,24 @@ namespace VPetLLM
                     }
                     else
                     {
-                        Utils.Logger.Log($"Settings file {_path} is empty, using default settings.");
+                        Logger.Log($"Settings file {_path} is empty, using default settings.");
                     }
                 }
                 catch (JsonException ex)
                 {
                     // JSON解析失败时记录错误，但已经加载的部分配置会保留
                     // 缺失的字段会在后面的初始化代码中补全为默认值
-                    Utils.Logger.Log($"Warning: Failed to fully parse settings from {_path}: {ex.Message}");
-                    Utils.Logger.Log("Partially loaded settings will be used, missing values will use defaults.");
+                    Logger.Log($"Warning: Failed to fully parse settings from {_path}: {ex.Message}");
+                    Logger.Log("Partially loaded settings will be used, missing values will use defaults.");
                 }
                 catch (Exception ex)
                 {
                     // 其他错误也记录但不中断加载
-                    Utils.Logger.Log($"Warning: Error reading settings file {_path}: {ex.Message}");
-                    Utils.Logger.Log("Using default settings for all values.");
+                    Logger.Log($"Warning: Error reading settings file {_path}: {ex.Message}");
+                    Logger.Log("Using default settings for all values.");
                 }
             }
-            
+
             // 确保所有属性都有默认值
             if (Ollama == null)
             {
@@ -153,7 +154,7 @@ namespace VPetLLM
             {
                 Screenshot = new Configuration.ScreenshotSettings();
             }
-            
+
             // 确保Screenshot的嵌套配置对象也被正确初始化
             if (Screenshot.OCR == null)
             {
@@ -286,7 +287,7 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
             public bool EnableVision { get; set; } = false;
-            
+
             public OpenAISetting GetCurrentOpenAISetting()
             {
                 return new OpenAISetting
@@ -309,7 +310,7 @@ namespace VPetLLM
             public List<OpenAINodeSetting> OpenAINodes { get; set; } = new List<OpenAINodeSetting>();
             public int CurrentNodeIndex { get; set; } = 0;
             public bool EnableLoadBalancing { get; set; } = true;
-            
+
             // 向后兼容的属性
             public string? ApiKey { get; set; }
             public string? Model { get; set; }
@@ -329,7 +330,7 @@ namespace VPetLLM
                     // 如果兼容配置的节点未启用，返回 null
                     if (!Enabled)
                         return null;
-                    
+
                     return new OpenAINodeSetting
                     {
                         ApiKey = ApiKey,
@@ -358,7 +359,7 @@ namespace VPetLLM
                     // 确保索引在有效范围内
                     if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
                         CurrentNodeIndex = 0;
-                    
+
                     var node = enabledNodes[CurrentNodeIndex];
                     // 更新索引指向下一个节点（为下次调用准备）
                     CurrentNodeIndex = (CurrentNodeIndex + 1) % enabledNodes.Count;
@@ -471,7 +472,7 @@ namespace VPetLLM
                     // 确保索引在有效范围内
                     if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
                         CurrentNodeIndex = 0;
-                    
+
                     var node = enabledNodes[CurrentNodeIndex];
                     // 更新索引指向下一个节点（为下次调用准备）
                     CurrentNodeIndex = (CurrentNodeIndex + 1) % enabledNodes.Count;
@@ -657,7 +658,7 @@ namespace VPetLLM
             // 通用设置
             public string BaseUrl { get; set; } = "http://127.0.0.1:9880";
             public GPTSoVITSApiMode ApiMode { get; set; } = GPTSoVITSApiMode.WebUI; // API 模式选择
-            
+
             // WebUI 模式专用设置（整合包网页）
             public string Version { get; set; } = "v4"; // API版本
             public string ModelName { get; set; } = ""; // 模型名称
@@ -668,13 +669,13 @@ namespace VPetLLM
             public string TextLanguage { get; set; } = "中文"; // 使用完整语言名称
             public string TextSplitMethod { get; set; } = "按标点符号切"; // 文本切分方法
             public string CutPunc { get; set; } = "";
-            
+
             // 通用推理参数
             public int TopK { get; set; } = 15;
             public double TopP { get; set; } = 1.0;
             public double Temperature { get; set; } = 1.0;
             public double Speed { get; set; } = 1.0;
-            
+
             // API v2 模式专用设置
             public string RefAudioPath { get; set; } = "";           // 参考音频路径（API v2 必需）
             public string PromptTextV2 { get; set; } = "";           // 提示文本
@@ -687,7 +688,7 @@ namespace VPetLLM
             public double RepetitionPenalty { get; set; } = 1.35;    // 重复惩罚
             public bool SuperSampling { get; set; } = false;         // 超采样
             public string MediaType { get; set; } = "wav";           // 输出格式 (wav/ogg/aac/raw)
-            
+
             // 模型权重路径（可选，用于动态切换模型）
             public string GptWeightsPath { get; set; } = "";
             public string SovitsWeightsPath { get; set; } = "";
@@ -721,13 +722,13 @@ namespace VPetLLM
             public bool AutoSend { get; set; } = true;
             public bool ShowTranscriptionWindow { get; set; } = true;
             public int RecordingDeviceNumber { get; set; } = 0; // 录音设备编号，0 = 默认设备
-            
+
             // OpenAI Whisper 设置
             public OpenAIASRSetting OpenAI { get; set; } = new OpenAIASRSetting();
-            
+
             // Soniox 设置
             public SonioxASRSetting Soniox { get; set; } = new SonioxASRSetting();
-            
+
             // Free 设置
             public FreeASRSetting Free { get; set; } = new FreeASRSetting();
         }
@@ -773,34 +774,34 @@ namespace VPetLLM
             /// Enable/disable the important records system
             /// </summary>
             public bool EnableRecords { get; set; } = true;
-            
+
             /// <summary>
             /// Maximum number of records to inject into context
             /// </summary>
             public int MaxRecordsInContext { get; set; } = 20;
-            
+
             /// <summary>
             /// Whether to decrement weights on every conversation turn
             /// </summary>
             public bool AutoDecrementWeights { get; set; } = true;
-            
+
             /// <summary>
             /// Maximum content length for a single record
             /// </summary>
             public int MaxRecordContentLength { get; set; } = 500;
-            
+
             /// <summary>
             /// Whether to inject records into summary module context
             /// </summary>
             public bool InjectIntoSummary { get; set; } = false;
-            
+
             /// <summary>
             /// Number of conversation turns required to decrease weight by 1
             /// Default: 1 (weight decreases by 1 every conversation)
             /// Example: 3 means weight decreases by 1/3 every conversation (takes 3 conversations to lose 1 weight)
             /// </summary>
             public int WeightDecayTurns { get; set; } = 1;
-            
+
             /// <summary>
             /// Maximum number of records to keep in database
             /// When exceeded, records with lowest weight will be automatically removed
@@ -819,17 +820,17 @@ namespace VPetLLM
             /// 默认音量 (0-100)
             /// </summary>
             public int DefaultVolume { get; set; } = 100;
-            
+
             /// <summary>
             /// 是否监控窗口可见性
             /// </summary>
             public bool MonitorWindowVisibility { get; set; } = true;
-            
+
             /// <summary>
             /// 窗口可见性检查间隔（毫秒）
             /// </summary>
             public int WindowCheckIntervalMs { get; set; } = 1000;
-            
+
             /// <summary>
             /// mpv.exe 路径（留空则使用插件目录下的 mpv.exe）
             /// </summary>

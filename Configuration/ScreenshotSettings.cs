@@ -1,7 +1,6 @@
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Runtime.CompilerServices;
+using VPetLLM.Utils.Common;
 
 namespace VPetLLM.Configuration
 {
@@ -14,12 +13,12 @@ namespace VPetLLM.Configuration
         /// 使用原生多模态模型（直接发送图片给支持视觉的 LLM）
         /// </summary>
         NativeMultimodal,
-        
+
         /// <summary>
         /// 使用前置多模态处理（先分析图片生成描述，再发送给主 LLM）
         /// </summary>
         PreprocessingMultimodal,
-        
+
         /// <summary>
         /// 使用 OCR API 提取文字
         /// </summary>
@@ -35,7 +34,7 @@ namespace VPetLLM.Configuration
         /// 使用 Free 渠道
         /// </summary>
         Free,
-        
+
         /// <summary>
         /// 使用启用视觉的渠道
         /// </summary>
@@ -152,7 +151,7 @@ namespace VPetLLM.Configuration
         /// <summary>
         /// 默认图片描述提示词（备用）
         /// </summary>
-        public const string DefaultImageDescriptionPrompt = 
+        public const string DefaultImageDescriptionPrompt =
             "请详细描述这张图片的内容，包括：主要元素、文字内容、布局结构、颜色和风格等。如果图片中有文字，请完整提取。";
 
         /// <summary>
@@ -161,7 +160,7 @@ namespace VPetLLM.Configuration
         /// <param name="lang">语言代码</param>
         public string GetEffectivePrompt(string lang = "zh")
         {
-            var prompt = Utils.PromptHelper.Get("Screenshot_ImageDescription_Prompt", lang);
+            var prompt = PromptHelper.Get("Screenshot_ImageDescription_Prompt", lang);
             // 如果从 Prompt.json 读取失败，使用默认值
             if (prompt.StartsWith("[Prompt"))
             {

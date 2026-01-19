@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:utils="clr-namespace:VPetLLM.Utils"
+        xmlns:utils="clr-namespace:VPetLLM.Utils.Localization"
         mc:Ignorable="d"
         Title="{utils:Localize KeyPath=VoiceInput.Title, Default=语音输入}"
         Height="Auto" Width="420"
@@ -74,41 +74,6 @@
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="border" Property="Background" Value="#E5E5E5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Windows 11 风格文本框 -->
-        <Style x:Key="Win11TextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="Foreground" Value="#1F1F1F"/>
-            <Setter Property="BorderBrush" Value="#D1D1D1"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,10"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Border x:Name="border"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ScrollViewer x:Name="PART_ContentHost" 
-                                        Margin="{TemplateBinding Padding}"
-                                        VerticalScrollBarVisibility="Auto"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="BorderBrush" Value="#8A8A8A"/>
-                            </Trigger>
-                            <Trigger Property="IsFocused" Value="True">
-                                <Setter TargetName="border" Property="BorderBrush" Value="#0078D4"/>
-                                <Setter TargetName="border" Property="BorderThickness" Value="2"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -215,7 +180,6 @@
 
                         <!-- 可编辑文本框 -->
                         <TextBox x:Name="TranscriptionTextBox" 
-                                 Style="{StaticResource Win11TextBox}"
                                  TextWrapping="Wrap" 
                                  AcceptsReturn="True"
                                  MinHeight="80"

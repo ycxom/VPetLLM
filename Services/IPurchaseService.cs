@@ -11,37 +11,37 @@ namespace VPetLLM.Services
         /// 物品名称
         /// </summary>
         public string Name { get; set; } = "";
-        
+
         /// <summary>
         /// 物品类型（通用字符串类型，支持 Item、Food、Tool、Toy 等）
         /// </summary>
         public string ItemType { get; set; } = "Food";
-        
+
         /// <summary>
         /// 食物类型（仅当 ItemType 为 Food 时有效，保持向后兼容）
         /// </summary>
         public Food.FoodType? FoodType { get; set; }
-        
+
         /// <summary>
         /// 物品价格
         /// </summary>
         public double Price { get; set; }
-        
+
         /// <summary>
         /// 购买时间
         /// </summary>
         public DateTime PurchaseTime { get; set; }
-        
+
         /// <summary>
         /// 购买数量
         /// </summary>
         public int Quantity { get; set; } = 1;
-        
+
         /// <summary>
         /// 物品描述
         /// </summary>
         public string Description { get; set; } = "";
-        
+
         /// <summary>
         /// 原始食物引用（用于向后兼容）
         /// </summary>

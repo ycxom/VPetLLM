@@ -1,9 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using VPetLLM.Core.TTSCore;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -23,24 +21,24 @@ namespace VPetLLM.UI.Windows
             // 初始化时 _plugin 可能为空，跳过
             if (_plugin == null || _plugin.Settings?.TTS?.GPTSoVITS == null)
                 return;
-                
+
             if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem selectedItem)
             {
                 var mode = selectedItem.Tag?.ToString();
                 var isApiV2 = mode == "ApiV2";
-                
+
                 // 切换面板可见性
                 var webUIPanel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_WebUI");
                 var apiV2Panel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_ApiV2");
-                
+
                 if (webUIPanel != null)
                     webUIPanel.Visibility = isApiV2 ? Visibility.Collapsed : Visibility.Visible;
                 if (apiV2Panel != null)
                     apiV2Panel.Visibility = isApiV2 ? Visibility.Visible : Visibility.Collapsed;
-                
+
                 // 保存设置
-                _plugin.Settings.TTS.GPTSoVITS.ApiMode = isApiV2 
-                    ? Setting.GPTSoVITSApiMode.ApiV2 
+                _plugin.Settings.TTS.GPTSoVITS.ApiMode = isApiV2
+                    ? Setting.GPTSoVITSApiMode.ApiV2
                     : Setting.GPTSoVITSApiMode.WebUI;
                 ScheduleAutoSave();
             }
@@ -55,7 +53,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 StartButtonLoadingAnimation(button);
-                
+
                 var weightsPath = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_GptWeightsPath"))?.Text;
                 if (string.IsNullOrWhiteSpace(weightsPath))
                 {
@@ -65,7 +63,7 @@ namespace VPetLLM.UI.Windows
 
                 var ttsCore = new GPTSoVITSTTSCore(_plugin.Settings);
                 var success = await ttsCore.SetGptWeightsAsync(weightsPath);
-                
+
                 if (success)
                 {
                     _plugin.Settings.TTS.GPTSoVITS.GptWeightsPath = weightsPath;
@@ -79,7 +77,7 @@ namespace VPetLLM.UI.Windows
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"应用 GPT 模型权重失败: {ex.Message}");
+                Logger.Log($"应用 GPT 模型权重失败: {ex.Message}");
                 MessageBox.Show($"应用失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -97,7 +95,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 StartButtonLoadingAnimation(button);
-                
+
                 var weightsPath = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SovitsWeightsPath"))?.Text;
                 if (string.IsNullOrWhiteSpace(weightsPath))
                 {
@@ -107,7 +105,7 @@ namespace VPetLLM.UI.Windows
 
                 var ttsCore = new GPTSoVITSTTSCore(_plugin.Settings);
                 var success = await ttsCore.SetSovitsWeightsAsync(weightsPath);
-                
+
                 if (success)
                 {
                     _plugin.Settings.TTS.GPTSoVITS.SovitsWeightsPath = weightsPath;
@@ -121,7 +119,7 @@ namespace VPetLLM.UI.Windows
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"应用 SoVITS 模型权重失败: {ex.Message}");
+                Logger.Log($"应用 SoVITS 模型权重失败: {ex.Message}");
                 MessageBox.Show($"应用失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -139,7 +137,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 StartButtonLoadingAnimation(button);
-                
+
                 var baseUrl = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl")).Text;
                 if (string.IsNullOrWhiteSpace(baseUrl))
                 {
@@ -155,9 +153,9 @@ namespace VPetLLM.UI.Windows
                 var ttsCore = new GPTSoVITSTTSCore(tempSettings);
                 // 恢复原始 BaseUrl
                 tempSettings.TTS.GPTSoVITS.BaseUrl = originalBaseUrl;
-                
+
                 var versions = await ttsCore.GetSupportedVersionsAsync();
-                
+
                 if (versions == null || versions.Count == 0)
                 {
                     MessageBox.Show("无法获取版本信息，请检查 API 地址是否正确", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -167,7 +165,7 @@ namespace VPetLLM.UI.Windows
                 // 更新版本下拉框
                 var versionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Version");
                 versionComboBox.Items.Clear();
-                
+
                 foreach (var version in versions)
                 {
                     var item = new ComboBoxItem
@@ -177,18 +175,18 @@ namespace VPetLLM.UI.Windows
                     };
                     versionComboBox.Items.Add(item);
                 }
-                
+
                 // 选择最新版本（通常是最后一个）
                 if (versionComboBox.Items.Count > 0)
                 {
                     versionComboBox.SelectedIndex = versionComboBox.Items.Count - 1;
                 }
-                
+
                 MessageBox.Show($"检测到 {versions.Count} 个支持的版本", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"检测版本失败: {ex.Message}");
+                Logger.Log($"检测版本失败: {ex.Message}");
                 MessageBox.Show($"检测版本失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -224,13 +222,13 @@ namespace VPetLLM.UI.Windows
                     // 恢复原始值
                     tempSettings.TTS.GPTSoVITS.BaseUrl = originalBaseUrl;
                     tempSettings.TTS.GPTSoVITS.Version = originalVersion;
-                    
+
                     _currentModels = await ttsCore.GetModelsAsync(version);
-                    
+
                     // 更新模型下拉框
                     var modelComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Model");
                     modelComboBox.Items.Clear();
-                    
+
                     if (_currentModels != null && _currentModels.Count > 0)
                     {
                         foreach (var modelName in _currentModels.Keys)
@@ -242,21 +240,21 @@ namespace VPetLLM.UI.Windows
                             };
                             modelComboBox.Items.Add(item);
                         }
-                        
+
                         // 选择第一个模型
                         if (modelComboBox.Items.Count > 0)
                         {
                             modelComboBox.SelectedIndex = 0;
                         }
                     }
-                    
+
                     // 保存版本设置
                     _plugin.Settings.TTS.GPTSoVITS.Version = version;
                     ScheduleAutoSave();
                 }
                 catch (Exception ex)
                 {
-                    Utils.Logger.Log($"加载模型列表失败: {ex.Message}");
+                    Logger.Log($"加载模型列表失败: {ex.Message}");
                 }
             }
         }
@@ -270,16 +268,16 @@ namespace VPetLLM.UI.Windows
             try
             {
                 StartButtonLoadingAnimation(button);
-                
+
                 var baseUrl = ((TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl")).Text;
                 var versionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Version");
-                
+
                 if (string.IsNullOrWhiteSpace(baseUrl))
                 {
                     MessageBox.Show("请先输入 API 地址", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
-                
+
                 if (versionComboBox.SelectedItem is ComboBoxItem selectedItem)
                 {
                     var version = selectedItem.Tag?.ToString();
@@ -298,12 +296,12 @@ namespace VPetLLM.UI.Windows
                     // 恢复原始值
                     tempSettings.TTS.GPTSoVITS.BaseUrl = originalBaseUrl;
                     tempSettings.TTS.GPTSoVITS.Version = originalVersion;
-                    
+
                     _currentModels = await ttsCore.GetModelsAsync(version);
-                    
+
                     var modelComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Model");
                     modelComboBox.Items.Clear();
-                    
+
                     if (_currentModels != null && _currentModels.Count > 0)
                     {
                         foreach (var modelName in _currentModels.Keys)
@@ -315,12 +313,12 @@ namespace VPetLLM.UI.Windows
                             };
                             modelComboBox.Items.Add(item);
                         }
-                        
+
                         if (modelComboBox.Items.Count > 0)
                         {
                             modelComboBox.SelectedIndex = 0;
                         }
-                        
+
                         MessageBox.Show($"成功加载 {_currentModels.Count} 个模型", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
@@ -331,7 +329,7 @@ namespace VPetLLM.UI.Windows
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"刷新模型失败: {ex.Message}");
+                Logger.Log($"刷新模型失败: {ex.Message}");
                 MessageBox.Show($"刷新模型失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -354,14 +352,14 @@ namespace VPetLLM.UI.Windows
                 // 更新语言下拉框
                 var languageComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Language");
                 var emotionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Emotion");
-                
+
                 languageComboBox.Items.Clear();
                 emotionComboBox.Items.Clear();
-                
+
                 if (_currentModels != null && _currentModels.ContainsKey(modelName))
                 {
                     var languages = _currentModels[modelName];
-                    
+
                     // 添加语言选项
                     foreach (var lang in languages.Keys)
                     {
@@ -372,12 +370,12 @@ namespace VPetLLM.UI.Windows
                         };
                         languageComboBox.Items.Add(item);
                     }
-                    
+
                     // 选择第一个语言
                     if (languageComboBox.Items.Count > 0)
                     {
                         languageComboBox.SelectedIndex = 0;
-                        
+
                         // 获取第一个语言的情感列表
                         var firstLang = languages.Keys.First();
                         if (languages.ContainsKey(firstLang))
@@ -391,18 +389,18 @@ namespace VPetLLM.UI.Windows
                                 };
                                 emotionComboBox.Items.Add(emotionItem);
                             }
-                            
+
                             if (emotionComboBox.Items.Count > 0)
                             {
                                 emotionComboBox.SelectedIndex = 0;
                             }
                         }
-                        
+
                         // 保存 PromptLanguage（从模型数据中获取）
                         _plugin.Settings.TTS.GPTSoVITS.PromptLanguage = firstLang;
                     }
                 }
-                
+
                 // 保存模型设置
                 _plugin.Settings.TTS.GPTSoVITS.ModelName = modelName;
                 ScheduleAutoSave();
@@ -423,16 +421,16 @@ namespace VPetLLM.UI.Windows
                 // 获取当前选择的模型
                 var modelComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Model");
                 var modelName = modelComboBox?.Text;
-                
+
                 if (string.IsNullOrWhiteSpace(modelName))
                     return;
 
                 // 更新情感下拉框
                 var emotionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Emotion");
                 emotionComboBox.Items.Clear();
-                
-                if (_currentModels != null && 
-                    _currentModels.ContainsKey(modelName) && 
+
+                if (_currentModels != null &&
+                    _currentModels.ContainsKey(modelName) &&
                     _currentModels[modelName].ContainsKey(language))
                 {
                     foreach (var emotion in _currentModels[modelName][language])
@@ -444,13 +442,13 @@ namespace VPetLLM.UI.Windows
                         };
                         emotionComboBox.Items.Add(emotionItem);
                     }
-                    
+
                     if (emotionComboBox.Items.Count > 0)
                     {
                         emotionComboBox.SelectedIndex = 0;
                     }
                 }
-                
+
                 // 保存 PromptLanguage
                 _plugin.Settings.TTS.GPTSoVITS.PromptLanguage = language;
                 ScheduleAutoSave();
@@ -482,7 +480,7 @@ namespace VPetLLM.UI.Windows
                         break;
                     }
                 }
-                
+
                 // 设置面板可见性
                 var isApiV2 = settings.ApiMode == Setting.GPTSoVITSApiMode.ApiV2;
                 var webUIPanel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_WebUI");
@@ -608,7 +606,7 @@ namespace VPetLLM.UI.Windows
                 "en" => "英文",
                 "ja" => "日文",
                 "ko" => "韩文",
-                
+
                 // 新格式完整语言名称（直接返回）
                 "中文" => "中文",
                 "粤语" => "粤语",
@@ -621,7 +619,7 @@ namespace VPetLLM.UI.Windows
                 "韩英混合" => "韩英混合",
                 "多语种混合" => "多语种混合",
                 "多语种混合(粤语)" => "多语种混合(粤语)",
-                
+
                 _ => "中文"
             };
         }

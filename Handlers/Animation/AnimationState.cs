@@ -1,4 +1,3 @@
-using System;
 using VPet_Simulator.Core;
 
 namespace VPetLLM.Handlers.Animation
@@ -101,8 +100,8 @@ namespace VPetLLM.Handlers.Animation
 
         public override string ToString()
         {
-            var displayInfo = CurrentDisplay != null 
-                ? $"{CurrentDisplay.Type} ({CurrentDisplay.Animat})" 
+            var displayInfo = CurrentDisplay != null
+                ? $"{CurrentDisplay.Type} ({CurrentDisplay.Animat})"
                 : "None";
             return $"State: {WorkingState}, Display: {displayInfo}, Animating: {IsAnimating}, UserInteracting: {IsUserInteracting}";
         }

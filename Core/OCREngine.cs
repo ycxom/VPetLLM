@@ -1,10 +1,8 @@
-using System;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using VPetLLM.Utils;
+using System.Net.Http;
+using System.Text;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core
 {
@@ -39,7 +37,7 @@ namespace VPetLLM.Core
         private async Task<string> RecognizeWithOpenAI(byte[] imageData)
         {
             var ocrSettings = _settings.Screenshot.OCR;
-            
+
             if (string.IsNullOrWhiteSpace(ocrSettings.ApiKey))
             {
                 throw new InvalidOperationException("OpenAI OCR requires an API key");

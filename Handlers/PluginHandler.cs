@@ -1,7 +1,7 @@
-using System;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -10,8 +10,8 @@ namespace VPetLLM.Handlers
         public ActionType ActionType => ActionType.Plugin;
         public ActionCategory Category => ActionCategory.Unknown;
         public string Keyword => "plugin";
-        public string Description => Utils.PromptHelper.Get("Handler_Plugin_Description", VPetLLM.Instance.Settings.PromptLanguage);
-        
+        public string Description => PromptHelper.Get("Handler_Plugin_Description", VPetLLM.Instance.Settings.PromptLanguage);
+
         // Store the current plugin name for new format commands
         [ThreadStatic]
         private static string _currentPluginName;
@@ -32,7 +32,7 @@ namespace VPetLLM.Handlers
         public async Task Execute(string value, IMainWindow main)
         {
             // 若处于单条 AI 回复的执行会话中，则豁免限流（允许该回复内多次插件联合调用）
-            var inMessageSession = global::VPetLLM.Utils.ExecutionContext.CurrentMessageId.Value.HasValue;
+            var inMessageSession = global::VPetLLM.Utils.System.ExecutionContext.CurrentMessageId.Value.HasValue;
 
             // 非用户触发的跨消息限流：使用配置的参数
             if (!inMessageSession)
@@ -51,10 +51,10 @@ namespace VPetLLM.Handlers
             }
 
             VPetLLM.Instance.Log($"PluginHandler: Received value: {value}");
-            
+
             string pluginName = null;
             string arguments = value;
-            
+
             // Check if we have a plugin name from new format (set by ActionProcessor)
             if (!string.IsNullOrEmpty(_currentPluginName))
             {

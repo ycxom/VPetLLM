@@ -1,7 +1,6 @@
-using System;
 using System.Net.Http;
 using System.Text.Json;
-using System.Threading.Tasks;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core.TTSCore
 {
@@ -34,11 +33,11 @@ namespace VPetLLM.Core.TTSCore
             {
                 dl_url = settings.BaseUrl?.TrimEnd('/'),
                 version = string.IsNullOrWhiteSpace(settings.Version) ? "v4" : settings.Version,
-                model_name = string.IsNullOrWhiteSpace(settings.ModelName) 
-                    ? "默认模型" 
+                model_name = string.IsNullOrWhiteSpace(settings.ModelName)
+                    ? "默认模型"
                     : settings.ModelName,
-                prompt_text_lang = string.IsNullOrWhiteSpace(settings.PromptLanguage) 
-                    ? "中文" 
+                prompt_text_lang = string.IsNullOrWhiteSpace(settings.PromptLanguage)
+                    ? "中文"
                     : settings.PromptLanguage,
                 emotion = string.IsNullOrWhiteSpace(settings.Emotion) ? "默认" : settings.Emotion,
                 text = text,
@@ -46,8 +45,8 @@ namespace VPetLLM.Core.TTSCore
                 top_k = settings.TopK,
                 top_p = settings.TopP,
                 temperature = settings.Temperature,
-                text_split_method = string.IsNullOrWhiteSpace(settings.TextSplitMethod) 
-                    ? "按标点符号切" 
+                text_split_method = string.IsNullOrWhiteSpace(settings.TextSplitMethod)
+                    ? "按标点符号切"
                     : settings.TextSplitMethod,
                 batch_size = 10,
                 batch_threshold = 0.75,
@@ -66,7 +65,7 @@ namespace VPetLLM.Core.TTSCore
         public async Task<byte[]> ParseResponseAsync(HttpResponseMessage response, HttpClient httpClient)
         {
             var responseText = await response.Content.ReadAsStringAsync();
-            Utils.Logger.Log($"TTS (GPT-SoVITS WebUI): 响应: {responseText}");
+            Logger.Log($"TTS (GPT-SoVITS WebUI): 响应: {responseText}");
 
             var apiResponse = JsonSerializer.Deserialize<InferSingleResponse>(responseText, new JsonSerializerOptions
             {
@@ -78,20 +77,20 @@ namespace VPetLLM.Core.TTSCore
                 throw new Exception($"响应格式错误: {responseText}");
             }
 
-            Utils.Logger.Log($"TTS (GPT-SoVITS WebUI): {apiResponse.msg}");
-            Utils.Logger.Log($"TTS (GPT-SoVITS WebUI): 音频URL: {apiResponse.audio_url}");
+            Logger.Log($"TTS (GPT-SoVITS WebUI): {apiResponse.msg}");
+            Logger.Log($"TTS (GPT-SoVITS WebUI): 音频URL: {apiResponse.audio_url}");
 
             // 下载音频文件
-            Utils.Logger.Log($"TTS (GPT-SoVITS WebUI): 开始下载音频");
+            Logger.Log($"TTS (GPT-SoVITS WebUI): 开始下载音频");
             var audioResponse = await httpClient.GetAsync(apiResponse.audio_url);
-            
+
             if (!audioResponse.IsSuccessStatusCode)
             {
                 throw new Exception($"下载音频失败: {audioResponse.StatusCode}");
             }
 
             var audioData = await audioResponse.Content.ReadAsByteArrayAsync();
-            Utils.Logger.Log($"TTS (GPT-SoVITS WebUI): 下载完成，大小: {audioData.Length} 字节");
+            Logger.Log($"TTS (GPT-SoVITS WebUI): 下载完成，大小: {audioData.Length} 字节");
 
             return audioData;
         }

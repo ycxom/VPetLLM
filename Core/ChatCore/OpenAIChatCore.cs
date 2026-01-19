@@ -1,12 +1,12 @@
+using LinePutScript.Localization.WPF;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using System.Text;
-using System.Linq;
-using System.Collections.Generic;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers;
-using LinePutScript.Localization.WPF;
+using ErrorHelper = global::VPetLLM.Utils.System.ErrorMessageHelper;
+using SystemLogger = global::VPetLLM.Utils.System.Logger;
 
 namespace VPetLLM.Core.ChatCore
 {
@@ -19,7 +19,7 @@ namespace VPetLLM.Core.ChatCore
         private readonly Random _random = new Random();
         // 单次请求上下文缓存：避免同一请求中多次随机选择不同节点
         private Setting.OpenAINodeSetting? _currentNodeContext;
-        
+
         public OpenAIChatCore(Setting.OpenAINodeSetting openAINodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
         {
@@ -47,6 +47,44 @@ namespace VPetLLM.Core.ChatCore
         }
 
         /// <summary>
+        /// 包装ErrorMessageHelper.HandleHttpResponseError调用以避免类型冲突
+        /// </summary>
+        private static async Task<string> HandleHttpError(HttpResponseMessage response, Setting settings, string providerName)
+        {
+            var statusCode = response.StatusCode;
+            var rawError = await response.Content.ReadAsStringAsync();
+
+            SystemLogger.Log($"{providerName} API 错误: {(int)statusCode} {statusCode} - {rawError}");
+
+            // 如果是调试模式，返回详细的原始错误
+            if (ErrorHelper.IsDebugMode(settings))
+            {
+                return $"{providerName} API 错误 [{(int)statusCode} {statusCode}]: {rawError}";
+            }
+
+            return ErrorHelper.GetFriendlyHttpError(statusCode, rawError, settings);
+        }
+
+        /// <summary>
+        /// 包装ErrorMessageHelper.HandleHttpResponseError的同步调用以避免类型冲突
+        /// </summary>
+        private static string HandleHttpErrorSync(HttpResponseMessage response, Setting settings, string providerName)
+        {
+            var statusCode = response.StatusCode;
+            var rawError = response.Content.ReadAsStringAsync().Result;
+
+            SystemLogger.Log($"{providerName} API 错误: {(int)statusCode} {statusCode} - {rawError}");
+
+            // 如果是调试模式，返回详细的原始错误
+            if (ErrorHelper.IsDebugMode(settings))
+            {
+                return $"{providerName} API 错误 [{(int)statusCode} {statusCode}]: {rawError}";
+            }
+
+            return ErrorHelper.GetFriendlyHttpError(statusCode, rawError, settings);
+        }
+
+        /// <summary>
         /// 获取当前节点，使用集中式节点选择逻辑
         /// </summary>
         /// <returns>当前选中的节点，如果没有启用的节点则返回 null</returns>
@@ -57,7 +95,7 @@ namespace VPetLLM.Core.ChatCore
             {
                 return _currentNodeContext;
             }
-            
+
             // 使用集中式节点选择逻辑
             var node = _openAISetting.GetCurrentOpenAISetting();
             if (node != null)
@@ -67,7 +105,7 @@ namespace VPetLLM.Core.ChatCore
             }
             return node;
         }
-        
+
         /// <summary>
         /// 清除当前请求的节点缓存，用于容灾切换到下一个节点
         /// </summary>
@@ -104,9 +142,9 @@ namespace VPetLLM.Core.ChatCore
             {
                 return (null, string.Empty, null);
             }
-            
+
             var currentApiKey = GetCurrentApiKey(currentNode);
-            
+
             string apiUrl = currentNode.Url;
             if (!apiUrl.Contains("/chat/completions"))
             {
@@ -136,38 +174,38 @@ namespace VPetLLM.Core.ChatCore
         {
             // Handle conversation turn for record weight decrement
             OnConversationTurn();
-            
+
             if (!Settings.KeepContext)
             {
                 ClearContext();
             }
-            
+
             // 清除上一次请求的节点缓存
             ClearNodeContext();
-            
+
             // 获取当前节点和API Key
             var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
-            
+
             // 检查是否有可用节点
             if (currentNode == null || apiUrl == null)
             {
-                var noNodeError = "没有启用的 OpenAI 节点，请在设置中启用至少一个节点";
-                Utils.Logger.Log($"OpenAI ChatWithImage 错误: {noNodeError}");
+                var noNodeError = "没有启用的OpenAI 节点，请在设置中启用至少一个节点";
+                SystemLogger.Log($"OpenAI ChatWithImage 错误: {noNodeError}");
                 ResponseHandler?.Invoke(noNodeError);
                 return "";
             }
-            
+
             // 检查视觉能力是否启用
             if (!currentNode.EnableVision)
             {
-                var visionError = "当前节点未启用视觉能力，请在设置中启用 EnableVision";
-                Utils.Logger.Log($"OpenAI ChatWithImage 错误: {visionError}");
+                var visionError = "当前节点未启用视觉能力，请在设置中启用EnableVision";
+                SystemLogger.Log($"OpenAI ChatWithImage 错误: {visionError}");
                 ResponseHandler?.Invoke(visionError);
                 return "";
             }
-            
-            Utils.Logger.Log($"OpenAI ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
-            
+
+            SystemLogger.Log($"OpenAI ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+
             // 构建多模态消息内容
             var base64Image = Convert.ToBase64String(imageData);
             var userContent = new object[]
@@ -175,10 +213,10 @@ namespace VPetLLM.Core.ChatCore
                 new { type = "text", text = prompt },
                 new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Image}" } }
             };
-            
+
             // 构建历史消息（不包含图像）
             List<Message> history = GetCoreHistory();
-            
+
             // 构建请求消息列表
             var requestMessages = new List<object>();
             foreach (var msg in history)
@@ -187,7 +225,7 @@ namespace VPetLLM.Core.ChatCore
             }
             // 添加带图像的用户消息
             requestMessages.Add(new { role = "user", content = userContent });
-            
+
             object data;
             if (_openAISetting.EnableAdvanced)
             {
@@ -210,10 +248,10 @@ namespace VPetLLM.Core.ChatCore
                     stream = currentNode.EnableStreaming
                 };
             }
-            
+
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
             string message;
-            
+
             try
             {
                 using (var client = GetClient())
@@ -222,30 +260,30 @@ namespace VPetLLM.Core.ChatCore
                     {
                         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                     }
-                    
+
                     if (currentNode.EnableStreaming)
                     {
-                        Utils.Logger.Log("OpenAI ChatWithImage: 使用流式传输模式");
+                        SystemLogger.Log("OpenAI ChatWithImage: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
                         {
                             Content = content
                         };
                         var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-                        
+
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
+                            var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
-                        
+
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
                         {
-                            Utils.Logger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
+                            SystemLogger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
                         }, VPetLLM.Instance);
-                        
+
                         using (var stream = await response.Content.ReadAsStreamAsync())
                         using (var reader = new System.IO.StreamReader(stream))
                         {
@@ -254,11 +292,11 @@ namespace VPetLLM.Core.ChatCore
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
-                                
+
                                 var jsonData = line.Substring(6).Trim();
                                 if (jsonData == "[DONE]")
                                     break;
-                                
+
                                 try
                                 {
                                     var chunk = JObject.Parse(jsonData);
@@ -278,16 +316,16 @@ namespace VPetLLM.Core.ChatCore
                     }
                     else
                     {
-                        Utils.Logger.Log("OpenAI ChatWithImage: 使用非流式传输模式");
+                        SystemLogger.Log("OpenAI ChatWithImage: 使用非流式传输模式");
                         var response = await client.PostAsync(apiUrl, content);
-                        
+
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
+                            var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
-                        
+
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
                         message = responseObject["choices"][0]["message"]["content"].ToString();
@@ -297,12 +335,12 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (Exception ex)
             {
-                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
-                Utils.Logger.Log($"OpenAI ChatWithImage 异常: {ex.Message}");
+                var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
+                SystemLogger.Log($"OpenAI ChatWithImage 异常: {ex.Message}");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
-            
+
             // 保存历史记录（包含图像数据用于上下文编辑器显示）
             if (Settings.KeepContext)
             {
@@ -316,7 +354,7 @@ namespace VPetLLM.Core.ChatCore
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
                 SaveHistory();
             }
-            
+
             return "";
         }
 
@@ -324,41 +362,41 @@ namespace VPetLLM.Core.ChatCore
         {
             // Handle conversation turn for record weight decrement
             OnConversationTurn();
-            
+
             if (!Settings.KeepContext)
             {
                 ClearContext();
             }
-            
+
             // 清除上一次请求的节点缓存，确保每次新请求都重新选择节点
             ClearNodeContext();
-            
+
             // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
             // 使用 CreateUserMessage 自动设置时间戳和状态信息
             var tempUserMessage = CreateUserMessage(prompt);
-            
+
             // 获取当前节点和API Key
             var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
-            
+
             // 检查是否有可用节点
             if (currentNode == null || apiUrl == null)
             {
                 var noNodeError = "NoEnabledOpenAINodes".Translate();
                 if (string.IsNullOrEmpty(noNodeError) || noNodeError == "NoEnabledOpenAINodes")
                 {
-                    noNodeError = "没有启用的 OpenAI 节点，请在设置中启用至少一个节点";
+                    noNodeError = "没有启用的OpenAI 节点，请在设置中启用至少一个节点";
                 }
-                Utils.Logger.Log($"OpenAI Chat 错误: {noNodeError}");
+                SystemLogger.Log($"OpenAI Chat 错误: {noNodeError}");
                 ResponseHandler?.Invoke(noNodeError);
                 return "";
             }
-            
+
             // 调试模式：当角色设定包含 VPetLLM_DeBug 时，记录当前调用的节点信息
             if (Settings?.Role?.Contains("VPetLLM_DeBug") == true)
             {
-                Utils.Logger.Log($"[DEBUG] OpenAI 当前调用节点: {currentNode.Name}, URL: {currentNode.Url}, Model: {currentNode.Model}");
+                SystemLogger.Log($"[DEBUG] OpenAI 当前调用节点: {currentNode.Name}, URL: {currentNode.Url}, Model: {currentNode.Model}");
             }
-            
+
             // 构建请求数据，根据启用开关决定是否包含高级参数
             List<Message> history = GetCoreHistory();
             // 如果有临时用户消息，添加到历史末尾用于API请求
@@ -368,7 +406,7 @@ namespace VPetLLM.Core.ChatCore
             }
             // 在添加用户消息后注入重要记录
             history = InjectRecordsIntoHistory(history);
-            
+
             object data;
             if (_openAISetting.EnableAdvanced)
             {
@@ -401,37 +439,37 @@ namespace VPetLLM.Core.ChatCore
                     {
                         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                     }
-                    
+
                     if (currentNode.EnableStreaming)
                     {
                         // 流式传输模式
-                        Utils.Logger.Log("OpenAI: 使用流式传输模式");
+                        SystemLogger.Log("OpenAI: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
                         {
                             Content = content
                         };
                         var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-                        
+
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
+                            var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
-                        
+
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
                         {
                             // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
-                            Utils.Logger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
+                            SystemLogger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
                         }, VPetLLM.Instance);
-                        
+
                         // 配置批处理设置
                         bool useBatch = Settings?.EnableStreamingBatch ?? true;
                         int batchWindow = Settings?.StreamingBatchWindowMs ?? 100;
                         streamProcessor.SetBatchingConfig(useBatch, batchWindow);
-                        
+
                         var TotalUsage = 0;
                         using (var stream = await response.Content.ReadAsStreamAsync())
                         using (var reader = new System.IO.StreamReader(stream))
@@ -441,11 +479,11 @@ namespace VPetLLM.Core.ChatCore
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
-                                
+
                                 var jsonData = line.Substring(6).Trim();
                                 if (jsonData == "[DONE]")
                                     break;
-                                
+
                                 try
                                 {
                                     var chunk = JObject.Parse(jsonData);
@@ -468,31 +506,31 @@ namespace VPetLLM.Core.ChatCore
                             }
                         }
                         message = fullMessage.ToString();
-                        
+
                         // 刷新批处理器，确保所有待处理命令都被处理
                         streamProcessor.FlushBatch();
-                        
-                        Utils.Logger.Log("OpenAI流式: 流式传输完成，总消息长度: {0},总Token用量：{1}".Translate(message.Length,TotalUsage));
+
+                        SystemLogger.Log("OpenAI流式: 流式传输完成，总消息长度 {0},总Token用量：{1}".Translate(message.Length, TotalUsage));
                         // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
                     else
                     {
                         // 非流式传输模式
-                        Utils.Logger.Log("OpenAI: 使用非流式传输模式");
+                        SystemLogger.Log("OpenAI: 使用非流式传输模式");
                         var response = await client.PostAsync(apiUrl, content);
-                        
+
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
+                            var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
-                        
+
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
                         message = responseObject["choices"][0]["message"]["content"].ToString();
                         var tokenUsage = responseObject["usage"]["total_tokens"].ToString();
-                        Utils.Logger.Log("OpenAI非流式: 收到完整消息，长度: {0}，Token用量：{1}".Translate(message.Length,tokenUsage));
+                        SystemLogger.Log("OpenAI非流式: 收到完整消息，长度 {0}，Token用量：{1}".Translate(message.Length, tokenUsage));
                         // 非流式模式下，一次性处理完整消息
                         ResponseHandler?.Invoke(message);
                     }
@@ -500,12 +538,12 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (Exception ex)
             {
-                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
-                Utils.Logger.Log($"OpenAI Chat 异常: {ex.Message}");
+                var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
+                SystemLogger.Log($"OpenAI Chat 异常: {ex.Message}");
                 ResponseHandler?.Invoke(errorMessage);
                 return "";
             }
-            
+
             // API调用成功后，才将用户消息和助手回复保存到历史记录
             if (Settings.KeepContext)
             {
@@ -522,7 +560,6 @@ namespace VPetLLM.Core.ChatCore
             return "";
         }
 
-
         public override async Task<string> Summarize(string systemPrompt, string userContent)
         {
             try
@@ -535,7 +572,7 @@ namespace VPetLLM.Core.ChatCore
 
                 // 清除节点缓存，确保重新选择节点
                 ClearNodeContext();
-                
+
                 // 获取当前节点和API Key
                 var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
 
@@ -545,10 +582,10 @@ namespace VPetLLM.Core.ChatCore
                     var noNodeError = "NoEnabledOpenAINodes".Translate();
                     if (string.IsNullOrEmpty(noNodeError) || noNodeError == "NoEnabledOpenAINodes")
                     {
-                        noNodeError = "没有启用的 OpenAI 节点，请在设置中启用至少一个节点";
+                        noNodeError = "没有启用的OpenAI 节点，请在设置中启用至少一个节点";
                     }
-                    Utils.Logger.Log($"OpenAI Summarize 错误: {noNodeError}");
-                    return Utils.ErrorMessageHelper.IsDebugMode(Settings) ? noNodeError : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
+                    SystemLogger.Log($"OpenAI Summarize 错误: {noNodeError}");
+                    return ErrorHelper.IsDebugMode(Settings) ? noNodeError : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试");
                 }
 
                 object data;
@@ -580,14 +617,14 @@ namespace VPetLLM.Core.ChatCore
                         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                     }
                     var response = await client.PostAsync(apiUrl, content);
-                    
+
                     if (!response.IsSuccessStatusCode)
                     {
-                        var errorMessage = await Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI");
-                        Utils.Logger.Log($"OpenAI Summarize 错误: {errorMessage}");
-                        return Utils.ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
+                        var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
+                        SystemLogger.Log($"OpenAI Summarize 错误: {errorMessage}");
+                        return ErrorHelper.IsDebugMode(Settings) ? errorMessage : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试");
                     }
-                    
+
                     var responseString = await response.Content.ReadAsStringAsync();
                     var responseObject = JObject.Parse(responseString);
                     return responseObject["choices"][0]["message"]["content"].ToString();
@@ -595,10 +632,10 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"OpenAI Summarize 异常: {ex.Message}");
-                return Utils.ErrorMessageHelper.IsDebugMode(Settings) 
-                    ? $"OpenAI Summarize 异常: {ex.Message}\n{ex.StackTrace}" 
-                    : (Utils.ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试。");
+                SystemLogger.Log($"OpenAI Summarize 异常: {ex.Message}");
+                return ErrorHelper.IsDebugMode(Settings)
+                    ? $"OpenAI Summarize 异常: {ex.Message}\n{ex.StackTrace}"
+                    : (ErrorHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试");
             }
         }
 
@@ -609,13 +646,13 @@ namespace VPetLLM.Core.ChatCore
                 new Message { Role = "system", Content = GetSystemMessage() }
             };
             history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
-            
+
             // Inject important records into history (only when explicitly requested, after user message is added)
             if (injectRecords)
             {
                 history = InjectRecordsIntoHistory(history);
             }
-            
+
             return history;
         }
 
@@ -625,21 +662,21 @@ namespace VPetLLM.Core.ChatCore
             {
                 // 清除节点缓存，确保重新选择节点
                 ClearNodeContext();
-                
+
                 // 获取当前节点和API Key
                 var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
-                
+
                 // 检查是否有可用节点
                 if (currentNode == null || apiUrl == null)
                 {
                     var noNodeError = "NoEnabledOpenAINodes".Translate();
                     if (string.IsNullOrEmpty(noNodeError) || noNodeError == "NoEnabledOpenAINodes")
                     {
-                        noNodeError = "没有启用的 OpenAI 节点，请在设置中启用至少一个节点";
+                        noNodeError = "没有启用的OpenAI 节点，请在设置中启用至少一个节点";
                     }
                     throw new System.Exception(noNodeError);
                 }
-                
+
                 string modelsUrl = apiUrl;
                 if (modelsUrl.Contains("/chat/completions"))
                 {
@@ -663,13 +700,13 @@ namespace VPetLLM.Core.ChatCore
                         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                     }
                     var response = client.GetAsync(url).Result;
-                    
+
                     if (!response.IsSuccessStatusCode)
                     {
-                        var errorMessage = Utils.ErrorMessageHelper.HandleHttpResponseError(response, Settings, "OpenAI").Result;
+                        var errorMessage = HandleHttpErrorSync(response, Settings, "OpenAI");
                         throw new System.Exception(errorMessage);
                     }
-                    
+
                     var responseString = response.Content.ReadAsStringAsync().Result;
                     JObject responseObject;
                     try
@@ -678,9 +715,9 @@ namespace VPetLLM.Core.ChatCore
                     }
                     catch (JsonReaderException)
                     {
-                        var parseError = Utils.ErrorMessageHelper.IsDebugMode(Settings)
+                        var parseError = ErrorHelper.IsDebugMode(Settings)
                             ? $"Failed to parse JSON response: {responseString.Substring(0, System.Math.Min(responseString.Length, 100))}"
-                            : "获取模型列表失败，服务器返回了无效的响应格式。";
+                            : "获取模型列表失败，服务器返回了无效的响应格式";
                         throw new System.Exception(parseError);
                     }
                     var models = new List<string>();
@@ -693,7 +730,7 @@ namespace VPetLLM.Core.ChatCore
             }
             catch (System.Exception ex) when (!(ex.Message.Contains("API") || ex.Message.Contains("获取模型") || ex.Message.Contains("没有启用")))
             {
-                var errorMessage = Utils.ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
+                var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
                 throw new System.Exception(errorMessage);
             }
         }

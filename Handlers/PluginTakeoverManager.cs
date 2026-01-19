@@ -1,9 +1,8 @@
-using System;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using VPetLLM.Core;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -93,14 +92,14 @@ namespace VPetLLM.Handlers
                 Logger.Log($"PluginTakeoverManager: 检测到插件调用: {pluginName}");
 
                 // 查找支持接管的插件
-                var plugin = VPetLLM.Instance?.Plugins.Find(p => 
+                var plugin = VPetLLM.Instance?.Plugins.Find(p =>
                     p.Name.Replace(" ", "_").Equals(pluginName, StringComparison.OrdinalIgnoreCase) &&
                     p is IPluginTakeover takeover && takeover.SupportsTakeover);
 
                 if (plugin is IPluginTakeover takeoverPlugin)
                 {
                     Logger.Log($"PluginTakeoverManager: 插件 {pluginName} 支持接管，开始接管流程");
-                    
+
                     // 提取初始内容（从插件名之后的内容）
                     var startIndex = takeoverMatch.Index + takeoverMatch.Length;
                     var initialContent = currentBuffer.Substring(startIndex);

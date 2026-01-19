@@ -1,5 +1,7 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Common;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -57,7 +59,7 @@ namespace VPetLLM.Services
                 // 使用PurchaseSourceDetector模块检测购买来源
                 var purchaseSource = PurchaseSourceDetector.DetectPurchaseSource(source);
                 string sourceDescription = PurchaseSourceDetector.GetPurchaseSourceDescription(purchaseSource);
-                
+
                 // 获取物品类型（使用反射兼容新旧版本）
                 string itemType = GetItemType(food);
                 Logger.Log($"Purchase source detected: {sourceDescription} (from: {source}, itemType: {itemType})");
@@ -107,7 +109,7 @@ namespace VPetLLM.Services
             {
                 Logger.Log($"GetItemType reflection failed: {ex.Message}");
             }
-            
+
             // 默认返回 "Food"
             return "Food";
         }
@@ -136,7 +138,7 @@ namespace VPetLLM.Services
                         Description = food.Desc ?? "",
                         OriginalFood = food
                     };
-                    
+
                     _pendingPurchases.Add(purchaseItem);
                     Logger.Log($"Added new purchase item: {food.Name} x{count} (type: {itemType})");
                 }
@@ -295,7 +297,7 @@ namespace VPetLLM.Services
                 }
                 return foodType.Value.ToString().ToLower();
             }
-            
+
             // 通用 Item 类型处理
             string itemKey = itemType switch
             {
@@ -311,7 +313,7 @@ namespace VPetLLM.Services
             {
                 return itemResult;
             }
-            
+
             // 降级：返回原始类型名
             return itemType.ToLower();
         }

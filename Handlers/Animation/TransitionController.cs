@@ -1,8 +1,6 @@
-using System;
-using System.Threading.Tasks;
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Animation
@@ -87,7 +85,7 @@ namespace VPetLLM.Handlers.Animation
             if (_synchronizer.CanReuseCurrentAnimation(mainWindow, animationName, request.AnimatType))
             {
                 Logger.Log($"TransitionController: Reusing current animation '{animationName}' to avoid flicker");
-                
+
                 // 如果是循环动画，尝试继续
                 if (request.AnimatType == AnimatType.B_Loop)
                 {
@@ -97,7 +95,7 @@ namespace VPetLLM.Handlers.Animation
                         return true;
                     }
                 }
-                
+
                 // 动画相同，不需要切换
                 return true;
             }
@@ -109,9 +107,9 @@ namespace VPetLLM.Handlers.Animation
                 if (transitionGraph != null)
                 {
                     Logger.Log($"TransitionController: Playing C_End animation before transition");
-                    
+
                     var tcs = new TaskCompletionSource<bool>();
-                    
+
                     _synchronizer.ExecuteOnUIThread(() =>
                     {
                         mainWindow.Main.Display(transitionGraph, () =>
@@ -222,12 +220,12 @@ namespace VPetLLM.Handlers.Animation
                 try
                 {
                     var displayType = mainWindow.Main.DisplayType;
-                    
+
                     // 参考 VPet MessageBar 的逻辑：
                     // 只有当 displayType.Name == graphName 或 displayType.Type == GraphType.Say 时才结束动画
                     // 并且 displayType.Animat != AnimatType.C_End（不是已经在播放结束动画）
                     bool shouldEnd = false;
-                    
+
                     if (displayType != null && displayType.Animat != AnimatType.C_End)
                     {
                         if (!string.IsNullOrEmpty(expectedGraphName) && displayType.Name == expectedGraphName)

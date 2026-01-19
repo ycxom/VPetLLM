@@ -6,7 +6,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using VPetLLM.Core;
-using VPetLLM.Utils;
+using VPetLLM.Utils.Localization;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -14,7 +15,7 @@ namespace VPetLLM.UI.Windows
     {
         public Message OriginalMessage { get; }
         public string Role => OriginalMessage.Role;
-        
+
         private string _content;
         public string Content
         {
@@ -120,13 +121,13 @@ namespace VPetLLM.UI.Windows
             _plugin = plugin;
 
             _originalHistory = _plugin.ChatCore.GetChatHistory();
-            
+
             // 备份原始图像数据
             foreach (var msg in _originalHistory)
             {
                 _originalImageBackup[msg] = msg.ImageData;
             }
-            
+
             var displayItems = _originalHistory
                 .Where(m => m.Role != "system")
                 .Select(m => new ContextEditorItem(m));
@@ -221,8 +222,8 @@ namespace VPetLLM.UI.Windows
         /// </summary>
         private void Thumbnail_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (sender is System.Windows.Controls.Image image && 
-                image.DataContext is ContextEditorItem item && 
+            if (sender is System.Windows.Controls.Image image &&
+                image.DataContext is ContextEditorItem item &&
                 item.HasImage)
             {
                 var preview = new winImagePreview(item.ImageData!);

@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core.TTSCore
 {
@@ -32,14 +27,14 @@ namespace VPetLLM.Core.TTSCore
                 // 检查是否启用（通过TTS主设置）
                 if (!Settings.TTS.IsEnabled)
                 {
-                    Utils.Logger.Log("TTS (DIY): DIY TTS 未启用");
+                    Logger.Log("TTS (DIY): DIY TTS 未启用");
                     throw new InvalidOperationException("DIY TTS 未启用");
                 }
 
                 // 验证配置
                 if (!IsValidConfig())
                 {
-                    Utils.Logger.Log("TTS (DIY): DIY TTS 配置无效");
+                    Logger.Log("TTS (DIY): DIY TTS 配置无效");
                     throw new InvalidOperationException("DIY TTS 配置无效");
                 }
 
@@ -51,7 +46,7 @@ namespace VPetLLM.Core.TTSCore
                 // 验证URL格式
                 if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
                 {
-                    Utils.Logger.Log($"TTS (DIY): 错误 - URL格式无效: {baseUrl}");
+                    Logger.Log($"TTS (DIY): 错误 - URL格式无效: {baseUrl}");
                     throw new ArgumentException($"无效的URL格式: {baseUrl}");
                 }
 
@@ -74,7 +69,7 @@ namespace VPetLLM.Core.TTSCore
                         {
                             // 不强制设置，允许用户自定义User-Agent
                             request.Headers.Add("User-Agent", header.Value);
-                            Utils.Logger.Log($"TTS (DIY): 已设置User-Agent: {header.Value}");
+                            Logger.Log($"TTS (DIY): 已设置User-Agent: {header.Value}");
                         }
                         else if (header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
                         {
@@ -86,11 +81,11 @@ namespace VPetLLM.Core.TTSCore
                             try
                             {
                                 request.Headers.Add(header.Key, header.Value);
-                                Utils.Logger.Log($"TTS (DIY): 已设置请求头: {header.Key}: {header.Value}");
+                                Logger.Log($"TTS (DIY): 已设置请求头: {header.Key}: {header.Value}");
                             }
                             catch (Exception ex)
                             {
-                                Utils.Logger.Log($"TTS (DIY): 设置请求头失败 {header.Key}: {ex.Message}");
+                                Logger.Log($"TTS (DIY): 设置请求头失败：{header.Key}: {ex.Message}");
                             }
                         }
                     }
@@ -101,9 +96,9 @@ namespace VPetLLM.Core.TTSCore
 
                     request.Content = new StringContent(requestBody, Encoding.UTF8, contentType);
 
-                    Utils.Logger.Log($"TTS (DIY): POST请求体:");
-                    Utils.Logger.Log($"TTS (DIY): {requestBody}");
-                    Utils.Logger.Log($"TTS (DIY): 发送POST请求到: {baseUrl}");
+                    Logger.Log($"TTS (DIY): POST请求体：");
+                    Logger.Log($"TTS (DIY): {requestBody}");
+                    Logger.Log($"TTS (DIY): 发送POST请求到 {baseUrl}");
 
                     using var client = CreateHttpClient();
                     response = await client.SendAsync(request, cts.Token);
@@ -160,61 +155,61 @@ namespace VPetLLM.Core.TTSCore
                         {
                             // 不强制设置，允许用户自定义User-Agent
                             request.Headers.Add("User-Agent", header.Value);
-                            Utils.Logger.Log($"TTS (DIY): 已设置User-Agent: {header.Value}");
+                            Logger.Log($"TTS (DIY): 已设置User-Agent: {header.Value}");
                         }
                         else if (header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
                         {
                             // GET请求跳过Content-Type设置
-                            Utils.Logger.Log($"TTS (DIY): 跳过Content-Type设置 (GET请求不需要)");
+                            Logger.Log($"TTS (DIY): 跳过Content-Type设置 (GET请求不需要)");
                         }
                         else
                         {
                             try
                             {
                                 request.Headers.Add(header.Key, header.Value);
-                                Utils.Logger.Log($"TTS (DIY): 已设置请求头: {header.Key}: {header.Value}");
+                                Logger.Log($"TTS (DIY): 已设置请求头: {header.Key}: {header.Value}");
                             }
                             catch (Exception ex)
                             {
-                                Utils.Logger.Log($"TTS (DIY): 设置请求头失败 {header.Key}: {ex.Message}");
+                                Logger.Log($"TTS (DIY): 设置请求头失败：{header.Key}: {ex.Message}");
                             }
                         }
                     }
 
-                    Utils.Logger.Log($"TTS (DIY): GET请求URL: {url}");
-                    Utils.Logger.Log($"TTS (DIY): 发送GET请求到: {url}");
+                    Logger.Log($"TTS (DIY): GET请求URL: {url}");
+                    Logger.Log($"TTS (DIY): 发送GET请求到 {url}");
 
                     using var client = CreateHttpClient();
                     response = await client.SendAsync(request, cts.Token);
                 }
 
-                Utils.Logger.Log($"TTS (DIY): 响应状态码: {response.StatusCode}");
+                Logger.Log($"TTS (DIY): 响应状态码: {response.StatusCode}");
 
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    Utils.Logger.Log($"TTS (DIY): 错误响应内容: {errorContent}");
+                    Logger.Log($"TTS (DIY): 错误响应内容: {errorContent}");
                     throw new Exception($"DIY TTS API 错误: {response.StatusCode}");
                 }
 
                 var responseData = await response.Content.ReadAsByteArrayAsync();
-                Utils.Logger.Log($"TTS (DIY): 响应数据大小: {responseData.Length} 字节");
+                Logger.Log($"TTS (DIY): 响应数据大小: {responseData.Length} 字节");
 
                 return responseData;
             }
             catch (TaskCanceledException ex)
             {
-                Utils.Logger.Log($"TTS (DIY): 请求超时: {ex.Message}");
+                Logger.Log($"TTS (DIY): 请求超时: {ex.Message}");
                 throw new Exception("请求超时，请检查网络连接");
             }
             catch (HttpRequestException ex)
             {
-                Utils.Logger.Log($"TTS (DIY): 网络错误: {ex.Message}");
+                Logger.Log($"TTS (DIY): 网络错误: {ex.Message}");
                 throw new Exception($"网络错误: {ex.Message}");
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"TTS (DIY): 生成音频错误: {ex.Message}");
+                Logger.Log($"TTS (DIY): 生成音频错误: {ex.Message}");
                 throw;
             }
         }
@@ -244,11 +239,11 @@ namespace VPetLLM.Core.TTSCore
         {
             try
             {
-                Utils.Logger.Log("TTS (DIY): 开始执行配置回收机制");
+                Logger.Log("TTS (DIY): 开始执行配置回收机制");
 
                 if (_diyConfig == null)
                 {
-                    Utils.Logger.Log("TTS (DIY): DIY配置为空，跳过回收");
+                    Logger.Log("TTS (DIY): DIY配置为空，跳过回收");
                     return;
                 }
 
@@ -258,7 +253,7 @@ namespace VPetLLM.Core.TTSCore
                 if (_diyConfig.CustomHeaders != null && _diyConfig.CustomHeaders.Any())
                 {
                     var originalCount = _diyConfig.CustomHeaders.Count;
-                    
+
                     // 移除空键名或空值的项
                     _diyConfig.CustomHeaders = _diyConfig.CustomHeaders
                         .Where(h => !string.IsNullOrWhiteSpace(h.Key) && !string.IsNullOrWhiteSpace(h.Value))
@@ -274,7 +269,7 @@ namespace VPetLLM.Core.TTSCore
                     if (newCount != originalCount)
                     {
                         hasChanges = true;
-                        Utils.Logger.Log($"TTS (DIY): 清理了 {originalCount - newCount} 个无效/重复的自定义请求头");
+                        Logger.Log($"TTS (DIY): 清理了{originalCount - newCount} 个无效/重复的自定义请求头");
                     }
                 }
 
@@ -284,7 +279,7 @@ namespace VPetLLM.Core.TTSCore
                     if (!Uri.TryCreate(_diyConfig.BaseUrl, UriKind.Absolute, out var uri) ||
                         (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
                     {
-                        Utils.Logger.Log($"TTS (DIY): 检测到无效的BaseUrl: {_diyConfig.BaseUrl}，重置为空");
+                        Logger.Log($"TTS (DIY): 检测到无效的BaseUrl: {_diyConfig.BaseUrl}，重置为空");
                         _diyConfig.BaseUrl = "";
                         hasChanges = true;
                     }
@@ -296,7 +291,7 @@ namespace VPetLLM.Core.TTSCore
                     var validMethods = new[] { "GET", "POST", "PUT", "DELETE", "PATCH" };
                     if (!validMethods.Contains(_diyConfig.Method.ToUpperInvariant()))
                     {
-                        Utils.Logger.Log($"TTS (DIY): 检测到无效的请求方法: {_diyConfig.Method}，重置为POST");
+                        Logger.Log($"TTS (DIY): 检测到无效的请求方法 {_diyConfig.Method}，重置为POST");
                         _diyConfig.Method = "POST";
                         hasChanges = true;
                     }
@@ -305,7 +300,7 @@ namespace VPetLLM.Core.TTSCore
                 // 清理过长的请求体（防止配置文件过大）
                 if (!string.IsNullOrWhiteSpace(_diyConfig.RequestBody) && _diyConfig.RequestBody.Length > 10000)
                 {
-                    Utils.Logger.Log($"TTS (DIY): 检测到过长的请求体 ({_diyConfig.RequestBody.Length} 字符)，截断到10000字符");
+                    Logger.Log($"TTS (DIY): 检测到过长的请求体 ({_diyConfig.RequestBody.Length} 字符)，截断到10000字符");
                     _diyConfig.RequestBody = _diyConfig.RequestBody.Substring(0, 10000);
                     hasChanges = true;
                 }
@@ -317,19 +312,19 @@ namespace VPetLLM.Core.TTSCore
                     {
                         // 这里应该调用设置的保存方法，但由于Setting类可能没有公共保存方法，
                         // 我们记录日志，实际的保存由调用者处理
-                        Utils.Logger.Log("TTS (DIY): 配置回收完成，发现更改，请手动保存设置");
+                        Logger.Log("TTS (DIY): 配置回收完成，发现更改，请手动保存设置");
                     }
                     catch (Exception ex)
                     {
-                        Utils.Logger.Log($"TTS (DIY): 保存配置时出错: {ex.Message}");
+                        Logger.Log($"TTS (DIY): 保存配置时出错 {ex.Message}");
                     }
                 }
 
-                Utils.Logger.Log("TTS (DIY): 配置回收机制执行完成");
+                Logger.Log("TTS (DIY): 配置回收机制执行完成");
             }
             catch (Exception ex)
             {
-                Utils.Logger.Log($"TTS (DIY): 配置回收机制执行出错: {ex.Message}");
+                Logger.Log($"TTS (DIY): 配置回收机制执行出错: {ex.Message}");
             }
         }
 

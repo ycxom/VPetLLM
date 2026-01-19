@@ -1,12 +1,10 @@
-using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -41,13 +39,13 @@ namespace VPetLLM.UI.Windows
         public winScreenshotCapture()
         {
             InitializeComponent();
-            
+
             // 计算虚拟桌面边界（覆盖所有屏幕）
             CalculateVirtualDesktopBounds();
-            
+
             // 设置窗口位置和大小以覆盖所有屏幕
             SetWindowToVirtualDesktop();
-            
+
             MouseLeftButtonDown += OnMouseLeftButtonDown;
             MouseMove += OnMouseMove;
             MouseLeftButtonUp += OnMouseLeftButtonUp;
@@ -61,7 +59,7 @@ namespace VPetLLM.UI.Windows
         {
             // 使用 System.Windows.Forms.Screen 获取所有屏幕信息
             var screens = System.Windows.Forms.Screen.AllScreens;
-            
+
             int minX = int.MaxValue, minY = int.MaxValue;
             int maxX = int.MinValue, maxY = int.MinValue;
 
@@ -109,13 +107,13 @@ namespace VPetLLM.UI.Windows
         {
             _startPoint = e.GetPosition(OverlayCanvas);
             _isSelecting = true;
-            
+
             SelectionRect.Visibility = Visibility.Visible;
             Canvas.SetLeft(SelectionRect, _startPoint.X);
             Canvas.SetTop(SelectionRect, _startPoint.Y);
             SelectionRect.Width = 0;
             SelectionRect.Height = 0;
-            
+
             HintText.Visibility = Visibility.Collapsed;
             CaptureMouse();
         }
@@ -125,7 +123,7 @@ namespace VPetLLM.UI.Windows
             if (!_isSelecting) return;
 
             var currentPoint = e.GetPosition(OverlayCanvas);
-            
+
             _selectionLeft = Math.Min(_startPoint.X, currentPoint.X);
             _selectionTop = Math.Min(_startPoint.Y, currentPoint.Y);
             _selectionWidth = Math.Abs(currentPoint.X - _startPoint.X);
@@ -140,7 +138,7 @@ namespace VPetLLM.UI.Windows
         private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             if (!_isSelecting) return;
-            
+
             _isSelecting = false;
             ReleaseMouseCapture();
 

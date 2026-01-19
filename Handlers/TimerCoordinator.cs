@@ -1,6 +1,4 @@
-using System;
-using System.Timers;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -13,25 +11,25 @@ namespace VPetLLM.Handlers
     {
         private readonly VPetLLM _plugin;
         private readonly object _lock = new object();
-        
+
         // 定时器状态
         private bool _showTimerWasActive;
         private bool _endTimerWasActive;
         private bool _closeTimerWasActive;
         private bool _isPaused;
-        
+
         // 显示时间配置
         private int _currentDisplayDuration;
         private bool _ttsEnabled;
         private int _audioDuration;
-        
+
         public TimerCoordinator(VPetLLM plugin)
         {
             _plugin = plugin;
             _isPaused = false;
             _currentDisplayDuration = 2000; // 默认2秒
         }
-        
+
         /// <summary>
         /// 暂停所有定时器（准备显示新气泡）
         /// </summary>
@@ -40,26 +38,26 @@ namespace VPetLLM.Handlers
             lock (_lock)
             {
                 if (_isPaused) return;
-                
+
                 try
                 {
                     var msgBar = _plugin?.MW?.Main?.MsgBar;
                     if (msgBar == null) return;
-                    
+
                     // 保存当前状态
                     var showTimer = GetTimer(msgBar, "ShowTimer");
                     var endTimer = GetTimer(msgBar, "EndTimer");
                     var closeTimer = GetTimer(msgBar, "CloseTimer");
-                    
+
                     _showTimerWasActive = showTimer?.Enabled ?? false;
                     _endTimerWasActive = endTimer?.Enabled ?? false;
                     _closeTimerWasActive = closeTimer?.Enabled ?? false;
-                    
+
                     // 停止所有定时器
                     showTimer?.Stop();
                     endTimer?.Stop();
                     closeTimer?.Stop();
-                    
+
                     _isPaused = true;
                     Logger.Log("TimerCoordinator: 所有定时器已暂停");
                 }
@@ -69,7 +67,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 恢复定时器（气泡显示完成）
         /// </summary>
@@ -78,22 +76,22 @@ namespace VPetLLM.Handlers
             lock (_lock)
             {
                 if (!_isPaused) return;
-                
+
                 try
                 {
                     var msgBar = _plugin?.MW?.Main?.MsgBar;
                     if (msgBar == null) return;
-                    
+
                     // 根据当前配置决定启动哪个定时器
                     var endTimer = GetTimer(msgBar, "EndTimer");
-                    
+
                     // 通常在显示完成后启动 EndTimer
                     if (endTimer != null && _currentDisplayDuration > 0)
                     {
                         endTimer.Interval = 200; // VPet 默认间隔
                         endTimer.Start();
                     }
-                    
+
                     _isPaused = false;
                     Logger.Log("TimerCoordinator: 定时器已恢复");
                 }
@@ -103,7 +101,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 设置气泡显示时间
         /// </summary>
@@ -116,7 +114,7 @@ namespace VPetLLM.Handlers
                 Logger.Log($"TimerCoordinator: 显示时间设置为 {_currentDisplayDuration}ms");
             }
         }
-        
+
         /// <summary>
         /// 根据文本长度计算显示时间
         /// </summary>
@@ -128,10 +126,10 @@ namespace VPetLLM.Handlers
         {
             if (string.IsNullOrEmpty(text))
                 return minTime;
-            
+
             return Math.Max(minTime, text.Length * timePerChar);
         }
-        
+
         /// <summary>
         /// 与 TTS 同步
         /// </summary>
@@ -143,7 +141,7 @@ namespace VPetLLM.Handlers
             {
                 _ttsEnabled = ttsEnabled;
                 _audioDuration = audioDuration;
-                
+
                 if (ttsEnabled && audioDuration > 0)
                 {
                     // TTS 启用时，显示时间至少等于音频时长
@@ -152,7 +150,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 强制停止所有定时器（用于错误恢复）
         /// </summary>
@@ -164,16 +162,16 @@ namespace VPetLLM.Handlers
                 {
                     var msgBar = _plugin?.MW?.Main?.MsgBar;
                     if (msgBar == null) return;
-                    
+
                     GetTimer(msgBar, "ShowTimer")?.Stop();
                     GetTimer(msgBar, "EndTimer")?.Stop();
                     GetTimer(msgBar, "CloseTimer")?.Stop();
-                    
+
                     _isPaused = false;
                     _showTimerWasActive = false;
                     _endTimerWasActive = false;
                     _closeTimerWasActive = false;
-                    
+
                     Logger.Log("TimerCoordinator: 所有定时器已强制停止");
                 }
                 catch (Exception ex)
@@ -182,7 +180,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 检查定时器状态是否一致
         /// </summary>
@@ -195,24 +193,24 @@ namespace VPetLLM.Handlers
                 {
                     var msgBar = _plugin?.MW?.Main?.MsgBar;
                     if (msgBar == null) return true;
-                    
+
                     var showTimer = GetTimer(msgBar, "ShowTimer");
                     var endTimer = GetTimer(msgBar, "EndTimer");
                     var closeTimer = GetTimer(msgBar, "CloseTimer");
-                    
+
                     int activeCount = 0;
                     if (showTimer?.Enabled == true) activeCount++;
                     if (endTimer?.Enabled == true) activeCount++;
                     if (closeTimer?.Enabled == true) activeCount++;
-                    
+
                     // 正常情况：最多一个定时器活动，或全部停止
                     bool isConsistent = activeCount <= 1;
-                    
+
                     if (!isConsistent)
                     {
                         Logger.Log($"TimerCoordinator: 检测到定时器冲突，活动数: {activeCount}");
                     }
-                    
+
                     return isConsistent;
                 }
                 catch (Exception ex)
@@ -222,7 +220,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 解决定时器冲突
         /// </summary>
@@ -232,12 +230,12 @@ namespace VPetLLM.Handlers
             {
                 if (CheckTimerConsistency())
                     return;
-                
+
                 Logger.Log("TimerCoordinator: 正在解决定时器冲突...");
                 ForceStopAll();
             }
         }
-        
+
         /// <summary>
         /// 获取定时器实例
         /// </summary>
@@ -245,7 +243,7 @@ namespace VPetLLM.Handlers
         {
             try
             {
-                var field = msgBar.GetType().GetField(timerName, 
+                var field = msgBar.GetType().GetField(timerName,
                     System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                 return field?.GetValue(msgBar) as System.Timers.Timer;
             }
@@ -254,7 +252,7 @@ namespace VPetLLM.Handlers
                 return null;
             }
         }
-        
+
         /// <summary>
         /// 获取当前状态快照
         /// </summary>
@@ -265,7 +263,7 @@ namespace VPetLLM.Handlers
                 try
                 {
                     var msgBar = _plugin?.MW?.Main?.MsgBar;
-                    
+
                     return new TimerStateSnapshot
                     {
                         IsPaused = _isPaused,
@@ -284,7 +282,7 @@ namespace VPetLLM.Handlers
             }
         }
     }
-    
+
     /// <summary>
     /// 定时器状态快照
     /// </summary>

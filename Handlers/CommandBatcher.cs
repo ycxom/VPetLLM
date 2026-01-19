@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using VPetLLM.Utils;
+using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers
 {
@@ -20,7 +16,7 @@ namespace VPetLLM.Handlers
         private bool _isDisposed = false;
         private DateTime _batchStartTime;
         private bool _timerScheduled = false;
-        
+
         /// <summary>
         /// 创建命令批处理器
         /// </summary>
@@ -32,13 +28,13 @@ namespace VPetLLM.Handlers
                 throw new ArgumentException("批处理窗口时间必须大于0", nameof(batchWindowMs));
             if (onBatchReady == null)
                 throw new ArgumentNullException(nameof(onBatchReady));
-            
+
             _batchWindowMs = batchWindowMs;
             _onBatchReady = onBatchReady;
-            
+
             Logger.Log($"CommandBatcher: 初始化完成，批处理窗口: {_batchWindowMs}ms");
         }
-        
+
         /// <summary>
         /// 添加命令到批处理队列
         /// </summary>
@@ -47,7 +43,7 @@ namespace VPetLLM.Handlers
         {
             if (string.IsNullOrEmpty(command) || _isDisposed)
                 return;
-            
+
             lock (_lock)
             {
                 // 如果是第一个命令，记录批次开始时间
@@ -55,9 +51,9 @@ namespace VPetLLM.Handlers
                 {
                     _batchStartTime = DateTime.Now;
                 }
-                
+
                 _pendingCommands.Add(command);
-                
+
                 // 如果定时器未启动，启动定时器
                 if (!_timerScheduled)
                 {
@@ -72,12 +68,12 @@ namespace VPetLLM.Handlers
         private void ScheduleBatchTimer()
         {
             _timerScheduled = true;
-            
+
             // 使用一次性定时器
             _batchTimer?.Dispose();
             _batchTimer = new Timer(OnBatchTimerElapsed, null, _batchWindowMs, Timeout.Infinite);
         }
-        
+
         /// <summary>
         /// 批处理定时器触发
         /// </summary>
@@ -85,14 +81,14 @@ namespace VPetLLM.Handlers
         {
             ProcessBatch();
         }
-        
+
         /// <summary>
         /// 处理当前批次
         /// </summary>
         private void ProcessBatch()
         {
             List<string> commandsToProcess = null;
-            
+
             lock (_lock)
             {
                 if (_pendingCommands.Count > 0)
@@ -100,14 +96,14 @@ namespace VPetLLM.Handlers
                     // 复制命令列表
                     commandsToProcess = new List<string>(_pendingCommands);
                     _pendingCommands.Clear();
-                    
+
                     var batchDuration = (DateTime.Now - _batchStartTime).TotalMilliseconds;
                     Logger.Log($"CommandBatcher: 处理批次，命令数: {commandsToProcess.Count}, 批次时长: {batchDuration:F1}ms");
                 }
-                
+
                 _timerScheduled = false;
             }
-            
+
             // 在锁外执行回调，避免死锁
             if (commandsToProcess != null && commandsToProcess.Count > 0)
             {
@@ -121,22 +117,22 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 强制刷新当前批次（立即处理所有待处理命令）
         /// </summary>
         public void Flush()
         {
             if (_isDisposed) return;
-            
+
             // 停止定时器
             _batchTimer?.Dispose();
             _batchTimer = null;
-            
+
             // 处理当前批次
             ProcessBatch();
         }
-        
+
         /// <summary>
         /// 获取当前待处理命令数量
         /// </summary>
@@ -150,7 +146,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 检查是否有待处理的命令
         /// </summary>
@@ -164,7 +160,7 @@ namespace VPetLLM.Handlers
                 }
             }
         }
-        
+
         /// <summary>
         /// 清空待处理命令（不触发回调）
         /// </summary>
@@ -175,31 +171,31 @@ namespace VPetLLM.Handlers
                 _pendingCommands.Clear();
                 _timerScheduled = false;
             }
-            
+
             _batchTimer?.Dispose();
             _batchTimer = null;
         }
-        
+
         /// <summary>
         /// 释放资源
         /// </summary>
         public void Dispose()
         {
             if (_isDisposed) return;
-            
+
             _isDisposed = true;
-            
+
             // 处理剩余命令
             Flush();
-            
+
             _batchTimer?.Dispose();
             _batchTimer = null;
-            
+
             lock (_lock)
             {
                 _pendingCommands.Clear();
             }
-            
+
             Logger.Log("CommandBatcher: 已释放");
         }
     }
