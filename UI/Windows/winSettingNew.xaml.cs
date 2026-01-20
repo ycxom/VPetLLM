@@ -13,6 +13,7 @@ using VPetLLM.Utils.Audio;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 using VPetLLM.Utils.Plugin;
+using NewPlugin = VPetLLM.Core.Abstractions.Interfaces.Plugin;
 
 namespace VPetLLM.UI.Windows
 {
@@ -31,7 +32,7 @@ namespace VPetLLM.UI.Windows
         public string Icon { get; set; }
         public string FileUrl { get; set; }
         public string SHA256 { get; set; }
-        public IVPetLLMPlugin LocalPlugin { get; set; }
+        public NewPlugin.IVPetLLMPlugin LocalPlugin { get; set; }
         public FailedPlugin FailedPlugin { get; set; }
         public string Version { get; set; }
         public string RemoteVersion { get; set; }
@@ -1876,7 +1877,9 @@ namespace VPetLLM.UI.Windows
                         try
                         {
                             item.LocalPlugin.Initialize(_plugin);
-                            _plugin.ChatCore?.AddPlugin(item.LocalPlugin);
+                            // Convert new-style plugin to legacy interface for ChatCore
+                            var legacyPlugin = global::VPetLLM.Core.PluginCompatibility.ToLegacy(item.LocalPlugin);
+                            _plugin.ChatCore?.AddPlugin(legacyPlugin);
                             Logger.Log($"Plugin '{item.LocalPlugin.Name}' has been enabled and initialized.");
                         }
                         catch (Exception ex)
@@ -1897,7 +1900,9 @@ namespace VPetLLM.UI.Windows
                         try
                         {
                             item.LocalPlugin.Unload();
-                            _plugin.ChatCore?.RemovePlugin(item.LocalPlugin);
+                            // Convert new-style plugin to legacy interface for ChatCore
+                            var legacyPlugin = global::VPetLLM.Core.PluginCompatibility.ToLegacy(item.LocalPlugin);
+                            _plugin.ChatCore?.RemovePlugin(legacyPlugin);
                             Logger.Log($"Plugin '{item.LocalPlugin.Name}' has been disabled and unloaded.");
                         }
                         catch (Exception ex)
@@ -2484,6 +2489,7 @@ namespace VPetLLM.UI.Windows
 
                 // 第一步：获取当前已加载的插件信息（不重新加载）
                 Logger.Log($"开始刷新插件列表 - 当前本地插件数量: {_plugin.Plugins.Count}");
+                Logger.Log($"RefreshPluginList: 失败的插件数量: {_plugin.FailedPlugins.Count}");
                 System.Diagnostics.Debug.WriteLine($"[PluginStore] 当前插件数量: {_plugin.Plugins.Count}");
                 System.Diagnostics.Debug.WriteLine($"[PluginStore] 失败的插件数量: {_plugin.FailedPlugins.Count}");
 
@@ -2523,9 +2529,20 @@ namespace VPetLLM.UI.Windows
                 }
 
                 // 添加本地失败插件
+                Logger.Log($"RefreshPluginList: 开始处理失败插件，数量: {_plugin.FailedPlugins.Count}");
                 foreach (var failedPlugin in _plugin.FailedPlugins)
                 {
+                    Logger.Log($"RefreshPluginList: 处理失败插件 - Name: {failedPlugin.Name}, FilePath: {failedPlugin.FilePath}");
                     var id = failedPlugin.Name;
+                    
+                    // 尝试计算失败插件的 SHA256，用于版本比较
+                    string failedPluginSha = null;
+                    if (!string.IsNullOrEmpty(failedPlugin.FilePath) && File.Exists(failedPlugin.FilePath))
+                    {
+                        failedPluginSha = PluginManager.GetFileSha256(failedPlugin.FilePath);
+                        Logger.Log($"RefreshPluginList: 失败插件 {failedPlugin.Name} 的 SHA256: {failedPluginSha}");
+                    }
+                    
                     pluginItems[id] = new UnifiedPluginItem
                     {
                         IsFailed = true,
@@ -2537,13 +2554,13 @@ namespace VPetLLM.UI.Windows
                         Description = $"{LanguageHelper.Get("Plugin.LoadFailed", langCode)}: {failedPlugin.Description}",
                         OriginalDescription = failedPlugin.Description,
                         IsEnabled = false,
-                        ActionText = LanguageHelper.Get("Plugin.Delete", langCode),
+                        ActionText = LanguageHelper.Get("Plugin.NeedsUpdate", langCode) ?? "需要更新",
                         Icon = "\uE783", // Error icon
                         FailedPlugin = failedPlugin,
                         UninstallActionText = LanguageHelper.Get("Plugin.Uninstall", langCode) ?? "卸载",
-                        Version = LanguageHelper.Get("Plugin.UnknownVersion", langCode),
+                        Version = failedPluginSha ?? LanguageHelper.Get("Plugin.UnknownVersion", langCode),
                         LocalFilePath = failedPlugin.FilePath,
-                        StatusText = LanguageHelper.Get("Plugin.StatusDisabled", langCode) ?? "已禁用"
+                        StatusText = LanguageHelper.Get("Plugin.StatusNeedsUpdate", langCode) ?? "需要更新"
                     };
                 }
 
@@ -2616,11 +2633,13 @@ namespace VPetLLM.UI.Windows
                                 localItem.FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty;
                                 localItem.SHA256 = remoteSha256;
 
-                                bool isUpdatable = !string.IsNullOrEmpty(localItem.Version) &&
+                                // 对于失败的插件，总是标记为可更新（因为它们无法正常加载）
+                                bool isUpdatable = localItem.IsFailed ||
+                                                   (!string.IsNullOrEmpty(localItem.Version) &&
                                                    !string.IsNullOrEmpty(remoteSha256) &&
-                                                   !localItem.Version.Equals(remoteSha256, StringComparison.OrdinalIgnoreCase);
+                                                   !localItem.Version.Equals(remoteSha256, StringComparison.OrdinalIgnoreCase));
 
-                                System.Diagnostics.Debug.WriteLine($"[PluginStore] 版本比较 - 本地: '{localItem.Version}', 远程: '{remoteSha256}', 可更新: {isUpdatable}");
+                                System.Diagnostics.Debug.WriteLine($"[PluginStore] 版本比较 - 本地: '{localItem.Version}', 远程: '{remoteSha256}', 失败插件: {localItem.IsFailed}, 可更新: {isUpdatable}");
 
                                 if (isUpdatable)
                                 {

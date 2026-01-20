@@ -1,5 +1,6 @@
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Infrastructure;
+using VPetLLM.Core.Abstractions.Interfaces.Plugin;
 
 namespace VPetLLM.Core.Services
 {

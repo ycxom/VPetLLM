@@ -1,3 +1,5 @@
+using VPetLLM.Core.Abstractions.Interfaces.Plugin;
+
 namespace VPetLLM.Core.Abstractions.Interfaces
 {
     public interface IChatCore

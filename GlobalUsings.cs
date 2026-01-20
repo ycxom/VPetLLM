@@ -29,6 +29,13 @@ global using VPetLLM.Core.Abstractions.Base;
 global using VPetLLM.Core.Abstractions.Interfaces;
 global using VPetLLM.Core.Abstractions.Interfaces.Plugin;
 
+// Global aliases for plugin interfaces to maintain backward compatibility
+global using IVPetLLMPlugin = VPetLLM.Core.Abstractions.Interfaces.Plugin.IVPetLLMPlugin;
+global using IActionPlugin = VPetLLM.Core.Abstractions.Interfaces.Plugin.IActionPlugin;
+global using IPluginWithData = VPetLLM.Core.Abstractions.Interfaces.Plugin.IPluginWithData;
+global using IDynamicInfoPlugin = VPetLLM.Core.Abstractions.Interfaces.Plugin.IDynamicInfoPlugin;
+global using IPluginTakeover = VPetLLM.Core.Abstractions.Interfaces.Plugin.IPluginTakeover;
+
 // VPetLLM Core - 提供商实现
 global using VPetLLM.Core.Providers.ASR;
 global using VPetLLM.Core.Providers.Chat;

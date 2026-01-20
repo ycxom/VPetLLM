@@ -1,6 +1,8 @@
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using VPetLLMUtils = VPetLLM.Utils.System;
+using VPetLLM.Core.Abstractions.Interfaces.Plugin;
+using LegacyPlugin = VPetLLM.Core;
 
 namespace VPetLLM.Utils.Plugin
 {
@@ -15,23 +17,78 @@ namespace VPetLLM.Utils.Plugin
         public static void LoadPlugins(IChatCore chatCore)
         {
             var pluginDir = PluginPath;
+            VPetLLMUtils.Logger.Log($"LoadPlugins: PluginPath property returns: {pluginDir}");
+            
             if (!Directory.Exists(pluginDir))
             {
+                VPetLLMUtils.Logger.Log($"LoadPlugins: Directory does not exist, creating: {pluginDir}");
                 Directory.CreateDirectory(pluginDir);
                 return;
             }
 
+            VPetLLMUtils.Logger.Log($"LoadPlugins: Directory exists, checking contents");
+            
+            // 详细检查目录内容
+            try
+            {
+                var allFiles = Directory.GetFiles(pluginDir);
+                VPetLLMUtils.Logger.Log($"LoadPlugins: Total files in directory: {allFiles.Length}");
+                foreach (var file in allFiles)
+                {
+                    VPetLLMUtils.Logger.Log($"LoadPlugins: Found file: {Path.GetFileName(file)}");
+                }
+                
+                var allDirectories = Directory.GetDirectories(pluginDir);
+                VPetLLMUtils.Logger.Log($"LoadPlugins: Total subdirectories: {allDirectories.Length}");
+                foreach (var dir in allDirectories)
+                {
+                    VPetLLMUtils.Logger.Log($"LoadPlugins: Found directory: {Path.GetFileName(dir)}");
+                }
+            }
+            catch (Exception ex)
+            {
+                VPetLLMUtils.Logger.Log($"LoadPlugins: Error listing directory contents: {ex.Message}");
+            }
+
+            VPetLLMUtils.Logger.Log($"LoadPlugins: Starting plugin load process. Plugin directory: {pluginDir}");
             UnloadAllPlugins(chatCore);
+            VPetLLMUtils.Logger.Log($"LoadPlugins: After UnloadAllPlugins - FailedPlugins.Count: {FailedPlugins.Count}");
 
             var configFile = Path.Combine(pluginDir, "plugins.json");
             var pluginStates = new Dictionary<string, bool>();
             if (File.Exists(configFile))
             {
                 pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
+                VPetLLMUtils.Logger.Log($"LoadPlugins: Loaded plugin states from config file, {pluginStates.Count} entries");
+            }
+            else
+            {
+                VPetLLMUtils.Logger.Log($"LoadPlugins: No plugins.json config file found");
             }
 
-            foreach (var file in Directory.GetFiles(pluginDir, "*.dll"))
+            VPetLLMUtils.Logger.Log($"LoadPlugins: Searching for DLL files with pattern '*.dll' in: {pluginDir}");
+            var dllFiles = Directory.GetFiles(pluginDir, "*.dll");
+            VPetLLMUtils.Logger.Log($"LoadPlugins: Directory.GetFiles returned {dllFiles.Length} DLL files");
+            
+            if (dllFiles.Length == 0)
             {
+                VPetLLMUtils.Logger.Log($"LoadPlugins: No DLL files found. Checking for case-sensitive issues...");
+                // 尝试不同的搜索模式
+                var allDllFiles = Directory.GetFiles(pluginDir, "*", SearchOption.TopDirectoryOnly)
+                    .Where(f => f.ToLowerInvariant().EndsWith(".dll"))
+                    .ToArray();
+                VPetLLMUtils.Logger.Log($"LoadPlugins: Case-insensitive search found {allDllFiles.Length} .dll files");
+                
+                if (allDllFiles.Length > 0)
+                {
+                    VPetLLMUtils.Logger.Log($"LoadPlugins: Using case-insensitive results");
+                    dllFiles = allDllFiles;
+                }
+            }
+            
+            foreach (var file in dllFiles)
+            {
+                VPetLLMUtils.Logger.Log($"LoadPlugins: Processing file: {Path.GetFileName(file)} (Full path: {file})");
                 try
                 {
                     var context = new AssemblyLoadContext($"{Path.GetFileNameWithoutExtension(file)}_{Guid.NewGuid()}", isCollectible: true);
@@ -51,11 +108,18 @@ namespace VPetLLM.Utils.Plugin
 
                     var assembly = context.LoadFromAssemblyPath(shadowCopiedFile);
                     _pluginContexts[file] = context;
+                    VPetLLMUtils.Logger.Log($"LoadPlugins: Successfully loaded assembly from {Path.GetFileName(file)}");
 
-                    foreach (var type in assembly.GetTypes())
+                    var types = assembly.GetTypes();
+                    VPetLLMUtils.Logger.Log($"LoadPlugins: Assembly contains {types.Length} types");
+
+                    bool foundCompatiblePlugin = false;
+                    foreach (var type in types)
                     {
+                        // Check for new-style plugins (IVPetLLMPlugin)
                         if (typeof(IVPetLLMPlugin).IsAssignableFrom(type) && !type.IsInterface)
                         {
+                            VPetLLMUtils.Logger.Log($"LoadPlugins: Found IVPetLLMPlugin implementation: {type.FullName}");
                             var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
                             plugin.FilePath = file;
 
@@ -66,7 +130,7 @@ namespace VPetLLM.Utils.Plugin
                                 VPetLLMUtils.Logger.Log($"Warning: Plugin with name '{plugin.Name}' already exists. Skipping duplicate from {file}");
                                 VPetLLMUtils.Logger.Log($"Existing plugin from: {existingPlugin.FilePath}");
                                 VPetLLMUtils.Logger.Log($"Duplicate plugin from: {file}");
-                                continue; // 跳过重复的插�?
+                                continue; // 跳过重复的插件
                             }
 
                             if (plugin is IPluginWithData pluginWithData)
@@ -82,11 +146,28 @@ namespace VPetLLM.Utils.Plugin
                                 plugin.Initialize(VPetLLM.Instance);
                                 if (chatCore is not null)
                                 {
-                                    chatCore.AddPlugin(plugin);
+                                    // Convert new-style plugin to legacy interface for chatCore
+                                    var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(plugin);
+                                    chatCore.AddPlugin(legacyPlugin);
                                 }
                             }
                             VPetLLMUtils.Logger.Log($"Loaded plugin: {plugin.Name}, Enabled: {plugin.Enabled}");
+                            foundCompatiblePlugin = true;
                         }
+                    }
+                    
+                    // 如果没有找到兼容的插件类型，将其标记为失败（可能是旧版本插件）
+                    if (!foundCompatiblePlugin)
+                    {
+                        VPetLLMUtils.Logger.Log($"LoadPlugins: No compatible plugin types found in {Path.GetFileName(file)} - likely an outdated plugin");
+                        FailedPlugins.Add(new FailedPlugin
+                        {
+                            Name = Path.GetFileNameWithoutExtension(file),
+                            FilePath = file,
+                            Error = new InvalidOperationException("插件使用旧版接口，需要更新"),
+                            Description = "此插件使用旧版接口编译，与当前版本不兼容。请更新插件。"
+                        });
+                        VPetLLMUtils.Logger.Log($"LoadPlugins: Added outdated plugin to FailedPlugins: {Path.GetFileNameWithoutExtension(file)}");
                     }
                 }
                 catch (Exception ex)
@@ -99,8 +180,11 @@ namespace VPetLLM.Utils.Plugin
                         Error = ex,
                         Description = ex.Message
                     });
+                    VPetLLMUtils.Logger.Log($"LoadPlugins: Added failed plugin '{Path.GetFileNameWithoutExtension(file)}'. Total failed plugins: {FailedPlugins.Count}");
                 }
             }
+            
+            VPetLLMUtils.Logger.Log($"LoadPlugins: Completed. Loaded plugins: {Plugins.Count}, Failed plugins: {FailedPlugins.Count}");
         }
 
         public static void SavePluginStates()
@@ -143,7 +227,9 @@ namespace VPetLLM.Utils.Plugin
 
             if (chatCore is not null)
             {
-                chatCore.RemovePlugin(plugin);
+                // Convert to legacy interface for chatCore
+                var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(plugin);
+                chatCore.RemovePlugin(legacyPlugin);
             }
             plugin.Unload();
             Plugins.Remove(plugin);
@@ -217,7 +303,9 @@ namespace VPetLLM.Utils.Plugin
             {
                 foreach (var p in Plugins.ToList())
                 {
-                    chatCore.RemovePlugin(p);
+                    // Convert to legacy interface for chatCore
+                    var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(p);
+                    chatCore.RemovePlugin(legacyPlugin);
                     p.Unload();
                 }
             }
@@ -577,7 +665,9 @@ namespace VPetLLM.Utils.Plugin
                     // 先卸载旧版本插件
                     if (chatCore is not null)
                     {
-                        chatCore.RemovePlugin(existingPlugin);
+                        // Convert to legacy interface for chatCore
+                        var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(existingPlugin);
+                        chatCore.RemovePlugin(legacyPlugin);
                     }
                     existingPlugin.Unload();
                     Plugins.Remove(existingPlugin);
@@ -662,7 +752,9 @@ namespace VPetLLM.Utils.Plugin
                         // 卸载重复的插�?
                         if (chatCore is not null)
                         {
-                            chatCore.RemovePlugin(duplicatePlugin);
+                            // Convert to legacy interface for chatCore
+                            var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(duplicatePlugin);
+                            chatCore.RemovePlugin(legacyPlugin);
                         }
                         duplicatePlugin.Unload();
                         Plugins.Remove(duplicatePlugin);
@@ -730,13 +822,14 @@ namespace VPetLLM.Utils.Plugin
 
                 foreach (var type in assembly.GetTypes())
                 {
+                    // Check for new-style plugins (IVPetLLMPlugin)
                     if (typeof(IVPetLLMPlugin).IsAssignableFrom(type) && !type.IsInterface)
                     {
                         var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
                         plugin.FilePath = pluginFilePath;
 
                         // 在单个插件加载中，不应该有重复插件，因为我们已经在更新前移除了旧插件
-                        // 如果仍然存在重复，说明有其他同名插件文件，这是一个问�?
+                        // 如果仍然存在重复，说明有其他同名插件文件，这是一个问题
                         var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
                         if (existingPlugin is not null)
                         {
@@ -745,11 +838,13 @@ namespace VPetLLM.Utils.Plugin
                             VPetLLMUtils.Logger.Log($"  New plugin from: {pluginFilePath}");
                             VPetLLMUtils.Logger.Log($"  This indicates multiple plugin files contain the same plugin name.");
 
-                            // 在更新场景下，我们应该替换现有插件而不是跳�?
+                            // 在更新场景下，我们应该替换现有插件而不是跳过
                             VPetLLMUtils.Logger.Log($"  Removing existing plugin and loading the new one...");
                             if (chatCore is not null)
                             {
-                                chatCore.RemovePlugin(existingPlugin);
+                                // Convert to legacy interface for chatCore
+                                var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(existingPlugin);
+                                chatCore.RemovePlugin(legacyPlugin);
                             }
                             existingPlugin.Unload();
                             Plugins.Remove(existingPlugin);
@@ -758,7 +853,7 @@ namespace VPetLLM.Utils.Plugin
                         Plugins.Add(plugin);
                         _pluginContexts[pluginFilePath] = context;
 
-                        // 应用插件状态配�?
+                        // 应用插件状态配置
                         if (pluginStates.TryGetValue(plugin.Name, out var isEnabled))
                         {
                             plugin.Enabled = isEnabled;
@@ -766,7 +861,9 @@ namespace VPetLLM.Utils.Plugin
 
                         if (plugin.Enabled && chatCore is not null)
                         {
-                            chatCore.AddPlugin(plugin);
+                            // Convert to legacy interface for chatCore
+                            var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(plugin);
+                            chatCore.AddPlugin(legacyPlugin);
                         }
 
                         VPetLLMUtils.Logger.Log($"Plugin loaded: {plugin.Name} from {pluginFilePath}");
