@@ -53,3 +53,5 @@
 
 
 archive
+*.md
+!README.md

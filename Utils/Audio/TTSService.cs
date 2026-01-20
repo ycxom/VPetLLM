@@ -2,6 +2,8 @@ using System.IO;
 using System.Reflection;
 using VPetLLM.Core;
 using VPetLLM.Core.TTSCore;
+using VPetLLM.Core.UnifiedTTS;
+using VPetLLM.Models;
 using VPetLLM.Services;
 using VPetLLMUtils = VPetLLM.Utils.System;
 
@@ -16,6 +18,10 @@ namespace VPetLLM.Utils.Audio
         private bool _isPlaying = false;
         private TaskCompletionSource<bool>? _currentPlaybackTask;
 
+        // 统一TTS系统集成 - 通过依赖注入
+        private readonly ITTSDispatcher? _unifiedTTSDispatcher;
+        private readonly bool _useUnifiedSystem;
+
         /// <summary>
         /// 实时检测 VPet TTS 插件状态的委托
         /// </summary>
@@ -25,9 +31,32 @@ namespace VPetLLM.Utils.Audio
         {
             _ttsSettings = settings;
             _proxySettings = proxySettings;
+            _useUnifiedSystem = false;
 
-            // 初始化内置TTS播放器
+            // 初始化传统播放器
             InitializePlayer();
+        }
+
+        /// <summary>
+        /// 构造函数 - 支持统一TTS系统注入
+        /// </summary>
+        /// <param name="settings">TTS设置</param>
+        /// <param name="proxySettings">代理设置</param>
+        /// <param name="unifiedTTSDispatcher">统一TTS调度器（可选）</param>
+        public TTSService(Setting.TTSSetting settings, Setting.ProxySetting? proxySettings, ITTSDispatcher? unifiedTTSDispatcher)
+        {
+            _ttsSettings = settings;
+            _proxySettings = proxySettings;
+            _unifiedTTSDispatcher = unifiedTTSDispatcher;
+            _useUnifiedSystem = _unifiedTTSDispatcher != null;
+
+            VPetLLMUtils.Logger.Log($"TTSService: 初始化完成，使用统一系统: {_useUnifiedSystem}");
+
+            // 只有在不使用统一系统时才初始化传统播放器
+            if (!_useUnifiedSystem)
+            {
+                InitializePlayer();
+            }
         }
 
         /// <summary>
@@ -143,10 +172,41 @@ namespace VPetLLM.Utils.Audio
 
             try
             {
-                // 使用 Core 层获取音频数据
-                var ttsCore = GetTTSCore();
-                var audioData = await ttsCore.GenerateAudioAsync(text);
-                var fileExtension = ttsCore.GetAudioFormat();
+                byte[] audioData;
+                string fileExtension;
+
+                if (_useUnifiedSystem && _unifiedTTSDispatcher != null)
+                {
+                    // 使用统一TTS系统
+                    var request = new TTSRequest
+                    {
+                        RequestId = Guid.NewGuid().ToString(),
+                        Text = text,
+                        Settings = new TTSSettings
+                        {
+                            Voice = "default",
+                            Speed = 1.0f,
+                            Volume = 1.0f
+                        }
+                    };
+
+                    var response = await _unifiedTTSDispatcher.ProcessRequestAsync(request);
+                    if (!response.Success || response.AudioData == null)
+                    {
+                        VPetLLMUtils.Logger.Log($"TTS: 统一系统处理失败: {response.ErrorMessage}");
+                        return null;
+                    }
+
+                    audioData = response.AudioData;
+                    fileExtension = response.AudioFormat ?? "mp3";
+                }
+                else
+                {
+                    // 使用传统TTS Core
+                    var ttsCore = GetTTSCore();
+                    audioData = await ttsCore.GenerateAudioAsync(text);
+                    fileExtension = ttsCore.GetAudioFormat();
+                }
 
                 if (audioData == null || audioData.Length == 0)
                 {
@@ -154,7 +214,7 @@ namespace VPetLLM.Utils.Audio
                     return null;
                 }
 
-                // 保存到临时文件（音量增益由 mpv 播放器处理）
+                // 保存到临时文件
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
@@ -252,10 +312,41 @@ namespace VPetLLM.Utils.Audio
             {
                 VPetLLMUtils.Logger.Log($"TTS: 开始转换文本: {text.Substring(0, Math.Min(text.Length, 50))}...");
 
-                // 使用 Core 层获取音频数据
-                var ttsCore = GetTTSCore();
-                var audioData = await ttsCore.GenerateAudioAsync(text);
-                var fileExtension = ttsCore.GetAudioFormat();
+                byte[] audioData;
+                string fileExtension;
+
+                if (_useUnifiedSystem && _unifiedTTSDispatcher != null)
+                {
+                    // 使用统一TTS系统
+                    var request = new TTSRequest
+                    {
+                        RequestId = Guid.NewGuid().ToString(),
+                        Text = text,
+                        Settings = new TTSSettings
+                        {
+                            Voice = "default",
+                            Speed = 1.0f,
+                            Volume = 1.0f
+                        }
+                    };
+
+                    var response = await _unifiedTTSDispatcher.ProcessRequestAsync(request);
+                    if (!response.Success || response.AudioData == null)
+                    {
+                        VPetLLMUtils.Logger.Log($"TTS: 统一系统处理失败: {response.ErrorMessage}");
+                        return false;
+                    }
+
+                    audioData = response.AudioData;
+                    fileExtension = response.AudioFormat ?? "mp3";
+                }
+                else
+                {
+                    // 使用传统TTS Core
+                    var ttsCore = GetTTSCore();
+                    audioData = await ttsCore.GenerateAudioAsync(text);
+                    fileExtension = ttsCore.GetAudioFormat();
+                }
 
                 if (audioData == null || audioData.Length == 0)
                 {
@@ -265,7 +356,7 @@ namespace VPetLLM.Utils.Audio
 
                 VPetLLMUtils.Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
-                // 保存到临时文件（音量增益由 mpv 播放器处理）
+                // 保存到临时文件
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
@@ -311,10 +402,41 @@ namespace VPetLLM.Utils.Audio
             {
                 VPetLLMUtils.Logger.Log($"TTS: 开始转换文本: {text.Substring(0, Math.Min(text.Length, 50))}...");
 
-                // 使用 Core 层获取音频数据
-                var ttsCore = GetTTSCore();
-                var audioData = await ttsCore.GenerateAudioAsync(text);
-                var fileExtension = ttsCore.GetAudioFormat();
+                byte[] audioData;
+                string fileExtension;
+
+                if (_useUnifiedSystem && _unifiedTTSDispatcher != null)
+                {
+                    // 使用统一TTS系统
+                    var request = new TTSRequest
+                    {
+                        RequestId = Guid.NewGuid().ToString(),
+                        Text = text,
+                        Settings = new TTSSettings
+                        {
+                            Voice = "default",
+                            Speed = 1.0f,
+                            Volume = 1.0f
+                        }
+                    };
+
+                    var response = await _unifiedTTSDispatcher.ProcessRequestAsync(request);
+                    if (!response.Success || response.AudioData == null)
+                    {
+                        VPetLLMUtils.Logger.Log($"TTS: 统一系统处理失败: {response.ErrorMessage}");
+                        return Task.CompletedTask;
+                    }
+
+                    audioData = response.AudioData;
+                    fileExtension = response.AudioFormat ?? "mp3";
+                }
+                else
+                {
+                    // 使用传统TTS Core
+                    var ttsCore = GetTTSCore();
+                    audioData = await ttsCore.GenerateAudioAsync(text);
+                    fileExtension = ttsCore.GetAudioFormat();
+                }
 
                 if (audioData == null || audioData.Length == 0)
                 {
@@ -367,10 +489,41 @@ namespace VPetLLM.Utils.Audio
             {
                 VPetLLMUtils.Logger.Log($"TTS: 开始转换文本: {text.Substring(0, Math.Min(text.Length, 50))}...");
 
-                // 使用 Core 层获取音频数据
-                var ttsCore = GetTTSCore();
-                var audioData = await ttsCore.GenerateAudioAsync(text);
-                var fileExtension = ttsCore.GetAudioFormat();
+                byte[] audioData;
+                string fileExtension;
+
+                if (_useUnifiedSystem && _unifiedTTSDispatcher != null)
+                {
+                    // 使用统一TTS系统
+                    var request = new TTSRequest
+                    {
+                        RequestId = Guid.NewGuid().ToString(),
+                        Text = text,
+                        Settings = new TTSSettings
+                        {
+                            Voice = "default",
+                            Speed = 1.0f,
+                            Volume = 1.0f
+                        }
+                    };
+
+                    var response = await _unifiedTTSDispatcher.ProcessRequestAsync(request);
+                    if (!response.Success || response.AudioData == null)
+                    {
+                        VPetLLMUtils.Logger.Log($"TTS: 统一系统处理失败: {response.ErrorMessage}");
+                        return false;
+                    }
+
+                    audioData = response.AudioData;
+                    fileExtension = response.AudioFormat ?? "mp3";
+                }
+                else
+                {
+                    // 使用传统TTS Core
+                    var ttsCore = GetTTSCore();
+                    audioData = await ttsCore.GenerateAudioAsync(text);
+                    fileExtension = ttsCore.GetAudioFormat();
+                }
 
                 if (audioData == null || audioData.Length == 0)
                 {
@@ -591,16 +744,44 @@ namespace VPetLLM.Utils.Audio
 
             try
             {
-                var ttsCore = GetTTSCore();
-                var audioData = await ttsCore.GenerateAudioAsync(text);
-
-                if (audioData == null || audioData.Length == 0)
+                if (_useUnifiedSystem && _unifiedTTSDispatcher != null)
                 {
-                    return null;
-                }
+                    // 使用统一TTS系统
+                    var request = new TTSRequest
+                    {
+                        RequestId = Guid.NewGuid().ToString(),
+                        Text = text,
+                        Settings = new TTSSettings
+                        {
+                            Voice = "default",
+                            Speed = 1.0f,
+                            Volume = 1.0f
+                        }
+                    };
 
-                // 音量增益由 mpv 播放器处理，这里直接返回原始音频数据
-                return audioData;
+                    var response = await _unifiedTTSDispatcher.ProcessRequestAsync(request);
+                    if (!response.Success || response.AudioData == null)
+                    {
+                        VPetLLMUtils.Logger.Log($"TTS: 统一系统合成失败: {response.ErrorMessage}");
+                        return null;
+                    }
+
+                    return response.AudioData;
+                }
+                else
+                {
+                    // 使用传统TTS Core
+                    var ttsCore = GetTTSCore();
+                    var audioData = await ttsCore.GenerateAudioAsync(text);
+
+                    if (audioData == null || audioData.Length == 0)
+                    {
+                        return null;
+                    }
+
+                    // 音量增益由 mpv 播放器处理，这里直接返回原始音频数据
+                    return audioData;
+                }
             }
             catch (Exception ex)
             {

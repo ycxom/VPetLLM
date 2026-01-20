@@ -3,7 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Handlers;
+using VPetLLM.Handlers.Core;
 using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core

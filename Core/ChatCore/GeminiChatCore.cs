@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using System.Text;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Handlers;
+using VPetLLM.Handlers.Core;
 using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core.ChatCore
@@ -164,7 +164,7 @@ namespace VPetLLM.Core.ChatCore
                         }
 
                         var fullMessage = new StringBuilder();
-                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        var streamProcessor = new Handlers.Core.StreamingCommandProcessor((cmd) =>
                         {
                             Logger.Log($"Gemini流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
@@ -334,7 +334,7 @@ namespace VPetLLM.Core.ChatCore
                         }
 
                         var fullMessage = new StringBuilder();
-                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        var streamProcessor = new Handlers.Core.StreamingCommandProcessor((cmd) =>
                         {
                             Logger.Log($"Gemini流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);

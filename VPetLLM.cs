@@ -5,8 +5,9 @@ using System.Windows.Controls;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
 using VPetLLM.Core.ChatCore;
-using VPetLLM.Handlers;
 using VPetLLM.Handlers.Animation;
+using VPetLLM.Handlers.Core;
+using VPetLLM.Handlers.UI;
 using VPetLLM.Infrastructure.Configuration;
 using VPetLLM.Infrastructure.DependencyInjection;
 using VPetLLM.Infrastructure.Events;
@@ -21,8 +22,11 @@ using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 using VPetLLM.Utils.Plugin;
 using VPetLLM.Utils.System;
+using InfraConfigManager = VPetLLM.Infrastructure.Configuration.IConfigurationManager;
+using InfraConfigManagerImpl = VPetLLM.Infrastructure.Configuration.ConfigurationManager;
 using SettingClass = VPetLLM.Setting;
 using TTSServiceType = VPetLLM.Utils.Audio.TTSService;
+using UnifiedTTSDispatcher = VPetLLM.Core.UnifiedTTS.ITTSDispatcher;
 
 namespace VPetLLM
 {
@@ -42,7 +46,7 @@ namespace VPetLLM
 
         private readonly IDependencyContainer _container;
         private readonly IServiceManager _serviceManager;
-        private readonly IConfigurationManager _configurationManager;
+        private readonly InfraConfigManager _configurationManager;
         private readonly IEventBus _eventBus;
         private readonly IStructuredLogger _logger;
 
@@ -155,7 +159,7 @@ namespace VPetLLM
             _container = new DependencyContainer();
             _eventBus = new EventBus();
             _logger = new StructuredLogger();
-            _configurationManager = new ConfigurationManager(ExtensionValue.BaseDirectory, _logger);
+            _configurationManager = new InfraConfigManagerImpl(ExtensionValue.BaseDirectory, _logger);
             _serviceManager = new ServiceManager(_container, _eventBus, _logger);
 
             // 注册核心组件
@@ -363,8 +367,15 @@ namespace VPetLLM
         {
             try
             {
-                TTSService = new TTSServiceType(Settings.TTS, Settings.Proxy);
-                _logger.LogInformation("Legacy TTS service initialized");
+                // 创建统一TTS调度器（如果需要）
+                UnifiedTTSDispatcher? unifiedDispatcher = null;
+
+                // 这里可以根据配置决定是否使用统一TTS系统
+                // 暂时保持传统模式，统一TTS系统将在主类级别管理
+
+                // 保持旧版TTS服务用于兼容性，支持统一TTS注入
+                TTSService = new TTSServiceType(Settings.TTS, Settings.Proxy, unifiedDispatcher);
+                _logger.LogInformation("Legacy TTS service initialized with dependency injection support");
             }
             catch (Exception ex)
             {
@@ -467,7 +478,7 @@ namespace VPetLLM
             _container.RegisterSingleton<IDependencyContainer>(_container);
             _container.RegisterSingleton<IEventBus>(_eventBus);
             _container.RegisterSingleton<IStructuredLogger>(_logger);
-            _container.RegisterSingleton<IConfigurationManager>(_configurationManager);
+            _container.RegisterSingleton<InfraConfigManager>(_configurationManager);
             _container.RegisterSingleton<IServiceManager>(_serviceManager);
 
             // 注册主插件实例

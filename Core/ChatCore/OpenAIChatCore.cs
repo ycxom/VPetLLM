@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using System.Text;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Handlers;
+using VPetLLM.Handlers.Core;
 using ErrorHelper = global::VPetLLM.Utils.System.ErrorMessageHelper;
 using SystemLogger = global::VPetLLM.Utils.System.Logger;
 
@@ -278,7 +278,7 @@ namespace VPetLLM.Core.ChatCore
                         }
 
                         var fullMessage = new StringBuilder();
-                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        var streamProcessor = new StreamingCommandProcessor((cmd) =>
                         {
                             SystemLogger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
@@ -458,7 +458,7 @@ namespace VPetLLM.Core.ChatCore
                         }
 
                         var fullMessage = new StringBuilder();
-                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        var streamProcessor = new StreamingCommandProcessor((cmd) =>
                         {
                             // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
                             SystemLogger.Log($"OpenAI流式: 检测到完整命令: {cmd}");

@@ -1,6 +1,6 @@
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core;
-using VPetLLM.Handlers;
+using VPetLLM.Handlers.Core;
 using VPetLLM.Infrastructure.Configuration.Configurations;
 using VPetLLM.Infrastructure.Logging;
 

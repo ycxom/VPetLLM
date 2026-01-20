@@ -3,7 +3,7 @@ using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using System.Text;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Handlers;
+using VPetLLM.Handlers.Core;
 using VPetLLM.Utils.System;
 
 namespace VPetLLM.Core.ChatCore
@@ -136,7 +136,7 @@ namespace VPetLLM.Core.ChatCore
                         response.EnsureSuccessStatusCode();
 
                         var fullMessage = new StringBuilder();
-                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        var streamProcessor = new StreamingCommandProcessor((cmd) =>
                         {
                             // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
                             Logger.Log($"Ollama流式: 检测到完整命令: {cmd}");
@@ -290,7 +290,7 @@ namespace VPetLLM.Core.ChatCore
                         response.EnsureSuccessStatusCode();
 
                         var fullMessage = new StringBuilder();
-                        var streamProcessor = new Handlers.StreamingCommandProcessor((cmd) =>
+                        var streamProcessor = new StreamingCommandProcessor((cmd) =>
                         {
                             // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
                             Logger.Log($"Ollama流式: 检测到完整命令: {cmd}");

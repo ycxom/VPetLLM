@@ -2,7 +2,8 @@ using Newtonsoft.Json;
 using System.Net.Http;
 using System.Text;
 using System.Windows;
-using VPetLLM.Handlers;
+using VPetLLM.Core;
+using VPetLLM.Handlers.Core;
 using VPetLLM.Utils.Localization;
 using VPetLLM.Utils.System;
 using VPetLLM.Utils.UI;
@@ -31,9 +32,21 @@ namespace VPetLLM.UI.Windows
         public SmartMessageProcessor MessageProcessor => _messageProcessor;
 
         /// <summary>
-        /// 获取气泡管理器（通过消息处理器）
+        /// 获取统一气泡门面（新系统）
         /// </summary>
-        public BubbleManager BubbleManager => _messageProcessor?.BubbleManager;
+        public UnifiedBubbleFacade BubbleFacade => _messageProcessor?.BubbleFacade;
+
+        /// <summary>
+        /// 获取气泡管理器（向后兼容，已弃用）
+        /// </summary>
+        [Obsolete("BubbleManager is deprecated. Use BubbleFacade instead.")]
+        public object BubbleManager => null; // 返回null，强制使用新系统
+
+        /// <summary>
+        /// 获取气泡管理器适配器（向后兼容，已弃用）
+        /// </summary>
+        [Obsolete("BubbleManagerAdapter is deprecated. Use BubbleFacade instead.")]
+        public object BubbleManagerAdapter => null; // 返回null，强制使用新系统
 
         public TalkBox(VPetLLM plugin) : base(plugin)
         {
@@ -65,7 +78,8 @@ namespace VPetLLM.UI.Windows
 
         public void HandleNormalResponse(string message)
         {
-            _plugin.MW.Main.Say(message);
+            // 使用直接气泡管理器
+            DirectBubbleManager.ShowBubble(_plugin, message);
         }
 
         /// <summary>
@@ -81,7 +95,8 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 处理AI回复 - 流式处理核心方法（优化：避免UI线程阻塞）
+        /// 处理AI回复 - 统一流式处理核心方法（优化：避免UI线程阻塞）
+        /// 修改：统一流式和非流式处理流程，简化架构
         /// </summary>
         public async void HandleResponse(string response)
         {
@@ -113,13 +128,26 @@ namespace VPetLLM.UI.Windows
                 _plugin.FloatingSidebarManager?.SetOutputtingStatus();
             }
 
-            // 在后台线程处理消息，避免阻塞UI
+            // 统一处理：无论流式还是非流式，都使用StreamingCommandProcessor
+            // 这样可以避免两套不同的处理逻辑导致的问题
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    // 流式处理模式：不自动设置Idle状态，由StreamingCommandProcessor统一管理
-                    await _messageProcessor.ProcessMessageAsync(response, !isFirstResponse, autoSetIdleOnComplete: false);
+                    // 检查是否为完整消息（非流式模式的特征：包含多个完整命令）
+                    if (IsCompleteMessage(response))
+                    {
+                        Logger.Log($"HandleResponse: 检测到完整消息，使用统一流式处理器拆分处理");
+                        
+                        // 使用StreamingCommandProcessor处理完整消息
+                        // 这样可以统一流式和非流式的处理逻辑
+                        await ProcessCompleteMessageAsStreaming(response);
+                    }
+                    else
+                    {
+                        // 流式片段，直接使用现有的流式处理逻辑
+                        await _messageProcessor.ProcessMessageAsync(response, !isFirstResponse, autoSetIdleOnComplete: false);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -128,7 +156,8 @@ namespace VPetLLM.UI.Windows
                     _plugin.FloatingSidebarManager?.SetErrorStatus();
                     _ = Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        try { _plugin.MW.Main.Say(response); } catch { }
+                        // 使用直接气泡管理器显示错误消息
+                        DirectBubbleManager.ShowBubble(_plugin, response);
                     }));
                 }
             });
@@ -217,7 +246,11 @@ namespace VPetLLM.UI.Windows
                 Logger.Log($"An error occurred in Responded: {e}");
                 // 更新状态灯为错误状态
                 _plugin.FloatingSidebarManager?.SetErrorStatus();
-                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    // 使用直接气泡管理器显示错误消息
+                    DirectBubbleManager.ShowBubble(_plugin, e.ToString());
+                });
             }
             finally
             {
@@ -278,7 +311,11 @@ namespace VPetLLM.UI.Windows
                 Logger.Log($"An error occurred in SendChat: {e}");
                 // 只有在发生异常时才停止思考动画
                 StopThinkingAnimationWithoutHide();
-                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    // 使用直接气泡管理器显示错误消息
+                    DirectBubbleManager.ShowBubble(_plugin, e.ToString());
+                });
             }
         }
 
@@ -330,7 +367,11 @@ namespace VPetLLM.UI.Windows
                 Logger.Log($"An error occurred in SendChatWithImage: {e}");
                 // 只有在发生异常时才停止思考动画
                 StopThinkingAnimationWithoutHide();
-                await Application.Current.Dispatcher.InvokeAsync(() => _plugin.MW.Main.Say(e.ToString()));
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    // 使用直接气泡管理器显示错误消息
+                    DirectBubbleManager.ShowBubble(_plugin, e.ToString());
+                });
             }
         }
 
@@ -447,7 +488,7 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 启动思考动画 - 显示动态的"思考中"气泡（优化：使用 BubbleManager）
+        /// 启动思考动画 - 显示动态的"思考中"气泡（优化：直接使用 DirectBubbleManager）
         /// </summary>
         public void StartThinkingAnimation()
         {
@@ -472,10 +513,45 @@ namespace VPetLLM.UI.Windows
             var template = LanguageHelper.Get("Thinking.Text", _plugin.Settings.Language);
             if (string.IsNullOrEmpty(template)) template = "{PetName} thinking";
             var baseText = template.Replace("{PetName}", petName);
+
+            // 直接使用DirectBubbleManager，实现真正的直接覆盖
+            Logger.Log("TalkBox: 使用DirectBubbleManager启动思考动画（直接覆盖模式）");
+            StartThinkingAnimationDirect(baseText, cts);
+        }
+
+        /// <summary>
+        /// 直接思考动画实现（使用DirectBubbleManager）
+        /// </summary>
+        private void StartThinkingAnimationDirect(string baseText, System.Threading.CancellationTokenSource cts)
+        {
             var dots = new[] { "", " ..", " ....", " ......", " ........" };
 
-            // 使用 BubbleManager 的 TimerCoordinator 暂停定时器
-            BubbleManager?.TimerCoordinator?.PauseAllTimers();
+            // 启动后台任务循环显示思考动画，直接使用DirectBubbleManager
+            _ = Task.Run(async () =>
+            {
+                int i = 0;
+                while (_isThinking && !cts.Token.IsCancellationRequested)
+                {
+                    var text = baseText + dots[i++ % dots.Length];
+
+                    // 直接使用DirectBubbleManager显示思考气泡
+                    if (_isThinking)
+                    {
+                        DirectBubbleManager.ShowThinkingBubble(_plugin, text);
+                    }
+
+                    try { await Task.Delay(450, cts.Token); }
+                    catch (TaskCanceledException) { break; }
+                }
+            });
+        }
+
+        /// <summary>
+        /// 回退的思考动画实现（保留用于兼容性）
+        /// </summary>
+        private void StartThinkingAnimationFallback(string baseText, System.Threading.CancellationTokenSource cts)
+        {
+            var dots = new[] { "", " ..", " ....", " ......", " ........" };
 
             // 启动后台任务循环显示思考动画
             _ = Task.Run(async () =>
@@ -485,10 +561,10 @@ namespace VPetLLM.UI.Windows
                 {
                     var text = baseText + dots[i++ % dots.Length];
 
-                    // 使用 BubbleManager 显示思考气泡
+                    // 使用直接气泡管理器显示思考气泡
                     if (_isThinking)
                     {
-                        BubbleManager?.ShowThinkingBubble(text);
+                        DirectBubbleManager.ShowThinkingBubble(_plugin, text);
                     }
 
                     try { await Task.Delay(450, cts.Token); }
@@ -499,7 +575,7 @@ namespace VPetLLM.UI.Windows
 
         /// <summary>
         /// 停止思考动画但不隐藏气泡（用于流式响应，让新气泡直接覆盖）
-        /// 优化：使用 BubbleManager 的状态过渡
+        /// 优化：直接使用 DirectBubbleManager
         /// </summary>
         public void StopThinkingAnimationWithoutHide()
         {
@@ -514,9 +590,8 @@ namespace VPetLLM.UI.Windows
                 try { cts.Cancel(); cts.Dispose(); } catch { }
             }
 
-            // 使用 BubbleManager 的 TimerCoordinator 停止定时器
-            // 但不清理状态，保持气泡可见以便平滑过渡
-            BubbleManager?.TimerCoordinator?.ForceStopAll();
+            // 直接使用DirectBubbleManager进行状态清理（不隐藏气泡）
+            Logger.Log("TalkBox: 使用DirectBubbleManager停止思考动画（无隐藏，直接覆盖模式）");
 
             // 使用低优先级异步清理流式状态
             Application.Current.Dispatcher.BeginInvoke(
@@ -537,7 +612,7 @@ namespace VPetLLM.UI.Windows
 
         /// <summary>
         /// 停止思考动画并隐藏气泡（用于错误情况或强制停止）
-        /// 优化：使用 BubbleManager 统一管理
+        /// 优化：直接使用 DirectBubbleManager
         /// </summary>
         private void StopThinkingAnimation()
         {
@@ -552,9 +627,19 @@ namespace VPetLLM.UI.Windows
                 try { cts.Cancel(); cts.Dispose(); } catch { }
             }
 
-            // 使用 BubbleManager 清理状态并隐藏气泡
-            BubbleManager?.Clear();
-            BubbleManager?.HideBubble();
+            // 直接使用DirectBubbleManager清理和隐藏
+            Logger.Log("TalkBox: 使用DirectBubbleManager停止思考动画并隐藏（直接覆盖模式）");
+
+            // 直接使用DirectBubbleManager进行清理
+            try
+            {
+                DirectBubbleManager.ClearBubbleState(_plugin);
+                DirectBubbleManager.HideBubble(_plugin);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"TalkBox: 清理气泡状态失败: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -565,15 +650,70 @@ namespace VPetLLM.UI.Windows
             // 快速检查状态，避免不必要的操作
             if (!_isThinking) return;
 
+            // 使用直接气泡管理器
+            DirectBubbleManager.ShowThinkingBubble(_plugin, text);
+        }
+
+        /// <summary>
+        /// 检测是否为完整消息（非流式模式的特征）
+        /// </summary>
+        private bool IsCompleteMessage(string response)
+        {
+            if (string.IsNullOrEmpty(response))
+                return false;
+
+            // 检测是否包含多个完整的命令标记
+            // 完整消息通常包含多个 <|xxx_begin|>...<|xxx_end|> 对
+            var beginCount = System.Text.RegularExpressions.Regex.Matches(response, @"<\|\w+_begin\|>").Count;
+            var endCount = System.Text.RegularExpressions.Regex.Matches(response, @"<\|\w+_end\|>").Count;
+
+            // 如果begin和end标记数量相等且大于1，认为是完整消息
+            bool isComplete = beginCount == endCount && beginCount > 1;
+            
+            if (isComplete)
+            {
+                Logger.Log($"HandleResponse: 检测到完整消息 - 包含 {beginCount} 个完整命令");
+            }
+            
+            return isComplete;
+        }
+
+        /// <summary>
+        /// 将完整消息按流式方式处理
+        /// 统一流式和非流式的处理逻辑，避免架构复杂性
+        /// </summary>
+        private async Task ProcessCompleteMessageAsStreaming(string completeMessage)
+        {
             try
             {
-                var msgBar = _plugin.MW.Main.MsgBar;
-                if (msgBar != null)
+                // 创建StreamingCommandProcessor来处理完整消息
+                var streamProcessor = new Handlers.Core.StreamingCommandProcessor(
+                    async (command) =>
+                    {
+                        // 每个完整命令都通过现有的流式处理逻辑处理
+                        Logger.Log($"统一流式处理: 处理命令片段: {command}");
+                        await _messageProcessor.ProcessMessageAsync(command, true, autoSetIdleOnComplete: false);
+                    },
+                    _plugin
+                );
+
+                // 将完整消息逐字符添加到StreamingCommandProcessor
+                // 这样可以模拟流式接收，触发命令检测和处理
+                foreach (char c in completeMessage)
                 {
-                    MessageBarHelper.ShowBubbleQuick(msgBar, text, _plugin.MW.Core.Save.Name);
+                    streamProcessor.AddText(c.ToString());
                 }
+
+                // 完成处理
+                streamProcessor.Complete();
+                
+                Logger.Log("统一流式处理: 完整消息处理完成");
             }
-            catch { /* 忽略显示错误，避免日志开销 */ }
+            catch (Exception ex)
+            {
+                Logger.Log($"统一流式处理: 处理完整消息失败: {ex.Message}");
+                throw;
+            }
         }
     }
 }

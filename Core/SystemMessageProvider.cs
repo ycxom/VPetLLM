@@ -1,5 +1,7 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Handlers;
+using VPetLLM.Handlers.Actions;
+using VPetLLM.Handlers.Core;
+using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Utils.Common;
 using VPetLLM.Utils.System;
 

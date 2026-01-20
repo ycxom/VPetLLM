@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using System.IO;
+using VPetLLM.Handlers.State;
 using VPetLLM.Utils.System;
 
 namespace VPetLLM
@@ -42,7 +43,7 @@ namespace VPetLLM
         public TTSSetting TTS { get; set; } = new TTSSetting();
         public ProxySetting Proxy { get; set; } = new ProxySetting();
         public PluginStoreSetting PluginStore { get; set; } = new PluginStoreSetting();
-        public Handlers.TouchFeedbackSettings TouchFeedback { get; set; } = new Handlers.TouchFeedbackSettings();
+        public TouchFeedbackSettings TouchFeedback { get; set; } = new TouchFeedbackSettings();
         public bool EnableBuyFeedback { get; set; } = true;
         public bool EnableLiveMode { get; set; } = false;
         public bool LimitStateChanges { get; set; } = true;
@@ -124,7 +125,7 @@ namespace VPetLLM
             }
             if (TouchFeedback == null)
             {
-                TouchFeedback = new Handlers.TouchFeedbackSettings();
+                TouchFeedback = new TouchFeedbackSettings();
             }
             if (Tools == null)
             {
