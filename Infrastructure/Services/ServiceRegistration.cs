@@ -16,13 +16,13 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public static void RegisterInfrastructureServices(IDependencyContainer container)
         {
-            if (container == null)
+            if (container is null)
                 throw new ArgumentNullException(nameof(container));
 
             // 注册基础设施服务
             container.RegisterSingleton<IStructuredLogger, StructuredLogger>();
             container.RegisterSingleton<IEventBus, EventBus>();
-            container.RegisterSingleton<IConfigurationManager, ConfigurationManager>();
+            container.RegisterSingleton<IConfigurationManager, InfraConfigurationManager>();
             container.RegisterSingleton<IServiceManager, ServiceManager>();
         }
 
@@ -31,7 +31,7 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public static void RegisterCoreServices(IDependencyContainer container, VPetLLM plugin, Setting settings)
         {
-            if (container == null)
+            if (container is null)
                 throw new ArgumentNullException(nameof(container));
 
             // 注册核心工厂
@@ -48,7 +48,7 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public static void RegisterApplicationServices(IDependencyContainer container, VPetLLM plugin)
         {
-            if (container == null)
+            if (container is null)
                 throw new ArgumentNullException(nameof(container));
 
             // TODO: 注册应用服务
@@ -73,7 +73,7 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public static async Task InitializeAndStartCoreServicesAsync(IServiceManager serviceManager)
         {
-            if (serviceManager == null)
+            if (serviceManager is null)
                 throw new ArgumentNullException(nameof(serviceManager));
 
             try
@@ -102,7 +102,7 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public static async Task StopAllServicesAsync(IServiceManager serviceManager)
         {
-            if (serviceManager == null)
+            if (serviceManager is null)
                 throw new ArgumentNullException(nameof(serviceManager));
 
             try

@@ -1,8 +1,3 @@
-using VPetLLM.Configuration;
-using VPetLLM.Handlers.Core;
-using VPetLLM.Handlers.TTS;
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Handlers.TTS
 {
     /// <summary>
@@ -166,7 +161,7 @@ namespace VPetLLM.Handlers.TTS
             try
             {
                 // 通过SmartMessageProcessor实例执行动作
-                if (_smartMessageProcessor != null)
+                if (_smartMessageProcessor is not null)
                 {
                     await _smartMessageProcessor.ExecuteActionInternalAsync(actionContent);
                 }
@@ -194,7 +189,7 @@ namespace VPetLLM.Handlers.TTS
 
                 // 通过SmartMessageProcessor实例等待外置TTS
                 // 注意：会话跟踪已在 SmartMessageProcessor.WaitForExternalTTSCompleteAsync 中实现
-                if (_smartMessageProcessor != null)
+                if (_smartMessageProcessor is not null)
                 {
                     // 修复：检查VPetTTS状态，如果不在播放状态则跳过等待
                     // 这样可以避免VPetTTS插件清除刚刚显示的气泡
@@ -202,9 +197,9 @@ namespace VPetLLM.Handlers.TTS
                     if (plugin?.IsVPetTTSPluginDetected == true)
                     {
                         // 获取VPetTTS状态监控器
-                        var stateMonitorField = _smartMessageProcessor.GetType().GetField("_stateMonitor", 
+                        var stateMonitorField = _smartMessageProcessor.GetType().GetField("_stateMonitor",
                             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        
+
                         if (stateMonitorField?.GetValue(_smartMessageProcessor) is VPetTTSStateMonitor stateMonitor)
                         {
                             // 检查当前是否正在播放
@@ -215,7 +210,7 @@ namespace VPetLLM.Handlers.TTS
                             }
                         }
                     }
-                    
+
                     await _smartMessageProcessor.WaitForExternalTTSInternalAsync(text);
                 }
                 else

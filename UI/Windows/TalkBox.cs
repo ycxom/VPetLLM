@@ -1,11 +1,6 @@
-using Newtonsoft.Json;
 using System.Net.Http;
-using System.Text;
 using System.Windows;
-using VPetLLM.Core;
-using VPetLLM.Handlers.Core;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 using VPetLLM.Utils.UI;
 
 namespace VPetLLM.UI.Windows
@@ -52,7 +47,7 @@ namespace VPetLLM.UI.Windows
         {
             _plugin = plugin;
             _messageProcessor = new SmartMessageProcessor(_plugin);
-            if (_plugin.ChatCore != null)
+            if (_plugin.ChatCore is not null)
             {
                 _plugin.ChatCore.SetResponseHandler(HandleResponse);
             }
@@ -65,7 +60,7 @@ namespace VPetLLM.UI.Windows
                     try
                     {
                         var msgBar = _plugin.MW?.Main?.MsgBar;
-                        if (msgBar != null)
+                        if (msgBar is not null)
                         {
                             MessageBarHelper.PreInitialize(msgBar);
                         }
@@ -118,7 +113,7 @@ namespace VPetLLM.UI.Windows
             {
                 _isThinking = false;
                 var cts = _thinkingCancellationTokenSource;
-                if (cts != null)
+                if (cts is not null)
                 {
                     _thinkingCancellationTokenSource = null;
                     try { cts.Cancel(); cts.Dispose(); } catch { }
@@ -138,7 +133,7 @@ namespace VPetLLM.UI.Windows
                     if (IsCompleteMessage(response))
                     {
                         Logger.Log($"HandleResponse: 检测到完整消息，使用统一流式处理器拆分处理");
-                        
+
                         // 使用StreamingCommandProcessor处理完整消息
                         // 这样可以统一流式和非流式的处理逻辑
                         await ProcessCompleteMessageAsStreaming(response);
@@ -300,7 +295,7 @@ namespace VPetLLM.UI.Windows
                 // 发送消息
                 // ChatCore.Chat() 内部会通过 ResponseHandler 触发 SmartMessageProcessor
                 // SmartMessageProcessor 会在处理完成后自动管理动画状态
-                if (_plugin.ChatCore != null)
+                if (_plugin.ChatCore is not null)
                 {
                     await _plugin.ChatCore.Chat(text);
                 }
@@ -327,7 +322,7 @@ namespace VPetLLM.UI.Windows
         /// <param name="imageData">图片数据</param>
         public async Task SendChatWithImage(string text, byte[] imageData)
         {
-            if (imageData == null || imageData.Length == 0)
+            if (imageData is null || imageData.Length == 0)
             {
                 await SendChat(text);
                 return;
@@ -356,7 +351,7 @@ namespace VPetLLM.UI.Windows
                 // 发送带图片的消息
                 // ChatCore.ChatWithImage() 内部会通过 ResponseHandler 触发 SmartMessageProcessor
                 // SmartMessageProcessor 会在处理完成后自动管理动画状态
-                if (_plugin.ChatCore != null)
+                if (_plugin.ChatCore is not null)
                 {
                     await _plugin.ChatCore.ChatWithImage(text, imageData);
                 }
@@ -377,7 +372,7 @@ namespace VPetLLM.UI.Windows
 
         private async Task ProcessTools(string text)
         {
-            if (_plugin.Settings.Tools == null) return;
+            if (_plugin.Settings.Tools is null) return;
 
             foreach (var tool in _plugin.Settings.Tools)
             {
@@ -426,7 +421,7 @@ namespace VPetLLM.UI.Windows
 
             // 获取插件代理设置
             var proxy = GetPluginProxy();
-            if (proxy != null)
+            if (proxy is not null)
             {
                 handler.Proxy = proxy;
                 handler.UseProxy = true;
@@ -449,7 +444,7 @@ namespace VPetLLM.UI.Windows
             var proxySettings = _plugin.Settings.Proxy;
 
             // 如果代理未启用，返回null
-            if (proxySettings == null || !proxySettings.IsEnabled)
+            if (proxySettings is null || !proxySettings.IsEnabled)
             {
                 return null;
             }
@@ -497,7 +492,7 @@ namespace VPetLLM.UI.Windows
             {
                 _isThinking = false;
                 var oldCts = _thinkingCancellationTokenSource;
-                if (oldCts != null)
+                if (oldCts is not null)
                 {
                     _thinkingCancellationTokenSource = null;
                     try { oldCts.Cancel(); oldCts.Dispose(); } catch { }
@@ -584,7 +579,7 @@ namespace VPetLLM.UI.Windows
 
             // 取消思考动画任务
             var cts = _thinkingCancellationTokenSource;
-            if (cts != null)
+            if (cts is not null)
             {
                 _thinkingCancellationTokenSource = null;
                 try { cts.Cancel(); cts.Dispose(); } catch { }
@@ -601,7 +596,7 @@ namespace VPetLLM.UI.Windows
                     try
                     {
                         var msgBar = _plugin.MW.Main.MsgBar;
-                        if (msgBar != null)
+                        if (msgBar is not null)
                         {
                             MessageBarHelper.ClearStreamState(msgBar);
                         }
@@ -621,7 +616,7 @@ namespace VPetLLM.UI.Windows
 
             // 取消思考动画任务
             var cts = _thinkingCancellationTokenSource;
-            if (cts != null)
+            if (cts is not null)
             {
                 _thinkingCancellationTokenSource = null;
                 try { cts.Cancel(); cts.Dispose(); } catch { }
@@ -669,12 +664,12 @@ namespace VPetLLM.UI.Windows
 
             // 如果begin和end标记数量相等且大于1，认为是完整消息
             bool isComplete = beginCount == endCount && beginCount > 1;
-            
+
             if (isComplete)
             {
                 Logger.Log($"HandleResponse: 检测到完整消息 - 包含 {beginCount} 个完整命令");
             }
-            
+
             return isComplete;
         }
 
@@ -706,7 +701,7 @@ namespace VPetLLM.UI.Windows
 
                 // 完成处理
                 streamProcessor.Complete();
-                
+
                 Logger.Log("统一流式处理: 完整消息处理完成");
             }
             catch (Exception ex)

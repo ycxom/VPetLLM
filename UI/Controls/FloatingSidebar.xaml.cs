@@ -4,7 +4,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using VPetLLM.UI.Controls;
-using VPetLLM.Utils.System;
 
 namespace VPetLLMPlugin.UI.Controls
 {
@@ -475,7 +474,7 @@ namespace VPetLLMPlugin.UI.Controls
         {
             try
             {
-                if (_isClosing || sidebarButton == null)
+                if (_isClosing || sidebarButton is null)
                 {
                     return;
                 }
@@ -577,7 +576,7 @@ namespace VPetLLMPlugin.UI.Controls
         {
             try
             {
-                if (_isClosing || buttonIds == null || buttonIds.Count == 0)
+                if (_isClosing || buttonIds is null || buttonIds.Count == 0)
                 {
                     return;
                 }
@@ -596,7 +595,7 @@ namespace VPetLLMPlugin.UI.Controls
                 foreach (string buttonId in buttonIds)
                 {
                     var button = buttons.Find(b => b.Tag?.ToString() == buttonId);
-                    if (button != null)
+                    if (button is not null)
                     {
                         ButtonContainer.Children.Add(button);
                     }
@@ -847,7 +846,7 @@ namespace VPetLLMPlugin.UI.Controls
                 }
 
                 // 取消事件订阅
-                if (_master?.MW?.Main != null)
+                if (_master?.MW?.Main is not null)
                 {
                     _master.MW.Main.MouseEnter -= Main_MouseEnter;
                     _master.MW.Main.MouseLeave -= Main_MouseLeave;
@@ -873,7 +872,7 @@ namespace VPetLLMPlugin.UI.Controls
             var buttonIds = new List<string>();
             foreach (UIElement child in ButtonContainer.Children)
             {
-                if (child is Button button && button.Tag != null)
+                if (child is Button button && button.Tag is not null)
                 {
                     buttonIds.Add(button.Tag.ToString()!);
                 }

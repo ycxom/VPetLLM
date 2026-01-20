@@ -1,7 +1,5 @@
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
-using VPetLLM.Configuration;
 using VPetLLM.Infrastructure.Configuration;
 using VPetLLM.Infrastructure.Events;
 using VPetLLM.Infrastructure.Logging;
@@ -51,7 +49,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             {
                 lock (_lock)
                 {
-                    return _mpvProcess != null && !_mpvProcess.HasExited;
+                    return _mpvProcess is not null && !_mpvProcess.HasExited;
                 }
             }
         }
@@ -118,7 +116,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             {
                 lock (_lock)
                 {
-                    if (_mpvProcess != null && _mpvProcess.HasExited)
+                    if (_mpvProcess is not null && _mpvProcess.HasExited)
                     {
                         LogWarning("mpv process has exited unexpectedly");
                     }
@@ -232,7 +230,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
 
                 lock (_lock)
                 {
-                    if (_mpvProcess != null)
+                    if (_mpvProcess is not null)
                     {
                         if (!_mpvProcess.HasExited)
                         {
@@ -313,7 +311,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
 
         private void StopWindowMonitor()
         {
-            if (_monitorCts != null)
+            if (_monitorCts is not null)
             {
                 _monitorCts.Cancel();
                 _monitorCts.Dispose();
@@ -336,7 +334,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
                         process = _mpvProcess;
                     }
 
-                    if (process == null || process.HasExited)
+                    if (process is null || process.HasExited)
                         break;
 
                     var mainWindowHandle = process.MainWindowHandle;

@@ -1,6 +1,5 @@
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace VPetLLM.Utils.Common
 {
@@ -25,7 +24,7 @@ namespace VPetLLM.Utils.Common
                 var t = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 var v0 = _0x1f?.Invoke() ?? 0;
                 var v1 = 0;
-                if (_0x2e != null) { try { v1 = await _0x2e(); } catch { } }
+                if (_0x2e is not null) { try { v1 = await _0x2e(); } catch { } }
                 var v2 = _0x4c();
 
                 r.Headers.Add(_0x5a(), _0x6b(v0.ToString(), t));
@@ -38,7 +37,7 @@ namespace VPetLLM.Utils.Common
 
         private static string _0x4c()
         {
-            if (_0x3d != null)
+            if (_0x3d is not null)
             {
                 try
                 {

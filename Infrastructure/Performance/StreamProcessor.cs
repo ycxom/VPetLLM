@@ -1,4 +1,3 @@
-using System.IO;
 using System.Runtime.CompilerServices;
 using VPetLLM.Infrastructure.Logging;
 
@@ -40,7 +39,7 @@ namespace VPetLLM.Infrastructure.Performance
             using (var reader = new StreamReader(fileStream))
             {
                 string? line;
-                while ((line = await reader.ReadLineAsync()) != null)
+                while ((line = await reader.ReadLineAsync()) is not null)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 

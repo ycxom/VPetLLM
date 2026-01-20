@@ -1,7 +1,5 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.Common;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -44,7 +42,7 @@ namespace VPetLLM.Services
         {
             try
             {
-                if (food == null)
+                if (food is null)
                 {
                     Logger.Log("Purchase event: food is null, skipping");
                     return;
@@ -71,7 +69,7 @@ namespace VPetLLM.Services
                     return;
                 }
 
-                if (_plugin.ChatCore == null)
+                if (_plugin.ChatCore is null)
                 {
                     Logger.Log("Purchase event: ChatCore is null, skipping");
                     return;
@@ -96,7 +94,7 @@ namespace VPetLLM.Services
             {
                 // 尝试获取 ItemType 属性（新版本 VPet）
                 var itemTypeProperty = food.GetType().GetProperty("ItemType");
-                if (itemTypeProperty != null)
+                if (itemTypeProperty is not null)
                 {
                     var value = itemTypeProperty.GetValue(food) as string;
                     if (!string.IsNullOrEmpty(value))
@@ -119,7 +117,7 @@ namespace VPetLLM.Services
             lock (_purchaseLock)
             {
                 var existingItem = _pendingPurchases.FirstOrDefault(p => p.Name == food.Name && p.ItemType == itemType);
-                if (existingItem != null)
+                if (existingItem is not null)
                 {
                     existingItem.Quantity += count;
                     existingItem.PurchaseTime = DateTime.Now;

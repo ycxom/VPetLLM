@@ -1,5 +1,3 @@
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Handlers.Infrastructure
 {
     /// <summary>
@@ -42,7 +40,7 @@ namespace VPetLLM.Handlers.Infrastructure
                 try
                 {
                     var msgBar = _plugin?.MW?.Main?.MsgBar;
-                    if (msgBar == null) return;
+                    if (msgBar is null) return;
 
                     // 保存当前状态
                     var showTimer = GetTimer(msgBar, "ShowTimer");
@@ -80,13 +78,13 @@ namespace VPetLLM.Handlers.Infrastructure
                 try
                 {
                     var msgBar = _plugin?.MW?.Main?.MsgBar;
-                    if (msgBar == null) return;
+                    if (msgBar is null) return;
 
                     // 根据当前配置决定启动哪个定时器
                     var endTimer = GetTimer(msgBar, "EndTimer");
 
                     // 通常在显示完成后启动 EndTimer
-                    if (endTimer != null && _currentDisplayDuration > 0)
+                    if (endTimer is not null && _currentDisplayDuration > 0)
                     {
                         endTimer.Interval = 200; // VPet 默认间隔
                         endTimer.Start();
@@ -161,7 +159,7 @@ namespace VPetLLM.Handlers.Infrastructure
                 try
                 {
                     var msgBar = _plugin?.MW?.Main?.MsgBar;
-                    if (msgBar == null) return;
+                    if (msgBar is null) return;
 
                     GetTimer(msgBar, "ShowTimer")?.Stop();
                     GetTimer(msgBar, "EndTimer")?.Stop();
@@ -192,7 +190,7 @@ namespace VPetLLM.Handlers.Infrastructure
                 try
                 {
                     var msgBar = _plugin?.MW?.Main?.MsgBar;
-                    if (msgBar == null) return true;
+                    if (msgBar is null) return true;
 
                     var showTimer = GetTimer(msgBar, "ShowTimer");
                     var endTimer = GetTimer(msgBar, "EndTimer");

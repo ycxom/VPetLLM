@@ -81,7 +81,7 @@ namespace VPetLLM.Configuration
                     break;
 
                 case Setting.LLMType.OpenAI:
-                    if (OpenAI?.OpenAINodes == null || OpenAI.OpenAINodes.Count == 0)
+                    if (OpenAI?.OpenAINodes is null || OpenAI.OpenAINodes.Count == 0)
                     {
                         if (string.IsNullOrWhiteSpace(OpenAI?.ApiKey))
                         {
@@ -91,7 +91,7 @@ namespace VPetLLM.Configuration
                     break;
 
                 case Setting.LLMType.Gemini:
-                    if (Gemini?.GeminiNodes == null || Gemini.GeminiNodes.Count == 0)
+                    if (Gemini?.GeminiNodes is null || Gemini.GeminiNodes.Count == 0)
                     {
                         if (string.IsNullOrWhiteSpace(Gemini?.ApiKey))
                         {

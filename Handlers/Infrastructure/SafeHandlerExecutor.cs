@@ -1,6 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Handlers.Actions;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Infrastructure
 {
@@ -27,7 +25,7 @@ namespace VPetLLM.Handlers.Infrastructure
             }
 
             var handler = _registry.GetHandler(actionName);
-            if (handler == null)
+            if (handler is null)
             {
                 return HandlerResult.Fail($"No handler registered for action: {actionName}");
             }
@@ -46,7 +44,7 @@ namespace VPetLLM.Handlers.Infrastructure
             }
 
             var handler = _registry.GetHandler(actionName);
-            if (handler == null)
+            if (handler is null)
             {
                 return HandlerResult.Fail($"No handler registered for action: {actionName}");
             }
@@ -65,7 +63,7 @@ namespace VPetLLM.Handlers.Infrastructure
             }
 
             var handler = _registry.GetHandler(actionName);
-            if (handler == null)
+            if (handler is null)
             {
                 return HandlerResult.Fail($"No handler registered for action: {actionName}");
             }
@@ -78,12 +76,12 @@ namespace VPetLLM.Handlers.Infrastructure
         /// </summary>
         public async Task<HandlerResult> ExecuteAsync(IActionHandler handler, IMainWindow mainWindow)
         {
-            if (handler == null)
+            if (handler is null)
             {
                 return HandlerResult.Fail("Handler cannot be null");
             }
 
-            if (mainWindow == null)
+            if (mainWindow is null)
             {
                 return HandlerResult.Fail("MainWindow cannot be null");
             }
@@ -107,12 +105,12 @@ namespace VPetLLM.Handlers.Infrastructure
         /// </summary>
         public async Task<HandlerResult> ExecuteAsync(IActionHandler handler, int value, IMainWindow mainWindow)
         {
-            if (handler == null)
+            if (handler is null)
             {
                 return HandlerResult.Fail("Handler cannot be null");
             }
 
-            if (mainWindow == null)
+            if (mainWindow is null)
             {
                 return HandlerResult.Fail("MainWindow cannot be null");
             }
@@ -136,12 +134,12 @@ namespace VPetLLM.Handlers.Infrastructure
         /// </summary>
         public async Task<HandlerResult> ExecuteAsync(IActionHandler handler, string value, IMainWindow mainWindow)
         {
-            if (handler == null)
+            if (handler is null)
             {
                 return HandlerResult.Fail("Handler cannot be null");
             }
 
-            if (mainWindow == null)
+            if (mainWindow is null)
             {
                 return HandlerResult.Fail("MainWindow cannot be null");
             }

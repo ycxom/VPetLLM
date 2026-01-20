@@ -1,12 +1,7 @@
 using System.Text.RegularExpressions;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Core;
-using VPetLLM.Handlers.Actions;
 using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Handlers.Legacy;
-using VPetLLM.Services;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Core
 {
@@ -71,20 +66,20 @@ namespace VPetLLM.Handlers.Core
             _handlerRegistry.Register("plugin", new PluginHandler());
 
             // Add RecordCommandHandler if RecordManager is available
-            if (_recordManager != null)
+            if (_recordManager is not null)
             {
                 _handlerRegistry.Register("record", new RecordCommandHandler(_recordManager));
                 _handlerRegistry.Register("record_modify", new RecordModifyCommandHandler(_recordManager));
             }
 
             // Add VPetSettingsHandler if Settings is available
-            if (_settings != null)
+            if (_settings is not null)
             {
                 _handlerRegistry.Register("vpet_settings", new VPetSettingsHandler(_settings));
             }
 
             // Add PlayHandler if MediaPlaybackService is available
-            if (_mediaPlaybackService != null)
+            if (_mediaPlaybackService is not null)
             {
                 _handlerRegistry.Register("play", new PlayHandler(_mediaPlaybackService));
             }
@@ -126,7 +121,7 @@ namespace VPetLLM.Handlers.Core
                 IActionHandler handler = _handlerRegistry.GetHandler(actionType);
 
                 // If no handler found, try parsing nested structure (e.g., talk(say(...)))
-                if (handler == null && !string.IsNullOrEmpty(value))
+                if (handler is null && !string.IsNullOrEmpty(value))
                 {
                     // Try to extract nested command
                     var nestedMatch = new Regex(@"^(\w+)\((.*)\)$", RegexOptions.Singleline).Match(value);
@@ -136,7 +131,7 @@ namespace VPetLLM.Handlers.Core
                         var nestedValue = nestedMatch.Groups[2].Value;
 
                         handler = _handlerRegistry.GetHandler(nestedCommand);
-                        if (handler != null)
+                        if (handler is not null)
                         {
                             // Use nested value
                             value = nestedValue;
@@ -145,7 +140,7 @@ namespace VPetLLM.Handlers.Core
                     }
                 }
 
-                if (handler == null)
+                if (handler is null)
                 {
                     Logger.Log($"ActionProcessor: No handler found for command: {actionType} (format: {command.Format})");
                     continue;

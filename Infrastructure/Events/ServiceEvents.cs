@@ -5,7 +5,7 @@ namespace VPetLLM.Infrastructure.Events
     /// <summary>
     /// 服务状态变更事件（用于事件总线）
     /// </summary>
-    public class ServiceStatusChangedEvent
+    public class InfraServiceStatusChangedEvent
     {
         /// <summary>
         /// 服务类型
@@ -20,17 +20,17 @@ namespace VPetLLM.Infrastructure.Events
         /// <summary>
         /// 旧状态
         /// </summary>
-        public ServiceStatus OldStatus { get; set; }
+        public InfraServiceStatus OldStatus { get; set; }
 
         /// <summary>
         /// 新状态
         /// </summary>
-        public ServiceStatus NewStatus { get; set; }
+        public InfraServiceStatus NewStatus { get; set; }
 
         /// <summary>
         /// 状态
         /// </summary>
-        public ServiceStatus Status { get; set; }
+        public InfraServiceStatus Status { get; set; }
 
         /// <summary>
         /// 变更时间

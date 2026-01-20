@@ -1,13 +1,10 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
-using VPetLLM.Core;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -47,14 +44,14 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        public bool HasImage => ImageData != null && ImageData.Length > 0;
+        public bool HasImage => ImageData is not null && ImageData.Length > 0;
 
         private BitmapSource? _thumbnailSource;
         public BitmapSource? ThumbnailSource
         {
             get
             {
-                if (_thumbnailSource == null && HasImage)
+                if (_thumbnailSource is null && HasImage)
                 {
                     _thumbnailSource = CreateThumbnail(ImageData!, 60);
                 }

@@ -1,8 +1,3 @@
-using Newtonsoft.Json;
-using System.IO;
-using VPetLLM.Core;
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Utils.Data
 {
     /// <summary>
@@ -96,7 +91,7 @@ namespace VPetLLM.Utils.Data
                 var json = File.ReadAllText(jsonPath);
                 var messages = JsonConvert.DeserializeObject<List<Message>>(json);
 
-                if (messages == null || messages.Count == 0)
+                if (messages is null || messages.Count == 0)
                 {
                     Logger.Log("JSON 文件中没有有效的消息");
                     return false;

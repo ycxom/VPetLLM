@@ -1,5 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.System;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Utils.UI
@@ -17,7 +16,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>true表示正在执行重要动画，应该阻止VPetLLM动作</returns>
         public static bool IsPlayingImportantAnimation(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null)
+            if (mainWindow?.Main is null)
                 return false;
 
             // 方法1：检查WorkingState（最准确的方式）
@@ -28,7 +27,7 @@ namespace VPetLLM.Utils.UI
                     // 工作状态 - 包括工作、学习、玩耍
                     // 进一步识别具体类型
                     var nowWork = mainWindow.Main.NowWork;
-                    if (nowWork != null)
+                    if (nowWork is not null)
                     {
                         switch (nowWork.Type)
                         {
@@ -62,7 +61,7 @@ namespace VPetLLM.Utils.UI
 
             // 方法2：检查DisplayType（辅助检查特殊动画）
             var displayType = mainWindow.Main.DisplayType;
-            if (displayType != null)
+            if (displayType is not null)
             {
                 // 首先检查是否是触摸类型的动画（Touch类型）
                 if (displayType.Type == GraphType.Touch_Head ||
@@ -101,7 +100,7 @@ namespace VPetLLM.Utils.UI
 
                 // 方法3：检查用户交互动画（捏脸、摸头、摸身体等）
                 // 这些动画名称通常包含特定关键字
-                if (displayType.Name != null)
+                if (displayType.Name is not null)
                 {
                     var animName = displayType.Name.ToLower();
 
@@ -144,7 +143,7 @@ namespace VPetLLM.Utils.UI
         /// </summary>
         public static string GetCurrentAnimationDescription(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main?.DisplayType == null)
+            if (mainWindow?.Main?.DisplayType is null)
                 return "Unknown";
 
             var displayType = mainWindow.Main.DisplayType;
@@ -171,7 +170,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>true表示可以执行状态转换，false表示应该延迟或取消</returns>
         public static bool CanExecuteStateTransition(IMainWindow mainWindow, object targetState, string actionName)
         {
-            if (mainWindow?.Main == null)
+            if (mainWindow?.Main is null)
             {
                 Logger.Log("AnimationStateChecker: mainWindow is null, allowing state transition");
                 return true;
@@ -190,7 +189,7 @@ namespace VPetLLM.Utils.UI
             try
             {
                 var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                if (stateProperty != null)
+                if (stateProperty is not null)
                 {
                     var currentState = stateProperty.GetValue(mainWindow.Main);
                     string currentStateName = currentState?.ToString() ?? "Unknown";
@@ -224,13 +223,13 @@ namespace VPetLLM.Utils.UI
         /// <returns>true表示当前状态可以被中断，false表示不应该中断</returns>
         public static bool CanInterruptCurrentState(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null)
+            if (mainWindow?.Main is null)
                 return true;
 
             try
             {
                 var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                if (stateProperty == null)
+                if (stateProperty is null)
                     return true;
 
                 var currentState = stateProperty.GetValue(mainWindow.Main);
@@ -271,13 +270,13 @@ namespace VPetLLM.Utils.UI
         /// <returns>当前状态的描述字符串</returns>
         public static string GetCurrentStateDescription(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null)
+            if (mainWindow?.Main is null)
                 return "Unknown (mainWindow is null)";
 
             try
             {
                 var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                if (stateProperty == null)
+                if (stateProperty is null)
                     return "Unknown (State property not found)";
 
                 var currentState = stateProperty.GetValue(mainWindow.Main);

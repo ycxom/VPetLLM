@@ -1,7 +1,4 @@
 using System.Windows;
-using VPetLLM.Configuration;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -62,7 +59,7 @@ namespace VPetLLM.Services
                 }
 
                 var mainWindow = Application.Current.MainWindow;
-                if (mainWindow == null)
+                if (mainWindow is null)
                 {
                     Logger.Log("Main window not found, cannot register screenshot hotkey");
                     return;
@@ -141,7 +138,7 @@ namespace VPetLLM.Services
             {
                 Logger.Log("Starting screenshot capture...");
 
-                if (_captureWindow != null)
+                if (_captureWindow is not null)
                 {
                     Logger.Log("Previous capture window still exists, closing it first");
                     try
@@ -221,7 +218,7 @@ namespace VPetLLM.Services
             try
             {
                 Logger.Log("Canceling screenshot capture...");
-                if (_captureWindow != null)
+                if (_captureWindow is not null)
                 {
                     _captureWindow.Close();
                     _captureWindow = null;
@@ -387,7 +384,7 @@ namespace VPetLLM.Services
         {
             try
             {
-                var ocrEngine = new Core.OCREngine(_settings, _plugin);
+                var ocrEngine = new OCREngine(_settings, _plugin);
                 return await ocrEngine.RecognizeText(imageData);
             }
             catch (Exception ex)
@@ -416,7 +413,7 @@ namespace VPetLLM.Services
             _screenshotHotkey?.Dispose();
             _screenshotHotkey = null;
 
-            if (_captureWindow != null)
+            if (_captureWindow is not null)
             {
                 try
                 {

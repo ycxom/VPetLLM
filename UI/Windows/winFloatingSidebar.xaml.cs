@@ -3,7 +3,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using VPetLLM.UI.Controls;
-using VPetLLM.Utils.System;
 
 namespace VPetLLMPlugin.UI.Windows
 {
@@ -73,7 +72,7 @@ namespace VPetLLMPlugin.UI.Windows
                     return;
                 }
 
-                if (sidebarButton == null)
+                if (sidebarButton is null)
                 {
                     Logger.Log("Cannot add null button");
                     return;
@@ -165,7 +164,7 @@ namespace VPetLLMPlugin.UI.Windows
         {
             try
             {
-                if (_isClosing || buttonIds == null || buttonIds.Count == 0)
+                if (_isClosing || buttonIds is null || buttonIds.Count == 0)
                 {
                     return;
                 }
@@ -190,7 +189,7 @@ namespace VPetLLMPlugin.UI.Windows
                     }
 
                     var button = buttons.Find(b => b.Tag?.ToString() == buttonId);
-                    if (button != null)
+                    if (button is not null)
                     {
                         ButtonContainer.Children.Add(button);
                     }
@@ -252,7 +251,7 @@ namespace VPetLLMPlugin.UI.Windows
             var buttonIds = new List<string>();
             foreach (UIElement child in ButtonContainer.Children)
             {
-                if (child is Button button && button.Tag != null)
+                if (child is Button button && button.Tag is not null)
                 {
                     buttonIds.Add(button.Tag.ToString()!);
                 }

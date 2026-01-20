@@ -1,10 +1,7 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Handlers.Actions;
 using VPetLLM.Handlers.Animation;
 using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Handlers.State;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 using VPetLLM.Utils.UI;
 using static VPet_Simulator.Core.GraphInfo;
 
@@ -91,7 +88,7 @@ namespace VPetLLM.Handlers.Legacy
                         var mainType = mainWindow.Main.GetType();
                         stateField = mainType.GetField("State");
 
-                        if (stateField != null)
+                        if (stateField is not null)
                         {
                             currentStateValue = stateField.GetValue(mainWindow.Main);
                             stateName = currentStateValue?.ToString() ?? "Unknown";
@@ -111,7 +108,7 @@ namespace VPetLLM.Handlers.Legacy
                                 try
                                 {
                                     var workTimer = mainWindow.Main.WorkTimer;
-                                    if (workTimer != null)
+                                    if (workTimer is not null)
                                     {
                                         workTimer.Stop(reason: VPet_Simulator.Core.WorkTimer.FinishWorkInfo.StopReason.MenualStop);
                                         Logger.Log("ActionHandler: stopaction completed - work stopped with proper animation");
@@ -124,16 +121,16 @@ namespace VPetLLM.Handlers.Legacy
 
                                     // Fallback to reflection
                                     var workTimerProperty = mainWindow.Main.GetType().GetProperty("WorkTimer");
-                                    if (workTimerProperty != null)
+                                    if (workTimerProperty is not null)
                                     {
                                         var workTimer = workTimerProperty.GetValue(mainWindow.Main);
-                                        if (workTimer != null)
+                                        if (workTimer is not null)
                                         {
                                             var stopMethod = workTimer.GetType().GetMethod("Stop");
-                                            if (stopMethod != null)
+                                            if (stopMethod is not null)
                                             {
                                                 var stopReasonType = workTimer.GetType().GetNestedType("FinishWorkInfo")?.GetNestedType("StopReason");
-                                                if (stopReasonType != null)
+                                                if (stopReasonType is not null)
                                                 {
                                                     var menuStopReason = Enum.Parse(stopReasonType, "MenualStop");
                                                     stopMethod.Invoke(workTimer, new object[] { null, menuStopReason });
@@ -151,7 +148,7 @@ namespace VPetLLM.Handlers.Legacy
                                 Logger.Log("ActionHandler: Stopping sleep state");
 
                                 // Set state to Nomal first
-                                if (stateField != null)
+                                if (stateField is not null)
                                 {
                                     var workingStateType = stateField.FieldType;
                                     var nomalState = Enum.Parse(workingStateType, "Nomal");
@@ -163,7 +160,7 @@ namespace VPetLLM.Handlers.Legacy
                                 {
                                     // Get DisplayNomal property
                                     var displayNomalProp = mainWindow.Main.GetType().GetProperty("DisplayNomal");
-                                    if (displayNomalProp != null)
+                                    if (displayNomalProp is not null)
                                     {
                                         var displayNomalAction = displayNomalProp.GetValue(mainWindow.Main) as Action;
                                         mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.Sleep,
@@ -352,7 +349,7 @@ namespace VPetLLM.Handlers.Legacy
                             try
                             {
                                 var displayPinchMethod = mainWindow.GetType().GetMethod("DisplayPinch");
-                                if (displayPinchMethod != null)
+                                if (displayPinchMethod is not null)
                                 {
                                     displayPinchMethod.Invoke(mainWindow, null);
                                     actionTriggered = true;
@@ -409,7 +406,7 @@ namespace VPetLLM.Handlers.Legacy
                             try
                             {
                                 var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                                if (stateProperty != null)
+                                if (stateProperty is not null)
                                 {
                                     var workingStateType = stateProperty.PropertyType;
                                     var sideLeftValue = System.Enum.Parse(workingStateType, "SideLeft");
@@ -439,7 +436,7 @@ namespace VPetLLM.Handlers.Legacy
                             try
                             {
                                 var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                                if (stateProperty != null)
+                                if (stateProperty is not null)
                                 {
                                     var workingStateType = stateProperty.PropertyType;
                                     var sideRightValue = System.Enum.Parse(workingStateType, "SideRight");
@@ -511,7 +508,7 @@ namespace VPetLLM.Handlers.Legacy
                 // Find the work
                 var work = WorkManager.FindWork(workName, workType);
 
-                if (work == null)
+                if (work is null)
                 {
                     Logger.Log($"ActionHandler: Work '{workName}' not found in {workType} list, ignoring action");
                     // Silently ignore non-existent work instead of falling back to generic animation

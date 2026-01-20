@@ -1,9 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
-using VPetLLM.Configuration;
 using VPetLLM.UI.Controls;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 using VPetLLMPlugin.UI.Controls;
 
 namespace VPetLLM.Handlers.UI
@@ -115,12 +113,12 @@ namespace VPetLLM.Handlers.UI
                     return;
                 }
 
-                if (_sidebar == null)
+                if (_sidebar is null)
                 {
                     CreateSidebar();
                 }
 
-                if (_sidebar != null)
+                if (_sidebar is not null)
                 {
                     _sidebar.Show();
                     RefreshButtons();
@@ -197,7 +195,7 @@ namespace VPetLLM.Handlers.UI
         /// </summary>
         private void ApplyPositionSettings(FloatingSidebarSettings settings)
         {
-            if (_sidebar == null) return;
+            if (_sidebar is null) return;
 
             // 使用 VerticalAlignment.Top 配合 Margin 来定位，避免层级切换时的位置跳动
             // 因为 UIGrid 和 UIGrid_Back 都是 VerticalAlignment="Top" 的 Grid
@@ -245,7 +243,7 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                if (_sidebar != null)
+                if (_sidebar is not null)
                 {
                     _sidebar.ButtonClicked -= OnButtonClicked;
                     _sidebar.SidebarClosed -= OnSidebarClosed;
@@ -266,7 +264,7 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                if (_sidebar == null) return;
+                if (_sidebar is null) return;
 
                 var settings = GetFloatingSidebarSettings();
                 var enabledButtons = settings.EnabledButtons ?? SidebarButton.GetDefaultButtons().Select(b => b.ButtonId).ToList();
@@ -325,7 +323,7 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                if (_sidebar != null && !_isDisposed)
+                if (_sidebar is not null && !_isDisposed)
                 {
                     _sidebar.UpdateStatusLight(status);
                     Logger.Log($"VPetLLM status updated to: {status}");
@@ -512,7 +510,7 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                if (_sidebar == null) return;
+                if (_sidebar is null) return;
 
                 _sidebar.DefaultOpacity = settings.InactiveOpacity;
                 _sidebar.ActiveOpacity = settings.DefaultOpacity;
@@ -575,7 +573,7 @@ namespace VPetLLM.Handlers.UI
             {
                 var settings = _vpetLLM.Settings?.FloatingSidebar;
 
-                if (settings == null)
+                if (settings is null)
                 {
                     Logger.Log("FloatingSidebar settings is null, creating default settings");
                     return new FloatingSidebarSettings();
@@ -605,7 +603,7 @@ namespace VPetLLM.Handlers.UI
                 var allButtons = SidebarButton.GetDefaultButtons();
                 var button = allButtons.FirstOrDefault(b => b.ButtonId == e.ButtonId);
 
-                if (button != null)
+                if (button is not null)
                 {
                     try
                     {

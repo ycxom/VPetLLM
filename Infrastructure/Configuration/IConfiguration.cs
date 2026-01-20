@@ -1,5 +1,3 @@
-using VPetLLM.Configuration;
-
 namespace VPetLLM.Infrastructure.Configuration
 {
     /// <summary>
@@ -96,7 +94,7 @@ namespace VPetLLM.Infrastructure.Configuration
         /// <summary>
         /// 配置变更事件
         /// </summary>
-        event EventHandler<ConfigurationChangedEventArgs> ConfigurationChanged;
+        event EventHandler<InfraConfigChangedEventArgs> ConfigurationChanged;
 
         /// <summary>
         /// 配置加载事件
@@ -112,7 +110,7 @@ namespace VPetLLM.Infrastructure.Configuration
     /// <summary>
     /// 配置变更事件参数
     /// </summary>
-    public class ConfigurationChangedEventArgs : EventArgs
+    public class InfraConfigChangedEventArgs : EventArgs
     {
         /// <summary>
         /// 配置类型
@@ -144,7 +142,7 @@ namespace VPetLLM.Infrastructure.Configuration
         /// </summary>
         public ConfigurationChangeReason Reason { get; }
 
-        public ConfigurationChangedEventArgs(Type configurationType, string configurationName,
+        public InfraConfigChangedEventArgs(Type configurationType, string configurationName,
             IConfiguration oldConfiguration, IConfiguration newConfiguration, ConfigurationChangeReason reason)
         {
             ConfigurationType = configurationType;

@@ -13,7 +13,7 @@ namespace VPetLLM.Infrastructure.Services
         /// <summary>
         /// 服务状态
         /// </summary>
-        ServiceStatus Status { get; }
+        InfraServiceStatus Status { get; }
 
         /// <summary>
         /// 服务版本
@@ -228,12 +228,12 @@ namespace VPetLLM.Infrastructure.Services
         /// <summary>
         /// 旧状态
         /// </summary>
-        public ServiceStatus OldStatus { get; }
+        public InfraServiceStatus OldStatus { get; }
 
         /// <summary>
         /// 新状态
         /// </summary>
-        public ServiceStatus NewStatus { get; }
+        public InfraServiceStatus NewStatus { get; }
 
         /// <summary>
         /// 变更时间
@@ -245,7 +245,7 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public string Reason { get; }
 
-        public ServiceStatusChangedEventArgs(string serviceName, ServiceStatus oldStatus, ServiceStatus newStatus, string reason = null)
+        public ServiceStatusChangedEventArgs(string serviceName, InfraServiceStatus oldStatus, InfraServiceStatus newStatus, string reason = null)
         {
             ServiceName = serviceName;
             OldStatus = oldStatus;

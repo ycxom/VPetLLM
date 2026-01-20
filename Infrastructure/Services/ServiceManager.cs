@@ -56,7 +56,7 @@ namespace VPetLLM.Infrastructure.Services
 
                 // 创建服务实例
                 var service = _container.Resolve<T>();
-                if (service == null)
+                if (service is null)
                 {
                     throw new ServiceException($"Failed to resolve service of type {typeof(T).Name}", $"Failed to resolve service of type {typeof(T).Name}", null);
                 }
@@ -66,14 +66,14 @@ namespace VPetLLM.Infrastructure.Services
                 _serviceMetadata[typeof(T)] = new ServiceMetadata
                 {
                     ServiceType = typeof(T),
-                    Status = ServiceStatus.Created,
+                    Status = InfraServiceStatus.Created,
                     Health = ServiceHealth.Unknown,
                     CreatedAt = DateTime.UtcNow,
                     LastHealthCheck = DateTime.UtcNow
                 };
 
                 _logger?.LogInformation("Service created", new { ServiceType = typeof(T).Name });
-                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, ServiceStatus.NotInitialized, ServiceStatus.Created));
+                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, InfraServiceStatus.NotInitialized, InfraServiceStatus.Created));
 
                 return service;
             }
@@ -90,7 +90,7 @@ namespace VPetLLM.Infrastructure.Services
             var service = await GetServiceAsync<T>();
             var metadata = _serviceMetadata[typeof(T)];
 
-            if (metadata.Status == ServiceStatus.Running)
+            if (metadata.Status == InfraServiceStatus.Running)
             {
                 _logger?.LogWarning("Service is already running", new { ServiceType = typeof(T).Name });
                 return;
@@ -105,24 +105,24 @@ namespace VPetLLM.Infrastructure.Services
                 // 启动服务
                 await service.StartAsync();
 
-                metadata.Status = ServiceStatus.Running;
+                metadata.Status = InfraServiceStatus.Running;
                 metadata.StartedAt = DateTime.UtcNow;
                 metadata.Health = ServiceHealth.Healthy;
                 metadata.LastHealthCheck = DateTime.UtcNow;
 
                 _logger?.LogInformation("Service started successfully", new { ServiceType = typeof(T).Name });
-                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, ServiceStatus.Starting, ServiceStatus.Running));
+                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, InfraServiceStatus.Starting, InfraServiceStatus.Running));
                 OnServiceHealthChanged(new ServiceHealthChangedEventArgs(typeof(T), ServiceHealth.Healthy, service));
             }
             catch (Exception ex)
             {
-                metadata.Status = ServiceStatus.Failed;
+                metadata.Status = InfraServiceStatus.Failed;
                 metadata.Health = ServiceHealth.Unhealthy;
                 metadata.LastError = ex;
                 metadata.LastHealthCheck = DateTime.UtcNow;
 
                 _logger?.LogError(ex, "Failed to start service", new { ServiceType = typeof(T).Name });
-                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, ServiceStatus.Starting, ServiceStatus.Failed));
+                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, InfraServiceStatus.Starting, InfraServiceStatus.Failed));
                 OnServiceHealthChanged(new ServiceHealthChangedEventArgs(typeof(T), ServiceHealth.Unhealthy, service));
 
                 throw new ServiceException(typeof(T).Name, $"Failed to start service {typeof(T).Name}", ex);
@@ -144,7 +144,7 @@ namespace VPetLLM.Infrastructure.Services
             }
 
             var metadata = _serviceMetadata[typeof(T)];
-            if (metadata.Status != ServiceStatus.Running)
+            if (metadata.Status != InfraServiceStatus.Running)
             {
                 _logger?.LogWarning("Service is not running", new { ServiceType = typeof(T).Name, Status = metadata.Status });
                 return;
@@ -159,21 +159,21 @@ namespace VPetLLM.Infrastructure.Services
                 // 停止服务
                 await service.StopAsync();
 
-                metadata.Status = ServiceStatus.Stopped;
+                metadata.Status = InfraServiceStatus.Stopped;
                 metadata.StoppedAt = DateTime.UtcNow;
                 metadata.Health = ServiceHealth.Unknown;
 
                 _logger?.LogInformation("Service stopped successfully", new { ServiceType = typeof(T).Name });
-                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, ServiceStatus.Running, ServiceStatus.Stopped));
+                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, InfraServiceStatus.Running, InfraServiceStatus.Stopped));
             }
             catch (Exception ex)
             {
-                metadata.Status = ServiceStatus.Failed;
+                metadata.Status = InfraServiceStatus.Failed;
                 metadata.Health = ServiceHealth.Unhealthy;
                 metadata.LastError = ex;
 
                 _logger?.LogError(ex, "Failed to stop service", new { ServiceType = typeof(T).Name });
-                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, ServiceStatus.Stopping, ServiceStatus.Failed));
+                OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, InfraServiceStatus.Stopping, InfraServiceStatus.Failed));
 
                 throw new ServiceException($"Failed to stop service {typeof(T).Name}", $"Failed to stop service {typeof(T).Name}", ex);
             }
@@ -196,7 +196,7 @@ namespace VPetLLM.Infrastructure.Services
             _logger?.LogInformation("Service restarted successfully", new { ServiceType = typeof(T).Name });
         }
 
-        public ServiceStatus GetServiceStatus<T>() where T : class, IService
+        public InfraServiceStatus GetServiceStatus<T>() where T : class, IService
         {
             ThrowIfDisposed();
 
@@ -205,7 +205,7 @@ namespace VPetLLM.Infrastructure.Services
                 return metadata.Status;
             }
 
-            return ServiceStatus.NotRegistered;
+            return InfraServiceStatus.NotRegistered;
         }
 
         public ServiceHealth GetServiceHealth<T>() where T : class, IService
@@ -240,7 +240,7 @@ namespace VPetLLM.Infrastructure.Services
                 try
                 {
                     var startMethod = typeof(ServiceManager).GetMethod(nameof(StartServiceAsync))?.MakeGenericMethod(serviceType);
-                    if (startMethod != null)
+                    if (startMethod is not null)
                     {
                         var task = (Task)startMethod.Invoke(this, null);
                         await task;
@@ -272,7 +272,7 @@ namespace VPetLLM.Infrastructure.Services
                 try
                 {
                     var stopMethod = typeof(ServiceManager).GetMethod(nameof(StopServiceAsync))?.MakeGenericMethod(serviceType);
-                    if (stopMethod != null)
+                    if (stopMethod is not null)
                     {
                         var task = (Task)stopMethod.Invoke(this, null);
                         await task;
@@ -293,10 +293,10 @@ namespace VPetLLM.Infrastructure.Services
             var dependencies = GetServiceDependencies(serviceType);
             foreach (var dependency in dependencies)
             {
-                if (_serviceMetadata.TryGetValue(dependency, out var metadata) && metadata.Status != ServiceStatus.Running)
+                if (_serviceMetadata.TryGetValue(dependency, out var metadata) && metadata.Status != InfraServiceStatus.Running)
                 {
                     var startMethod = typeof(ServiceManager).GetMethod(nameof(StartServiceAsync))?.MakeGenericMethod(dependency);
-                    if (startMethod != null)
+                    if (startMethod is not null)
                     {
                         var task = (Task)startMethod.Invoke(this, null);
                         await task;
@@ -312,10 +312,10 @@ namespace VPetLLM.Infrastructure.Services
             var dependents = GetServiceDependents(serviceType);
             foreach (var dependent in dependents)
             {
-                if (_serviceMetadata.TryGetValue(dependent, out var metadata) && metadata.Status == ServiceStatus.Running)
+                if (_serviceMetadata.TryGetValue(dependent, out var metadata) && metadata.Status == InfraServiceStatus.Running)
                 {
                     var stopMethod = typeof(ServiceManager).GetMethod(nameof(StopServiceAsync))?.MakeGenericMethod(dependent);
-                    if (stopMethod != null)
+                    if (stopMethod is not null)
                     {
                         var task = (Task)stopMethod.Invoke(this, null);
                         await task;
@@ -410,7 +410,7 @@ namespace VPetLLM.Infrastructure.Services
                     var service = kvp.Value;
                     var metadata = _serviceMetadata[serviceType];
 
-                    if (metadata.Status == ServiceStatus.Running)
+                    if (metadata.Status == InfraServiceStatus.Running)
                     {
                         healthCheckTasks.Add(CheckServiceHealthAsync(serviceType, service, metadata));
                     }
@@ -455,7 +455,7 @@ namespace VPetLLM.Infrastructure.Services
                             try
                             {
                                 var restartMethod = typeof(ServiceManager).GetMethod(nameof(RestartServiceAsync))?.MakeGenericMethod(serviceType);
-                                if (restartMethod != null)
+                                if (restartMethod is not null)
                                 {
                                     var task = (Task)restartMethod.Invoke(this, null);
                                     await task;
@@ -493,8 +493,8 @@ namespace VPetLLM.Infrastructure.Services
             {
                 ServiceType = null, // 无法从事件参数获取Type信息
                 ServiceName = e.ServiceName,
-                OldStatus = e.OldStatus,
-                NewStatus = e.NewStatus,
+                OldStatus = (InfraServiceStatus)e.OldStatus,
+                NewStatus = (InfraServiceStatus)e.NewStatus,
                 Timestamp = DateTime.UtcNow
             });
         }
@@ -538,7 +538,7 @@ namespace VPetLLM.Infrastructure.Services
             ThrowIfDisposed();
 
             var service = GetService(serviceName);
-            if (service == null)
+            if (service is null)
             {
                 return new ServiceHealthStatus
                 {
@@ -574,7 +574,7 @@ namespace VPetLLM.Infrastructure.Services
         {
             ThrowIfDisposed();
 
-            if (service == null)
+            if (service is null)
                 throw new ArgumentNullException(nameof(service));
 
             var serviceType = typeof(T);
@@ -582,7 +582,7 @@ namespace VPetLLM.Infrastructure.Services
             _serviceMetadata[serviceType] = new ServiceMetadata
             {
                 ServiceType = serviceType,
-                Status = ServiceStatus.NotInitialized,
+                Status = InfraServiceStatus.NotInitialized,
                 Health = ServiceHealth.Unknown
             };
 
@@ -629,12 +629,12 @@ namespace VPetLLM.Infrastructure.Services
             return _services.Values.ToList();
         }
 
-        public ServiceStatus GetServiceStatus(string serviceName)
+        public InfraServiceStatus GetServiceStatus(string serviceName)
         {
             ThrowIfDisposed();
 
             var service = GetService(serviceName);
-            return service?.Status ?? ServiceStatus.NotInitialized;
+            return service?.Status ?? InfraServiceStatus.NotInitialized;
         }
 
         public async Task RestartServiceAsync(string serviceName, CancellationToken cancellationToken = default)
@@ -642,7 +642,7 @@ namespace VPetLLM.Infrastructure.Services
             ThrowIfDisposed();
 
             var service = GetService(serviceName);
-            if (service == null)
+            if (service is null)
             {
                 throw new InvalidOperationException($"Service {serviceName} not found");
             }
@@ -708,7 +708,7 @@ namespace VPetLLM.Infrastructure.Services
     internal class ServiceMetadata
     {
         public Type ServiceType { get; set; }
-        public ServiceStatus Status { get; set; }
+        public InfraServiceStatus Status { get; set; }
         public ServiceHealth Health { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? StartedAt { get; set; }

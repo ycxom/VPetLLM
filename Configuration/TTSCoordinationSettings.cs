@@ -1,5 +1,3 @@
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Configuration
 {
     /// <summary>
@@ -18,11 +16,11 @@ namespace VPetLLM.Configuration
         {
             get
             {
-                if (_instance == null)
+                if (_instance is null)
                 {
                     lock (_lockObject)
                     {
-                        if (_instance == null)
+                        if (_instance is null)
                         {
                             _instance = new TTSCoordinationSettings();
                             _instance.LoadDefaults();

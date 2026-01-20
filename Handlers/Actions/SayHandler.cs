@@ -1,8 +1,6 @@
 using System.Text.RegularExpressions;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Animation;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 using VPetLLM.Utils.UI;
 using static VPet_Simulator.Core.GraphInfo;
 
@@ -100,7 +98,7 @@ namespace VPetLLM.Handlers.Actions
                             try
                             {
                                 var displayPinchMethod = mainWindow.GetType().GetMethod("DisplayPinch");
-                                if (displayPinchMethod != null)
+                                if (displayPinchMethod is not null)
                                 {
                                     displayPinchMethod.Invoke(mainWindow, null);
                                     actionTriggered = true;
@@ -134,7 +132,7 @@ namespace VPetLLM.Handlers.Actions
                             try
                             {
                                 var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                                if (stateProperty != null)
+                                if (stateProperty is not null)
                                 {
                                     var workingStateType = stateProperty.PropertyType;
                                     var sideLeftValue = System.Enum.Parse(workingStateType, "SideLeft");
@@ -161,7 +159,7 @@ namespace VPetLLM.Handlers.Actions
                             try
                             {
                                 var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                                if (stateProperty != null)
+                                if (stateProperty is not null)
                                 {
                                     var workingStateType = stateProperty.PropertyType;
                                     var sideRightValue = System.Enum.Parse(workingStateType, "SideRight");
@@ -243,7 +241,7 @@ namespace VPetLLM.Handlers.Actions
                         var currentMode = mainWindow.Main.Core.Save.Mode;
                         var graph = mainWindow.Main.Core.Graph.FindGraph(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, currentMode);
 
-                        if (graph == null)
+                        if (graph is null)
                         {
                             Logger.Log($"Say animation '{animName}' not found in mode '{currentMode}'. Using default say animation.");
                             animName = "say";
@@ -294,14 +292,14 @@ namespace VPetLLM.Handlers.Actions
                 try
                 {
                     var plugin = VPetLLM.Instance;
-                    if (plugin != null)
+                    if (plugin is not null)
                     {
                         Logger.Log($"SayHandler: 显示气泡（仅气泡模式）- 文本: \"{text}\"");
-                        
+
                         // 无论是否有VPetTTS插件，都使用VPet原生Say API
                         // 这样可以确保气泡内容正确显示，同时让VPetTTS插件处理TTS协调
                         mainWindow.Main.Say(text, null, false);
-                        
+
                         Logger.Log($"SayHandler: 气泡显示完成（使用VPet原生API）");
                     }
                     else

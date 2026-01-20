@@ -1,6 +1,4 @@
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.IO;
 using VPetLLM.Infrastructure.Configuration.Configurations;
 using VPetLLM.Infrastructure.Logging;
 
@@ -26,7 +24,7 @@ namespace VPetLLM.Infrastructure.Configuration
             _migrationHandlers = new Dictionary<string, Func<JObject, IConfiguration>>
             {
                 { "LLM", MigrateLLMConfiguration },
-                { "TTS", MigrateTTSConfiguration },
+                { "TTS", MigrateInfraTTSConfiguration },
                 { "ASR", MigrateASRConfiguration },
                 { "Proxy", MigrateProxyConfiguration },
                 { "Application", MigrateApplicationConfiguration }
@@ -198,7 +196,7 @@ namespace VPetLLM.Infrastructure.Configuration
         {
             // 迁移Ollama设置
             var ollamaToken = legacyConfig["Ollama"];
-            if (ollamaToken != null)
+            if (ollamaToken is not null)
             {
                 config.Ollama.Url = GetStringValue(ollamaToken, "Url", "http://localhost:11434");
                 config.Ollama.Model = GetStringValue(ollamaToken, "Model", "");
@@ -211,7 +209,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移OpenAI设置 - 简化为单节点配置
             var openAIToken = legacyConfig["OpenAI"];
-            if (openAIToken != null)
+            if (openAIToken is not null)
             {
                 config.OpenAI.ApiKey = GetStringValue(openAIToken, "ApiKey", "");
                 config.OpenAI.Model = GetStringValue(openAIToken, "Model", "");
@@ -225,7 +223,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移Gemini设置 - 简化为单节点配置
             var geminiToken = legacyConfig["Gemini"];
-            if (geminiToken != null)
+            if (geminiToken is not null)
             {
                 config.Gemini.ApiKey = GetStringValue(geminiToken, "ApiKey", "");
                 config.Gemini.Model = GetStringValue(geminiToken, "Model", "gemini-pro");
@@ -239,7 +237,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移Free设置
             var freeToken = legacyConfig["Free"];
-            if (freeToken != null)
+            if (freeToken is not null)
             {
                 config.Free.Model = GetStringValue(freeToken, "Model", "");
                 config.Free.Temperature = GetDoubleValue(freeToken, "Temperature", 0.7);
@@ -253,12 +251,12 @@ namespace VPetLLM.Infrastructure.Configuration
         /// <summary>
         /// 迁移TTS配置
         /// </summary>
-        private IConfiguration MigrateTTSConfiguration(JObject legacyConfig)
+        private IConfiguration MigrateInfraTTSConfiguration(JObject legacyConfig)
         {
-            var config = new TTSConfiguration();
+            var config = new InfraTTSConfiguration();
             var ttsToken = legacyConfig["TTS"];
 
-            if (ttsToken != null)
+            if (ttsToken is not null)
             {
                 config.IsEnabled = GetBoolValue(ttsToken, "IsEnabled", false);
                 config.Provider = GetStringValue(ttsToken, "Provider", "URL");
@@ -279,11 +277,11 @@ namespace VPetLLM.Infrastructure.Configuration
         /// <summary>
         /// 迁移TTS提供商设置
         /// </summary>
-        private void MigrateTTSProviderSettings(JToken ttsToken, TTSConfiguration config)
+        private void MigrateTTSProviderSettings(JToken ttsToken, InfraTTSConfiguration config)
         {
             // 迁移URL TTS设置
             var urlToken = ttsToken["URL"];
-            if (urlToken != null)
+            if (urlToken is not null)
             {
                 config.URL.BaseUrl = GetStringValue(urlToken, "BaseUrl", "https://www.example.com");
                 config.URL.Voice = GetStringValue(urlToken, "Voice", "36");
@@ -292,7 +290,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移OpenAI TTS设置
             var openAIToken = ttsToken["OpenAI"];
-            if (openAIToken != null)
+            if (openAIToken is not null)
             {
                 config.OpenAI.ApiKey = GetStringValue(openAIToken, "ApiKey", "");
                 config.OpenAI.BaseUrl = GetStringValue(openAIToken, "BaseUrl", "https://api.fish.audio/v1");
@@ -303,7 +301,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移DIY TTS设置
             var diyToken = ttsToken["DIY"];
-            if (diyToken != null)
+            if (diyToken is not null)
             {
                 config.DIY.BaseUrl = GetStringValue(diyToken, "BaseUrl", "https://api.example.com/tts");
                 config.DIY.Method = GetStringValue(diyToken, "Method", "POST");
@@ -312,7 +310,7 @@ namespace VPetLLM.Infrastructure.Configuration
                 config.DIY.ResponseFormat = GetStringValue(diyToken, "ResponseFormat", "mp3");
 
                 var headersToken = diyToken["CustomHeaders"];
-                if (headersToken != null && headersToken.Type == JTokenType.Array)
+                if (headersToken is not null && headersToken.Type == JTokenType.Array)
                 {
                     config.DIY.CustomHeaders.Clear();
                     foreach (var headerToken in headersToken)
@@ -329,7 +327,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移GPT-SoVITS设置
             var gptSoVITSToken = ttsToken["GPTSoVITS"];
-            if (gptSoVITSToken != null)
+            if (gptSoVITSToken is not null)
             {
                 config.GPTSoVITS.BaseUrl = GetStringValue(gptSoVITSToken, "BaseUrl", "http://127.0.0.1:9880");
                 config.GPTSoVITS.ApiMode = GetEnumValue<GPTSoVITSApiMode>(gptSoVITSToken, "ApiMode", GPTSoVITSApiMode.WebUI);
@@ -355,7 +353,7 @@ namespace VPetLLM.Infrastructure.Configuration
             var config = new ASRConfiguration();
             var asrToken = legacyConfig["ASR"];
 
-            if (asrToken != null)
+            if (asrToken is not null)
             {
                 config.IsEnabled = GetBoolValue(asrToken, "IsEnabled", false);
                 config.Provider = GetStringValue(asrToken, "Provider", "OpenAI");
@@ -382,7 +380,7 @@ namespace VPetLLM.Infrastructure.Configuration
         {
             // 迁移OpenAI设置
             var openAIToken = asrToken["OpenAI"];
-            if (openAIToken != null)
+            if (openAIToken is not null)
             {
                 config.OpenAI.ApiKey = GetStringValue(openAIToken, "ApiKey", "");
                 config.OpenAI.BaseUrl = GetStringValue(openAIToken, "BaseUrl", "https://api.openai.com/v1");
@@ -391,7 +389,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移Soniox设置
             var sonioxToken = asrToken["Soniox"];
-            if (sonioxToken != null)
+            if (sonioxToken is not null)
             {
                 config.Soniox.ApiKey = GetStringValue(sonioxToken, "ApiKey", "");
                 config.Soniox.BaseUrl = GetStringValue(sonioxToken, "BaseUrl", "https://api.soniox.com");
@@ -409,7 +407,7 @@ namespace VPetLLM.Infrastructure.Configuration
             var config = new ProxyConfiguration();
             var proxyToken = legacyConfig["Proxy"];
 
-            if (proxyToken != null)
+            if (proxyToken is not null)
             {
                 config.IsEnabled = GetBoolValue(proxyToken, "IsEnabled", false);
                 config.FollowSystemProxy = GetBoolValue(proxyToken, "FollowSystemProxy", false);
@@ -462,7 +460,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移工具设置
             var toolsToken = legacyConfig["Tools"];
-            if (toolsToken != null && toolsToken.Type == JTokenType.Array)
+            if (toolsToken is not null && toolsToken.Type == JTokenType.Array)
             {
                 foreach (var toolToken in toolsToken)
                 {
@@ -479,7 +477,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移速率限制设置
             var rateLimiterToken = legacyConfig["RateLimiter"];
-            if (rateLimiterToken != null)
+            if (rateLimiterToken is not null)
             {
                 config.RateLimiter.EnableToolRateLimit = GetBoolValue(rateLimiterToken, "EnableToolRateLimit", true);
                 config.RateLimiter.ToolMaxCount = GetIntValue(rateLimiterToken, "ToolMaxCount", 5);
@@ -492,7 +490,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移记录设置
             var recordsToken = legacyConfig["Records"];
-            if (recordsToken != null)
+            if (recordsToken is not null)
             {
                 config.Records.EnableRecords = GetBoolValue(recordsToken, "EnableRecords", true);
                 config.Records.MaxRecordsInContext = GetIntValue(recordsToken, "MaxRecordsInContext", 20);
@@ -505,7 +503,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移媒体播放设置
             var mediaPlaybackToken = legacyConfig["MediaPlayback"];
-            if (mediaPlaybackToken != null)
+            if (mediaPlaybackToken is not null)
             {
                 config.MediaPlayback.DefaultVolume = GetIntValue(mediaPlaybackToken, "DefaultVolume", 100);
                 config.MediaPlayback.MonitorWindowVisibility = GetBoolValue(mediaPlaybackToken, "MonitorWindowVisibility", true);
@@ -515,7 +513,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
             // 迁移插件商店设置
             var pluginStoreToken = legacyConfig["PluginStore"];
-            if (pluginStoreToken != null)
+            if (pluginStoreToken is not null)
             {
                 config.PluginStore.UseProxy = GetBoolValue(pluginStoreToken, "UseProxy", true);
                 config.PluginStore.ProxyUrl = GetStringValue(pluginStoreToken, "ProxyUrl", "https://ghfast.top");

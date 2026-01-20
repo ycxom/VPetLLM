@@ -1,14 +1,4 @@
-using System.Text;
 using System.Text.RegularExpressions;
-using VPetLLM.Configuration;
-using VPetLLM.Core;
-using VPetLLM.Handlers.Actions;
-using VPetLLM.Handlers.TTS;
-using VPetLLM.Handlers.UI;
-using VPetLLM.Models;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
-using VPetLLM.Utils.UI;
 
 namespace VPetLLM.Handlers.Core
 {
@@ -76,7 +66,7 @@ namespace VPetLLM.Handlers.Core
                 if (_plugin.IsVPetTTSPluginDetected)
                 {
                     var vpetTTSPlugin = GetVPetTTSPlugin();
-                    if (vpetTTSPlugin != null)
+                    if (vpetTTSPlugin is not null)
                     {
                         _stateMonitor = new VPetTTSStateMonitor(vpetTTSPlugin);
                         Logger.Log("SmartMessageProcessor: VPetTTS状态监控器已初始化");
@@ -162,7 +152,7 @@ namespace VPetLLM.Handlers.Core
                         try
                         {
                             var msgBar = _plugin.MW.Main.MsgBar;
-                            if (msgBar != null && !MessageBarHelper.IsInitialized)
+                            if (msgBar is not null && !MessageBarHelper.IsInitialized)
                             {
                                 MessageBarHelper.PreInitialize(msgBar);
                             }
@@ -205,7 +195,7 @@ namespace VPetLLM.Handlers.Core
                 {
                     foreach (var segment in messageSegments)
                     {
-                        if (segment.Type == SegmentType.Talk && downloadTasks != null)
+                        if (segment.Type == SegmentType.Talk && downloadTasks is not null)
                         {
                             await ProcessTalkSegmentWithQueueAsync(segment, downloadTasks, talkIndex++).ConfigureAwait(false);
                         }
@@ -490,7 +480,7 @@ namespace VPetLLM.Handlers.Core
         private async Task<string> WaitForTTSDownloadAsync(List<TTSDownloadTask> downloadTasks, int targetIndex)
         {
             var targetTask = downloadTasks.FirstOrDefault(t => t.Index == targetIndex);
-            if (targetTask == null)
+            if (targetTask is null)
             {
                 Logger.Log($"SmartMessageProcessor: 未找到索引 {targetIndex} 的下载任务");
                 return null;
@@ -505,7 +495,7 @@ namespace VPetLLM.Handlers.Core
             try
             {
                 // 如果任务尚未启动，现在启动它
-                if (targetTask.DownloadTask == null)
+                if (targetTask.DownloadTask is null)
                 {
                     Logger.Log($"SmartMessageProcessor: 按需启动任务 #{targetIndex} 下载...");
                     targetTask.DownloadTask = _plugin.TTSService.DownloadTTSAudioAsync(targetTask.Text);
@@ -542,7 +532,7 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private void StartNextTTSDownload(List<TTSDownloadTask> downloadTasks, int currentIndex)
         {
-            if (downloadTasks == null || !_plugin.Settings.TTS.UseQueueDownload)
+            if (downloadTasks is null || !_plugin.Settings.TTS.UseQueueDownload)
             {
                 return; // 非队列模式下，所有任务已经在并行下载
             }
@@ -551,7 +541,7 @@ namespace VPetLLM.Handlers.Core
             if (nextIndex < downloadTasks.Count)
             {
                 var nextTask = downloadTasks[nextIndex];
-                if (nextTask.DownloadTask == null && !nextTask.IsCompleted)
+                if (nextTask.DownloadTask is null && !nextTask.IsCompleted)
                 {
                     Logger.Log($"SmartMessageProcessor: 预下载优化 - 启动下一个任务 #{nextIndex} 下载...");
                     nextTask.DownloadTask = _plugin.TTSService.DownloadTTSAudioAsync(nextTask.Text);
@@ -603,7 +593,7 @@ namespace VPetLLM.Handlers.Core
                             {
                                 // TTS 全部关闭：等待气泡打印完成
                                 var msgBar = _plugin.MW?.Main?.MsgBar;
-                                if (msgBar != null)
+                                if (msgBar is not null)
                                 {
                                     int maxWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(talkText);
                                     Logger.Log($"SmartMessageProcessor: TTS关闭，等待气泡打印完成，预估时间: {maxWaitMs}ms");
@@ -627,7 +617,7 @@ namespace VPetLLM.Handlers.Core
                         audioFile = predownloadedAudio;
                         ttsSucceeded = true;
                     }
-                    else if (downloadTasks != null)
+                    else if (downloadTasks is not null)
                     {
                         // 没有预下载音频，等待当前索引的音频下载完成
                         Logger.Log($"SmartMessageProcessor: 等待音频 #{talkIndex} 下载完成...");
@@ -645,7 +635,7 @@ namespace VPetLLM.Handlers.Core
                         Logger.Log($"SmartMessageProcessor: 音频 #{talkIndex} 准备就绪，开始播放: {audioFile}");
 
                         // 优先使用BubbleFacade的TTS同步功能
-                        if (BubbleFacade != null)
+                        if (BubbleFacade is not null)
                         {
                             Logger.Log("SmartMessageProcessor: 使用BubbleFacade TTS同步功能");
 
@@ -691,7 +681,7 @@ namespace VPetLLM.Handlers.Core
                         {
                             // TTS 全部关闭：等待气泡打印完成
                             var msgBar = _plugin.MW?.Main?.MsgBar;
-                            if (msgBar != null)
+                            if (msgBar is not null)
                             {
                                 int maxWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(talkText);
                                 Logger.Log($"SmartMessageProcessor: TTS关闭，等待气泡打印完成，预估时间: {maxWaitMs}ms");
@@ -739,7 +729,7 @@ namespace VPetLLM.Handlers.Core
                 Logger.Log("SmartMessageProcessor: 开始等待外置TTS播放完成...");
 
                 // 优先使用状态监控器（完全依赖进度检测，不传入超时参数）
-                if (_stateMonitor != null && TTSCoordinationSettings.Instance.EnableStateMonitor)
+                if (_stateMonitor is not null && TTSCoordinationSettings.Instance.EnableStateMonitor)
                 {
                     Logger.Log("SmartMessageProcessor: 使用VPetTTS状态监控器等待播放完成（基于进度检测）");
                     // 不传入超时参数，使用默认的5分钟最大超时作为安全保护
@@ -811,7 +801,7 @@ namespace VPetLLM.Handlers.Core
                 }
 
                 // 检查 VPet 主程序是否正在播放语音
-                if (_plugin.MW?.Main == null)
+                if (_plugin.MW?.Main is null)
                 {
                     Logger.Log("SmartMessageProcessor: MW.Main 为 null，无法检查语音状态");
                     return;
@@ -869,7 +859,7 @@ namespace VPetLLM.Handlers.Core
 
                     // 尝试获取VPetTTS插件的状态接口
                     var vpetTTSPlugin = GetVPetTTSPlugin();
-                    if (vpetTTSPlugin != null)
+                    if (vpetTTSPlugin is not null)
                     {
                         int ttsWaitTime = 0;
                         int ttsMaxWait = 15000; // VPetTTS专用等待时间：最多15秒
@@ -947,13 +937,13 @@ namespace VPetLLM.Handlers.Core
             {
                 // 通过反射访问VPetTTS的TTSState.IsPlaying属性
                 var ttsStateProperty = vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (ttsStateProperty != null)
+                if (ttsStateProperty is not null)
                 {
                     var ttsState = ttsStateProperty.GetValue(vpetTTSPlugin);
-                    if (ttsState != null)
+                    if (ttsState is not null)
                     {
                         var isPlayingProperty = ttsState.GetType().GetProperty("IsPlaying");
-                        if (isPlayingProperty != null)
+                        if (isPlayingProperty is not null)
                         {
                             var isPlaying = (bool)isPlayingProperty.GetValue(ttsState);
                             return isPlaying;
@@ -1014,7 +1004,7 @@ namespace VPetLLM.Handlers.Core
                 // 如果启用了TTS，先播放语音，然后显示气泡
                 if (_plugin.Settings.TTS.IsEnabled)
                 {
-                    if (BubbleFacade != null)
+                    if (BubbleFacade is not null)
                     {
                         // 使用BubbleFacade的TTS同步功能
                         Logger.Log("SmartMessageProcessor: 使用BubbleFacade处理文本片段TTS");
@@ -1090,7 +1080,7 @@ namespace VPetLLM.Handlers.Core
                         // 首先检查是否有流式处理预下载的音频
                         var predownloadedAudio = StreamingCommandProcessor.GetAndRemovePredownloadedAudio(segment.Content);
 
-                        if (BubbleFacade != null)
+                        if (BubbleFacade is not null)
                         {
                             // 使用BubbleFacade的TTS同步功能
                             Logger.Log("SmartMessageProcessor: 使用BubbleFacade TTS同步功能");
@@ -1174,7 +1164,7 @@ namespace VPetLLM.Handlers.Core
                     {
                         // TTS 全部关闭：等待气泡打印完成（新增逻辑）
                         var msgBar = _plugin.MW?.Main?.MsgBar;
-                        if (msgBar != null)
+                        if (msgBar is not null)
                         {
                             int maxWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(talkText);
                             Logger.Log($"SmartMessageProcessor: TTS关闭，等待气泡打印完成，预估时间: {maxWaitMs}ms");
@@ -1233,7 +1223,7 @@ namespace VPetLLM.Handlers.Core
 
             try
             {
-                if (BubbleFacade != null)
+                if (BubbleFacade is not null)
                 {
                     // 使用BubbleFacade的TTS同步功能
                     Logger.Log("SmartMessageProcessor: 使用BubbleFacade TTS同步功能");
@@ -1250,7 +1240,7 @@ namespace VPetLLM.Handlers.Core
                 {
                     // 回退到原有逻辑
                     // 优先请求TTS音频
-                    if (_plugin.TTSService != null)
+                    if (_plugin.TTSService is not null)
                     {
                         Logger.Log($"SmartMessageProcessor: 请求TTS音频...");
                         await _plugin.TTSService.PlayTextAsync(text);

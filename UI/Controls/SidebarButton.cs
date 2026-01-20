@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Controls
 {
@@ -116,7 +115,7 @@ namespace VPetLLM.UI.Controls
         {
             try
             {
-                if (Action != null && IsEnabled)
+                if (Action is not null && IsEnabled)
                 {
                     Action.Invoke(vpetLLM);
                     Logger.Log($"Executed action for button: {ButtonId}");
@@ -156,7 +155,7 @@ namespace VPetLLM.UI.Controls
             try
             {
                 // 检查设置窗口是否已经打开
-                if (vpetLLM.SettingWindow != null && vpetLLM.SettingWindow.IsVisible)
+                if (vpetLLM.SettingWindow is not null && vpetLLM.SettingWindow.IsVisible)
                 {
                     // 将现有窗口置于前台
                     vpetLLM.SettingWindow.Activate();

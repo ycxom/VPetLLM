@@ -1,6 +1,5 @@
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Animation
 {
@@ -69,7 +68,7 @@ namespace VPetLLM.Handlers.Animation
                 return false;
             }
 
-            if (request == null)
+            if (request is null)
             {
                 Logger.Log("AnimationCoordinator: Null request received");
                 return false;
@@ -155,7 +154,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         private void StartProcessing()
         {
-            if (_processingTask != null && !_processingTask.IsCompleted)
+            if (_processingTask is not null && !_processingTask.IsCompleted)
             {
                 return;
             }
@@ -207,7 +206,7 @@ namespace VPetLLM.Handlers.Animation
 
                     // 出队并处理
                     var request = _queue.Dequeue();
-                    if (request != null)
+                    if (request is not null)
                     {
                         _isProcessing = true;
                         await ProcessRequestAsync(request);
@@ -297,7 +296,7 @@ namespace VPetLLM.Handlers.Animation
 
             // 尝试获取动画并检查就绪状态
             var graph = _mainWindow?.Main?.Core?.Graph;
-            if (graph == null) return false;
+            if (graph is null) return false;
 
             var mode = _mainWindow.Main.Core.Save.Mode;
             IGraph targetGraph = null;
@@ -312,7 +311,7 @@ namespace VPetLLM.Handlers.Animation
                 targetGraph = graph.FindGraph(name, request.AnimatType, mode);
             }
 
-            if (targetGraph == null)
+            if (targetGraph is null)
             {
                 Logger.Log($"AnimationCoordinator: Target animation not found");
                 return false;

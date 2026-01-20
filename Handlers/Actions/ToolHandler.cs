@@ -1,7 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Core;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Actions
 {
@@ -30,7 +27,7 @@ namespace VPetLLM.Handlers.Actions
                 {
                     var stats = RateLimiter.GetStats("tool");
                     VPetLLM.Instance.Log($"ToolHandler: 触发熔断 - 工具调用超限（跨消息）");
-                    if (VPetLLM.Instance?.Settings?.RateLimiter?.LogRateLimitEvents == true && stats != null)
+                    if (VPetLLM.Instance?.Settings?.RateLimiter?.LogRateLimitEvents == true && stats is not null)
                     {
                         VPetLLM.Instance.Log($"  当前: {stats.CurrentCount}/{config?.MaxCount}, 已阻止: {stats.BlockedRequests}次");
                     }
@@ -48,7 +45,7 @@ namespace VPetLLM.Handlers.Actions
                 var arguments = value.Substring(firstParen + 1, lastParen - firstParen - 1);
                 VPetLLM.Instance.Log($"ToolHandler: Parsed tool name: {toolName}, arguments: {arguments}");
                 var tool = VPetLLM.Instance.Plugins.Find(p => p.Name.Replace(" ", "_").ToLower() == toolName.ToLower());
-                if (tool != null)
+                if (tool is not null)
                 {
                     if (!tool.Enabled)
                     {

@@ -1,9 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
-using VPetLLM.Core;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {

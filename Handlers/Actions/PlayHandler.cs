@@ -1,8 +1,5 @@
 using System.Text.RegularExpressions;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Services;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Actions
 {
@@ -53,7 +50,7 @@ namespace VPetLLM.Handlers.Actions
             }
 
             // 获取默认音量
-            if (volume == null)
+            if (volume is null)
             {
                 volume = VPetLLM.Instance?.Settings?.MediaPlayback?.DefaultVolume ?? 100;
             }

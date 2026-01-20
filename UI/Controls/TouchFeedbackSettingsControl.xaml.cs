@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Controls
 {
@@ -37,7 +36,7 @@ namespace VPetLLM.UI.Controls
 
             // 更新说明文本
             var descriptionTextBlock = this.FindName("DescriptionTextBlock") as TextBlock;
-            if (descriptionTextBlock != null)
+            if (descriptionTextBlock is not null)
             {
                 descriptionTextBlock.Text = LanguageHelper.Get("TouchFeedback.EnableDescription", langCode,
                     "启用后，触摸VPet的头部或身体时会触发智能反馈");
@@ -45,14 +44,14 @@ namespace VPetLLM.UI.Controls
 
             // 更新冷却时间标签
             var cooldownLabel = this.FindName("CooldownLabel") as TextBlock;
-            if (cooldownLabel != null)
+            if (cooldownLabel is not null)
             {
                 cooldownLabel.Text = LanguageHelper.Get("TouchFeedback.TouchCooldown", langCode, "触摸冷却时间");
             }
 
             // 更新说明文本
             var cooldownDescription = this.FindName("CooldownDescription") as TextBlock;
-            if (cooldownDescription != null)
+            if (cooldownDescription is not null)
             {
                 cooldownDescription.Text = LanguageHelper.Get("TouchFeedback.CooldownDescription", langCode,
                     "冷却时间可防止过于频繁的交互，建议设置在1-3秒之间。");
@@ -85,7 +84,7 @@ namespace VPetLLM.UI.Controls
         /// </summary>
         private void UpdateDetailSettingsVisibility(bool isEnabled)
         {
-            if (DetailSettingsPanel != null)
+            if (DetailSettingsPanel is not null)
             {
                 DetailSettingsPanel.IsEnabled = isEnabled;
                 DetailSettingsPanel.Opacity = isEnabled ? 1.0 : 0.5;
@@ -94,7 +93,7 @@ namespace VPetLLM.UI.Controls
 
         private void TouchCooldownSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (TouchCooldownValueText != null)
+            if (TouchCooldownValueText is not null)
             {
                 var value = (int)e.NewValue;
                 _plugin.Settings.TouchFeedback.TouchCooldown = value;

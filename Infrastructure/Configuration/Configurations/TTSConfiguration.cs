@@ -1,5 +1,3 @@
-using VPetLLM.Configuration;
-
 namespace VPetLLM.Infrastructure.Configuration.Configurations
 {
     /// <summary>
@@ -93,7 +91,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
             {
                 case "URL":
                     var urlValidation = URL?.Validate();
-                    if (urlValidation != null && !urlValidation.IsValid)
+                    if (urlValidation is not null && !urlValidation.IsValid)
                     {
                         result.Errors.AddRange(urlValidation.Errors.Select(e => $"URL TTS: {e}"));
                         result.IsValid = false;
@@ -102,7 +100,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
 
                 case "OpenAI":
                     var openaiValidation = OpenAI?.Validate();
-                    if (openaiValidation != null && !openaiValidation.IsValid)
+                    if (openaiValidation is not null && !openaiValidation.IsValid)
                     {
                         result.Errors.AddRange(openaiValidation.Errors.Select(e => $"OpenAI TTS: {e}"));
                         result.IsValid = false;
@@ -111,7 +109,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
 
                 case "DIY":
                     var diyValidation = DIY?.Validate();
-                    if (diyValidation != null && !diyValidation.IsValid)
+                    if (diyValidation is not null && !diyValidation.IsValid)
                     {
                         result.Errors.AddRange(diyValidation.Errors.Select(e => $"DIY TTS: {e}"));
                         result.IsValid = false;
@@ -120,7 +118,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
 
                 case "GPTSoVITS":
                     var gptSovitsValidation = GPTSoVITS?.Validate();
-                    if (gptSovitsValidation != null && !gptSovitsValidation.IsValid)
+                    if (gptSovitsValidation is not null && !gptSovitsValidation.IsValid)
                     {
                         result.Errors.AddRange(gptSovitsValidation.Errors.Select(e => $"GPT-SoVITS: {e}"));
                         result.IsValid = false;

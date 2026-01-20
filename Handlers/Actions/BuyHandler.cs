@@ -1,6 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Actions
 {
@@ -26,7 +24,7 @@ namespace VPetLLM.Handlers.Actions
         /// </summary>
         private FoodSearchService GetFoodSearchService(IMainWindow mainWindow)
         {
-            if (_foodSearchService == null)
+            if (_foodSearchService is null)
             {
                 _foodSearchService = new FoodSearchService(mainWindow);
             }
@@ -50,7 +48,7 @@ namespace VPetLLM.Handlers.Actions
                 var searchService = GetFoodSearchService(mainWindow);
                 var food = searchService.SearchFood(itemName);
 
-                if (food == null)
+                if (food is null)
                 {
                     Logger.Log($"BuyHandler: 物品未找到: {itemName}");
                     return;
@@ -114,7 +112,7 @@ namespace VPetLLM.Handlers.Actions
                 var searchService = GetFoodSearchService(mainWindow);
                 var food = searchService.SearchFood(itemName);
 
-                if (food == null)
+                if (food is null)
                 {
                     Logger.Log($"BuyHandler: 朋友赠送物品未找到: {itemName}");
                     return;
@@ -150,7 +148,7 @@ namespace VPetLLM.Handlers.Actions
                 var searchService = GetFoodSearchService(mainWindow);
                 var food = searchService.SearchFood(itemName);
 
-                if (food == null)
+                if (food is null)
                 {
                     Logger.Log($"BuyHandler: 朋友代购物品未找到: {itemName}");
                     return;

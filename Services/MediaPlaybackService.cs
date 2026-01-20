@@ -1,7 +1,5 @@
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -43,7 +41,7 @@ namespace VPetLLM.Services
             {
                 lock (_lock)
                 {
-                    return _mpvProcess != null && !_mpvProcess.HasExited;
+                    return _mpvProcess is not null && !_mpvProcess.HasExited;
                 }
             }
         }
@@ -150,7 +148,7 @@ namespace VPetLLM.Services
 
                 lock (_lock)
                 {
-                    if (_mpvProcess != null)
+                    if (_mpvProcess is not null)
                     {
                         if (!_mpvProcess.HasExited)
                         {
@@ -210,7 +208,7 @@ namespace VPetLLM.Services
 
         private void StopWindowMonitor()
         {
-            if (_monitorCts != null)
+            if (_monitorCts is not null)
             {
                 _monitorCts.Cancel();
                 _monitorCts.Dispose();
@@ -233,7 +231,7 @@ namespace VPetLLM.Services
                         process = _mpvProcess;
                     }
 
-                    if (process == null || process.HasExited)
+                    if (process is null || process.HasExited)
                         break;
 
                     var mainWindowHandle = process.MainWindowHandle;

@@ -1,5 +1,3 @@
-using VPetLLM.Configuration;
-
 namespace VPetLLM.Infrastructure.Configuration.Configurations
 {
     /// <summary>
@@ -180,28 +178,28 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
 
             // 验证子配置
             var rateLimiterValidation = RateLimiter?.Validate();
-            if (rateLimiterValidation != null && !rateLimiterValidation.IsValid)
+            if (rateLimiterValidation is not null && !rateLimiterValidation.IsValid)
             {
                 result.Errors.AddRange(rateLimiterValidation.Errors);
                 result.IsValid = false;
             }
 
             var recordsValidation = Records?.Validate();
-            if (recordsValidation != null && !recordsValidation.IsValid)
+            if (recordsValidation is not null && !recordsValidation.IsValid)
             {
                 result.Errors.AddRange(recordsValidation.Errors);
                 result.IsValid = false;
             }
 
             var mediaPlaybackValidation = MediaPlayback?.Validate();
-            if (mediaPlaybackValidation != null && !mediaPlaybackValidation.IsValid)
+            if (mediaPlaybackValidation is not null && !mediaPlaybackValidation.IsValid)
             {
                 result.Errors.AddRange(mediaPlaybackValidation.Errors);
                 result.IsValid = false;
             }
 
             var pluginStoreValidation = PluginStore?.Validate();
-            if (pluginStoreValidation != null && !pluginStoreValidation.IsValid)
+            if (pluginStoreValidation is not null && !pluginStoreValidation.IsValid)
             {
                 result.Errors.AddRange(pluginStoreValidation.Errors);
                 result.IsValid = false;

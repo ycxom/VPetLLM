@@ -1,5 +1,3 @@
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Handlers.Infrastructure
 {
     /// <summary>
@@ -26,7 +24,7 @@ namespace VPetLLM.Handlers.Infrastructure
         {
             if (batchWindowMs <= 0)
                 throw new ArgumentException("批处理窗口时间必须大于0", nameof(batchWindowMs));
-            if (onBatchReady == null)
+            if (onBatchReady is null)
                 throw new ArgumentNullException(nameof(onBatchReady));
 
             _batchWindowMs = batchWindowMs;
@@ -105,7 +103,7 @@ namespace VPetLLM.Handlers.Infrastructure
             }
 
             // 在锁外执行回调，避免死锁
-            if (commandsToProcess != null && commandsToProcess.Count > 0)
+            if (commandsToProcess is not null && commandsToProcess.Count > 0)
             {
                 try
                 {

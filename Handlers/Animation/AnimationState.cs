@@ -48,7 +48,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public bool IsInTransition()
         {
-            if (CurrentDisplay == null) return false;
+            if (CurrentDisplay is null) return false;
 
             var type = CurrentDisplay.Type;
             return type == GraphInfo.GraphType.Switch_Up ||
@@ -62,7 +62,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public bool IsInTouchAnimation()
         {
-            if (CurrentDisplay == null) return false;
+            if (CurrentDisplay is null) return false;
 
             var type = CurrentDisplay.Type;
             return type == GraphInfo.GraphType.Touch_Head ||
@@ -100,7 +100,7 @@ namespace VPetLLM.Handlers.Animation
 
         public override string ToString()
         {
-            var displayInfo = CurrentDisplay != null
+            var displayInfo = CurrentDisplay is not null
                 ? $"{CurrentDisplay.Type} ({CurrentDisplay.Animat})"
                 : "None";
             return $"State: {WorkingState}, Display: {displayInfo}, Animating: {IsAnimating}, UserInteracting: {IsUserInteracting}";

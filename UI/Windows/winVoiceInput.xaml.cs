@@ -4,14 +4,13 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using VPetLLM.Utils.Audio;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
     public partial class winVoiceInput : Window
     {
         private readonly VPetLLM _plugin;
-        private readonly ASRService _asrService;
+        private readonly UtilsASRService _asrService;
         private bool _isRecording;
         private CancellationTokenSource? _cancellationTokenSource;
         private bool _isQuickDisplayMode;
@@ -28,7 +27,7 @@ namespace VPetLLM.UI.Windows
         {
             InitializeComponent();
             _plugin = plugin;
-            _asrService = new ASRService(_plugin.Settings);
+            _asrService = new UtilsASRService(_plugin.Settings);
             _isQuickDisplayMode = quickDisplayMode;
             _cancellationTokenSource = new CancellationTokenSource();
 

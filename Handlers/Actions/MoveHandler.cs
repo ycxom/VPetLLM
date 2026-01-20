@@ -1,7 +1,5 @@
 using System.Windows;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Actions
@@ -55,7 +53,7 @@ namespace VPetLLM.Handlers.Actions
                         var isPrimaryScreenProp = controllerType.GetProperty("IsPrimaryScreen");
                         var screenBorderProp = controllerType.GetProperty("ScreenBorder");
 
-                        if (isPrimaryScreenProp != null && screenBorderProp != null)
+                        if (isPrimaryScreenProp is not null && screenBorderProp is not null)
                         {
                             bool isPrimaryScreen = (bool)isPrimaryScreenProp.GetValue(mainWindow.Core.Controller);
 
@@ -126,7 +124,7 @@ namespace VPetLLM.Handlers.Actions
                         var displayToMoveMethod = mainType.GetMethod("DisplayToMove",
                             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
-                        if (displayToMoveMethod != null)
+                        if (displayToMoveMethod is not null)
                         {
                             displayToMoveMethod.Invoke(mainWindow.Main, null);
                         }
@@ -153,7 +151,7 @@ namespace VPetLLM.Handlers.Actions
                     var isPrimaryScreenProp = controllerType.GetProperty("IsPrimaryScreen");
                     var screenBorderProp = controllerType.GetProperty("ScreenBorder");
 
-                    if (isPrimaryScreenProp != null && screenBorderProp != null)
+                    if (isPrimaryScreenProp is not null && screenBorderProp is not null)
                     {
                         bool isPrimaryScreen = (bool)isPrimaryScreenProp.GetValue(mainWindow.Core.Controller);
 

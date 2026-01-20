@@ -1,6 +1,3 @@
-using VPetLLM.Configuration;
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Handlers.TTS
 {
     /// <summary>
@@ -57,13 +54,13 @@ namespace VPetLLM.Handlers.TTS
                 {
                     // 直接从VPetTTS获取最新状态，不使用缓存
                     var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                    if (ttsStateProperty != null)
+                    if (ttsStateProperty is not null)
                     {
                         var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
-                        if (ttsState != null)
+                        if (ttsState is not null)
                         {
                             var isPlayingProperty = ttsState.GetType().GetProperty("IsPlaying");
-                            if (isPlayingProperty != null)
+                            if (isPlayingProperty is not null)
                             {
                                 return (bool)isPlayingProperty.GetValue(ttsState);
                             }
@@ -177,14 +174,14 @@ namespace VPetLLM.Handlers.TTS
             try
             {
                 var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (ttsStateProperty == null) return null;
+                if (ttsStateProperty is null) return null;
 
                 var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
-                if (ttsState == null) return null;
+                if (ttsState is null) return null;
 
                 // 获取PlaybackCompleted事件
                 var playbackCompletedEvent = ttsState.GetType().GetEvent("PlaybackCompleted");
-                if (playbackCompletedEvent == null) return null;
+                if (playbackCompletedEvent is null) return null;
 
                 Logger.Log($"VPetTTSStateMonitor: 使用事件驱动方式，订阅PlaybackCompleted事件");
 
@@ -317,13 +314,13 @@ namespace VPetLLM.Handlers.TTS
             try
             {
                 var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (ttsStateProperty != null)
+                if (ttsStateProperty is not null)
                 {
                     var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
-                    if (ttsState != null)
+                    if (ttsState is not null)
                     {
                         var isPlaybackCompleteProperty = ttsState.GetType().GetProperty("IsPlaybackComplete");
-                        if (isPlaybackCompleteProperty != null)
+                        if (isPlaybackCompleteProperty is not null)
                         {
                             return (bool)isPlaybackCompleteProperty.GetValue(ttsState);
                         }
@@ -349,13 +346,13 @@ namespace VPetLLM.Handlers.TTS
             try
             {
                 var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (ttsStateProperty != null)
+                if (ttsStateProperty is not null)
                 {
                     var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
-                    if (ttsState != null)
+                    if (ttsState is not null)
                     {
                         var lastHeartbeatProperty = ttsState.GetType().GetProperty("LastHeartbeatTime");
-                        if (lastHeartbeatProperty != null)
+                        if (lastHeartbeatProperty is not null)
                         {
                             return (DateTime)lastHeartbeatProperty.GetValue(ttsState);
                         }
@@ -379,10 +376,10 @@ namespace VPetLLM.Handlers.TTS
             try
             {
                 var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (ttsStateProperty != null)
+                if (ttsStateProperty is not null)
                 {
                     var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
-                    if (ttsState != null)
+                    if (ttsState is not null)
                     {
                         var info = new PlaybackProgressInfo();
 
@@ -393,7 +390,7 @@ namespace VPetLLM.Handlers.TTS
                         foreach (var propName in props)
                         {
                             var prop = ttsState.GetType().GetProperty(propName);
-                            if (prop != null)
+                            if (prop is not null)
                             {
                                 var value = prop.GetValue(ttsState);
                                 switch (propName)
@@ -501,7 +498,7 @@ namespace VPetLLM.Handlers.TTS
                 DateTime? playStartTime = null;
                 foreach (var record in _stateHistory)
                 {
-                    if (record.IsPlaying && playStartTime == null)
+                    if (record.IsPlaying && playStartTime is null)
                     {
                         playStartTime = record.Timestamp;
                         stats.PlaybackCount++;

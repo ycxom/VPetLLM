@@ -14,7 +14,7 @@ namespace VPetLLM.Models
         /// <summary>
         /// TTS 设置
         /// </summary>
-        public TTSSettings Settings { get; set; }
+        public TTSRequestSettings Settings { get; set; }
 
         /// <summary>
         /// 请求唯一标识符
@@ -56,10 +56,10 @@ namespace VPetLLM.Models
             AdditionalParameters = new Dictionary<string, object>();
         }
 
-        public TTSRequest(string text, TTSSettings settings = null) : this()
+        public TTSRequest(string text, TTSRequestSettings settings = null) : this()
         {
             Text = text;
-            Settings = settings ?? new TTSSettings();
+            Settings = settings ?? new TTSRequestSettings();
         }
 
         /// <summary>
@@ -85,13 +85,13 @@ namespace VPetLLM.Models
                 result.AddError("Timeout must be positive");
             }
 
-            if (Settings != null)
+            if (Settings is not null)
             {
                 var settingsValidation = Settings.Validate();
                 if (!settingsValidation.IsValid)
                 {
                     result.Errors.AddRange(settingsValidation.Errors);
-                    if (settingsValidation.Warnings != null)
+                    if (settingsValidation.Warnings is not null)
                     {
                         var warningsList = result.Warnings?.ToList() ?? new List<string>();
                         warningsList.AddRange(settingsValidation.Warnings);
@@ -150,9 +150,9 @@ namespace VPetLLM.Models
     }
 
     /// <summary>
-    /// TTS 设置
+    /// TTS 请求设置
     /// </summary>
-    public class TTSSettings
+    public class TTSRequestSettings
     {
         /// <summary>
         /// 语音标识符
@@ -229,9 +229,9 @@ namespace VPetLLM.Models
         /// 创建设置的副本
         /// </summary>
         /// <returns>设置副本</returns>
-        public TTSSettings Clone()
+        public TTSRequestSettings Clone()
         {
-            return new TTSSettings
+            return new TTSRequestSettings
             {
                 Voice = Voice,
                 Speed = Speed,

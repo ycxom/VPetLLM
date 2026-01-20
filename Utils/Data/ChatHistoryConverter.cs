@@ -1,7 +1,4 @@
-using Newtonsoft.Json;
-using System.IO;
 using System.Reflection;
-using VPetLLM.Core;
 using VPetLLMUtils = VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Data
@@ -100,11 +97,11 @@ namespace VPetLLM.Utils.Data
             try
             {
                 var oldFormat = JsonConvert.DeserializeObject<Dictionary<string, List<Message>>>(json);
-                if (oldFormat != null)
+                if (oldFormat is not null)
                 {
                     foreach (var providerMessages in oldFormat.Values)
                     {
-                        if (providerMessages != null)
+                        if (providerMessages is not null)
                         {
                             messages.AddRange(providerMessages);
                         }
@@ -122,7 +119,7 @@ namespace VPetLLM.Utils.Data
             try
             {
                 var newFormat = JsonConvert.DeserializeObject<List<Message>>(json);
-                if (newFormat != null)
+                if (newFormat is not null)
                 {
                     messages.AddRange(newFormat);
                     VPetLLMUtils.Logger.Log($"从 {fileName} 读取了 {messages.Count} 条消息（新列表格式）");
@@ -213,7 +210,7 @@ namespace VPetLLM.Utils.Data
 
             // 向上查找包含data文件夹的Mod目录
             var directory = new DirectoryInfo(currentDirectory);
-            while (directory != null)
+            while (directory is not null)
             {
                 var dataPath = Path.Combine(directory.FullName, "data");
                 if (Directory.Exists(dataPath))

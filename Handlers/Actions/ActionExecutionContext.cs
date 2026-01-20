@@ -120,7 +120,7 @@ namespace VPetLLM.Handlers.Actions
                         $"Success={Success}";
 
             // Add state information if available
-            if (PreviousState != null || TargetState != null || ActualState != null)
+            if (PreviousState is not null || TargetState is not null || ActualState is not null)
             {
                 result += $", PreviousState={PreviousState ?? "null"}, " +
                          $"TargetState={TargetState ?? "null"}, " +
@@ -159,7 +159,7 @@ namespace VPetLLM.Handlers.Actions
             if (Category != ActionCategory.StateBased)
                 return true; // Non-state-based actions don't have state transitions
 
-            if (TargetState == null || ActualState == null)
+            if (TargetState is null || ActualState is null)
                 return false; // Can't verify without both states
 
             return TargetState.ToString() == ActualState.ToString();

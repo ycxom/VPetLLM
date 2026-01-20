@@ -33,7 +33,7 @@ namespace VPetLLM.Infrastructure.Services
         /// <summary>
         /// 获取服务状态（泛型）
         /// </summary>
-        ServiceStatus GetServiceStatus<T>() where T : class, IService;
+        InfraServiceStatus GetServiceStatus<T>() where T : class, IService;
 
         /// <summary>
         /// 获取服务健康状态（泛型）
@@ -88,7 +88,7 @@ namespace VPetLLM.Infrastructure.Services
         /// <summary>
         /// 获取服务状态
         /// </summary>
-        ServiceStatus GetServiceStatus(string serviceName);
+        InfraServiceStatus GetServiceStatus(string serviceName);
 
         /// <summary>
         /// 重启服务

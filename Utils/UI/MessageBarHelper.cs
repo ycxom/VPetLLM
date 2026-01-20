@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using SystemTimers = System.Timers;
@@ -43,7 +42,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否初始化成功</returns>
         public static bool Initialize(object msgBar)
         {
-            if (msgBar == null) return false;
+            if (msgBar is null) return false;
 
             lock (_initLock)
             {
@@ -92,7 +91,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否预初始化成功</returns>
         public static bool PreInitialize(object msgBar)
         {
-            if (msgBar == null) return false;
+            if (msgBar is null) return false;
 
             // 预初始化就是调用 Initialize，但记录不同的日志
             var result = Initialize(msgBar);
@@ -112,7 +111,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>字段值，失败返回默认值</returns>
         public static T GetFieldValue<T>(object msgBar, string fieldName)
         {
-            if (msgBar == null) return default;
+            if (msgBar is null) return default;
 
             if (!_isInitialized)
             {
@@ -122,7 +121,7 @@ namespace VPetLLM.Utils.UI
             try
             {
                 var field = GetCachedField(fieldName);
-                if (field != null)
+                if (field is not null)
                 {
                     var value = field.GetValue(msgBar);
                     if (value is T typedValue)
@@ -134,7 +133,7 @@ namespace VPetLLM.Utils.UI
                 // 回退：直接反射获取
                 var directField = msgBar.GetType().GetField(fieldName,
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                if (directField != null)
+                if (directField is not null)
                 {
                     var value = directField.GetValue(msgBar);
                     if (value is T typedValue)
@@ -160,7 +159,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否设置成功</returns>
         public static bool SetFieldValue(object msgBar, string fieldName, object value)
         {
-            if (msgBar == null) return false;
+            if (msgBar is null) return false;
 
             if (!_isInitialized)
             {
@@ -170,7 +169,7 @@ namespace VPetLLM.Utils.UI
             try
             {
                 var field = GetCachedField(fieldName);
-                if (field != null)
+                if (field is not null)
                 {
                     field.SetValue(msgBar, value);
                     return true;
@@ -179,7 +178,7 @@ namespace VPetLLM.Utils.UI
                 // 回退：直接反射设置
                 var directField = msgBar.GetType().GetField(fieldName,
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                if (directField != null)
+                if (directField is not null)
                 {
                     directField.SetValue(msgBar, value);
                     return true;
@@ -219,7 +218,7 @@ namespace VPetLLM.Utils.UI
         /// <param name="msgBar">MessageBar实例</param>
         public static void StopAllTimers(object msgBar)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             // 确保已初始化
             if (!_isInitialized)
@@ -229,19 +228,19 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                if (_showTimerField != null)
+                if (_showTimerField is not null)
                 {
                     var showTimer = _showTimerField.GetValue(msgBar) as SystemTimers.Timer;
                     showTimer?.Stop();
                 }
 
-                if (_endTimerField != null)
+                if (_endTimerField is not null)
                 {
                     var endTimer = _endTimerField.GetValue(msgBar) as SystemTimers.Timer;
                     endTimer?.Stop();
                 }
 
-                if (_closeTimerField != null)
+                if (_closeTimerField is not null)
                 {
                     var closeTimer = _closeTimerField.GetValue(msgBar) as SystemTimers.Timer;
                     closeTimer?.Stop();
@@ -259,7 +258,7 @@ namespace VPetLLM.Utils.UI
         /// <param name="msgBar">MessageBar实例</param>
         public static void ClearStreamState(object msgBar)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             if (!_isInitialized)
             {
@@ -269,20 +268,20 @@ namespace VPetLLM.Utils.UI
             try
             {
                 // 清空 oldsaystream
-                if (_oldsaystreamField != null)
+                if (_oldsaystreamField is not null)
                 {
                     _oldsaystreamField.SetValue(msgBar, null);
                 }
 
                 // 清空 outputtext
-                if (_outputtextField != null)
+                if (_outputtextField is not null)
                 {
                     var outputtext = _outputtextField.GetValue(msgBar) as List<char>;
                     outputtext?.Clear();
                 }
 
                 // 清空 outputtextsample
-                if (_outputtextsampleField != null)
+                if (_outputtextsampleField is not null)
                 {
                     var outputtextsample = _outputtextsampleField.GetValue(msgBar) as StringBuilder;
                     outputtextsample?.Clear();
@@ -300,7 +299,7 @@ namespace VPetLLM.Utils.UI
         /// <param name="msgBar">MessageBar实例</param>
         public static async Task ClearStateAsync(object msgBar)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
@@ -313,7 +312,7 @@ namespace VPetLLM.Utils.UI
         /// </summary>
         private static void ClearStateInternal(object msgBar)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             if (!_isInitialized)
             {
@@ -341,7 +340,7 @@ namespace VPetLLM.Utils.UI
         /// <param name="debounceMs">防抖时间（毫秒）</param>
         public static async Task ClearStateDebounced(object msgBar, int debounceMs = 50)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             lock (_debounceLock)
             {
@@ -385,7 +384,7 @@ namespace VPetLLM.Utils.UI
         /// <param name="text">要显示的文本</param>
         public static void UpdateTextDirect(object msgBar, string text)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             if (!_isInitialized)
             {
@@ -394,10 +393,10 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                if (_tTextField != null)
+                if (_tTextField is not null)
                 {
                     var tText = _tTextField.GetValue(msgBar) as TextBox;
-                    if (tText != null)
+                    if (tText is not null)
                     {
                         tText.Text = text;
                     }
@@ -416,7 +415,7 @@ namespace VPetLLM.Utils.UI
         /// <param name="name">说话者名称</param>
         public static void UpdateSpeakerName(object msgBar, string name)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             if (!_isInitialized)
             {
@@ -425,10 +424,10 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                if (_lNameField != null)
+                if (_lNameField is not null)
                 {
                     var lName = _lNameField.GetValue(msgBar) as Label;
-                    if (lName != null)
+                    if (lName is not null)
                     {
                         lName.Content = name;
                     }
@@ -446,7 +445,7 @@ namespace VPetLLM.Utils.UI
         /// <param name="msgBar">MessageBar实例</param>
         public static void ClearMessageBoxContent(object msgBar)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             if (!_isInitialized)
             {
@@ -455,7 +454,7 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                if (_messageBoxContentField != null)
+                if (_messageBoxContentField is not null)
                 {
                     var messageBoxContent = _messageBoxContentField.GetValue(msgBar) as Grid;
                     messageBoxContent?.Children.Clear();
@@ -475,12 +474,12 @@ namespace VPetLLM.Utils.UI
         /// <param name="opacity">透明度（0-1）</param>
         public static void SetVisibility(object msgBar, bool visible, double opacity = 0.8)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             try
             {
                 var uiElement = msgBar as UIElement;
-                if (uiElement != null)
+                if (uiElement is not null)
                 {
                     uiElement.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
                     uiElement.Opacity = opacity;
@@ -500,7 +499,7 @@ namespace VPetLLM.Utils.UI
         /// <param name="speakerName">说话者名称</param>
         public static void ShowBubbleQuick(object msgBar, string text, string speakerName)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             if (!_isInitialized)
             {
@@ -541,7 +540,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>true 表示正在打印，false 表示打印完成或无法检测</returns>
         public static bool IsBubblePrinting(object msgBar)
         {
-            if (msgBar == null) return false;
+            if (msgBar is null) return false;
 
             if (!_isInitialized)
             {
@@ -550,7 +549,7 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                if (_showTimerField != null)
+                if (_showTimerField is not null)
                 {
                     var showTimer = _showTimerField.GetValue(msgBar) as SystemTimers.Timer;
                     return showTimer?.Enabled ?? false;
@@ -572,7 +571,7 @@ namespace VPetLLM.Utils.UI
         /// <param name="maxWaitMs">最大等待时间（毫秒），默认 10000ms</param>
         public static async Task WaitForPrintCompleteAsync(object msgBar, int maxWaitMs = 10000)
         {
-            if (msgBar == null) return;
+            if (msgBar is null) return;
 
             int elapsed = 0;
             const int checkInterval = 100;

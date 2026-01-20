@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace VPetLLM.Utils.System
 {
     /// <summary>
@@ -33,12 +31,12 @@ namespace VPetLLM.Utils.System
                 sb.AppendLine($"[{key}] - {config?.Description ?? "无描述"}");
                 sb.AppendLine($"  状态: {(config?.Enabled == true ? "启用" : "禁用")}");
 
-                if (config != null)
+                if (config is not null)
                 {
                     sb.AppendLine($"  配置: {config.MaxCount}次 / {config.Window.TotalMinutes}分钟");
                 }
 
-                if (stats != null)
+                if (stats is not null)
                 {
                     sb.AppendLine($"  统计:");
                     sb.AppendLine($"    总请求: {stats.TotalRequests}");
@@ -58,7 +56,7 @@ namespace VPetLLM.Utils.System
 
                     if (stats.WindowStart.HasValue)
                     {
-                        var windowRemaining = config != null
+                        var windowRemaining = config is not null
                             ? config.Window - (DateTime.UtcNow - stats.WindowStart.Value)
                             : TimeSpan.Zero;
                         if (windowRemaining > TimeSpan.Zero)
@@ -97,7 +95,7 @@ namespace VPetLLM.Utils.System
                 var config = RateLimiter.GetConfig(key);
                 var stats = allStats.ContainsKey(key) ? allStats[key] : null;
 
-                if (config != null && stats != null)
+                if (config is not null && stats is not null)
                 {
                     var status = config.Enabled ? "启用" : "禁用";
                     summaries.Add($"{key}({status}): {stats.CurrentCount}/{config.MaxCount}");
@@ -115,7 +113,7 @@ namespace VPetLLM.Utils.System
             var config = RateLimiter.GetConfig(key);
             var stats = RateLimiter.GetStats(key);
 
-            if (config == null || stats == null || !config.Enabled)
+            if (config is null || stats is null || !config.Enabled)
             {
                 return false;
             }
@@ -131,7 +129,7 @@ namespace VPetLLM.Utils.System
             var config = RateLimiter.GetConfig(key);
             var stats = RateLimiter.GetStats(key);
 
-            if (config == null || stats == null || config.MaxCount == 0)
+            if (config is null || stats is null || config.MaxCount == 0)
             {
                 return 100.0;
             }
@@ -144,7 +142,7 @@ namespace VPetLLM.Utils.System
         /// </summary>
         public static void ReloadConfig(Setting setting)
         {
-            if (setting?.RateLimiter == null)
+            if (setting?.RateLimiter is null)
             {
                 Logger.Log("RateLimiterManager: Setting或RateLimiter配置为null");
                 return;

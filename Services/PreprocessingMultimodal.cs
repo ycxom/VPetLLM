@@ -1,7 +1,4 @@
-using VPetLLM.Configuration;
-using VPetLLM.Core.ChatCore;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -23,7 +20,7 @@ namespace VPetLLM.Services
         /// <inheritdoc/>
         public async Task<PreprocessingResult> AnalyzeImageAsync(byte[] imageData, string? customPrompt = null)
         {
-            if (imageData == null || imageData.Length == 0)
+            if (imageData is null || imageData.Length == 0)
             {
                 return PreprocessingResult.CreateFailure("图片数据为空");
             }
@@ -179,18 +176,18 @@ namespace VPetLLM.Services
                 switch (providerType)
                 {
                     case "Free":
-                        if (_settings.Free != null)
+                        if (_settings.Free is not null)
                         {
                             chatCore = new FreeChatCore(_settings.Free, _settings, mainWindow, null!);
                         }
                         break;
 
                     case "OpenAI":
-                        if (node != null && _settings.OpenAI?.OpenAINodes != null)
+                        if (node is not null && _settings.OpenAI?.OpenAINodes is not null)
                         {
                             var openAINode = _settings.OpenAI.OpenAINodes
                                 .FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision);
-                            if (openAINode != null)
+                            if (openAINode is not null)
                             {
                                 chatCore = new OpenAIChatCore(openAINode, _settings, mainWindow, null!);
                             }
@@ -198,11 +195,11 @@ namespace VPetLLM.Services
                         break;
 
                     case "Gemini":
-                        if (node != null && _settings.Gemini?.GeminiNodes != null)
+                        if (node is not null && _settings.Gemini?.GeminiNodes is not null)
                         {
                             var geminiNode = _settings.Gemini.GeminiNodes
                                 .FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision);
-                            if (geminiNode != null)
+                            if (geminiNode is not null)
                             {
                                 chatCore = new GeminiChatCore(_settings.Gemini, _settings, mainWindow, null!);
                             }
@@ -218,7 +215,7 @@ namespace VPetLLM.Services
                         break;
                 }
 
-                if (chatCore == null)
+                if (chatCore is null)
                 {
                     throw new InvalidOperationException($"无法创建 {providerType} 的 ChatCore 实例");
                 }
@@ -253,7 +250,7 @@ namespace VPetLLM.Services
             var nodes = new List<VisionNodeIdentifier>();
 
             // 收集 OpenAI 视觉节点
-            if (_settings.OpenAI?.OpenAINodes != null)
+            if (_settings.OpenAI?.OpenAINodes is not null)
             {
                 foreach (var node in _settings.OpenAI.OpenAINodes.Where(n => n.Enabled && n.EnableVision))
                 {
@@ -267,7 +264,7 @@ namespace VPetLLM.Services
             }
 
             // 收集 Gemini 视觉节点
-            if (_settings.Gemini?.GeminiNodes != null)
+            if (_settings.Gemini?.GeminiNodes is not null)
             {
                 foreach (var node in _settings.Gemini.GeminiNodes.Where(n => n.Enabled && n.EnableVision))
                 {
@@ -297,7 +294,7 @@ namespace VPetLLM.Services
         /// <inheritdoc/>
         public List<VisionNodeIdentifier> ValidateSelectedNodes(List<VisionNodeIdentifier> nodes)
         {
-            if (nodes == null || nodes.Count == 0)
+            if (nodes is null || nodes.Count == 0)
             {
                 return new List<VisionNodeIdentifier>();
             }

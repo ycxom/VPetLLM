@@ -1,4 +1,3 @@
-using VPetLLM.Core;
 using VPetLLM.Infrastructure.Configuration;
 using VPetLLM.Infrastructure.Configuration.Configurations;
 using VPetLLM.Infrastructure.Events;
@@ -14,7 +13,7 @@ namespace VPetLLM.Infrastructure.Services
     {
         public override string ServiceName => "ASRService";
 
-        private readonly IConfigurationManager _configurationManager;
+        private readonly InfraConfigManager _configurationManager;
         private new readonly IEventBus _eventBus;
         private readonly CoreFactory _coreFactory;
         private readonly Dictionary<string, ASRCoreBase> _asrCores;
@@ -23,9 +22,10 @@ namespace VPetLLM.Infrastructure.Services
         private readonly Queue<ASRRequest> _requestQueue;
         private readonly SemaphoreSlim _queueSemaphore;
         private CancellationTokenSource _processingCancellation;
+        private readonly EventHandler<InfraConfigChangedEventArgs> _configChangedHandler;
 
         public ASRService(
-            IConfigurationManager configurationManager,
+            InfraConfigManager configurationManager,
             IEventBus eventBus,
             IStructuredLogger logger,
             CoreFactory coreFactory = null) : base(logger)
@@ -36,6 +36,7 @@ namespace VPetLLM.Infrastructure.Services
             _asrCores = new Dictionary<string, ASRCoreBase>();
             _requestQueue = new Queue<ASRRequest>();
             _queueSemaphore = new SemaphoreSlim(1, 1);
+            _configChangedHandler = OnConfigurationChanged;
         }
 
         protected override async Task OnInitializeAsync(CancellationToken cancellationToken)
@@ -48,7 +49,7 @@ namespace VPetLLM.Infrastructure.Services
                 _asrConfig = _configurationManager.GetConfiguration<ASRConfiguration>();
 
                 // 订阅配置变更事件
-                _configurationManager.ConfigurationChanged += OnConfigurationChanged;
+                _configurationManager.ConfigurationChanged += _configChangedHandler;
 
                 // 初始化ASR核心
                 await InitializeASRCoresAsync();
@@ -113,7 +114,7 @@ namespace VPetLLM.Infrastructure.Services
                 }
 
                 // 取消订阅配置变更事件
-                _configurationManager.ConfigurationChanged -= OnConfigurationChanged;
+                _configurationManager.ConfigurationChanged -= _configChangedHandler;
 
                 // 发布服务停止事件
                 await _eventBus.PublishAsync(new ASRServiceStoppedEvent
@@ -139,11 +140,11 @@ namespace VPetLLM.Infrastructure.Services
                     ["IsEnabled"] = _asrConfig?.IsEnabled ?? false,
                     ["CurrentProvider"] = _asrConfig?.Provider ?? "Unknown",
                     ["AvailableCores"] = _asrCores.Count,
-                    ["CurrentCoreActive"] = _currentASRCore != null,
+                    ["CurrentCoreActive"] = _currentASRCore is not null,
                     ["QueueLength"] = _requestQueue.Count
                 };
 
-                if (_currentASRCore != null)
+                if (_currentASRCore is not null)
                 {
                     metrics["CurrentCoreName"] = _currentASRCore.Name;
 
@@ -167,7 +168,7 @@ namespace VPetLLM.Infrastructure.Services
                     status = HealthStatus.Degraded;
                     description = "ASR is disabled";
                 }
-                else if (_currentASRCore == null)
+                else if (_currentASRCore is null)
                 {
                     status = HealthStatus.Unhealthy;
                     description = "No active ASR core";
@@ -205,12 +206,12 @@ namespace VPetLLM.Infrastructure.Services
                 throw new ServiceException(ServiceName, "ASR service is disabled");
             }
 
-            if (_currentASRCore == null)
+            if (_currentASRCore is null)
             {
                 throw new ServiceException(ServiceName, "No active ASR core available");
             }
 
-            if (audioData == null || audioData.Length == 0)
+            if (audioData is null || audioData.Length == 0)
             {
                 throw new ArgumentException("Audio data cannot be null or empty", nameof(audioData));
             }
@@ -312,7 +313,7 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public async Task<List<string>> GetAvailableModelsAsync()
         {
-            if (_currentASRCore == null)
+            if (_currentASRCore is null)
             {
                 return new List<string>();
             }
@@ -390,7 +391,7 @@ namespace VPetLLM.Infrastructure.Services
                         _queueSemaphore.Release();
                     }
 
-                    if (request != null && _currentASRCore != null)
+                    if (request is not null && _currentASRCore is not null)
                     {
                         try
                         {
@@ -459,7 +460,7 @@ namespace VPetLLM.Infrastructure.Services
             }
         }
 
-        private async void OnConfigurationChanged(object sender, ConfigurationChangedEventArgs e)
+        private async void OnConfigurationChanged(object sender, InfraConfigChangedEventArgs e)
         {
             if (e.ConfigurationType == typeof(ASRConfiguration))
             {

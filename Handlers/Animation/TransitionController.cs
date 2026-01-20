@@ -1,6 +1,5 @@
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.System;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Animation
@@ -23,7 +22,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public bool NeedsEndAnimation(GraphInfo currentDisplay, GraphType targetType)
         {
-            if (currentDisplay == null) return false;
+            if (currentDisplay is null) return false;
 
             // 如果当前动画类型与目标类型相同，不需要结束动画
             if (currentDisplay.Type == targetType) return false;
@@ -42,7 +41,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public IGraph GetTransitionAnimation(IMainWindow mainWindow, GraphInfo currentDisplay, GraphType targetType)
         {
-            if (mainWindow?.Main?.Core?.Graph == null || currentDisplay == null)
+            if (mainWindow?.Main?.Core?.Graph is null || currentDisplay is null)
             {
                 return null;
             }
@@ -52,7 +51,7 @@ namespace VPetLLM.Handlers.Animation
             var mode = mainWindow.Main.Core.Save.Mode;
 
             var endGraph = graph.FindGraph(currentDisplay.Name, AnimatType.C_End, mode);
-            if (endGraph != null)
+            if (endGraph is not null)
             {
                 Logger.Log($"TransitionController: Found C_End animation for {currentDisplay.Name}");
                 return endGraph;
@@ -69,7 +68,7 @@ namespace VPetLLM.Handlers.Animation
             IMainWindow mainWindow,
             AnimationRequest request)
         {
-            if (mainWindow?.Main == null)
+            if (mainWindow?.Main is null)
             {
                 Logger.Log("TransitionController: mainWindow is null");
                 return false;
@@ -104,7 +103,7 @@ namespace VPetLLM.Handlers.Animation
             if (NeedsEndAnimation(currentDisplay, targetType))
             {
                 var transitionGraph = GetTransitionAnimation(mainWindow, currentDisplay, targetType);
-                if (transitionGraph != null)
+                if (transitionGraph is not null)
                 {
                     Logger.Log($"TransitionController: Playing C_End animation before transition");
 
@@ -204,7 +203,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public async Task<bool> SafeEndCurrentAnimationAsync(IMainWindow mainWindow, string expectedGraphName = null)
         {
-            if (mainWindow?.Main == null) return false;
+            if (mainWindow?.Main is null) return false;
 
             // 检查是否正在播放语音 - 如果是，等待语音完成
             if (_synchronizer.IsPlayingVoice(mainWindow))
@@ -226,7 +225,7 @@ namespace VPetLLM.Handlers.Animation
                     // 并且 displayType.Animat != AnimatType.C_End（不是已经在播放结束动画）
                     bool shouldEnd = false;
 
-                    if (displayType != null && displayType.Animat != AnimatType.C_End)
+                    if (displayType is not null && displayType.Animat != AnimatType.C_End)
                     {
                         if (!string.IsNullOrEmpty(expectedGraphName) && displayType.Name == expectedGraphName)
                         {
@@ -265,7 +264,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public void SetLoopProperty(IGraph graph, bool isLoop)
         {
-            if (graph != null)
+            if (graph is not null)
             {
                 graph.IsLoop = isLoop;
                 Logger.Log($"TransitionController: Set IsLoop={isLoop} for animation");
@@ -277,7 +276,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public async Task<bool> ExecuteStateChangeAsync(IMainWindow mainWindow, AnimationRequest request)
         {
-            if (mainWindow?.Main == null || request.TargetState == null)
+            if (mainWindow?.Main is null || request.TargetState is null)
             {
                 Logger.Log("TransitionController: Invalid state change request");
                 return false;
@@ -300,7 +299,7 @@ namespace VPetLLM.Handlers.Animation
 
                             // 获取状态字段
                             var stateField = mainWindow.Main.GetType().GetField("State");
-                            if (stateField == null)
+                            if (stateField is null)
                             {
                                 Logger.Log("TransitionController: State field not found");
                                 tcs.TrySetResult(false);

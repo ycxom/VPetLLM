@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using VPetLLM.Utils.System;
 
 
 namespace VPetLLM.Infrastructure.DependencyInjection
@@ -28,7 +27,7 @@ namespace VPetLLM.Infrastructure.DependencyInjection
             where TInterface : class
         {
             ThrowIfDisposed();
-            if (instance == null)
+            if (instance is null)
                 throw new ArgumentNullException(nameof(instance));
 
             var descriptor = new ServiceDescriptor(typeof(TInterface), instance);
@@ -168,7 +167,7 @@ namespace VPetLLM.Infrastructure.DependencyInjection
 
         private object CreateSingletonInstance(ServiceDescriptor descriptor, HashSet<Type> resolutionPath)
         {
-            if (descriptor.Instance != null)
+            if (descriptor.Instance is not null)
             {
                 return descriptor.Instance;
             }
@@ -232,7 +231,7 @@ namespace VPetLLM.Infrastructure.DependencyInjection
 
         private void ValidateServiceDependencies(ServiceDescriptor descriptor, HashSet<Type> validationPath)
         {
-            if (descriptor.Instance != null)
+            if (descriptor.Instance is not null)
             {
                 return; // Instance-based registrations don't need validation
             }

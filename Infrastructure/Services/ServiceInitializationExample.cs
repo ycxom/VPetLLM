@@ -164,7 +164,7 @@ namespace VPetLLM.Infrastructure.Services
             finally
             {
                 // 确保服务被正确关闭
-                if (serviceManager != null)
+                if (serviceManager is not null)
                 {
                     await ShutdownServicesAsync(serviceManager);
                 }

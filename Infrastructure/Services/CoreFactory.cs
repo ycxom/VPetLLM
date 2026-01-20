@@ -1,6 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Core;
-using VPetLLM.Handlers.Core;
 using VPetLLM.Infrastructure.Configuration.Configurations;
 using VPetLLM.Infrastructure.Logging;
 
@@ -75,13 +73,13 @@ namespace VPetLLM.Infrastructure.Services
         private int GetProviderCount(LLMConfiguration config)
         {
             // 临时实现，返回基于Provider枚举的计数
-            return config != null ? 1 : 0;
+            return config is not null ? 1 : 0;
         }
 
         /// <summary>
         /// 创建TTS核心实例
         /// </summary>
-        public Dictionary<string, TTSCoreBase> CreateTTSCores(TTSConfiguration config)
+        public Dictionary<string, TTSCoreBase> CreateTTSCores(InfraTTSConfiguration config)
         {
             var cores = new Dictionary<string, TTSCoreBase>();
 
@@ -213,7 +211,7 @@ namespace VPetLLM.Infrastructure.Services
                 }
                 */
 
-                if (core == null)
+                if (core is null)
                 {
                     throw new NotSupportedException($"Chat provider '{providerName}' is not supported or not implemented yet");
                 }
@@ -231,7 +229,7 @@ namespace VPetLLM.Infrastructure.Services
         /// <summary>
         /// 创建单个TTS核心实例
         /// </summary>
-        public TTSCoreBase CreateTTSCore(string providerName, TTSConfiguration config)
+        public TTSCoreBase CreateTTSCore(string providerName, InfraTTSConfiguration config)
         {
             try
             {
@@ -264,7 +262,7 @@ namespace VPetLLM.Infrastructure.Services
                 }
                 */
 
-                if (core == null)
+                if (core is null)
                 {
                     throw new NotSupportedException($"TTS provider '{providerName}' is not supported or not implemented yet");
                 }
@@ -315,7 +313,7 @@ namespace VPetLLM.Infrastructure.Services
                 }
                 */
 
-                if (core == null)
+                if (core is null)
                 {
                     throw new NotSupportedException($"ASR provider '{providerName}' is not supported or not implemented yet");
                 }

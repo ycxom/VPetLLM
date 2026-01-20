@@ -289,7 +289,7 @@ namespace VPetLLM.Infrastructure.Performance
                         }
                     }
 
-                    if (task != null)
+                    if (task is not null)
                     {
                         await _concurrencyController.ExecuteAsync(task, cancellationToken);
                     }

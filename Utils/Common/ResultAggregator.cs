@@ -109,7 +109,7 @@ namespace VPetLLM.Utils.Common
                     }
                 }
 
-                if (!string.IsNullOrEmpty(aggregated) && VPetLLM.Instance?.ChatCore != null)
+                if (!string.IsNullOrEmpty(aggregated) && VPetLLM.Instance?.ChatCore is not null)
                 {
                     VPetLLMUtils.Logger.Log($"ResultAggregator: 向AI回灌聚合内容: {aggregated}");
 

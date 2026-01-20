@@ -1,11 +1,6 @@
 using NAudio.Wave;
-using System.IO;
 using System.Net;
 using System.Net.Http;
-using VPetLLM.Core;
-using VPetLLM.Core.ASRCore;
-using VPetLLM.Services;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Audio
 {
@@ -73,7 +68,7 @@ namespace VPetLLM.Utils.Audio
             // 检查是否应该使用代理
             bool useProxy = false;
 
-            if (_proxySettings != null && _proxySettings.IsEnabled)
+            if (_proxySettings is not null && _proxySettings.IsEnabled)
             {
                 // 如果ForAllAPI为true，则对所有API使用代理
                 if (_proxySettings.ForAllAPI)
@@ -248,7 +243,7 @@ namespace VPetLLM.Utils.Audio
                 _waveWriter?.Flush();
 
                 // 检查是否有数据
-                if (_recordingStream == null || _recordingStream.Length == 0)
+                if (_recordingStream is null || _recordingStream.Length == 0)
                 {
                     Logger.Log("ASR: No audio data recorded");
                     TranscriptionError?.Invoke(this, new InvalidOperationException("没有录制到音频数据"));
@@ -308,7 +303,7 @@ namespace VPetLLM.Utils.Audio
             {
                 Logger.Log($"ASR: Sending audio to {_asrSettings.Provider} service...");
 
-                if (_asrCore == null)
+                if (_asrCore is null)
                 {
                     throw new InvalidOperationException($"ASR Core 未初始化");
                 }
@@ -419,7 +414,7 @@ namespace VPetLLM.Utils.Audio
         /// </summary>
         public async Task<string?> TranscribeAsync(byte[] audioData)
         {
-            if (!IsEnabled || audioData == null || audioData.Length == 0)
+            if (!IsEnabled || audioData is null || audioData.Length == 0)
             {
                 return null;
             }
@@ -441,7 +436,7 @@ namespace VPetLLM.Utils.Audio
         /// </summary>
         public async Task<string?> TranscribeAsync(Stream audioStream)
         {
-            if (!IsEnabled || audioStream == null)
+            if (!IsEnabled || audioStream is null)
             {
                 return null;
             }

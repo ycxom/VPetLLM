@@ -1,6 +1,4 @@
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Windows;
@@ -10,15 +8,11 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using VPetLLM.Core;
-using VPetLLM.Core.ChatCore;
 using VPetLLM.UI.Controls;
 using VPetLLM.Utils.Audio;
-using VPetLLM.Utils.Common;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 using VPetLLM.Utils.Plugin;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -69,7 +63,7 @@ namespace VPetLLM.UI.Windows
                     }
 
                     // 如果 DefaultPluginChecker 存在且插件已初始化，检查是否需要添加横幅
-                    if (_plugin != null)
+                    if (_plugin is not null)
                     {
                         bool isDefaultPlugin = _plugin.IsVPetLLMDefaultPlugin();
                         if (!isDefaultPlugin)
@@ -251,7 +245,7 @@ namespace VPetLLM.UI.Windows
         private bool _isLoadingMultimodalSettings = false;
 
         // TTS服务
-        private TTSService? _ttsService;
+        private UtilsTTSService? _ttsService;
         // 随机选择器（负载均衡随机用）
         private readonly Random _rand = new Random();
 
@@ -276,7 +270,7 @@ namespace VPetLLM.UI.Windows
         // 克隆一个 OpenAI 节点，并将 ApiKey 随机拆分后取单个 key
         private Setting.OpenAINodeSetting CloneOpenAINodeWithRandomKey(Setting.OpenAINodeSetting src)
         {
-            if (src == null) return null;
+            if (src is null) return null;
             return new Setting.OpenAINodeSetting
             {
                 Name = src.Name,
@@ -701,15 +695,15 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
             ((TextBox)this.FindName("TextBox_Role")).Text = _plugin.Settings.Role;
-            if (_plugin.Settings.OpenAI == null)
+            if (_plugin.Settings.OpenAI is null)
             {
                 _plugin.Settings.OpenAI = new Setting.OpenAISetting();
             }
-            if (_plugin.Settings.Free == null)
+            if (_plugin.Settings.Free is null)
             {
                 _plugin.Settings.Free = new Setting.FreeSetting();
             }
-            if (_plugin.Settings.Ollama == null)
+            if (_plugin.Settings.Ollama is null)
             {
                 _plugin.Settings.Ollama = new Setting.OllamaSetting();
             }
@@ -720,7 +714,7 @@ namespace VPetLLM.UI.Windows
             //((TextBox)this.FindName("TextBox_OpenAIApiKey")).Text = "";
             //((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text = "";
             //((TextBox)this.FindName("TextBox_OpenAIUrl")).Text = "";
-            if (_plugin.Settings.Gemini == null)
+            if (_plugin.Settings.Gemini is null)
             {
                 _plugin.Settings.Gemini = new Setting.GeminiSetting();
             }
@@ -818,7 +812,7 @@ namespace VPetLLM.UI.Windows
             LoadLogsAsync();
 
             // Proxy settings
-            if (_plugin.Settings.Proxy == null)
+            if (_plugin.Settings.Proxy is null)
             {
                 _plugin.Settings.Proxy = new Setting.ProxySetting();
             }
@@ -844,7 +838,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked = _plugin.Settings.Proxy.ForPlugin;
 
             // Plugin Store Proxy settings
-            if (_plugin.Settings.PluginStore == null)
+            if (_plugin.Settings.PluginStore is null)
             {
                 _plugin.Settings.PluginStore = new Setting.PluginStoreSetting();
             }
@@ -852,7 +846,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).Text = _plugin.Settings.PluginStore.ProxyUrl;
 
             // TTS settings
-            if (_plugin.Settings.TTS == null)
+            if (_plugin.Settings.TTS is null)
             {
                 _plugin.Settings.TTS = new Setting.TTSSetting();
             }
@@ -929,10 +923,10 @@ namespace VPetLLM.UI.Windows
             LoadGPTSoVITSSettings();
 
             // 初始化TTS服务
-            _ttsService = new TTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
+            _ttsService = new UtilsTTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
 
             // ASR settings
-            if (_plugin.Settings.ASR == null)
+            if (_plugin.Settings.ASR is null)
             {
                 _plugin.Settings.ASR = new Setting.ASRSetting();
             }
@@ -1166,7 +1160,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Provider = newProvider;
             var selectedLanguageDisplay = (string)languageComboBox.SelectedItem;
             var selectedLangCode = LanguageHelper.LanguageDisplayMap.FirstOrDefault(x => x.Value == selectedLanguageDisplay).Key;
-            if (selectedLangCode != null)
+            if (selectedLangCode is not null)
             {
                 _plugin.Settings.Language = selectedLangCode;
             }
@@ -1181,16 +1175,16 @@ namespace VPetLLM.UI.Windows
             // OpenAI多节点配置 - 不再使用单一配置
             // 这些控件现在用于多节点管理界面
             // OpenAI配置通过多节点列表管理
-            if (geminiApiKeyTextBox != null)
+            if (geminiApiKeyTextBox is not null)
                 _plugin.Settings.Gemini.ApiKey = geminiApiKeyTextBox.Text;
-            if (geminiModelComboBox != null)
+            if (geminiModelComboBox is not null)
                 _plugin.Settings.Gemini.Model = geminiModelComboBox.Text;
 
 
             _plugin.Settings.KeepContext = keepContextCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableChatHistory = enableChatHistoryCheckBox.IsChecked ?? true;
             _plugin.Settings.SeparateChatByProvider = separateChatByProviderCheckBox.IsChecked ?? true;
-            if (_plugin.Settings.Records == null) _plugin.Settings.Records = new Setting.RecordSettings();
+            if (_plugin.Settings.Records is null) _plugin.Settings.Records = new Setting.RecordSettings();
             _plugin.Settings.Records.EnableRecords = enableRecordsCheckBox.IsChecked ?? true;
 
             // 保存记录器高级设置
@@ -1249,11 +1243,11 @@ namespace VPetLLM.UI.Windows
                 _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
             // OpenAI多节点配置 - 高级设置通过多节点管理界面处理
             // 温度和最大令牌数现在由各个节点独立配置
-            if (geminiEnableAdvancedCheckBox != null)
+            if (geminiEnableAdvancedCheckBox is not null)
                 _plugin.Settings.Gemini.EnableAdvanced = geminiEnableAdvancedCheckBox.IsChecked ?? false;
-            if (geminiTemperatureSlider != null)
+            if (geminiTemperatureSlider is not null)
                 _plugin.Settings.Gemini.Temperature = geminiTemperatureSlider.Value;
-            if (geminiMaxTokensTextBox != null && int.TryParse(geminiMaxTokensTextBox.Text, out int geminiMaxTokens))
+            if (geminiMaxTokensTextBox is not null && int.TryParse(geminiMaxTokensTextBox.Text, out int geminiMaxTokens))
                 _plugin.Settings.Gemini.MaxTokens = geminiMaxTokens;
 
             // 保存 Gemini 负载均衡开关
@@ -1264,15 +1258,15 @@ namespace VPetLLM.UI.Windows
                 _plugin.Settings.OpenAI.EnableLoadBalancing = cbOpenLB2.IsChecked ?? false;
 
             // 保存 Free 设置
-            if (freeEnableStreamingCheckBox != null)
+            if (freeEnableStreamingCheckBox is not null)
                 _plugin.Settings.Free.EnableStreaming = freeEnableStreamingCheckBox.IsChecked ?? false;
             if (this.FindName("CheckBox_Free_EnableVision") is CheckBox cbFreeVision)
                 _plugin.Settings.Free.EnableVision = cbFreeVision.IsChecked ?? false;
-            if (freeEnableAdvancedCheckBox != null)
+            if (freeEnableAdvancedCheckBox is not null)
                 _plugin.Settings.Free.EnableAdvanced = freeEnableAdvancedCheckBox.IsChecked ?? false;
-            if (freeTemperatureSlider != null)
+            if (freeTemperatureSlider is not null)
                 _plugin.Settings.Free.Temperature = freeTemperatureSlider.Value;
-            if (freeMaxTokensTextBox != null && int.TryParse(freeMaxTokensTextBox.Text, out int freeMaxTokens))
+            if (freeMaxTokensTextBox is not null && int.TryParse(freeMaxTokensTextBox.Text, out int freeMaxTokens))
                 _plugin.Settings.Free.MaxTokens = freeMaxTokens;
 
             _plugin.Settings.Tools = new List<Setting.ToolSetting>((IEnumerable<Setting.ToolSetting>)toolsDataGrid.ItemsSource);
@@ -1313,7 +1307,7 @@ namespace VPetLLM.UI.Windows
 
             // TTS提供商设置
             var selectedProviderItem = ((ComboBox)this.FindName("ComboBox_TTS_Provider")).SelectedItem as ComboBoxItem;
-            if (selectedProviderItem != null)
+            if (selectedProviderItem is not null)
             {
                 _plugin.Settings.TTS.Provider = selectedProviderItem.Tag?.ToString() ?? "URL";
             }
@@ -1324,7 +1318,7 @@ namespace VPetLLM.UI.Windows
 
             // 保存请求方法设置
             var selectedURLMethodItem = ((ComboBox)this.FindName("ComboBox_TTS_URL_RequestMethod")).SelectedItem as ComboBoxItem;
-            if (selectedURLMethodItem != null)
+            if (selectedURLMethodItem is not null)
             {
                 _plugin.Settings.TTS.URL.Method = selectedURLMethodItem.Tag?.ToString() ?? "GET";
             }
@@ -1335,13 +1329,13 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.TTS.OpenAI.Model = ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Model")).Text;
 
             var selectedOpenAIVoiceItem = ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Voice")).SelectedItem as ComboBoxItem;
-            if (selectedOpenAIVoiceItem != null)
+            if (selectedOpenAIVoiceItem is not null)
             {
                 _plugin.Settings.TTS.OpenAI.Voice = selectedOpenAIVoiceItem.Tag?.ToString() ?? "alloy";
             }
 
             var selectedFormatItem = ((ComboBox)this.FindName("ComboBox_TTS_OpenAI_Format")).SelectedItem as ComboBoxItem;
-            if (selectedFormatItem != null)
+            if (selectedFormatItem is not null)
             {
                 _plugin.Settings.TTS.OpenAI.Format = selectedFormatItem.Tag?.ToString() ?? "mp3";
             }
@@ -1364,14 +1358,14 @@ namespace VPetLLM.UI.Windows
 
             // ASR Provider 设置
             var selectedASRProviderItem = ((ComboBox)this.FindName("ComboBox_ASR_Provider")).SelectedItem as ComboBoxItem;
-            if (selectedASRProviderItem != null)
+            if (selectedASRProviderItem is not null)
             {
                 _plugin.Settings.ASR.Provider = selectedASRProviderItem.Tag?.ToString() ?? "OpenAI";
             }
 
             // ASR 录音设备设置
             var selectedDeviceItem = ((ComboBox)this.FindName("ComboBox_ASR_RecordingDevice")).SelectedItem as ComboBoxItem;
-            if (selectedDeviceItem != null && selectedDeviceItem.Tag != null)
+            if (selectedDeviceItem is not null && selectedDeviceItem.Tag is not null)
             {
                 _plugin.Settings.ASR.RecordingDeviceNumber = int.Parse(selectedDeviceItem.Tag.ToString());
             }
@@ -1381,7 +1375,7 @@ namespace VPetLLM.UI.Windows
             {
                 // Soniox 使用独立的语言选择
                 var selectedSonioxLanguageItem = ((ComboBox)this.FindName("ComboBox_ASR_Soniox_Language")).SelectedItem as ComboBoxItem;
-                if (selectedSonioxLanguageItem != null)
+                if (selectedSonioxLanguageItem is not null)
                 {
                     _plugin.Settings.ASR.Language = selectedSonioxLanguageItem.Tag?.ToString() ?? "en";
                 }
@@ -1513,7 +1507,7 @@ namespace VPetLLM.UI.Windows
                 {
                     StopButtonLoadingAnimation(button);
 
-                    if (button != null)
+                    if (button is not null)
                     {
                         button.IsEnabled = true;
                         button.UpdateLayout();
@@ -1531,7 +1525,7 @@ namespace VPetLLM.UI.Windows
             {
                 // 使用界面上选中的节点，而不是当前启用的节点
                 var selectedNode = GetSelectedOpenAINode();
-                if (selectedNode == null)
+                if (selectedNode is null)
                 {
                     MessageBox.Show(
                         ErrorMessageHelper.GetLocalizedMessage("RefreshOpenAIModels.NoNodeSelected", _plugin.Settings.Language, "请先选择一个OpenAI节点"),
@@ -1571,7 +1565,7 @@ namespace VPetLLM.UI.Windows
                 var selectedNode = GetSelectedGeminiNode();
                 Setting.GeminiSetting geminiSetting;
 
-                if (selectedNode != null)
+                if (selectedNode is not null)
                 {
                     // 如果选中了节点，使用选中节点的配置
                     geminiSetting = new Setting.GeminiSetting
@@ -1701,7 +1695,7 @@ namespace VPetLLM.UI.Windows
         private async void LoadLogsAsync()
         {
             var logBox = (ListBox)this.FindName("LogBox");
-            if (logBox == null) return;
+            if (logBox is null) return;
 
             // 先显示加载状态（可选）
             logBox.ItemsSource = null;
@@ -1749,7 +1743,7 @@ namespace VPetLLM.UI.Windows
                 var dataGrid = (DataGrid)this.FindName("DataGrid_Tools");
                 var selectedTool = dataGrid.SelectedItem as Setting.ToolSetting;
 
-                if (selectedTool != null)
+                if (selectedTool is not null)
                 {
                     await Task.Run(() =>
                     {
@@ -1831,7 +1825,7 @@ namespace VPetLLM.UI.Windows
 
                 // 查找TTS状态提示文本
                 var ttsStatusText = this.FindName("TextBlock_TTS_PluginStatus") as TextBlock;
-                if (ttsStatusText == null)
+                if (ttsStatusText is null)
                     return;
 
                 if (hasEnabledPlugin)
@@ -1867,7 +1861,7 @@ namespace VPetLLM.UI.Windows
 
         private void PluginEnabled_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is CheckBox checkBox && checkBox.DataContext is UnifiedPluginItem item && item.LocalPlugin != null)
+            if (sender is CheckBox checkBox && checkBox.DataContext is UnifiedPluginItem item && item.LocalPlugin is not null)
             {
                 var langCode = _plugin.Settings.Language;
 
@@ -2099,7 +2093,7 @@ namespace VPetLLM.UI.Windows
         // 旋转动画辅助方法
         private void StartButtonLoadingAnimation(Button button)
         {
-            if (button == null) return;
+            if (button is null) return;
 
             // 保存原始内容
             button.Tag = button.Content;
@@ -2137,7 +2131,7 @@ namespace VPetLLM.UI.Windows
 
         private void StopButtonLoadingAnimation(Button button)
         {
-            if (button == null) return;
+            if (button is null) return;
 
             // 停止动画
             if (button.Content is TextBlock rotateIcon && rotateIcon.RenderTransform is RotateTransform transform)
@@ -2146,7 +2140,7 @@ namespace VPetLLM.UI.Windows
             }
 
             // 恢复原始内容
-            if (button.Tag != null)
+            if (button.Tag is not null)
             {
                 button.Content = button.Tag;
                 button.Tag = null;
@@ -2478,7 +2472,7 @@ namespace VPetLLM.UI.Windows
             var button = sender as Button;
 
             // 防止重复点击
-            if (button != null && !button.IsEnabled)
+            if (button is not null && !button.IsEnabled)
                 return;
 
             StartButtonLoadingAnimation(button);
@@ -2594,17 +2588,17 @@ namespace VPetLLM.UI.Windows
                                 p.OriginalName == pluginName ||
                                 p.Name == pluginName ||
                                 p.Id == id ||
-                                (p.LocalPlugin != null && p.LocalPlugin.Name == pluginName));
+                                (p.LocalPlugin is not null && p.LocalPlugin.Name == pluginName));
 
                             // 如果通过名称没有找到，尝试通过文件路径匹配（处理插件名称变更的情况）
-                            if (localItem == null)
+                            if (localItem is null)
                             {
                                 var expectedFilePath = Path.Combine(PluginManager.PluginPath, $"{id}.dll");
                                 localItem = pluginItems.Values.FirstOrDefault(p =>
-                                    p.LocalFilePath != null &&
+                                    p.LocalFilePath is not null &&
                                     p.LocalFilePath.Equals(expectedFilePath, StringComparison.OrdinalIgnoreCase));
 
-                                if (localItem != null)
+                                if (localItem is not null)
                                 {
                                     System.Diagnostics.Debug.WriteLine($"[PluginStore] 通过文件路径匹配到插件: {localItem.Name} -> {pluginName}");
                                 }
@@ -2613,7 +2607,7 @@ namespace VPetLLM.UI.Windows
                             System.Diagnostics.Debug.WriteLine($"[PluginStore] 匹配远程插件 '{pluginName}' (ID: {id})");
                             System.Diagnostics.Debug.WriteLine($"[PluginStore] 本地插件列表: {string.Join(", ", pluginItems.Values.Select(p => $"{p.Name}({p.OriginalName})"))}");
 
-                            if (localItem != null)
+                            if (localItem is not null)
                             {
                                 System.Diagnostics.Debug.WriteLine($"[PluginStore] 找到匹配的本地插件: {localItem.Name}");
 
@@ -2646,7 +2640,7 @@ namespace VPetLLM.UI.Windows
 
                                 // 更新描述
                                 var des = remoteInfo["Description"]?.ToObject<Dictionary<string, string>>();
-                                var remoteDescription = des != null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
+                                var remoteDescription = des is not null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
                                 if (!string.IsNullOrEmpty(remoteDescription))
                                 {
                                     var localSource = LanguageHelper.Get("Plugin.Source.Local", langCode);
@@ -2657,7 +2651,7 @@ namespace VPetLLM.UI.Windows
                             {
                                 // 添加纯在线插件
                                 var des = remoteInfo["Description"]?.ToObject<Dictionary<string, string>>();
-                                var description = des != null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
+                                var description = des is not null ? (des.TryGetValue(langCode, out var d) ? d : (des.TryGetValue("en", out var enD) ? enD : string.Empty)) : string.Empty;
 
                                 pluginItems[id] = new UnifiedPluginItem
                                 {
@@ -2773,12 +2767,12 @@ namespace VPetLLM.UI.Windows
             var failedPlugin = _plugin.FailedPlugins.FirstOrDefault(p => p.Name == pluginNameToFind);
 
             // 尝试1: 通过Plugin实例卸载
-            if (localPlugin != null)
+            if (localPlugin is not null)
             {
                 uninstalled = await _plugin.UnloadAndTryDeletePlugin(localPlugin);
             }
             // 尝试2: 通过FailedPlugin卸载
-            else if (failedPlugin != null && !string.IsNullOrEmpty(failedPlugin.FilePath))
+            else if (failedPlugin is not null && !string.IsNullOrEmpty(failedPlugin.FilePath))
             {
                 uninstalled = await _plugin.DeletePluginFile(failedPlugin.FilePath);
             }
@@ -2814,14 +2808,14 @@ namespace VPetLLM.UI.Windows
             if (uninstalled)
             {
                 // 从失败插件列表中移除
-                if (failedPlugin != null)
+                if (failedPlugin is not null)
                 {
                     _plugin.FailedPlugins.Remove(failedPlugin);
                     Logger.Log($"Removed failed plugin from memory: {pluginNameToFind}");
                 }
 
                 // 从已加载插件列表中移除（如果还在的话）
-                if (localPlugin != null && _plugin.Plugins.Contains(localPlugin))
+                if (localPlugin is not null && _plugin.Plugins.Contains(localPlugin))
                 {
                     _plugin.Plugins.Remove(localPlugin);
                     Logger.Log($"Removed loaded plugin from memory: {pluginNameToFind}");
@@ -2847,7 +2841,7 @@ namespace VPetLLM.UI.Windows
             bool deleted = await _plugin.DeletePluginFile(pluginFilePath);
 
             // 如果删除成功，立即从失败插件列表中移除
-            if (deleted && plugin.FailedPlugin != null)
+            if (deleted && plugin.FailedPlugin is not null)
             {
                 _plugin.FailedPlugins.Remove(plugin.FailedPlugin);
                 Logger.Log($"Removed failed plugin from memory: {plugin.FailedPlugin.Name}");
@@ -2973,7 +2967,7 @@ namespace VPetLLM.UI.Windows
                     string filePath;
 
                     // 如果是更新操作，使用现有插件的文件路径，确保替换而不是创建新文件
-                    if (plugin.IsLocal && plugin.LocalPlugin != null && !string.IsNullOrEmpty(plugin.LocalPlugin.FilePath))
+                    if (plugin.IsLocal && plugin.LocalPlugin is not null && !string.IsNullOrEmpty(plugin.LocalPlugin.FilePath))
                     {
                         filePath = plugin.LocalPlugin.FilePath;
                         Logger.Log($"Updating existing plugin file: {filePath}");
@@ -3016,7 +3010,7 @@ namespace VPetLLM.UI.Windows
                     }
 
                     // 如果是更新操作，使用专门的更新方法
-                    if (plugin.IsLocal && plugin.LocalPlugin != null)
+                    if (plugin.IsLocal && plugin.LocalPlugin is not null)
                     {
                         Logger.Log($"Updating existing plugin: {plugin.LocalPlugin.Name}");
                         bool updateSuccess = await _plugin.UpdatePlugin(filePath);
@@ -3057,7 +3051,7 @@ namespace VPetLLM.UI.Windows
                     if (dataGrid?.ItemsSource is IEnumerable<UnifiedPluginItem> currentItems)
                     {
                         var updatedItem = currentItems.FirstOrDefault(p => p.Id == plugin.Id || p.OriginalName == plugin.OriginalName);
-                        if (updatedItem != null)
+                        if (updatedItem is not null)
                         {
                             Logger.Log($"Updated plugin item found - Name: {updatedItem.Name}");
                             Logger.Log($"  Local Version (SHA256): {updatedItem.Version}");
@@ -3184,31 +3178,31 @@ namespace VPetLLM.UI.Windows
                     var gptSoVITSPanel = FindName("Panel_TTS_GPTSoVITS") as StackPanel;
                     var freePanel = FindName("Panel_TTS_Free") as StackPanel;
 
-                    if (urlPanel != null) urlPanel.Visibility = Visibility.Collapsed;
-                    if (openAIPanel != null) openAIPanel.Visibility = Visibility.Collapsed;
-                    if (diyPanel != null) diyPanel.Visibility = Visibility.Collapsed;
-                    if (gptSoVITSPanel != null) gptSoVITSPanel.Visibility = Visibility.Collapsed;
-                    if (freePanel != null) freePanel.Visibility = Visibility.Collapsed;
+                    if (urlPanel is not null) urlPanel.Visibility = Visibility.Collapsed;
+                    if (openAIPanel is not null) openAIPanel.Visibility = Visibility.Collapsed;
+                    if (diyPanel is not null) diyPanel.Visibility = Visibility.Collapsed;
+                    if (gptSoVITSPanel is not null) gptSoVITSPanel.Visibility = Visibility.Collapsed;
+                    if (freePanel is not null) freePanel.Visibility = Visibility.Collapsed;
 
                     // 显示对应的面板
                     switch (provider)
                     {
                         case "URL":
-                            if (urlPanel != null)
+                            if (urlPanel is not null)
                             {
                                 urlPanel.Visibility = Visibility.Visible;
                                 System.Diagnostics.Debug.WriteLine("[TTS Provider] 显示URL面板");
                             }
                             break;
                         case "OpenAI":
-                            if (openAIPanel != null)
+                            if (openAIPanel is not null)
                             {
                                 openAIPanel.Visibility = Visibility.Visible;
                                 System.Diagnostics.Debug.WriteLine("[TTS Provider] 显示OpenAI面板");
                             }
                             break;
                         case "DIY":
-                            if (diyPanel != null)
+                            if (diyPanel is not null)
                             {
                                 diyPanel.Visibility = Visibility.Visible;
                                 System.Diagnostics.Debug.WriteLine("[TTS Provider] 显示DIY面板");
@@ -3219,7 +3213,7 @@ namespace VPetLLM.UI.Windows
                             }
                             break;
                         case "GPT-SoVITS":
-                            if (gptSoVITSPanel != null)
+                            if (gptSoVITSPanel is not null)
                             {
                                 gptSoVITSPanel.Visibility = Visibility.Visible;
                                 System.Diagnostics.Debug.WriteLine("[TTS Provider] 显示GPT-SoVITS面板");
@@ -3230,7 +3224,7 @@ namespace VPetLLM.UI.Windows
                             }
                             break;
                         case "Free":
-                            if (freePanel != null)
+                            if (freePanel is not null)
                             {
                                 freePanel.Visibility = Visibility.Visible;
                                 System.Diagnostics.Debug.WriteLine("[TTS Provider] 显示Free面板");
@@ -3262,7 +3256,7 @@ namespace VPetLLM.UI.Windows
 
             // 加载请求方法
             var methodComboBox = FindName("ComboBox_TTS_DIY_Method") as ComboBox;
-            if (methodComboBox != null)
+            if (methodComboBox is not null)
             {
                 foreach (ComboBoxItem item in methodComboBox.Items)
                 {
@@ -3276,21 +3270,21 @@ namespace VPetLLM.UI.Windows
 
             // 加载 URL
             var urlTextBox = FindName("TextBox_TTS_DIY_BaseUrl") as TextBox;
-            if (urlTextBox != null)
+            if (urlTextBox is not null)
             {
                 urlTextBox.Text = diySettings.BaseUrl;
             }
 
             // 加载 Content-Type
             var contentTypeTextBox = FindName("TextBox_TTS_DIY_ContentType") as TextBox;
-            if (contentTypeTextBox != null)
+            if (contentTypeTextBox is not null)
             {
                 contentTypeTextBox.Text = diySettings.ContentType;
             }
 
             // 加载请求头
             var headersDataGrid = FindName("DataGrid_TTS_DIY_Headers") as DataGrid;
-            if (headersDataGrid != null)
+            if (headersDataGrid is not null)
             {
                 headersDataGrid.ItemsSource = new System.Collections.ObjectModel.ObservableCollection<Setting.CustomHeader>(
                     diySettings.CustomHeaders ?? new List<Setting.CustomHeader>()
@@ -3299,14 +3293,14 @@ namespace VPetLLM.UI.Windows
 
             // 加载请求体
             var bodyTextBox = FindName("TextBox_TTS_DIY_RequestBody") as TextBox;
-            if (bodyTextBox != null)
+            if (bodyTextBox is not null)
             {
                 bodyTextBox.Text = diySettings.RequestBody;
             }
 
             // 加载响应格式
             var formatComboBox = FindName("ComboBox_TTS_DIY_ResponseFormat") as ComboBox;
-            if (formatComboBox != null)
+            if (formatComboBox is not null)
             {
                 foreach (ComboBoxItem item in formatComboBox.Items)
                 {
@@ -3333,14 +3327,14 @@ namespace VPetLLM.UI.Windows
 
             // 保存 URL
             var urlTextBox = FindName("TextBox_TTS_DIY_BaseUrl") as TextBox;
-            if (urlTextBox != null)
+            if (urlTextBox is not null)
             {
                 diySettings.BaseUrl = urlTextBox.Text;
             }
 
             // 保存 Content-Type
             var contentTypeTextBox = FindName("TextBox_TTS_DIY_ContentType") as TextBox;
-            if (contentTypeTextBox != null)
+            if (contentTypeTextBox is not null)
             {
                 diySettings.ContentType = contentTypeTextBox.Text;
             }
@@ -3354,7 +3348,7 @@ namespace VPetLLM.UI.Windows
 
             // 保存请求体
             var bodyTextBox = FindName("TextBox_TTS_DIY_RequestBody") as TextBox;
-            if (bodyTextBox != null)
+            if (bodyTextBox is not null)
             {
                 diySettings.RequestBody = bodyTextBox.Text;
             }
@@ -3389,7 +3383,7 @@ namespace VPetLLM.UI.Windows
             var header = button?.DataContext as Setting.CustomHeader;
 
             var headersDataGrid = FindName("DataGrid_TTS_DIY_Headers") as DataGrid;
-            if (headersDataGrid?.ItemsSource is System.Collections.ObjectModel.ObservableCollection<Setting.CustomHeader> headers && header != null)
+            if (headersDataGrid?.ItemsSource is System.Collections.ObjectModel.ObservableCollection<Setting.CustomHeader> headers && header is not null)
             {
                 headers.Remove(header);
             }
@@ -3408,9 +3402,9 @@ namespace VPetLLM.UI.Windows
 
                 // 重新创建TTS服务实例以使用最新设置
                 _ttsService?.Dispose();
-                _ttsService = new TTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
+                _ttsService = new UtilsTTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
 
-                if (_ttsService != null)
+                if (_ttsService is not null)
                 {
                     var success = await _ttsService.TestTTSAsync();
                     if (success)
@@ -3448,9 +3442,9 @@ namespace VPetLLM.UI.Windows
 
                 // 重新创建TTS服务实例以使用最新设置
                 _ttsService?.Dispose();
-                _ttsService = new TTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
+                _ttsService = new UtilsTTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
 
-                if (_ttsService != null)
+                if (_ttsService is not null)
                 {
                     var success = await _ttsService.TestTTSAsync();
                     if (success)
@@ -3531,7 +3525,7 @@ namespace VPetLLM.UI.Windows
 
                         comboBox.Items.Clear();
 
-                        if (items != null)
+                        if (items is not null)
                         {
                             foreach (var item in items)
                             {
@@ -3583,7 +3577,7 @@ namespace VPetLLM.UI.Windows
         {
             // 优先检查插件商店专用代理设置
             var pluginStoreSettings = _plugin.Settings.PluginStore;
-            if (pluginStoreSettings != null && pluginStoreSettings.UseProxy && !string.IsNullOrEmpty(pluginStoreSettings.ProxyUrl))
+            if (pluginStoreSettings is not null && pluginStoreSettings.UseProxy && !string.IsNullOrEmpty(pluginStoreSettings.ProxyUrl))
             {
                 var proxyUrl = pluginStoreSettings.ProxyUrl.Trim();
 
@@ -3610,7 +3604,7 @@ namespace VPetLLM.UI.Windows
             var proxySettings = _plugin.Settings.Proxy;
 
             // 如果通用代理未启用，不使用代理
-            if (proxySettings == null || !proxySettings.IsEnabled)
+            if (proxySettings is null || !proxySettings.IsEnabled)
             {
                 return (false, null);
             }
@@ -3662,7 +3656,7 @@ namespace VPetLLM.UI.Windows
             var handler = new HttpClientHandler();
             var proxy = GetPluginStoreProxy();
 
-            if (proxy != null)
+            if (proxy is not null)
             {
                 handler.Proxy = proxy;
                 handler.UseProxy = true;
@@ -3710,7 +3704,7 @@ namespace VPetLLM.UI.Windows
         private void RefreshOpenAINodesList()
         {
             var list = this.FindName("ListView_OpenAINodes") as ListView;
-            if (list != null)
+            if (list is not null)
             {
                 var selectedItem = list.SelectedItem;
                 var selectedIndex = list.SelectedIndex;
@@ -3718,7 +3712,7 @@ namespace VPetLLM.UI.Windows
                 list.ItemsSource = null;
                 list.ItemsSource = _plugin.Settings.OpenAI.OpenAINodes;
 
-                if (selectedItem != null && _plugin.Settings.OpenAI.OpenAINodes.Contains(selectedItem))
+                if (selectedItem is not null && _plugin.Settings.OpenAI.OpenAINodes.Contains(selectedItem))
                     list.SelectedItem = selectedItem;
                 else if (selectedIndex >= 0 && selectedIndex < list.Items.Count)
                     list.SelectedIndex = selectedIndex;
@@ -3737,7 +3731,7 @@ namespace VPetLLM.UI.Windows
         private void RefreshGeminiNodesList()
         {
             var list = this.FindName("ListView_GeminiNodes") as ListView;
-            if (list != null)
+            if (list is not null)
             {
                 var selectedItem = list.SelectedItem;
                 var selectedIndex = list.SelectedIndex;
@@ -3745,7 +3739,7 @@ namespace VPetLLM.UI.Windows
                 list.ItemsSource = null;
                 list.ItemsSource = _plugin.Settings.Gemini.GeminiNodes;
 
-                if (selectedItem != null && _plugin.Settings.Gemini.GeminiNodes.Contains(selectedItem))
+                if (selectedItem is not null && _plugin.Settings.Gemini.GeminiNodes.Contains(selectedItem))
                     list.SelectedItem = selectedItem;
                 else if (selectedIndex >= 0 && selectedIndex < list.Items.Count)
                     list.SelectedIndex = selectedIndex;
@@ -3795,7 +3789,7 @@ namespace VPetLLM.UI.Windows
         {
             _isUpdatingNodeDetails = true;
             var node = GetSelectedOpenAINode();
-            if (node == null) { _isUpdatingNodeDetails = false; return; }
+            if (node is null) { _isUpdatingNodeDetails = false; return; }
 
             if (this.FindName("TextBox_OpenAINodeName") is TextBox tbName) tbName.Text = node.Name ?? string.Empty;
             if (this.FindName("PasswordBox_OpenAIApiKey") is PasswordBox pb) pb.Password = node.ApiKey ?? string.Empty;
@@ -3818,7 +3812,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedOpenAINode();
-            if (node == null) return;
+            if (node is null) return;
 
             if (sender is TextBox tb)
             {
@@ -3848,7 +3842,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedOpenAINode();
-            if (node == null) return;
+            if (node is null) return;
             if (sender is PasswordBox pb)
             {
                 node.ApiKey = pb.Password;
@@ -3864,7 +3858,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedOpenAINode();
-            if (node == null) return;
+            if (node is null) return;
             if (sender is ComboBox cb && cb.Name == "ComboBox_OpenAIModel")
             {
                 node.Model = cb.Text;
@@ -3877,7 +3871,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedOpenAINode();
-            if (node == null) return;
+            if (node is null) return;
             if (sender is CheckBox cb)
             {
                 if (cb.Name == "CheckBox_OpenAI_EnableAdvanced")
@@ -3905,7 +3899,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedOpenAINode();
-            if (node == null) return;
+            if (node is null) return;
             if (sender is Slider sl && sl.Name == "Slider_OpenAI_Temperature")
             {
                 node.Temperature = sl.Value;
@@ -3983,7 +3977,7 @@ namespace VPetLLM.UI.Windows
 
             _isUpdatingNodeDetails = true;
             var node = GetSelectedGeminiNode();
-            if (node == null) { _isUpdatingNodeDetails = false; return; }
+            if (node is null) { _isUpdatingNodeDetails = false; return; }
 
             if (this.FindName("TextBox_GeminiNodeName") is TextBox tbName) tbName.Text = node.Name ?? string.Empty;
             if (this.FindName("PasswordBox_GeminiApiKey") is PasswordBox pb) pb.Password = node.ApiKey ?? string.Empty;
@@ -4006,7 +4000,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedGeminiNode();
-            if (node == null) return;
+            if (node is null) return;
 
             if (sender is TextBox tb)
             {
@@ -4037,7 +4031,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedGeminiNode();
-            if (node == null) return;
+            if (node is null) return;
             if (sender is PasswordBox pb)
             {
                 node.ApiKey = pb.Password;
@@ -4053,7 +4047,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedGeminiNode();
-            if (node == null) return;
+            if (node is null) return;
             if (sender is ComboBox cb && cb.Name == "ComboBox_GeminiNodeModel")
             {
                 cb.Dispatcher.BeginInvoke(new Action(() =>
@@ -4069,7 +4063,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedGeminiNode();
-            if (node == null) return;
+            if (node is null) return;
             if (sender is CheckBox cb)
             {
                 if (cb.Name == "CheckBox_GeminiNode_EnableAdvanced")
@@ -4097,7 +4091,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedGeminiNode();
-            if (node == null) return;
+            if (node is null) return;
             if (sender is Slider sl && sl.Name == "Slider_GeminiNode_Temperature")
             {
                 node.Temperature = sl.Value;
@@ -4186,7 +4180,7 @@ namespace VPetLLM.UI.Windows
         private bool IsInGeminiList(DependencyObject source)
         {
             DependencyObject current = source;
-            while (current != null)
+            while (current is not null)
             {
                 if (current is FrameworkElement fe && fe.Name == "ListView_GeminiNodes")
                     return true;
@@ -4239,7 +4233,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_isUpdatingNodeDetails) return;
             var node = GetSelectedOpenAINode();
-            if (node == null) return;
+            if (node is null) return;
             if (sender is ComboBox cb)
             {
                 node.Model = cb.Text;
@@ -4282,29 +4276,29 @@ namespace VPetLLM.UI.Windows
                     var sonioxPanel = FindName("Panel_ASR_Soniox") as StackPanel;
                     var freePanel = FindName("Panel_ASR_Free") as StackPanel;
 
-                    if (openAIPanel != null) openAIPanel.Visibility = Visibility.Collapsed;
-                    if (sonioxPanel != null) sonioxPanel.Visibility = Visibility.Collapsed;
-                    if (freePanel != null) freePanel.Visibility = Visibility.Collapsed;
+                    if (openAIPanel is not null) openAIPanel.Visibility = Visibility.Collapsed;
+                    if (sonioxPanel is not null) sonioxPanel.Visibility = Visibility.Collapsed;
+                    if (freePanel is not null) freePanel.Visibility = Visibility.Collapsed;
 
                     // 显示对应的面板
                     switch (provider)
                     {
                         case "OpenAI":
-                            if (openAIPanel != null)
+                            if (openAIPanel is not null)
                             {
                                 openAIPanel.Visibility = Visibility.Visible;
                                 System.Diagnostics.Debug.WriteLine("[ASR Provider] 显示OpenAI面板");
                             }
                             break;
                         case "Soniox":
-                            if (sonioxPanel != null)
+                            if (sonioxPanel is not null)
                             {
                                 sonioxPanel.Visibility = Visibility.Visible;
                                 System.Diagnostics.Debug.WriteLine("[ASR Provider] 显示Soniox面板");
                             }
                             break;
                         case "Free":
-                            if (freePanel != null)
+                            if (freePanel is not null)
                             {
                                 freePanel.Visibility = Visibility.Visible;
                                 System.Diagnostics.Debug.WriteLine("[ASR Provider] 显示Free面板");
@@ -4330,7 +4324,7 @@ namespace VPetLLM.UI.Windows
 
                 // 加载Chat配置
                 var chatConfig = FreeConfigManager.GetChatConfig();
-                if (chatConfig != null)
+                if (chatConfig is not null)
                 {
                     var chatDescription = FreeConfigManager.GetDescription(chatConfig, language);
                     var chatProvider = FreeConfigManager.GetProviderInfo(chatConfig, language);
@@ -4347,7 +4341,7 @@ namespace VPetLLM.UI.Windows
 
                 // 加载ASR配置
                 var asrConfig = FreeConfigManager.GetASRConfig();
-                if (asrConfig != null)
+                if (asrConfig is not null)
                 {
                     var asrDescription = FreeConfigManager.GetDescription(asrConfig, language);
                     var asrProvider = FreeConfigManager.GetProviderInfo(asrConfig, language);
@@ -4364,7 +4358,7 @@ namespace VPetLLM.UI.Windows
 
                 // 加载TTS配置
                 var ttsConfig = FreeConfigManager.GetTTSConfig();
-                if (ttsConfig != null)
+                if (ttsConfig is not null)
                 {
                     var ttsDescription = FreeConfigManager.GetDescription(ttsConfig, language);
                     var ttsProvider = FreeConfigManager.GetProviderInfo(ttsConfig, language);
@@ -4407,7 +4401,7 @@ namespace VPetLLM.UI.Windows
         private async void Button_ASR_Soniox_RefreshModels_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
-            if (button == null) return;
+            if (button is null) return;
 
             try
             {
@@ -4418,7 +4412,7 @@ namespace VPetLLM.UI.Windows
                 SaveSettings();
 
                 // 创建临时 ASR 服务来获取模型列表
-                var asrService = new ASRService(_plugin.Settings);
+                var asrService = new UtilsASRService(_plugin.Settings);
                 _sonioxModels = await asrService.FetchSonioxModels();
                 asrService.Dispose();
 
@@ -4479,7 +4473,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 var comboBox = sender as ComboBox;
-                if (comboBox == null) return;
+                if (comboBox is null) return;
 
                 string selectedModelId = "";
                 if (comboBox.SelectedItem is ComboBoxItem item)
@@ -4495,11 +4489,11 @@ namespace VPetLLM.UI.Windows
 
                 // 查找对应的模型信息
                 var modelInfo = _sonioxModels.FirstOrDefault(m => m.Id == selectedModelId);
-                if (modelInfo == null || modelInfo.Languages.Count == 0) return;
+                if (modelInfo is null || modelInfo.Languages.Count == 0) return;
 
                 // 更新语言下拉框
                 var languageComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Language");
-                if (languageComboBox == null) return;
+                if (languageComboBox is null) return;
 
                 var currentLanguage = "";
                 if (languageComboBox.SelectedItem is ComboBoxItem currentItem)
@@ -4566,12 +4560,12 @@ namespace VPetLLM.UI.Windows
             try
             {
                 var languageComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Language");
-                if (languageComboBox == null) return;
+                if (languageComboBox is null) return;
 
                 // 如果已经有 API Key，尝试自动加载模型列表
                 if (!string.IsNullOrWhiteSpace(_plugin.Settings.ASR.Soniox.ApiKey))
                 {
-                    var asrService = new ASRService(_plugin.Settings);
+                    var asrService = new UtilsASRService(_plugin.Settings);
                     _sonioxModels = await asrService.FetchSonioxModels();
                     asrService.Dispose();
 
@@ -4579,7 +4573,7 @@ namespace VPetLLM.UI.Windows
                     {
                         // 更新模型下拉框
                         var modelComboBox = (ComboBox)this.FindName("ComboBox_ASR_Soniox_Model");
-                        if (modelComboBox != null)
+                        if (modelComboBox is not null)
                         {
                             var currentModel = modelComboBox.Text;
                             modelComboBox.Items.Clear();
@@ -4616,7 +4610,7 @@ namespace VPetLLM.UI.Windows
                         var selectedModelId = _plugin.Settings.ASR.Soniox.Model;
                         var modelInfo = _sonioxModels.FirstOrDefault(m => m.Id == selectedModelId);
 
-                        if (modelInfo != null && modelInfo.Languages.Count > 0)
+                        if (modelInfo is not null && modelInfo.Languages.Count > 0)
                         {
                             languageComboBox.Items.Clear();
 
@@ -4695,7 +4689,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 var comboBox = (ComboBox)this.FindName("ComboBox_ASR_RecordingDevice");
-                if (comboBox == null) return;
+                if (comboBox is null) return;
 
                 comboBox.Items.Clear();
 
@@ -4730,7 +4724,7 @@ namespace VPetLLM.UI.Windows
                     }
                 }
 
-                if (comboBox.SelectedItem == null && comboBox.Items.Count > 0)
+                if (comboBox.SelectedItem is null && comboBox.Items.Count > 0)
                 {
                     comboBox.SelectedIndex = 0;
                 }
@@ -4833,7 +4827,7 @@ namespace VPetLLM.UI.Windows
         private void UpdateHotkeyDisplay()
         {
             var textBox = (TextBox)this.FindName("TextBox_ASR_HotkeyDisplay");
-            if (textBox != null)
+            if (textBox is not null)
             {
                 var modifiers = _plugin.Settings.ASR.HotkeyModifiers;
                 var key = _plugin.Settings.ASR.HotkeyKey;
@@ -4896,7 +4890,7 @@ namespace VPetLLM.UI.Windows
                 var multimodalPanel = (StackPanel)this.FindName("Panel_Screenshot_Main_Multimodal");
                 var nativeMultimodalPanel = (StackPanel)this.FindName("Panel_Screenshot_Main_NativeMultimodal");
 
-                if (comboBox == null || ocrPanel == null || multimodalPanel == null) return;
+                if (comboBox is null || ocrPanel is null || multimodalPanel is null) return;
 
                 var selectedItem = comboBox.SelectedItem as ComboBoxItem;
                 var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
@@ -4908,13 +4902,13 @@ namespace VPetLLM.UI.Windows
                         // 原生多模态：显示原生多模态说明面板
                         ocrPanel.Visibility = Visibility.Collapsed;
                         multimodalPanel.Visibility = Visibility.Collapsed;
-                        if (nativeMultimodalPanel != null) nativeMultimodalPanel.Visibility = Visibility.Visible;
+                        if (nativeMultimodalPanel is not null) nativeMultimodalPanel.Visibility = Visibility.Visible;
                         break;
                     case "PreprocessingMultimodal":
                         // 前置多模态：显示多模态提供商配置
                         ocrPanel.Visibility = Visibility.Collapsed;
                         multimodalPanel.Visibility = Visibility.Visible;
-                        if (nativeMultimodalPanel != null) nativeMultimodalPanel.Visibility = Visibility.Collapsed;
+                        if (nativeMultimodalPanel is not null) nativeMultimodalPanel.Visibility = Visibility.Collapsed;
                         // 切换到前置多模态时，先加载已保存的多模态提供商设置
                         LoadMultimodalProviderSettings();
                         break;
@@ -4922,7 +4916,7 @@ namespace VPetLLM.UI.Windows
                         // OCR API：显示 OCR 配置
                         ocrPanel.Visibility = Visibility.Visible;
                         multimodalPanel.Visibility = Visibility.Collapsed;
-                        if (nativeMultimodalPanel != null) nativeMultimodalPanel.Visibility = Visibility.Collapsed;
+                        if (nativeMultimodalPanel is not null) nativeMultimodalPanel.Visibility = Visibility.Collapsed;
                         break;
                 }
             }
@@ -5019,7 +5013,7 @@ namespace VPetLLM.UI.Windows
         private void UpdateScreenshotHotkeyDisplay()
         {
             var textBox = (TextBox)this.FindName("TextBox_Screenshot_Main_HotkeyDisplay");
-            if (textBox != null)
+            if (textBox is not null)
             {
                 var modifiers = _plugin.Settings.Screenshot.HotkeyModifiers;
                 var key = _plugin.Settings.Screenshot.HotkeyKey;
@@ -5044,7 +5038,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 // 确保 Screenshot 配置存在
-                if (_plugin.Settings.Screenshot == null)
+                if (_plugin.Settings.Screenshot is null)
                 {
                     _plugin.Settings.Screenshot = new Configuration.ScreenshotSettings();
                 }
@@ -5056,10 +5050,10 @@ namespace VPetLLM.UI.Windows
                 var textBoxOCRBaseUrl = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_BaseUrl");
                 var textBoxOCRApiKey = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_ApiKey");
 
-                if (checkBoxEnabled != null)
+                if (checkBoxEnabled is not null)
                     checkBoxEnabled.IsChecked = _plugin.Settings.Screenshot.IsEnabled;
 
-                if (comboBoxMode != null)
+                if (comboBoxMode is not null)
                 {
                     var mode = _plugin.Settings.Screenshot.ProcessingMode.ToString();
                     foreach (ComboBoxItem item in comboBoxMode.Items)
@@ -5072,10 +5066,10 @@ namespace VPetLLM.UI.Windows
                     }
                 }
 
-                if (checkBoxAutoSend != null)
+                if (checkBoxAutoSend is not null)
                     checkBoxAutoSend.IsChecked = _plugin.Settings.Screenshot.AutoSend;
 
-                if (comboBoxOCRProvider != null)
+                if (comboBoxOCRProvider is not null)
                 {
                     var provider = _plugin.Settings.Screenshot.OCR.Provider;
                     foreach (ComboBoxItem item in comboBoxOCRProvider.Items)
@@ -5088,10 +5082,10 @@ namespace VPetLLM.UI.Windows
                     }
                 }
 
-                if (textBoxOCRBaseUrl != null)
+                if (textBoxOCRBaseUrl is not null)
                     textBoxOCRBaseUrl.Text = _plugin.Settings.Screenshot.OCR.BaseUrl;
 
-                if (textBoxOCRApiKey != null)
+                if (textBoxOCRApiKey is not null)
                     textBoxOCRApiKey.Text = _plugin.Settings.Screenshot.OCR.ApiKey;
 
                 UpdateScreenshotHotkeyDisplay();
@@ -5109,15 +5103,15 @@ namespace VPetLLM.UI.Windows
             try
             {
                 // 确保 Screenshot 和其嵌套对象不为 null
-                if (_plugin.Settings.Screenshot == null)
+                if (_plugin.Settings.Screenshot is null)
                 {
                     _plugin.Settings.Screenshot = new Configuration.ScreenshotSettings();
                 }
-                if (_plugin.Settings.Screenshot.OCR == null)
+                if (_plugin.Settings.Screenshot.OCR is null)
                 {
                     _plugin.Settings.Screenshot.OCR = new Configuration.OCRSettings();
                 }
-                if (_plugin.Settings.Screenshot.MultimodalProvider == null)
+                if (_plugin.Settings.Screenshot.MultimodalProvider is null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
                 }
@@ -5129,10 +5123,10 @@ namespace VPetLLM.UI.Windows
                 var textBoxOCRBaseUrl = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_BaseUrl");
                 var textBoxOCRApiKey = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_ApiKey");
 
-                if (checkBoxEnabled != null)
+                if (checkBoxEnabled is not null)
                     _plugin.Settings.Screenshot.IsEnabled = checkBoxEnabled.IsChecked ?? false;
 
-                if (comboBoxMode != null)
+                if (comboBoxMode is not null)
                 {
                     var selectedItem = comboBoxMode.SelectedItem as ComboBoxItem;
                     var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
@@ -5144,19 +5138,19 @@ namespace VPetLLM.UI.Windows
                     };
                 }
 
-                if (checkBoxAutoSend != null)
+                if (checkBoxAutoSend is not null)
                     _plugin.Settings.Screenshot.AutoSend = checkBoxAutoSend.IsChecked ?? false;
 
-                if (comboBoxOCRProvider != null)
+                if (comboBoxOCRProvider is not null)
                 {
                     var selectedItem = comboBoxOCRProvider.SelectedItem as ComboBoxItem;
                     _plugin.Settings.Screenshot.OCR.Provider = selectedItem?.Tag?.ToString() ?? "OpenAI";
                 }
 
-                if (textBoxOCRBaseUrl != null)
+                if (textBoxOCRBaseUrl is not null)
                     _plugin.Settings.Screenshot.OCR.BaseUrl = textBoxOCRBaseUrl.Text;
 
-                if (textBoxOCRApiKey != null)
+                if (textBoxOCRApiKey is not null)
                     _plugin.Settings.Screenshot.OCR.ApiKey = textBoxOCRApiKey.Text;
 
                 // 更新快捷键注册
@@ -5184,15 +5178,15 @@ namespace VPetLLM.UI.Windows
             try
             {
                 // 确保 Screenshot 和其嵌套对象不为 null
-                if (_plugin.Settings.Screenshot == null)
+                if (_plugin.Settings.Screenshot is null)
                 {
                     _plugin.Settings.Screenshot = new Configuration.ScreenshotSettings();
                 }
-                if (_plugin.Settings.Screenshot.OCR == null)
+                if (_plugin.Settings.Screenshot.OCR is null)
                 {
                     _plugin.Settings.Screenshot.OCR = new Configuration.OCRSettings();
                 }
-                if (_plugin.Settings.Screenshot.MultimodalProvider == null)
+                if (_plugin.Settings.Screenshot.MultimodalProvider is null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
                 }
@@ -5204,10 +5198,10 @@ namespace VPetLLM.UI.Windows
                 var textBoxOCRBaseUrl = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_BaseUrl");
                 var textBoxOCRApiKey = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_ApiKey");
 
-                if (checkBoxEnabled != null)
+                if (checkBoxEnabled is not null)
                     _plugin.Settings.Screenshot.IsEnabled = checkBoxEnabled.IsChecked ?? false;
 
-                if (comboBoxMode != null)
+                if (comboBoxMode is not null)
                 {
                     var selectedItem = comboBoxMode.SelectedItem as ComboBoxItem;
                     var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
@@ -5219,19 +5213,19 @@ namespace VPetLLM.UI.Windows
                     };
                 }
 
-                if (checkBoxAutoSend != null)
+                if (checkBoxAutoSend is not null)
                     _plugin.Settings.Screenshot.AutoSend = checkBoxAutoSend.IsChecked ?? false;
 
-                if (comboBoxOCRProvider != null)
+                if (comboBoxOCRProvider is not null)
                 {
                     var selectedItem = comboBoxOCRProvider.SelectedItem as ComboBoxItem;
                     _plugin.Settings.Screenshot.OCR.Provider = selectedItem?.Tag?.ToString() ?? "OpenAI";
                 }
 
-                if (textBoxOCRBaseUrl != null)
+                if (textBoxOCRBaseUrl is not null)
                     _plugin.Settings.Screenshot.OCR.BaseUrl = textBoxOCRBaseUrl.Text;
 
-                if (textBoxOCRApiKey != null)
+                if (textBoxOCRApiKey is not null)
                     _plugin.Settings.Screenshot.OCR.ApiKey = textBoxOCRApiKey.Text;
 
                 // 更新快捷键注册
@@ -5344,13 +5338,13 @@ namespace VPetLLM.UI.Windows
                 var freeProviderTip = (TextBlock)this.FindName("TextBlock_Screenshot_Main_FreeProviderTip");
                 var visionChannelsProviderTip = (TextBlock)this.FindName("TextBlock_Screenshot_Main_VisionChannelsProviderTip");
 
-                if (comboBox == null)
+                if (comboBox is null)
                 {
                     Logger.Log("Warning: ComboBox_Screenshot_Main_Multimodal_Provider not found in UpdateMultimodalProviderPanel");
                     return;
                 }
 
-                if (visionNodesPanel == null)
+                if (visionNodesPanel is null)
                 {
                     Logger.Log("Warning: Panel_Screenshot_Main_VisionNodes not found in UpdateMultimodalProviderPanel");
                     return;
@@ -5362,15 +5356,15 @@ namespace VPetLLM.UI.Windows
                 if (providerType == "VisionChannels")
                 {
                     visionNodesPanel.Visibility = Visibility.Visible;
-                    if (freeProviderTip != null) freeProviderTip.Visibility = Visibility.Collapsed;
-                    if (visionChannelsProviderTip != null) visionChannelsProviderTip.Visibility = Visibility.Visible;
+                    if (freeProviderTip is not null) freeProviderTip.Visibility = Visibility.Collapsed;
+                    if (visionChannelsProviderTip is not null) visionChannelsProviderTip.Visibility = Visibility.Visible;
                     RefreshVisionNodesList();
                 }
                 else
                 {
                     visionNodesPanel.Visibility = Visibility.Collapsed;
-                    if (freeProviderTip != null) freeProviderTip.Visibility = Visibility.Visible;
-                    if (visionChannelsProviderTip != null) visionChannelsProviderTip.Visibility = Visibility.Collapsed;
+                    if (freeProviderTip is not null) freeProviderTip.Visibility = Visibility.Visible;
+                    if (visionChannelsProviderTip is not null) visionChannelsProviderTip.Visibility = Visibility.Collapsed;
                 }
             }
             catch (Exception ex)
@@ -5386,7 +5380,7 @@ namespace VPetLLM.UI.Windows
                 var visionNodesControl = (ItemsControl)this.FindName("ItemsControl_Screenshot_VisionNodes");
                 var noNodesText = (TextBlock)this.FindName("TextBlock_Screenshot_Main_NoVisionNodes");
 
-                if (visionNodesControl == null)
+                if (visionNodesControl is null)
                 {
                     Logger.Log("Warning: ItemsControl_Screenshot_VisionNodes not found");
                     return;
@@ -5418,12 +5412,12 @@ namespace VPetLLM.UI.Windows
 
                 if (availableNodes.Count == 0)
                 {
-                    if (noNodesText != null) noNodesText.Visibility = Visibility.Visible;
+                    if (noNodesText is not null) noNodesText.Visibility = Visibility.Visible;
                     visionNodesControl.Visibility = Visibility.Collapsed;
                 }
                 else
                 {
-                    if (noNodesText != null) noNodesText.Visibility = Visibility.Collapsed;
+                    if (noNodesText is not null) noNodesText.Visibility = Visibility.Collapsed;
                     visionNodesControl.Visibility = Visibility.Visible;
 
                     foreach (var node in availableNodes)
@@ -5469,14 +5463,14 @@ namespace VPetLLM.UI.Windows
                 var comboBoxProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_Multimodal_Provider");
 
                 // 确保 MultimodalProvider 配置存在
-                if (_plugin.Settings.Screenshot.MultimodalProvider == null)
+                if (_plugin.Settings.Screenshot.MultimodalProvider is null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
                     Logger.Log("LoadMultimodalProviderSettings: Created new MultimodalProviderConfig");
                 }
 
                 // 确保SelectedNodes列表被正确初始化
-                if (_plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes == null)
+                if (_plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes is null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = new List<Configuration.VisionNodeIdentifier>();
                     Logger.Log("LoadMultimodalProviderSettings: Created new SelectedNodes list");
@@ -5492,7 +5486,7 @@ namespace VPetLLM.UI.Windows
                 }
 
                 // 加载提供商类型
-                if (comboBoxProvider != null)
+                if (comboBoxProvider is not null)
                 {
                     var providerType = _plugin.Settings.Screenshot.MultimodalProvider?.ProviderType.ToString() ?? "Free";
                     Logger.Log($"LoadMultimodalProviderSettings: Setting ComboBox to {providerType}");
@@ -5544,19 +5538,19 @@ namespace VPetLLM.UI.Windows
                 var comboBoxProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_Multimodal_Provider");
                 var visionNodesControl = (ItemsControl)this.FindName("ItemsControl_Screenshot_VisionNodes");
 
-                if (_plugin.Settings.Screenshot.MultimodalProvider == null)
+                if (_plugin.Settings.Screenshot.MultimodalProvider is null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
                 }
 
                 // 确保SelectedNodes列表被正确初始化
-                if (_plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes == null)
+                if (_plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes is null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = new List<Configuration.VisionNodeIdentifier>();
                 }
 
                 // 保存提供商类型
-                if (comboBoxProvider != null)
+                if (comboBoxProvider is not null)
                 {
                     var selectedItem = comboBoxProvider.SelectedItem as ComboBoxItem;
                     var providerType = selectedItem?.Tag?.ToString() ?? "Free";
@@ -5574,7 +5568,7 @@ namespace VPetLLM.UI.Windows
                     selectedNodes = nodes.Where(n => n.IsSelected).Select(n => n.Node).ToList();
                     Logger.Log($"SaveMultimodalProviderSettings: Got {selectedNodes.Count} selected nodes from ItemsControl");
                 }
-                else if (_visionNodes != null && _visionNodes.Count > 0)
+                else if (_visionNodes is not null && _visionNodes.Count > 0)
                 {
                     // 备用方案：直接从 _visionNodes 集合获取
                     selectedNodes = _visionNodes.Where(n => n.IsSelected).Select(n => n.Node).ToList();
@@ -5616,13 +5610,13 @@ namespace VPetLLM.UI.Windows
                 var config = _plugin.Settings.Screenshot.MultimodalProvider;
                 var errorPanel = (StackPanel)this.FindName("Panel_Screenshot_ValidationErrors");
 
-                if (errorPanel == null) return;
+                if (errorPanel is null) return;
 
                 // 清除现有错误
                 errorPanel.Children.Clear();
                 errorPanel.Visibility = Visibility.Collapsed;
 
-                if (config == null) return;
+                if (config is null) return;
 
                 bool hasErrors = false;
 
@@ -5638,7 +5632,7 @@ namespace VPetLLM.UI.Windows
                 }
                 else if (config.ProviderType == Configuration.MultimodalProviderType.VisionChannels)
                 {
-                    if (config.SelectedNodes == null || config.SelectedNodes.Count == 0)
+                    if (config.SelectedNodes is null || config.SelectedNodes.Count == 0)
                     {
                         var errorMessage = LanguageHelper.Get("Screenshot.Validation.VisionNodeRequired", _plugin.Settings.Language)
                             ?? "使用视觉渠道时必须选择至少一个视觉节点。";
@@ -5661,7 +5655,7 @@ namespace VPetLLM.UI.Windows
         private void AddValidationError(string message)
         {
             var errorPanel = (StackPanel)this.FindName("Panel_Screenshot_ValidationErrors");
-            if (errorPanel == null) return;
+            if (errorPanel is null) return;
 
             var errorText = new TextBlock
             {

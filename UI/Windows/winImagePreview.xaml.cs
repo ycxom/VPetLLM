@@ -1,8 +1,6 @@
-using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -27,7 +25,7 @@ namespace VPetLLM.UI.Windows
         {
             try
             {
-                if (imageData == null || imageData.Length == 0)
+                if (imageData is null || imageData.Length == 0)
                 {
                     Logger.Log("图像预览: 无图像数据");
                     return;

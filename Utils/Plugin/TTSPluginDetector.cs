@@ -1,5 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Plugin
 {
@@ -287,7 +286,7 @@ namespace VPetLLM.Utils.Plugin
 
             try
             {
-                if (mainWindow?.Plugins == null)
+                if (mainWindow?.Plugins is null)
                 {
                     Logger.Log("TTSPluginDetector: 插件列表为空");
                     return result;
@@ -340,7 +339,7 @@ namespace VPetLLM.Utils.Plugin
 
             try
             {
-                if (mainWindow?.Plugins == null)
+                if (mainWindow?.Plugins is null)
                 {
                     return result;
                 }
@@ -398,28 +397,28 @@ namespace VPetLLM.Utils.Plugin
 
                 // 首先尝试获取 Set 属性
                 var setProperty = plugin.GetType().GetProperty("Set");
-                if (setProperty != null)
+                if (setProperty is not null)
                 {
                     setObject = setProperty.GetValue(plugin);
                     Logger.Log("TTSPluginDetector: 通过属性获取到 Set 对象");
                 }
 
                 // 如果属性不存在，尝试获取 Set 字段（VPetTTS 使用的是字段）
-                if (setObject == null)
+                if (setObject is null)
                 {
                     var setField = plugin.GetType().GetField("Set");
-                    if (setField != null)
+                    if (setField is not null)
                     {
                         setObject = setField.GetValue(plugin);
                         Logger.Log("TTSPluginDetector: 通过字段获取到 Set 对象");
                     }
                 }
 
-                if (setObject != null)
+                if (setObject is not null)
                 {
                     // 尝试获取 Enable 属性
                     var enableProperty = setObject.GetType().GetProperty("Enable");
-                    if (enableProperty != null)
+                    if (enableProperty is not null)
                     {
                         var enableValue = enableProperty.GetValue(setObject);
                         if (enableValue is bool enabled)
@@ -452,7 +451,7 @@ namespace VPetLLM.Utils.Plugin
                 // 尝试从程序集获取版本
                 var assembly = plugin.GetType().Assembly;
                 var version = assembly.GetName().Version;
-                if (version != null)
+                if (version is not null)
                 {
                     return version.ToString();
                 }

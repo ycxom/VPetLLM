@@ -1,8 +1,4 @@
-using System.Text;
 using System.Text.RegularExpressions;
-using VPetLLM.Core;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Infrastructure
 {
@@ -63,7 +59,7 @@ namespace VPetLLM.Handlers.Infrastructure
             var currentBuffer = _takeoverBuffer.ToString();
 
             // 如果正在接管中
-            if (_isTakingOver && _currentTakeoverPlugin != null)
+            if (_isTakingOver && _currentTakeoverPlugin is not null)
             {
                 // 检查是否应该结束接管
                 if (_currentTakeoverPlugin.ShouldEndTakeover(currentBuffer))
@@ -137,7 +133,7 @@ namespace VPetLLM.Handlers.Infrastructure
         /// </summary>
         private async Task EndTakeoverAsync()
         {
-            if (_currentTakeoverPlugin == null)
+            if (_currentTakeoverPlugin is null)
                 return;
 
             try

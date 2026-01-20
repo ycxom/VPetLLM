@@ -1,6 +1,4 @@
 using Newtonsoft.Json.Linq;
-using System.IO;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Common
 {
@@ -33,7 +31,7 @@ namespace VPetLLM.Utils.Common
 
         public static string Get(string key, string lang)
         {
-            if (_prompts == null)
+            if (_prompts is null)
             {
                 Logger.Log("PromptHelper: _prompts is null");
                 return $"[Prompt Not Loaded: {key}]";

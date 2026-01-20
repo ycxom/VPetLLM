@@ -1,7 +1,3 @@
-using Newtonsoft.Json;
-using System.IO;
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Configuration
 {
     /// <summary>
@@ -40,7 +36,7 @@ namespace VPetLLM.Configuration
         /// <inheritdoc/>
         public void SaveSettings<T>(T settings) where T : class, ISettings
         {
-            if (settings == null)
+            if (settings is null)
             {
                 throw new ArgumentNullException(nameof(settings));
             }
@@ -112,7 +108,7 @@ namespace VPetLLM.Configuration
                     if (!string.IsNullOrWhiteSpace(json))
                     {
                         var settings = JsonConvert.DeserializeObject<T>(json);
-                        if (settings != null)
+                        if (settings is not null)
                         {
                             Logger.Log($"Loaded settings from {filePath}");
                             return settings;

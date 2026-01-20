@@ -1,8 +1,6 @@
 using System.Windows;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.Common;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.UI
 {
@@ -44,7 +42,7 @@ namespace VPetLLM.Handlers.UI
             }
 
             // 延迟注册事件，确保Main已经初始化
-            if (_plugin?.MW?.Main != null)
+            if (_plugin?.MW?.Main is not null)
             {
                 RegisterTouchEvents();
                 Logger.Log("TouchInteractionHandler initialized with events registered.");
@@ -71,7 +69,7 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                if (_plugin?.MW?.Main != null)
+                if (_plugin?.MW?.Main is not null)
                 {
                     RegisterTouchEvents();
                     Logger.Log("Touch events registered successfully (delayed).");
@@ -94,7 +92,7 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                if (_plugin?.MW?.Main == null)
+                if (_plugin?.MW?.Main is null)
                 {
                     Logger.Log("Cannot register touch events: MW.Main is null.");
                     return;
@@ -165,7 +163,7 @@ namespace VPetLLM.Handlers.UI
                 {
                     try
                     {
-                        if (_plugin?.MW?.Main?.DisplayType == null)
+                        if (_plugin?.MW?.Main?.DisplayType is null)
                             return;
 
                         var displayType = _plugin.MW.Main.DisplayType;
@@ -295,7 +293,7 @@ namespace VPetLLM.Handlers.UI
         /// </summary>
         private async Task GenerateTouchFeedback(TouchInteraction interaction)
         {
-            if (_plugin.TalkBox == null || !_plugin.Settings.EnableAction)
+            if (_plugin.TalkBox is null || !_plugin.Settings.EnableAction)
             {
                 return;
             }
@@ -423,7 +421,7 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                if (_plugin?.MW?.Main?.Core?.Save != null)
+                if (_plugin?.MW?.Main?.Core?.Save is not null)
                 {
                     return _plugin.MW.Main.Core.Save.Feeling;
                 }
@@ -442,7 +440,7 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                if (_plugin?.MW?.Main?.Core?.Save != null)
+                if (_plugin?.MW?.Main?.Core?.Save is not null)
                 {
                     return _plugin.MW.Main.Core.Save.Health;
                 }
@@ -537,7 +535,7 @@ namespace VPetLLM.Handlers.UI
                     _allInstances.Remove(this);
                 }
 
-                if (_plugin?.MW?.Main != null)
+                if (_plugin?.MW?.Main is not null)
                 {
                     _plugin.MW.Main.Event_TouchHead -= OnTouchHead;
                     _plugin.MW.Main.Event_TouchBody -= OnTouchBody;

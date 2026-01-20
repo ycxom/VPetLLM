@@ -1,7 +1,4 @@
-using Newtonsoft.Json;
-using System.IO;
 using VPetLLM.Handlers.State;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM
 {
@@ -95,88 +92,88 @@ namespace VPetLLM
             }
 
             // 确保所有属性都有默认值
-            if (Ollama == null)
+            if (Ollama is null)
             {
                 Ollama = new OllamaSetting();
             }
-            if (OpenAI == null)
+            if (OpenAI is null)
             {
                 OpenAI = new OpenAISetting();
             }
-            if (Gemini == null)
+            if (Gemini is null)
             {
                 Gemini = new GeminiSetting();
             }
-            if (Free == null)
+            if (Free is null)
             {
                 Free = new FreeSetting();
             }
-            if (Proxy == null)
+            if (Proxy is null)
             {
                 Proxy = new ProxySetting();
             }
-            if (PluginStore == null)
+            if (PluginStore is null)
             {
                 PluginStore = new PluginStoreSetting();
             }
-            if (TTS == null)
+            if (TTS is null)
             {
                 TTS = new TTSSetting();
             }
-            if (TouchFeedback == null)
+            if (TouchFeedback is null)
             {
                 TouchFeedback = new TouchFeedbackSettings();
             }
-            if (Tools == null)
+            if (Tools is null)
             {
                 Tools = new List<ToolSetting>();
             }
-            if (RateLimiter == null)
+            if (RateLimiter is null)
             {
                 RateLimiter = new RateLimiterSetting();
             }
-            if (ASR == null)
+            if (ASR is null)
             {
                 ASR = new ASRSetting();
             }
-            if (Records == null)
+            if (Records is null)
             {
                 Records = new RecordSettings();
             }
-            if (MediaPlayback == null)
+            if (MediaPlayback is null)
             {
                 MediaPlayback = new MediaPlaybackSetting();
             }
-            if (FloatingSidebar == null)
+            if (FloatingSidebar is null)
             {
                 FloatingSidebar = new Configuration.FloatingSidebarSettings();
             }
-            if (Screenshot == null)
+            if (Screenshot is null)
             {
                 Screenshot = new Configuration.ScreenshotSettings();
             }
 
             // 确保Screenshot的嵌套配置对象也被正确初始化
-            if (Screenshot.OCR == null)
+            if (Screenshot.OCR is null)
             {
                 Screenshot.OCR = new Configuration.OCRSettings();
             }
-            if (Screenshot.MultimodalProvider == null)
+            if (Screenshot.MultimodalProvider is null)
             {
                 Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
             }
             // 确保MultimodalProvider的SelectedNodes列表被正确初始化
-            if (Screenshot.MultimodalProvider.SelectedNodes == null)
+            if (Screenshot.MultimodalProvider.SelectedNodes is null)
             {
                 Screenshot.MultimodalProvider.SelectedNodes = new List<Configuration.VisionNodeIdentifier>();
             }
 
             // 旧版OpenAI单节点配置迁移到多节点结构，避免用户配置丢失
-            if (OpenAI == null)
+            if (OpenAI is null)
             {
                 OpenAI = new OpenAISetting();
             }
-            if (OpenAI.OpenAINodes == null)
+            if (OpenAI.OpenAINodes is null)
             {
                 OpenAI.OpenAINodes = new List<OpenAINodeSetting>();
             }
@@ -189,7 +186,7 @@ namespace VPetLLM
                 OpenAI.MaxTokens != 2048 ||
                 OpenAI.EnableAdvanced ||
                 !OpenAI.Enabled ||
-                (OpenAI.Name != null && OpenAI.Name != "OpenAI节点");
+                (OpenAI.Name is not null && OpenAI.Name != "OpenAI节点");
 
             if (OpenAI.OpenAINodes.Count == 0 && hasLegacyOpenAI)
             {
@@ -217,11 +214,11 @@ namespace VPetLLM
             }
 
             // 旧版Gemini单节点配置迁移到多节点结构，避免用户配置丢失
-            if (Gemini == null)
+            if (Gemini is null)
             {
                 Gemini = new GeminiSetting();
             }
-            if (Gemini.GeminiNodes == null)
+            if (Gemini.GeminiNodes is null)
             {
                 Gemini.GeminiNodes = new List<GeminiNodeSetting>();
             }

@@ -47,7 +47,7 @@ namespace VPetLLM.Utils.System
                 if (_isRegistered)
                 {
                     _source = HwndSource.FromHwnd(_windowHandle);
-                    if (_source != null)
+                    if (_source is not null)
                     {
                         _source.AddHook(HwndHook);
                         Logger.Log($"GlobalHotkey: Registered hotkey with ID {_hotkeyId}");
@@ -74,7 +74,7 @@ namespace VPetLLM.Utils.System
 
             try
             {
-                if (_source != null)
+                if (_source is not null)
                 {
                     _source.RemoveHook(HwndHook);
                     _source = null;

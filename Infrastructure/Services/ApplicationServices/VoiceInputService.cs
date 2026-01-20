@@ -3,7 +3,6 @@ using VPetLLM.Infrastructure.Configuration.Configurations;
 using VPetLLM.Infrastructure.Events;
 using VPetLLM.Infrastructure.Logging;
 using VPetLLM.UI.Windows;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Infrastructure.Services.ApplicationServices
 {
@@ -104,7 +103,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             }
 
             // 检查快捷键状�?
-            if (_configuration.IsEnabled && _voiceInputHotkey == null)
+            if (_configuration.IsEnabled && _voiceInputHotkey is null)
             {
                 healthStatus.Status = HealthStatus.Degraded;
                 healthStatus.Description = "Hotkey is not registered";
@@ -112,9 +111,9 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
 
             // 添加健康指标
             healthStatus.Metrics["CurrentState"] = _currentState.ToString();
-            healthStatus.Metrics["HotkeyRegistered"] = _voiceInputHotkey != null;
+            healthStatus.Metrics["HotkeyRegistered"] = _voiceInputHotkey is not null;
             healthStatus.Metrics["ASREnabled"] = _configuration.IsEnabled;
-            healthStatus.Metrics["WindowActive"] = _currentVoiceInputWindow != null;
+            healthStatus.Metrics["WindowActive"] = _currentVoiceInputWindow is not null;
 
             return healthStatus;
         }
@@ -141,7 +140,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
                 }
 
                 var mainWindow = Application.Current.MainWindow;
-                if (mainWindow == null)
+                if (mainWindow is null)
                 {
                     LogWarning("Main window not found, cannot register voice input hotkey");
                     return;
@@ -191,7 +190,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
 
         private async Task CleanupHotkeyAsync()
         {
-            if (_voiceInputHotkey != null)
+            if (_voiceInputHotkey is not null)
             {
                 try
                 {
@@ -254,7 +253,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             {
                 LogInformation("Starting voice input recording");
 
-                if (_currentVoiceInputWindow != null)
+                if (_currentVoiceInputWindow is not null)
                 {
                     LogInformation("Previous voice input window still exists, closing it first");
                     try
@@ -319,7 +318,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             {
                 LogInformation("Stopping voice input recording");
 
-                if (_currentVoiceInputWindow == null)
+                if (_currentVoiceInputWindow is null)
                 {
                     LogInformation("No voice input window to stop, resetting state to Idle");
                     await SetStateAsync(VoiceInputState.Idle);
@@ -354,7 +353,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             {
                 LogInformation("Canceling voice input recording");
 
-                if (_currentVoiceInputWindow != null)
+                if (_currentVoiceInputWindow is not null)
                 {
                     _currentVoiceInputWindow.Close();
                     _currentVoiceInputWindow = null;
@@ -454,7 +453,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             _voiceInputHotkey?.Dispose();
             _voiceInputHotkey = null;
 
-            if (_currentVoiceInputWindow != null)
+            if (_currentVoiceInputWindow is not null)
             {
                 try
                 {

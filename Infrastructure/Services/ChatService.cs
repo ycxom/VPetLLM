@@ -13,15 +13,16 @@ namespace VPetLLM.Infrastructure.Services
     {
         public override string ServiceName => "ChatService";
 
-        private readonly IConfigurationManager _configurationManager;
+        private readonly InfraConfigManager _configurationManager;
         private new readonly IEventBus _eventBus;
         private readonly CoreFactory _coreFactory;
         private readonly Dictionary<string, IChatCore> _chatCores;
         private IChatCore _currentChatCore;
         private LLMConfiguration _llmConfig;
+        private readonly EventHandler<InfraConfigChangedEventArgs> _configChangedHandler;
 
         public ChatService(
-            IConfigurationManager configurationManager,
+            InfraConfigManager configurationManager,
             IEventBus eventBus,
             IStructuredLogger logger,
             CoreFactory coreFactory = null) : base(logger)
@@ -30,6 +31,7 @@ namespace VPetLLM.Infrastructure.Services
             _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
             _coreFactory = coreFactory ?? new CoreFactory(logger);
             _chatCores = new Dictionary<string, IChatCore>();
+            _configChangedHandler = OnConfigurationChanged;
         }
 
         protected override async Task OnInitializeAsync(CancellationToken cancellationToken)
@@ -42,7 +44,7 @@ namespace VPetLLM.Infrastructure.Services
                 _llmConfig = _configurationManager.GetConfiguration<LLMConfiguration>();
 
                 // 订阅配置变更事件
-                _configurationManager.ConfigurationChanged += OnConfigurationChanged;
+                _configurationManager.ConfigurationChanged += _configChangedHandler;
 
                 // 初始化聊天核�?
                 await InitializeChatCoresAsync();
@@ -66,7 +68,7 @@ namespace VPetLLM.Infrastructure.Services
                 Logger?.LogInformation("Starting ChatService");
 
                 // 启动当前聊天核心
-                if (_currentChatCore != null)
+                if (_currentChatCore is not null)
                 {
                     // 加载历史记录
                     _currentChatCore.LoadHistory();
@@ -95,13 +97,13 @@ namespace VPetLLM.Infrastructure.Services
                 Logger?.LogInformation("Stopping ChatService");
 
                 // 保存当前聊天历史
-                if (_currentChatCore != null)
+                if (_currentChatCore is not null)
                 {
                     _currentChatCore.SaveHistory();
                 }
 
                 // 取消订阅配置变更事件
-                _configurationManager.ConfigurationChanged -= OnConfigurationChanged;
+                _configurationManager.ConfigurationChanged -= _configChangedHandler;
 
                 // 发布服务停止事件
                 await _eventBus.PublishAsync(new ChatServiceStoppedEvent
@@ -126,10 +128,10 @@ namespace VPetLLM.Infrastructure.Services
                 {
                     ["CurrentProvider"] = _llmConfig?.Provider.ToString() ?? "Unknown",
                     ["AvailableCores"] = _chatCores.Count,
-                    ["CurrentCoreActive"] = _currentChatCore != null
+                    ["CurrentCoreActive"] = _currentChatCore is not null
                 };
 
-                if (_currentChatCore != null)
+                if (_currentChatCore is not null)
                 {
                     metrics["CurrentCoreName"] = _currentChatCore.Name;
                     metrics["HistoryCount"] = _currentChatCore.GetChatHistory()?.Count ?? 0;
@@ -139,8 +141,8 @@ namespace VPetLLM.Infrastructure.Services
                 return new ServiceHealthStatus
                 {
                     ServiceName = ServiceName,
-                    Status = _currentChatCore != null ? HealthStatus.Healthy : HealthStatus.Degraded,
-                    Description = _currentChatCore != null ? "Service is healthy" : "No active chat core",
+                    Status = _currentChatCore is not null ? HealthStatus.Healthy : HealthStatus.Degraded,
+                    Description = _currentChatCore is not null ? "Service is healthy" : "No active chat core",
                     Metrics = metrics,
                     CheckTime = DateTime.UtcNow
                 };
@@ -163,7 +165,7 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public async Task<string> ChatAsync(string prompt, bool isFunctionCall = false)
         {
-            if (_currentChatCore == null)
+            if (_currentChatCore is null)
             {
                 throw new ServiceException(ServiceName, "No active chat core available");
             }
@@ -213,7 +215,7 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public async Task<string> ChatWithImageAsync(string prompt, byte[] imageData)
         {
-            if (_currentChatCore == null)
+            if (_currentChatCore is null)
             {
                 throw new ServiceException(ServiceName, "No active chat core available");
             }
@@ -274,7 +276,7 @@ namespace VPetLLM.Infrastructure.Services
                 await SetCurrentChatCoreAsync(providerName);
 
                 // 如果需要，恢复历史记录
-                if (currentHistory != null && !_llmConfig.SeparateChatByProvider)
+                if (currentHistory is not null && !_llmConfig.SeparateChatByProvider)
                 {
                     _currentChatCore?.SetChatHistory(currentHistory);
                 }
@@ -284,7 +286,7 @@ namespace VPetLLM.Infrastructure.Services
                 {
                     OldProvider = _currentChatCore?.Name,
                     NewProvider = providerName,
-                    HistoryPreserved = currentHistory != null && !_llmConfig.SeparateChatByProvider
+                    HistoryPreserved = currentHistory is not null && !_llmConfig.SeparateChatByProvider
                 });
 
                 Logger?.LogInformation("Chat provider switched successfully", new { NewProvider = providerName });
@@ -317,7 +319,7 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public async Task ClearContextAsync()
         {
-            if (_currentChatCore != null)
+            if (_currentChatCore is not null)
             {
                 _currentChatCore.ClearContext();
 
@@ -368,7 +370,7 @@ namespace VPetLLM.Infrastructure.Services
             }
         }
 
-        private async void OnConfigurationChanged(object sender, ConfigurationChangedEventArgs e)
+        private async void OnConfigurationChanged(object sender, InfraConfigChangedEventArgs e)
         {
             if (e.ConfigurationType == typeof(LLMConfiguration))
             {

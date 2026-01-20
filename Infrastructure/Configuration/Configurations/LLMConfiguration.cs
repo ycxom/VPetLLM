@@ -1,5 +1,3 @@
-using VPetLLM.Configuration;
-
 namespace VPetLLM.Infrastructure.Configuration.Configurations
 {
     /// <summary>
@@ -130,7 +128,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
             {
                 case LLMProviderType.Ollama:
                     var ollamaValidation = Ollama?.Validate();
-                    if (ollamaValidation != null && !ollamaValidation.IsValid)
+                    if (ollamaValidation is not null && !ollamaValidation.IsValid)
                     {
                         result.Errors.AddRange(ollamaValidation.Errors.Select(e => $"Ollama: {e}"));
                         result.IsValid = false;
@@ -139,7 +137,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
 
                 case LLMProviderType.OpenAI:
                     var openaiValidation = OpenAI?.Validate();
-                    if (openaiValidation != null && !openaiValidation.IsValid)
+                    if (openaiValidation is not null && !openaiValidation.IsValid)
                     {
                         result.Errors.AddRange(openaiValidation.Errors.Select(e => $"OpenAI: {e}"));
                         result.IsValid = false;
@@ -148,7 +146,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
 
                 case LLMProviderType.Gemini:
                     var geminiValidation = Gemini?.Validate();
-                    if (geminiValidation != null && !geminiValidation.IsValid)
+                    if (geminiValidation is not null && !geminiValidation.IsValid)
                     {
                         result.Errors.AddRange(geminiValidation.Errors.Select(e => $"Gemini: {e}"));
                         result.IsValid = false;
@@ -157,7 +155,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
 
                 case LLMProviderType.Free:
                     var freeValidation = Free?.Validate();
-                    if (freeValidation != null && !freeValidation.IsValid)
+                    if (freeValidation is not null && !freeValidation.IsValid)
                     {
                         result.Errors.AddRange(freeValidation.Errors.Select(e => $"Free: {e}"));
                         result.IsValid = false;

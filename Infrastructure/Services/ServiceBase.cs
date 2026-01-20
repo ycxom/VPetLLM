@@ -11,7 +11,7 @@ namespace VPetLLM.Infrastructure.Services
         protected readonly IStructuredLogger _logger;
         protected readonly IEventBus _eventBus;
         private bool _disposed = false;
-        private ServiceStatus _status = ServiceStatus.NotInitialized;
+        private InfraServiceStatus _status = InfraServiceStatus.NotInitialized;
         private readonly object _statusLock = new object();
 
         /// <summary>
@@ -22,7 +22,7 @@ namespace VPetLLM.Infrastructure.Services
         /// <summary>
         /// 服务状态
         /// </summary>
-        public ServiceStatus Status
+        public InfraServiceStatus Status
         {
             get
             {
@@ -94,7 +94,7 @@ namespace VPetLLM.Infrastructure.Services
         // Event publishing helper
         protected async Task PublishEventAsync<T>(T eventData) where T : class
         {
-            if (_eventBus != null)
+            if (_eventBus is not null)
             {
                 await _eventBus.PublishAsync(eventData);
             }
@@ -107,22 +107,22 @@ namespace VPetLLM.Infrastructure.Services
         {
             ThrowIfDisposed();
 
-            if (Status != ServiceStatus.NotInitialized)
+            if (Status != InfraServiceStatus.NotInitialized)
             {
                 throw new InvalidOperationException($"Service {ServiceName} is already initialized");
             }
 
-            Status = ServiceStatus.Initializing;
+            Status = InfraServiceStatus.Initializing;
 
             try
             {
                 await OnInitializeAsync(cancellationToken);
-                Status = ServiceStatus.Initialized;
+                Status = InfraServiceStatus.Initialized;
                 _logger?.LogInformation("Service initialized", new { ServiceName });
             }
             catch (Exception ex)
             {
-                Status = ServiceStatus.Error;
+                Status = InfraServiceStatus.Error;
                 _logger?.LogError(ex, "Failed to initialize service", new { ServiceName });
                 throw;
             }
@@ -135,22 +135,22 @@ namespace VPetLLM.Infrastructure.Services
         {
             ThrowIfDisposed();
 
-            if (Status != ServiceStatus.Initialized && Status != ServiceStatus.Stopped)
+            if (Status != InfraServiceStatus.Initialized && Status != InfraServiceStatus.Stopped)
             {
                 throw new InvalidOperationException($"Service {ServiceName} must be initialized before starting");
             }
 
-            Status = ServiceStatus.Starting;
+            Status = InfraServiceStatus.Starting;
 
             try
             {
                 await OnStartAsync(cancellationToken);
-                Status = ServiceStatus.Running;
+                Status = InfraServiceStatus.Running;
                 _logger?.LogInformation("Service started", new { ServiceName });
             }
             catch (Exception ex)
             {
-                Status = ServiceStatus.Error;
+                Status = InfraServiceStatus.Error;
                 _logger?.LogError(ex, "Failed to start service", new { ServiceName });
                 throw;
             }
@@ -161,20 +161,20 @@ namespace VPetLLM.Infrastructure.Services
         /// </summary>
         public virtual async Task StopAsync(CancellationToken cancellationToken = default)
         {
-            if (_disposed || Status == ServiceStatus.Stopped)
+            if (_disposed || Status == InfraServiceStatus.Stopped)
                 return;
 
-            Status = ServiceStatus.Stopping;
+            Status = InfraServiceStatus.Stopping;
 
             try
             {
                 await OnStopAsync(cancellationToken);
-                Status = ServiceStatus.Stopped;
+                Status = InfraServiceStatus.Stopped;
                 _logger?.LogInformation("Service stopped", new { ServiceName });
             }
             catch (Exception ex)
             {
-                Status = ServiceStatus.Error;
+                Status = InfraServiceStatus.Error;
                 _logger?.LogError(ex, "Failed to stop service", new { ServiceName });
                 throw;
             }
@@ -247,7 +247,7 @@ namespace VPetLLM.Infrastructure.Services
         {
             return Task.FromResult(new ServiceHealthStatus
             {
-                Status = Status == ServiceStatus.Running ? HealthStatus.Healthy : HealthStatus.Unhealthy,
+                Status = Status == InfraServiceStatus.Running ? HealthStatus.Healthy : HealthStatus.Unhealthy,
                 Description = $"Service is {Status}"
             });
         }
@@ -280,11 +280,11 @@ namespace VPetLLM.Infrastructure.Services
                 return;
 
             _disposed = true;
-            Status = ServiceStatus.Disposed;
+            Status = InfraServiceStatus.Disposed;
 
             try
             {
-                if (Status == ServiceStatus.Running)
+                if (Status == InfraServiceStatus.Running)
                 {
                     StopAsync().Wait(TimeSpan.FromSeconds(30));
                 }

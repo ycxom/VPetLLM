@@ -1,5 +1,3 @@
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Handlers.Animation
 {
     /// <summary>
@@ -41,7 +39,7 @@ namespace VPetLLM.Handlers.Animation
         /// <returns>true 如果请求被入队，false 如果被合并或丢弃</returns>
         public bool Enqueue(AnimationRequest request)
         {
-            if (request == null)
+            if (request is null)
             {
                 Logger.Log("AnimationQueue: Received null request, ignoring");
                 return false;
@@ -182,7 +180,7 @@ namespace VPetLLM.Handlers.Animation
                 r.Type == newRequest.Type &&
                 r.Priority == newRequest.Priority);
 
-            if (existingRequest != null)
+            if (existingRequest is not null)
             {
                 // 更新现有请求的参数为新请求的参数
                 existingRequest.AnimationName = newRequest.AnimationName;
@@ -204,7 +202,7 @@ namespace VPetLLM.Handlers.Animation
         private void InsertByPriority(AnimationRequest request)
         {
             var node = _queue.First;
-            while (node != null)
+            while (node is not null)
             {
                 if (node.Value.Priority < request.Priority)
                 {

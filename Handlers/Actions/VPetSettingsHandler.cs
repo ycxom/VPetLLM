@@ -1,6 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Actions
 {
@@ -33,7 +31,7 @@ namespace VPetLLM.Handlers.Actions
             }
 
             // 如果有参数，进行格式化
-            if (args != null && args.Length > 0)
+            if (args is not null && args.Length > 0)
             {
                 try
                 {
@@ -163,7 +161,7 @@ namespace VPetLLM.Handlers.Actions
             {
                 // 从 mainWindow 获取 Dispatcher（更可靠的方式）
                 var window = mainWindow as System.Windows.Window;
-                if (window != null)
+                if (window is not null)
                 {
                     window.Dispatcher.Invoke(() =>
                     {
@@ -214,14 +212,14 @@ namespace VPetLLM.Handlers.Actions
                 var window = mainWindow as System.Windows.Window;
                 var dispatcher = window?.Dispatcher ?? System.Windows.Application.Current?.Dispatcher;
 
-                if (dispatcher != null)
+                if (dispatcher is not null)
                 {
                     dispatcher.Invoke(() =>
                     {
                         var windowType = mainWindow.GetType();
                         var opacityProperty = windowType.GetProperty("Opacity");
 
-                        if (opacityProperty != null && opacityProperty.CanWrite)
+                        if (opacityProperty is not null && opacityProperty.CanWrite)
                         {
                             opacityProperty.SetValue(mainWindow, transparencyValue);
                             Logger.Log($"VPetSettingsHandler: {GetLocalizedMessage("VPetSettings_Log_TransparencySuccess", transparencyValue)}");
@@ -269,7 +267,7 @@ namespace VPetLLM.Handlers.Actions
                 var window = mainWindow as System.Windows.Window;
                 var dispatcher = window?.Dispatcher ?? System.Windows.Application.Current?.Dispatcher;
 
-                if (dispatcher != null)
+                if (dispatcher is not null)
                 {
                     dispatcher.Invoke(() =>
                     {

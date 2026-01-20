@@ -115,14 +115,14 @@ namespace VPetLLM.Configuration
                 }
 
                 // 检查启用的按钮列表
-                if (EnabledButtons == null)
+                if (EnabledButtons is null)
                 {
                     result.AddWarning("启用按钮列表为空，将使用默认按钮");
                     EnabledButtons = SidebarButton.GetDefaultButtons().Select(b => b.ButtonId).ToList();
                 }
 
                 // 检查按钮顺序配置
-                if (ButtonOrder == null)
+                if (ButtonOrder is null)
                 {
                     result.AddWarning("按钮顺序配置为空，将使用默认顺序");
                     ButtonOrder = SidebarButton.GetDefaultButtons().ToDictionary(b => b.ButtonId, b => b.Order);
@@ -192,14 +192,14 @@ namespace VPetLLM.Configuration
             }
 
             // 修复空的按钮列表
-            if (EnabledButtons == null || EnabledButtons.Count == 0)
+            if (EnabledButtons is null || EnabledButtons.Count == 0)
             {
                 EnabledButtons = SidebarButton.GetDefaultButtons().Select(b => b.ButtonId).ToList();
                 repaired = true;
             }
 
             // 修复空的按钮顺序
-            if (ButtonOrder == null || ButtonOrder.Count == 0)
+            if (ButtonOrder is null || ButtonOrder.Count == 0)
             {
                 ButtonOrder = SidebarButton.GetDefaultButtons().ToDictionary(b => b.ButtonId, b => b.Order);
                 repaired = true;

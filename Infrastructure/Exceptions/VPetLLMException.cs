@@ -46,7 +46,7 @@ namespace VPetLLM.Infrastructure.Exceptions
                 }
             }
 
-            if (InnerException != null)
+            if (InnerException is not null)
             {
                 message += $"\nInner Exception: {InnerException.Message}";
             }

@@ -1,4 +1,3 @@
-using VPetLLM.Utils.System;
 using SystemWindows = System.Windows;
 
 namespace VPetLLM.Utils.UI
@@ -18,7 +17,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否成功显示</returns>
         public static async Task<bool> ShowBubbleAsync(VPetLLM plugin, string text, string animation = null)
         {
-            if (plugin == null || string.IsNullOrEmpty(text))
+            if (plugin is null || string.IsNullOrEmpty(text))
             {
                 return false;
             }
@@ -72,7 +71,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否成功显示</returns>
         public static bool ShowBubble(VPetLLM plugin, string text, string animation = null)
         {
-            if (plugin == null || string.IsNullOrEmpty(text))
+            if (plugin is null || string.IsNullOrEmpty(text))
             {
                 return false;
             }
@@ -88,7 +87,7 @@ namespace VPetLLM.Utils.UI
                 {
                     plugin.MW.Main.Say(text, null, false);
                 }
-                
+
                 Logger.Log($"DirectBubbleManager: 直接显示气泡成功 - 文本长度: {text.Length}");
                 return true;
             }
@@ -107,7 +106,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否成功显示</returns>
         public static bool ShowThinkingBubble(VPetLLM plugin, string thinkingText)
         {
-            if (plugin == null || string.IsNullOrEmpty(thinkingText))
+            if (plugin is null || string.IsNullOrEmpty(thinkingText))
             {
                 return false;
             }
@@ -122,7 +121,7 @@ namespace VPetLLM.Utils.UI
                     {
                         // 直接使用MessageBarHelper，移除UnifiedBubbleFacade抽象层
                         var msgBar = plugin.MW?.Main?.MsgBar;
-                        if (msgBar != null)
+                        if (msgBar is not null)
                         {
                             MessageBarHelper.ShowBubbleQuick(msgBar, thinkingText, plugin.MW.Core.Save.Name);
                             Logger.Log($"DirectBubbleManager: 直接显示思考气泡成功 - 文本长度: {thinkingText.Length}");
@@ -157,7 +156,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否成功隐藏</returns>
         public static bool HideBubble(VPetLLM plugin)
         {
-            if (plugin == null)
+            if (plugin is null)
             {
                 return false;
             }
@@ -172,7 +171,7 @@ namespace VPetLLM.Utils.UI
                     {
                         // 直接使用MessageBarHelper，移除UnifiedBubbleFacade抽象层
                         var msgBar = plugin.MW?.Main?.MsgBar;
-                        if (msgBar != null)
+                        if (msgBar is not null)
                         {
                             MessageBarHelper.SetVisibility(msgBar, false);
                             Logger.Log("DirectBubbleManager: 直接隐藏气泡成功");
@@ -207,7 +206,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否成功清理</returns>
         public static bool ClearBubbleState(VPetLLM plugin)
         {
-            if (plugin == null)
+            if (plugin is null)
             {
                 return false;
             }
@@ -222,7 +221,7 @@ namespace VPetLLM.Utils.UI
                     {
                         // 直接使用MessageBarHelper，移除UnifiedBubbleFacade抽象层
                         var msgBar = plugin.MW?.Main?.MsgBar;
-                        if (msgBar != null)
+                        if (msgBar is not null)
                         {
                             MessageBarHelper.ClearStreamState(msgBar);
                             Logger.Log("DirectBubbleManager: 直接清理状态成功");

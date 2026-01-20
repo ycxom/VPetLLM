@@ -13,7 +13,7 @@ namespace VPetLLM.Utils.System
         /// </summary>
         public static bool IsDebugMode(Setting settings)
         {
-            if (settings == null || string.IsNullOrEmpty(settings.Role))
+            if (settings is null || string.IsNullOrEmpty(settings.Role))
                 return false;
 
             // 模糊匹配，不区分大小写

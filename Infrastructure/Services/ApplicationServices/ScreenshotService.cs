@@ -1,10 +1,7 @@
 using System.Windows;
-using VPetLLM.Configuration;
 using VPetLLM.Infrastructure.Configuration;
 using VPetLLM.Infrastructure.Events;
 using VPetLLM.Infrastructure.Logging;
-using VPetLLM.Services;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Infrastructure.Services.ApplicationServices
 {
@@ -102,7 +99,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             UnregisterScreenshotHotkey();
 
             // 清理窗口
-            if (_captureWindow != null)
+            if (_captureWindow is not null)
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -122,7 +119,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
         protected override async Task OnHealthCheckAsync(CancellationToken cancellationToken)
         {
             // 检查热键是否正常注册
-            if (Configuration.EnableScreenshotHotkey && _screenshotHotkey == null)
+            if (Configuration.EnableScreenshotHotkey && _screenshotHotkey is null)
             {
                 LogWarning("Screenshot hotkey is not registered");
             }
@@ -194,7 +191,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
                 ChangeState(ScreenshotState.Processing);
 
                 var ocrEngine = _plugin.GetOCREngine();
-                if (ocrEngine == null)
+                if (ocrEngine is null)
                 {
                     LogError("OCR engine not available");
                     ChangeState(ScreenshotState.Error);
@@ -333,7 +330,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
 
         private void UnregisterScreenshotHotkey()
         {
-            if (_screenshotHotkey != null)
+            if (_screenshotHotkey is not null)
             {
                 _screenshotHotkey.Dispose();
                 _screenshotHotkey = null;
@@ -367,7 +364,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
                 });
 
                 // 关闭捕获窗口
-                if (_captureWindow != null)
+                if (_captureWindow is not null)
                 {
                     Application.Current.Dispatcher.Invoke(() =>
                     {
@@ -389,7 +386,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             LogInformation("Screenshot capture cancelled");
             ChangeState(ScreenshotState.Idle);
 
-            if (_captureWindow != null)
+            if (_captureWindow is not null)
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -423,7 +420,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
         {
             UnregisterScreenshotHotkey();
 
-            if (_captureWindow != null)
+            if (_captureWindow is not null)
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {

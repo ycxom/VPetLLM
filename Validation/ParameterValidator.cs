@@ -1,6 +1,3 @@
-using VPetLLM.Models;
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Validation
 {
     /// <summary>
@@ -25,7 +22,7 @@ namespace VPetLLM.Validation
         {
             try
             {
-                if (text == null)
+                if (text is null)
                 {
                     Logger.Log("ParameterValidator: Text is null");
                     return ValidationResult.Failure("Text cannot be null");
@@ -71,7 +68,7 @@ namespace VPetLLM.Validation
             try
             {
                 // Null animation name is valid (means no animation)
-                if (animationName == null)
+                if (animationName is null)
                 {
                     Logger.Log("ParameterValidator: Animation name is null (no animation)");
                     return ValidationResult.Success();
@@ -216,7 +213,7 @@ namespace VPetLLM.Validation
         {
             try
             {
-                if (request == null)
+                if (request is null)
                 {
                     Logger.Log("ParameterValidator: BubbleDisplayRequest is null");
                     return ValidationResult.Failure("Request cannot be null");
@@ -259,7 +256,7 @@ namespace VPetLLM.Validation
                 }
 
                 // Validate TTS options if present
-                if (request.TTSOptions != null)
+                if (request.TTSOptions is not null)
                 {
                     var ttsResult = ValidateTTSOptions(request.TTSOptions);
                     if (!ttsResult.IsValid)
@@ -294,7 +291,7 @@ namespace VPetLLM.Validation
         {
             try
             {
-                if (ttsOptions == null)
+                if (ttsOptions is null)
                 {
                     return ValidationResult.Success(); // TTS options are optional
                 }

@@ -202,11 +202,11 @@ namespace VPetLLM.Infrastructure.Validation
                 Console.WriteLine("验证配置管理...");
 
                 var logger = new StructuredLogger();
-                var configManager = new ConfigurationManager(".", logger);
+                var configManager = new InfraConfigurationManager(".", logger);
 
                 // 测试配置获取
                 var llmConfig = configManager.GetConfiguration<LLMConfiguration>();
-                if (llmConfig == null)
+                if (llmConfig is null)
                 {
                     Console.WriteLine("❌ 配置获取验证失败");
                     return false;
@@ -214,7 +214,7 @@ namespace VPetLLM.Infrastructure.Validation
 
                 // 测试配置验证
                 var validationResult = llmConfig.Validate();
-                if (validationResult == null)
+                if (validationResult is null)
                 {
                     Console.WriteLine("❌ 配置验证功能验证失败");
                     return false;
@@ -250,7 +250,7 @@ namespace VPetLLM.Infrastructure.Validation
 
                 // 测试服务获取
                 var testService = await serviceManager.GetServiceAsync<TestService>();
-                if (testService == null)
+                if (testService is null)
                 {
                     Console.WriteLine("❌ 服务获取验证失败");
                     return false;
@@ -258,7 +258,7 @@ namespace VPetLLM.Infrastructure.Validation
 
                 // 测试服务状态
                 var status = serviceManager.GetServiceStatus<TestService>();
-                if (status == ServiceStatus.NotRegistered)
+                if (status == InfraServiceStatus.NotRegistered)
                 {
                     Console.WriteLine("❌ 服务状态验证失败");
                     return false;
@@ -294,7 +294,7 @@ namespace VPetLLM.Infrastructure.Validation
 
                 // 获取服务管理器
                 var serviceManager = container.Resolve<IServiceManager>();
-                if (serviceManager == null)
+                if (serviceManager is null)
                 {
                     Console.WriteLine("❌ 服务管理器解析失败");
                     return false;
@@ -305,7 +305,7 @@ namespace VPetLLM.Infrastructure.Validation
                 var ttsService = await serviceManager.GetServiceAsync<TTSService>();
                 var asrService = await serviceManager.GetServiceAsync<ASRService>();
 
-                if (chatService == null || ttsService == null || asrService == null)
+                if (chatService is null || ttsService is null || asrService is null)
                 {
                     Console.WriteLine("❌ 核心服务创建验证失败");
                     return false;

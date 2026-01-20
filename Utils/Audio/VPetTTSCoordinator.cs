@@ -286,7 +286,7 @@ namespace VPetLLM.Utils.Audio
             try
             {
                 _vpetTTSPlugin = FindVPetTTSPlugin();
-                if (_vpetTTSPlugin == null)
+                if (_vpetTTSPlugin is null)
                 {
                     VPetLLMUtils.Logger.Log("VPetTTSCoordinator: VPetTTS 插件未找到");
                     return false;
@@ -294,14 +294,14 @@ namespace VPetLLM.Utils.Audio
 
                 // 获取 TTSState 属性
                 _ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (_ttsStateProperty == null)
+                if (_ttsStateProperty is null)
                 {
                     VPetLLMUtils.Logger.Log("VPetTTSCoordinator: VPetTTS 插件没有 TTSState 属性");
                     return false;
                 }
 
                 _ttsState = _ttsStateProperty.GetValue(_vpetTTSPlugin);
-                if (_ttsState == null)
+                if (_ttsState is null)
                 {
                     VPetLLMUtils.Logger.Log("VPetTTSCoordinator: TTSState 为 null");
                     return false;
@@ -309,7 +309,7 @@ namespace VPetLLM.Utils.Audio
 
                 // 获取 TTSCoordinator 属性（可选）
                 _ttsCoordinatorProperty = _vpetTTSPlugin.GetType().GetProperty("TTSCoordinator");
-                if (_ttsCoordinatorProperty != null)
+                if (_ttsCoordinatorProperty is not null)
                 {
                     _ttsCoordinator = _ttsCoordinatorProperty.GetValue(_vpetTTSPlugin);
                 }
@@ -332,7 +332,7 @@ namespace VPetLLM.Utils.Audio
         /// </summary>
         private void CacheStateProperties()
         {
-            if (_ttsState == null) return;
+            if (_ttsState is null) return;
 
             var stateType = _ttsState.GetType();
             _isProcessingProperty = stateType.GetProperty("IsProcessing");
@@ -353,7 +353,7 @@ namespace VPetLLM.Utils.Audio
         /// </summary>
         private MainPlugin FindVPetTTSPlugin()
         {
-            if (_mainWindow?.Plugins == null) return null;
+            if (_mainWindow?.Plugins is null) return null;
 
             foreach (var plugin in _mainWindow.Plugins)
             {
@@ -370,7 +370,7 @@ namespace VPetLLM.Utils.Audio
         /// </summary>
         public bool IsVPetTTSAvailable()
         {
-            if (_ttsState == null)
+            if (_ttsState is null)
             {
                 // 尝试重新初始化
                 if (!Initialize())
@@ -393,7 +393,7 @@ namespace VPetLLM.Utils.Audio
         /// </summary>
         public bool CanAcceptNewRequests()
         {
-            if (_ttsState == null) return false;
+            if (_ttsState is null) return false;
 
             try
             {
@@ -413,7 +413,7 @@ namespace VPetLLM.Utils.Audio
         {
             var info = new VPetTTSStateInfo();
 
-            if (_ttsState == null)
+            if (_ttsState is null)
             {
                 return info;
             }
@@ -442,21 +442,21 @@ namespace VPetLLM.Utils.Audio
 
         private bool GetBoolProperty(global::System.Reflection.PropertyInfo property)
         {
-            if (property == null || _ttsState == null) return false;
+            if (property is null || _ttsState is null) return false;
             var value = property.GetValue(_ttsState);
             return value is bool b && b;
         }
 
         private string GetStringProperty(global::System.Reflection.PropertyInfo property)
         {
-            if (property == null || _ttsState == null) return "";
+            if (property is null || _ttsState is null) return "";
             var value = property.GetValue(_ttsState);
             return value?.ToString() ?? "";
         }
 
         private double GetDoubleProperty(global::System.Reflection.PropertyInfo property)
         {
-            if (property == null || _ttsState == null) return 0;
+            if (property is null || _ttsState is null) return 0;
             var value = property.GetValue(_ttsState);
             return value is double d ? d : 0;
         }
@@ -468,13 +468,13 @@ namespace VPetLLM.Utils.Audio
         {
             lock (_lockObject)
             {
-                if (_isMonitoring || _ttsState == null) return;
+                if (_isMonitoring || _ttsState is null) return;
 
                 try
                 {
                     // 订阅 StateChanged 事件
                     var stateChangedEvent = _ttsState.GetType().GetEvent("StateChanged");
-                    if (stateChangedEvent != null)
+                    if (stateChangedEvent is not null)
                     {
                         var handler = new EventHandler<object>(OnTTSStateChanged);
                         // 使用动态方法创建委托
@@ -487,7 +487,7 @@ namespace VPetLLM.Utils.Audio
 
                     // 订阅 AvailabilityChanged 事件
                     var availabilityChangedEvent = _ttsState.GetType().GetEvent("AvailabilityChanged");
-                    if (availabilityChangedEvent != null)
+                    if (availabilityChangedEvent is not null)
                     {
                         var delegateType = availabilityChangedEvent.EventHandlerType;
                         var methodInfo = GetType().GetMethod(nameof(OnTTSAvailabilityChangedDynamic),
@@ -550,7 +550,7 @@ namespace VPetLLM.Utils.Audio
 
                 // 检测状态变化
                 var currentState = GetStateInfo();
-                if (_lastStateInfo != null)
+                if (_lastStateInfo is not null)
                 {
                     DetectStateTransitions(_lastStateInfo, currentState);
                 }
@@ -760,7 +760,7 @@ namespace VPetLLM.Utils.Audio
                 };
 
                 // 尝试从事件参数中提取信息
-                if (e != null)
+                if (e is not null)
                 {
                     var eType = e.GetType();
                     var propertyNameProp = eType.GetProperty("PropertyName");
@@ -790,7 +790,7 @@ namespace VPetLLM.Utils.Audio
                 };
 
                 // 尝试从事件参数中提取信息
-                if (e != null)
+                if (e is not null)
                 {
                     var eType = e.GetType();
                     var isAvailableProp = eType.GetProperty("IsAvailable");

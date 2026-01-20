@@ -1,13 +1,8 @@
-using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Core;
-using VPetLLM.Core.ChatCore;
 using VPetLLM.Handlers.Animation;
-using VPetLLM.Handlers.Core;
-using VPetLLM.Handlers.UI;
 using VPetLLM.Infrastructure.Configuration;
 using VPetLLM.Infrastructure.DependencyInjection;
 using VPetLLM.Infrastructure.Events;
@@ -16,17 +11,14 @@ using VPetLLM.Infrastructure.Services;
 using VPetLLM.Infrastructure.Services.ApplicationServices;
 using VPetLLM.UI.Windows;
 using VPetLLM.Utils.Audio;
-using VPetLLM.Utils.Common;
 using VPetLLM.Utils.Configuration;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 using VPetLLM.Utils.Plugin;
-using VPetLLM.Utils.System;
-using InfraConfigManager = VPetLLM.Infrastructure.Configuration.IConfigurationManager;
 using InfraConfigManagerImpl = VPetLLM.Infrastructure.Configuration.ConfigurationManager;
 using SettingClass = VPetLLM.Setting;
 using TTSServiceType = VPetLLM.Utils.Audio.TTSService;
-using UnifiedTTSDispatcher = VPetLLM.Core.UnifiedTTS.ITTSDispatcher;
+using UnifiedTTSDispatcher = VPetLLM.Core.Integration.UnifiedTTS.Interfaces.ITTSDispatcher;
 
 namespace VPetLLM
 {
@@ -269,7 +261,7 @@ namespace VPetLLM
                 // 设置获取 AuthKey 的委托
                 Func<Task<int>> getAuthKey = async () =>
                 {
-                    try { return MW != null ? await MW.GenerateAuthKey() : 0; } catch { return 0; }
+                    try { return MW is not null ? await MW.GenerateAuthKey() : 0; } catch { return 0; }
                 };
 
                 // 设置获取 ModId 的委托（从 VPet MOD 系统动态获取）
@@ -282,7 +274,7 @@ namespace VPetLLM
 
                         foreach (var mod in MW.OnModInfo)
                         {
-                            if (mod.Path != null && dllPath.StartsWith(mod.Path.FullName, StringComparison.OrdinalIgnoreCase))
+                            if (mod.Path is not null && dllPath.StartsWith(mod.Path.FullName, StringComparison.OrdinalIgnoreCase))
                             {
                                 if (mod.ItemID > 0)
                                     return mod.ItemID.ToString();
@@ -553,7 +545,7 @@ namespace VPetLLM
                     Logger.Log("Dispatcher.Invoke started.");
 
                     // 创建和注册 TalkBox
-                    if (TalkBox != null)
+                    if (TalkBox is not null)
                     {
                         MW.TalkAPI.Remove(TalkBox);
                     }
@@ -587,7 +579,7 @@ namespace VPetLLM
                     InitializeScreenshotHotkey();
 
                     // 初始化默认插件状态检查器
-                    if (_defaultPluginChecker != null)
+                    if (_defaultPluginChecker is not null)
                     {
                         _defaultPluginChecker.IsVPetLLMDefaultPlugin();
                         // 如果设置窗口已经打开，刷新窗口标题
@@ -765,7 +757,7 @@ namespace VPetLLM
                 Logger.Log("开始初始化TouchInteractionHandler...");
 
                 // 检查必要的组件是否已准备好
-                if (MW?.Main == null)
+                if (MW?.Main is null)
                 {
                     Logger.Log("错误：MW.Main为null，无法初始化TouchInteractionHandler");
                     return;
@@ -792,7 +784,7 @@ namespace VPetLLM
             {
                 // Event_TakeItemHandle在MainWindow类中，不在IMainWindow接口中
                 var eventInfo = MW.GetType().GetEvent("Event_TakeItemHandle");
-                if (eventInfo != null)
+                if (eventInfo is not null)
                 {
                     var handler = new Action<Food, int, string>(OnTakeItemHandle);
                     eventInfo.AddEventHandler(MW, handler);
@@ -821,7 +813,7 @@ namespace VPetLLM
             try
             {
                 var eventInfo = MW.GetType().GetEvent("Event_TakeItemHandle");
-                if (eventInfo != null)
+                if (eventInfo is not null)
                 {
                     var handler = new Action<Food, int, string>(OnTakeItemHandle);
                     eventInfo.RemoveEventHandler(MW, handler);
@@ -921,7 +913,7 @@ namespace VPetLLM
 
                 Logger.Log($"Purchase event detected: {food?.Name ?? "Unknown"}, count: {count}, from: {from}");
 
-                if (MW == null)
+                if (MW is null)
                 {
                     Logger.Log("Purchase event: MW is null, skipping");
                     return;
@@ -965,7 +957,7 @@ namespace VPetLLM
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                if (SettingWindow == null || !SettingWindow.IsVisible)
+                if (SettingWindow is null || !SettingWindow.IsVisible)
                 {
                     SettingWindow = new winSettingNew(this);
                     SettingWindow.Show();
@@ -982,7 +974,7 @@ namespace VPetLLM
             try
             {
                 // 取消事件监听
-                if (MW != null)
+                if (MW is not null)
                 {
                     UnregisterTakeItemHandleEvent();
                     UnregisterItemUseHook();
@@ -1111,15 +1103,15 @@ namespace VPetLLM
                 {
                     try
                     {
-                        if (args.ImageData != null && args.ImageData.Length > 0)
+                        if (args.ImageData is not null && args.ImageData.Length > 0)
                         {
                             Logger.Log($"Sending screenshot with prompt: {args.Prompt}");
 
-                            if (TalkBox != null)
+                            if (TalkBox is not null)
                             {
                                 await TalkBox.SendChatWithImage(args.Prompt, args.ImageData);
                             }
-                            else if (ChatCore != null)
+                            else if (ChatCore is not null)
                             {
                                 await ChatCore.ChatWithImage(args.Prompt, args.ImageData);
                             }
@@ -1128,11 +1120,11 @@ namespace VPetLLM
                         {
                             if (!string.IsNullOrWhiteSpace(args.Prompt))
                             {
-                                if (TalkBox != null)
+                                if (TalkBox is not null)
                                 {
                                     await TalkBox.SendChat(args.Prompt);
                                 }
-                                else if (ChatCore != null)
+                                else if (ChatCore is not null)
                                 {
                                     await ChatCore.Chat(args.Prompt);
                                 }
@@ -1168,7 +1160,7 @@ namespace VPetLLM
                 {
                     try
                     {
-                        if (args.ImageData != null && args.ImageData.Length > 0)
+                        if (args.ImageData is not null && args.ImageData.Length > 0)
                         {
                             Logger.Log($"Processing screenshot with preprocessing");
 
@@ -1195,11 +1187,11 @@ namespace VPetLLM
                         {
                             if (!string.IsNullOrWhiteSpace(args.Prompt))
                             {
-                                if (TalkBox != null)
+                                if (TalkBox is not null)
                                 {
                                     await TalkBox.SendChat(args.Prompt);
                                 }
-                                else if (ChatCore != null)
+                                else if (ChatCore is not null)
                                 {
                                     await ChatCore.Chat(args.Prompt);
                                 }
@@ -1241,7 +1233,7 @@ namespace VPetLLM
                     {
                         try
                         {
-                            if (ChatCore != null && !string.IsNullOrWhiteSpace(e.CombinedMessage))
+                            if (ChatCore is not null && !string.IsNullOrWhiteSpace(e.CombinedMessage))
                             {
                                 await ChatCore.Chat(e.CombinedMessage);
                             }
@@ -1317,7 +1309,7 @@ namespace VPetLLM
         /// </summary>
         public async Task<string> SendChat(string prompt)
         {
-            if (ChatCore == null)
+            if (ChatCore is null)
             {
                 _logger.LogWarning("ChatCore is null, cannot send message");
                 return "错误：聊天核心未初始化。";
@@ -1348,7 +1340,7 @@ namespace VPetLLM
 
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                if (TalkBox != null)
+                if (TalkBox is not null)
                 {
                     MW.TalkAPI.Remove(TalkBox);
                     Logger.Log("Old TalkBox removed from TalkAPI");
@@ -1377,7 +1369,7 @@ namespace VPetLLM
         /// </summary>
         public List<Message> GetChatHistory()
         {
-            return ChatCore?.GetChatHistory() ?? new List<Message>();
+            return ChatCore is not null ? ChatCore.GetChatHistory() : new List<Message>();
         }
 
         /// <summary>
@@ -1437,7 +1429,7 @@ namespace VPetLLM
         /// </summary>
         public async Task PlayTTSAsync(string text)
         {
-            if (Settings.TTS.IsEnabled && TTSService != null && !string.IsNullOrWhiteSpace(text))
+            if (Settings.TTS.IsEnabled && TTSService is not null && !string.IsNullOrWhiteSpace(text))
             {
                 try
                 {
@@ -1537,7 +1529,7 @@ namespace VPetLLM
         /// </summary>
         public void PerformConfigurationOptimization()
         {
-            if (_configurationOptimizer == null)
+            if (_configurationOptimizer is null)
             {
                 _configurationOptimizer = new IntelligentConfigurationOptimizer(Settings);
             }
@@ -1550,7 +1542,7 @@ namespace VPetLLM
         /// </summary>
         public string GetConfigurationHealthReport()
         {
-            if (_configurationOptimizer == null)
+            if (_configurationOptimizer is null)
             {
                 _configurationOptimizer = new IntelligentConfigurationOptimizer(Settings);
             }
@@ -1627,7 +1619,7 @@ namespace VPetLLM
                         }
 
                         var graph = MW.Main.Core.Graph.FindGraph(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, modeType);
-                        if (graph != null)
+                        if (graph is not null)
                         {
                             animations.Add($"{mode}_{animName}");
                         }
@@ -1652,7 +1644,7 @@ namespace VPetLLM
         {
             try
             {
-                if (_floatingSidebarManager == null)
+                if (_floatingSidebarManager is null)
                 {
                     InitializeFloatingSidebar();
                 }
@@ -1804,12 +1796,12 @@ namespace VPetLLM
         /// <summary>
         /// 获取OCR引擎（向后兼容）
         /// </summary>
-        public Core.IOCREngine GetOCREngine()
+        public IOCREngine GetOCREngine()
         {
             // 返回OCR引擎实例
             try
             {
-                return new Core.OCREngine(Settings, this);
+                return new OCREngine(Settings, this);
             }
             catch (Exception ex)
             {

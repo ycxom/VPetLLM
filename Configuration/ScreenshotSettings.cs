@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using VPetLLM.Utils.Common;
 
 namespace VPetLLM.Configuration
 {
@@ -260,7 +259,7 @@ namespace VPetLLM.Configuration
             // 根据处理模式验证特定配置
             if (ProcessingMode == ScreenshotProcessingMode.OCRApi)
             {
-                if (OCR == null)
+                if (OCR is null)
                 {
                     result.AddError("OCR settings are required when using OCR API mode");
                 }
@@ -293,14 +292,14 @@ namespace VPetLLM.Configuration
             // 验证前置多模态提供商配置
             if (ProcessingMode == ScreenshotProcessingMode.PreprocessingMultimodal)
             {
-                if (MultimodalProvider == null)
+                if (MultimodalProvider is null)
                 {
                     MultimodalProvider = new MultimodalProviderConfig();
                 }
 
                 if (MultimodalProvider.ProviderType == MultimodalProviderType.VisionChannels)
                 {
-                    if (MultimodalProvider.SelectedNodes == null || !MultimodalProvider.SelectedNodes.Any())
+                    if (MultimodalProvider.SelectedNodes is null || !MultimodalProvider.SelectedNodes.Any())
                     {
                         result.AddWarning("No vision-enabled nodes selected for preprocessing multimodal");
                     }

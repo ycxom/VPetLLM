@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Infrastructure.Events
 {
@@ -16,7 +15,7 @@ namespace VPetLLM.Infrastructure.Events
         public async Task PublishAsync<T>(T eventData, CancellationToken cancellationToken = default) where T : class
         {
             ThrowIfDisposed();
-            if (eventData == null)
+            if (eventData is null)
                 throw new ArgumentNullException(nameof(eventData));
 
             var eventType = typeof(T);
@@ -45,7 +44,7 @@ namespace VPetLLM.Infrastructure.Events
                     var sortedSubscriptions = weakSubscriptions.OrderByDescending(s => s.Priority).ToList();
                     foreach (var subscription in sortedSubscriptions)
                     {
-                        if (subscription.Filter == null || subscription.Filter(eventData))
+                        if (subscription.Filter is null || subscription.Filter(eventData))
                         {
                             tasks.Add(HandleWeakSubscriptionAsync(subscription, eventData, eventTypeName, cancellationToken));
                         }
@@ -88,7 +87,7 @@ namespace VPetLLM.Infrastructure.Events
                     var sortedSubscriptions = subscriptions.OrderByDescending(s => s.Priority).ToList();
                     foreach (var subscription in sortedSubscriptions)
                     {
-                        if (subscription.Filter == null || subscription.Filter(eventData))
+                        if (subscription.Filter is null || subscription.Filter(eventData))
                         {
                             tasks.Add(HandleWeakSubscriptionAsync(subscription, eventData, eventType, cancellationToken));
                         }
@@ -127,7 +126,7 @@ namespace VPetLLM.Infrastructure.Events
         public void Subscribe<T>(Func<T, Task> handler, int priority = 0) where T : class
         {
             ThrowIfDisposed();
-            if (handler == null)
+            if (handler is null)
                 throw new ArgumentNullException(nameof(handler));
 
             var eventType = typeof(T);
@@ -148,7 +147,7 @@ namespace VPetLLM.Infrastructure.Events
         public void Subscribe<T>(IEventHandler<T> handler) where T : class
         {
             ThrowIfDisposed();
-            if (handler == null)
+            if (handler is null)
                 throw new ArgumentNullException(nameof(handler));
 
             Subscribe<T>(eventData => handler.HandleAsync(eventData, CancellationToken.None), handler.Priority);
@@ -164,7 +163,7 @@ namespace VPetLLM.Infrastructure.Events
             ThrowIfDisposed();
             if (string.IsNullOrEmpty(eventType))
                 throw new ArgumentException("Event type cannot be null or empty", nameof(eventType));
-            if (handler == null)
+            if (handler is null)
                 throw new ArgumentNullException(nameof(handler));
 
             var subscription = new WeakEventSubscription(handler, priority, filter);
@@ -184,7 +183,7 @@ namespace VPetLLM.Infrastructure.Events
         public void Unsubscribe<T>(IEventHandler<T> handler) where T : class
         {
             ThrowIfDisposed();
-            if (handler == null)
+            if (handler is null)
                 throw new ArgumentNullException(nameof(handler));
 
             var eventType = typeof(T);
@@ -210,7 +209,7 @@ namespace VPetLLM.Infrastructure.Events
             ThrowIfDisposed();
             if (string.IsNullOrEmpty(eventType))
                 throw new ArgumentException("Event type cannot be null or empty", nameof(eventType));
-            if (handler == null)
+            if (handler is null)
                 throw new ArgumentNullException(nameof(handler));
 
             if (_weakTypedSubscriptions.TryGetValue(eventType, out var subscriptions))

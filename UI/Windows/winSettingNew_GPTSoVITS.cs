@@ -1,7 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using VPetLLM.Core.TTSCore;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -19,7 +17,7 @@ namespace VPetLLM.UI.Windows
         private void ComboBox_TTS_GPTSoVITS_ApiMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             // 初始化时 _plugin 可能为空，跳过
-            if (_plugin == null || _plugin.Settings?.TTS?.GPTSoVITS == null)
+            if (_plugin is null || _plugin.Settings?.TTS?.GPTSoVITS is null)
                 return;
 
             if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem selectedItem)
@@ -31,9 +29,9 @@ namespace VPetLLM.UI.Windows
                 var webUIPanel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_WebUI");
                 var apiV2Panel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_ApiV2");
 
-                if (webUIPanel != null)
+                if (webUIPanel is not null)
                     webUIPanel.Visibility = isApiV2 ? Visibility.Collapsed : Visibility.Visible;
-                if (apiV2Panel != null)
+                if (apiV2Panel is not null)
                     apiV2Panel.Visibility = isApiV2 ? Visibility.Visible : Visibility.Collapsed;
 
                 // 保存设置
@@ -156,7 +154,7 @@ namespace VPetLLM.UI.Windows
 
                 var versions = await ttsCore.GetSupportedVersionsAsync();
 
-                if (versions == null || versions.Count == 0)
+                if (versions is null || versions.Count == 0)
                 {
                     MessageBox.Show("无法获取版本信息，请检查 API 地址是否正确", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
@@ -229,7 +227,7 @@ namespace VPetLLM.UI.Windows
                     var modelComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Model");
                     modelComboBox.Items.Clear();
 
-                    if (_currentModels != null && _currentModels.Count > 0)
+                    if (_currentModels is not null && _currentModels.Count > 0)
                     {
                         foreach (var modelName in _currentModels.Keys)
                         {
@@ -302,7 +300,7 @@ namespace VPetLLM.UI.Windows
                     var modelComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Model");
                     modelComboBox.Items.Clear();
 
-                    if (_currentModels != null && _currentModels.Count > 0)
+                    if (_currentModels is not null && _currentModels.Count > 0)
                     {
                         foreach (var modelName in _currentModels.Keys)
                         {
@@ -356,7 +354,7 @@ namespace VPetLLM.UI.Windows
                 languageComboBox.Items.Clear();
                 emotionComboBox.Items.Clear();
 
-                if (_currentModels != null && _currentModels.ContainsKey(modelName))
+                if (_currentModels is not null && _currentModels.ContainsKey(modelName))
                 {
                     var languages = _currentModels[modelName];
 
@@ -429,7 +427,7 @@ namespace VPetLLM.UI.Windows
                 var emotionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Emotion");
                 emotionComboBox.Items.Clear();
 
-                if (_currentModels != null &&
+                if (_currentModels is not null &&
                     _currentModels.ContainsKey(modelName) &&
                     _currentModels[modelName].ContainsKey(language))
                 {
@@ -460,7 +458,7 @@ namespace VPetLLM.UI.Windows
         /// </summary>
         private void LoadGPTSoVITSSettings()
         {
-            if (_plugin.Settings.TTS.GPTSoVITS == null)
+            if (_plugin.Settings.TTS.GPTSoVITS is null)
             {
                 _plugin.Settings.TTS.GPTSoVITS = new Setting.GPTSoVITSTTSSetting();
             }
@@ -469,7 +467,7 @@ namespace VPetLLM.UI.Windows
 
             // 加载 API 模式
             var apiModeComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_ApiMode");
-            if (apiModeComboBox != null)
+            if (apiModeComboBox is not null)
             {
                 var modeTag = settings.ApiMode == Setting.GPTSoVITSApiMode.ApiV2 ? "ApiV2" : "WebUI";
                 foreach (ComboBoxItem item in apiModeComboBox.Items)
@@ -485,15 +483,15 @@ namespace VPetLLM.UI.Windows
                 var isApiV2 = settings.ApiMode == Setting.GPTSoVITSApiMode.ApiV2;
                 var webUIPanel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_WebUI");
                 var apiV2Panel = (StackPanel)this.FindName("Panel_TTS_GPTSoVITS_ApiV2");
-                if (webUIPanel != null)
+                if (webUIPanel is not null)
                     webUIPanel.Visibility = isApiV2 ? Visibility.Collapsed : Visibility.Visible;
-                if (apiV2Panel != null)
+                if (apiV2Panel is not null)
                     apiV2Panel.Visibility = isApiV2 ? Visibility.Visible : Visibility.Collapsed;
             }
 
             // 加载基本设置
             var baseUrlTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl");
-            if (baseUrlTextBox != null)
+            if (baseUrlTextBox is not null)
             {
                 baseUrlTextBox.Text = settings.BaseUrl;
             }
@@ -502,38 +500,38 @@ namespace VPetLLM.UI.Windows
             LoadGPTSoVITSApiV2Settings(settings);
 
             var cutPuncTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc");
-            if (cutPuncTextBox != null)
+            if (cutPuncTextBox is not null)
             {
                 cutPuncTextBox.Text = settings.CutPunc;
             }
 
             var topKTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopK");
-            if (topKTextBox != null)
+            if (topKTextBox is not null)
             {
                 topKTextBox.Text = settings.TopK.ToString();
             }
 
             var topPTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopP");
-            if (topPTextBox != null)
+            if (topPTextBox is not null)
             {
                 topPTextBox.Text = settings.TopP.ToString();
             }
 
             var temperatureTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Temperature");
-            if (temperatureTextBox != null)
+            if (temperatureTextBox is not null)
             {
                 temperatureTextBox.Text = settings.Temperature.ToString();
             }
 
             var speedTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Speed");
-            if (speedTextBox != null)
+            if (speedTextBox is not null)
             {
                 speedTextBox.Text = settings.Speed.ToString();
             }
 
             // 加载版本
             var versionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Version");
-            if (versionComboBox != null)
+            if (versionComboBox is not null)
             {
                 foreach (ComboBoxItem item in versionComboBox.Items)
                 {
@@ -547,21 +545,21 @@ namespace VPetLLM.UI.Windows
 
             // 加载模型名称（如果有）
             var modelComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Model");
-            if (modelComboBox != null && !string.IsNullOrWhiteSpace(settings.ModelName))
+            if (modelComboBox is not null && !string.IsNullOrWhiteSpace(settings.ModelName))
             {
                 modelComboBox.Text = settings.ModelName;
             }
 
             // 加载情感（如果有）
             var emotionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Emotion");
-            if (emotionComboBox != null && !string.IsNullOrWhiteSpace(settings.Emotion))
+            if (emotionComboBox is not null && !string.IsNullOrWhiteSpace(settings.Emotion))
             {
                 emotionComboBox.Text = settings.Emotion;
             }
 
             // 加载目标文本语言（向后兼容：将语言代码转换为完整名称）
             var textLangComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextLanguage");
-            if (textLangComboBox != null)
+            if (textLangComboBox is not null)
             {
                 var textLang = ConvertLanguageCodeToName(settings.TextLanguage);
                 foreach (ComboBoxItem item in textLangComboBox.Items)
@@ -576,7 +574,7 @@ namespace VPetLLM.UI.Windows
 
             // 加载文本切分方法
             var splitMethodComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_SplitMethod");
-            if (splitMethodComboBox != null)
+            if (splitMethodComboBox is not null)
             {
                 var splitMethod = string.IsNullOrWhiteSpace(settings.TextSplitMethod) ? "按标点符号切" : settings.TextSplitMethod;
                 foreach (ComboBoxItem item in splitMethodComboBox.Items)
@@ -631,37 +629,37 @@ namespace VPetLLM.UI.Windows
         {
             // 保存基本设置
             var baseUrlTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BaseUrl");
-            if (baseUrlTextBox != null)
+            if (baseUrlTextBox is not null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.BaseUrl = baseUrlTextBox.Text;
             }
 
             var cutPuncTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_CutPunc");
-            if (cutPuncTextBox != null)
+            if (cutPuncTextBox is not null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.CutPunc = cutPuncTextBox.Text;
             }
 
             var topKTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopK");
-            if (topKTextBox != null && int.TryParse(topKTextBox.Text, out int topK))
+            if (topKTextBox is not null && int.TryParse(topKTextBox.Text, out int topK))
             {
                 _plugin.Settings.TTS.GPTSoVITS.TopK = topK;
             }
 
             var topPTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_TopP");
-            if (topPTextBox != null && double.TryParse(topPTextBox.Text, out double topP))
+            if (topPTextBox is not null && double.TryParse(topPTextBox.Text, out double topP))
             {
                 _plugin.Settings.TTS.GPTSoVITS.TopP = topP;
             }
 
             var temperatureTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Temperature");
-            if (temperatureTextBox != null && double.TryParse(temperatureTextBox.Text, out double temperature))
+            if (temperatureTextBox is not null && double.TryParse(temperatureTextBox.Text, out double temperature))
             {
                 _plugin.Settings.TTS.GPTSoVITS.Temperature = temperature;
             }
 
             var speedTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_Speed");
-            if (speedTextBox != null && double.TryParse(speedTextBox.Text, out double speed))
+            if (speedTextBox is not null && double.TryParse(speedTextBox.Text, out double speed))
             {
                 _plugin.Settings.TTS.GPTSoVITS.Speed = speed;
             }
@@ -675,7 +673,7 @@ namespace VPetLLM.UI.Windows
 
             // 模型
             var modelComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Model");
-            if (modelComboBox != null)
+            if (modelComboBox is not null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.ModelName = modelComboBox.Text;
             }
@@ -689,7 +687,7 @@ namespace VPetLLM.UI.Windows
 
             // 情感
             var emotionComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_Emotion");
-            if (emotionComboBox != null)
+            if (emotionComboBox is not null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.Emotion = emotionComboBox.Text;
             }
@@ -719,21 +717,21 @@ namespace VPetLLM.UI.Windows
         {
             // 参考音频路径
             var refAudioPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_RefAudioPath");
-            if (refAudioPathTextBox != null)
+            if (refAudioPathTextBox is not null)
             {
                 refAudioPathTextBox.Text = settings.RefAudioPath;
             }
 
             // 提示文本
             var promptTextV2TextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptTextV2");
-            if (promptTextV2TextBox != null)
+            if (promptTextV2TextBox is not null)
             {
                 promptTextV2TextBox.Text = settings.PromptTextV2;
             }
 
             // 提示语言
             var promptLangV2ComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_PromptLangV2");
-            if (promptLangV2ComboBox != null)
+            if (promptLangV2ComboBox is not null)
             {
                 foreach (ComboBoxItem item in promptLangV2ComboBox.Items)
                 {
@@ -747,7 +745,7 @@ namespace VPetLLM.UI.Windows
 
             // 合成文本语言
             var textLangV2ComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextLangV2");
-            if (textLangV2ComboBox != null)
+            if (textLangV2ComboBox is not null)
             {
                 foreach (ComboBoxItem item in textLangV2ComboBox.Items)
                 {
@@ -761,7 +759,7 @@ namespace VPetLLM.UI.Windows
 
             // 文本切分方法
             var textSplitMethodV2ComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_TextSplitMethodV2");
-            if (textSplitMethodV2ComboBox != null)
+            if (textSplitMethodV2ComboBox is not null)
             {
                 foreach (ComboBoxItem item in textSplitMethodV2ComboBox.Items)
                 {
@@ -775,7 +773,7 @@ namespace VPetLLM.UI.Windows
 
             // 输出格式
             var mediaTypeComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_MediaType");
-            if (mediaTypeComboBox != null)
+            if (mediaTypeComboBox is not null)
             {
                 foreach (ComboBoxItem item in mediaTypeComboBox.Items)
                 {
@@ -789,28 +787,28 @@ namespace VPetLLM.UI.Windows
 
             // 批处理大小
             var batchSizeTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BatchSize");
-            if (batchSizeTextBox != null)
+            if (batchSizeTextBox is not null)
             {
                 batchSizeTextBox.Text = settings.BatchSize.ToString();
             }
 
             // 采样步数
             var sampleStepsTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SampleSteps");
-            if (sampleStepsTextBox != null)
+            if (sampleStepsTextBox is not null)
             {
                 sampleStepsTextBox.Text = settings.SampleSteps.ToString();
             }
 
             // 重复惩罚
             var repetitionPenaltyTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_RepetitionPenalty");
-            if (repetitionPenaltyTextBox != null)
+            if (repetitionPenaltyTextBox is not null)
             {
                 repetitionPenaltyTextBox.Text = settings.RepetitionPenalty.ToString();
             }
 
             // 流式模式
             var streamingModeComboBox = (ComboBox)this.FindName("ComboBox_TTS_GPTSoVITS_StreamingMode");
-            if (streamingModeComboBox != null)
+            if (streamingModeComboBox is not null)
             {
                 foreach (ComboBoxItem item in streamingModeComboBox.Items)
                 {
@@ -824,21 +822,21 @@ namespace VPetLLM.UI.Windows
 
             // 超采样
             var superSamplingCheckBox = (CheckBox)this.FindName("CheckBox_TTS_GPTSoVITS_SuperSampling");
-            if (superSamplingCheckBox != null)
+            if (superSamplingCheckBox is not null)
             {
                 superSamplingCheckBox.IsChecked = settings.SuperSampling;
             }
 
             // GPT 模型权重路径
             var gptWeightsPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_GptWeightsPath");
-            if (gptWeightsPathTextBox != null)
+            if (gptWeightsPathTextBox is not null)
             {
                 gptWeightsPathTextBox.Text = settings.GptWeightsPath;
             }
 
             // SoVITS 模型权重路径
             var sovitsWeightsPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SovitsWeightsPath");
-            if (sovitsWeightsPathTextBox != null)
+            if (sovitsWeightsPathTextBox is not null)
             {
                 sovitsWeightsPathTextBox.Text = settings.SovitsWeightsPath;
             }
@@ -851,14 +849,14 @@ namespace VPetLLM.UI.Windows
         {
             // 参考音频路径
             var refAudioPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_RefAudioPath");
-            if (refAudioPathTextBox != null)
+            if (refAudioPathTextBox is not null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.RefAudioPath = refAudioPathTextBox.Text;
             }
 
             // 提示文本
             var promptTextV2TextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_PromptTextV2");
-            if (promptTextV2TextBox != null)
+            if (promptTextV2TextBox is not null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.PromptTextV2 = promptTextV2TextBox.Text;
             }
@@ -893,21 +891,21 @@ namespace VPetLLM.UI.Windows
 
             // 批处理大小
             var batchSizeTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_BatchSize");
-            if (batchSizeTextBox != null && int.TryParse(batchSizeTextBox.Text, out int batchSize))
+            if (batchSizeTextBox is not null && int.TryParse(batchSizeTextBox.Text, out int batchSize))
             {
                 _plugin.Settings.TTS.GPTSoVITS.BatchSize = batchSize;
             }
 
             // 采样步数
             var sampleStepsTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SampleSteps");
-            if (sampleStepsTextBox != null && int.TryParse(sampleStepsTextBox.Text, out int sampleSteps))
+            if (sampleStepsTextBox is not null && int.TryParse(sampleStepsTextBox.Text, out int sampleSteps))
             {
                 _plugin.Settings.TTS.GPTSoVITS.SampleSteps = sampleSteps;
             }
 
             // 重复惩罚
             var repetitionPenaltyTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_RepetitionPenalty");
-            if (repetitionPenaltyTextBox != null && double.TryParse(repetitionPenaltyTextBox.Text, out double repetitionPenalty))
+            if (repetitionPenaltyTextBox is not null && double.TryParse(repetitionPenaltyTextBox.Text, out double repetitionPenalty))
             {
                 _plugin.Settings.TTS.GPTSoVITS.RepetitionPenalty = repetitionPenalty;
             }
@@ -924,21 +922,21 @@ namespace VPetLLM.UI.Windows
 
             // 超采样
             var superSamplingCheckBox = (CheckBox)this.FindName("CheckBox_TTS_GPTSoVITS_SuperSampling");
-            if (superSamplingCheckBox != null)
+            if (superSamplingCheckBox is not null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.SuperSampling = superSamplingCheckBox.IsChecked ?? false;
             }
 
             // GPT 模型权重路径
             var gptWeightsPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_GptWeightsPath");
-            if (gptWeightsPathTextBox != null)
+            if (gptWeightsPathTextBox is not null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.GptWeightsPath = gptWeightsPathTextBox.Text;
             }
 
             // SoVITS 模型权重路径
             var sovitsWeightsPathTextBox = (TextBox)this.FindName("TextBox_TTS_GPTSoVITS_SovitsWeightsPath");
-            if (sovitsWeightsPathTextBox != null)
+            if (sovitsWeightsPathTextBox is not null)
             {
                 _plugin.Settings.TTS.GPTSoVITS.SovitsWeightsPath = sovitsWeightsPathTextBox.Text;
             }

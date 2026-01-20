@@ -107,7 +107,7 @@ namespace VPetLLM.Models
             switch (Type)
             {
                 case TTSType.External:
-                    if (ExternalSettings == null)
+                    if (ExternalSettings is null)
                     {
                         result.AddError("External TTS settings are required when type is External");
                     }
@@ -117,7 +117,7 @@ namespace VPetLLM.Models
                         if (!externalValidation.IsValid)
                         {
                             result.Errors.AddRange(externalValidation.Errors);
-                            if (externalValidation.Warnings != null)
+                            if (externalValidation.Warnings is not null)
                             {
                                 var warningsList = result.Warnings?.ToList() ?? new List<string>();
                                 warningsList.AddRange(externalValidation.Warnings);
@@ -128,7 +128,7 @@ namespace VPetLLM.Models
                     break;
 
                 case TTSType.BuiltIn:
-                    if (BuiltInSettings == null)
+                    if (BuiltInSettings is null)
                     {
                         result.AddError("Built-in TTS settings are required when type is BuiltIn");
                     }
@@ -138,7 +138,7 @@ namespace VPetLLM.Models
                         if (!builtInValidation.IsValid)
                         {
                             result.Errors.AddRange(builtInValidation.Errors);
-                            if (builtInValidation.Warnings != null)
+                            if (builtInValidation.Warnings is not null)
                             {
                                 var warningsList = result.Warnings?.ToList() ?? new List<string>();
                                 warningsList.AddRange(builtInValidation.Warnings);

@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.IO;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Audio
 {
@@ -108,7 +106,7 @@ namespace VPetLLM.Utils.Audio
         {
             try
             {
-                if (_process != null && !_process.HasExited)
+                if (_process is not null && !_process.HasExited)
                 {
                     _process.Kill();
                     _process.WaitForExit(1000);

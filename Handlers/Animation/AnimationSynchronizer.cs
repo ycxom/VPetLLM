@@ -1,7 +1,6 @@
 using System.Windows;
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.System;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Animation
@@ -56,7 +55,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public T ExecuteOnUIThread<T>(Func<T> action)
         {
-            if (Application.Current?.Dispatcher == null)
+            if (Application.Current?.Dispatcher is null)
             {
                 Logger.Log("AnimationSynchronizer: Dispatcher is null, executing directly");
                 return action();
@@ -75,7 +74,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public void ExecuteOnUIThread(Action action)
         {
-            if (Application.Current?.Dispatcher == null)
+            if (Application.Current?.Dispatcher is null)
             {
                 Logger.Log("AnimationSynchronizer: Dispatcher is null, executing directly");
                 action();
@@ -96,7 +95,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public async Task<T> ExecuteOnUIThreadAsync<T>(Func<T> action)
         {
-            if (Application.Current?.Dispatcher == null)
+            if (Application.Current?.Dispatcher is null)
             {
                 Logger.Log("AnimationSynchronizer: Dispatcher is null, executing directly");
                 return action();
@@ -115,7 +114,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public bool CanExecuteAnimation(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null)
+            if (mainWindow?.Main is null)
             {
                 Logger.Log("AnimationSynchronizer: mainWindow is null");
                 return false;
@@ -148,7 +147,7 @@ namespace VPetLLM.Handlers.Animation
 
             // 检查触摸动画
             var displayType = mainWindow.Main.DisplayType;
-            if (displayType != null)
+            if (displayType is not null)
             {
                 if (displayType.Type == GraphType.Touch_Head ||
                     displayType.Type == GraphType.Touch_Body)
@@ -191,7 +190,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public bool IsPlayingVoice(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null) return false;
+            if (mainWindow?.Main is null) return false;
             return mainWindow.Main.PlayingVoice;
         }
 
@@ -201,7 +200,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public int GetVoiceRemainingTime(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null || !mainWindow.Main.PlayingVoice)
+            if (mainWindow?.Main is null || !mainWindow.Main.PlayingVoice)
                 return 0;
 
             return ExecuteOnUIThread(() =>
@@ -211,7 +210,7 @@ namespace VPetLLM.Handlers.Animation
                     // 获取 VoicePlayer 字段
                     var voicePlayerField = mainWindow.Main.GetType().GetField("VoicePlayer",
                         System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    if (voicePlayerField == null) return 0;
+                    if (voicePlayerField is null) return 0;
 
                     var voicePlayer = voicePlayerField.GetValue(mainWindow.Main) as System.Windows.Media.MediaPlayer;
                     if (voicePlayer?.Clock?.NaturalDuration.HasTimeSpan == true)
@@ -233,7 +232,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public async Task WaitForVoiceCompleteAsync(IMainWindow mainWindow, int maxWaitMs = 30000)
         {
-            if (mainWindow?.Main == null || !mainWindow.Main.PlayingVoice)
+            if (mainWindow?.Main is null || !mainWindow.Main.PlayingVoice)
                 return;
 
             var startTime = DateTime.Now;
@@ -261,7 +260,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public string GetBlockingReason(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null)
+            if (mainWindow?.Main is null)
                 return "mainWindow is null";
 
             if (_currentState.IsUserInteracting)
@@ -276,7 +275,7 @@ namespace VPetLLM.Handlers.Animation
                 return "VPet is traveling";
 
             var displayType = mainWindow.Main.DisplayType;
-            if (displayType != null)
+            if (displayType is not null)
             {
                 if (displayType.Type == GraphType.Touch_Head || displayType.Type == GraphType.Touch_Body)
                     return $"Touch animation in progress ({displayType.Type})";
@@ -325,7 +324,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public void UpdateState(IMainWindow mainWindow, string source)
         {
-            if (mainWindow?.Main == null) return;
+            if (mainWindow?.Main is null) return;
 
             ExecuteOnUIThread(() =>
             {
@@ -366,13 +365,13 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public bool GetPetGridCrlf(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null) return true;
+            if (mainWindow?.Main is null) return true;
 
             return ExecuteOnUIThread(() =>
             {
                 var field = mainWindow.Main.GetType().GetField("petgridcrlf",
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (field != null)
+                if (field is not null)
                 {
                     return (bool)field.GetValue(mainWindow.Main);
                 }
@@ -390,12 +389,12 @@ namespace VPetLLM.Handlers.Animation
         /// <returns>true 如果可以复用当前动画</returns>
         public bool CanReuseCurrentAnimation(IMainWindow mainWindow, string animationName, AnimatType animatType)
         {
-            if (mainWindow?.Main == null) return false;
+            if (mainWindow?.Main is null) return false;
 
             return ExecuteOnUIThread(() =>
             {
                 var displayType = mainWindow.Main.DisplayType;
-                if (displayType == null) return false;
+                if (displayType is null) return false;
 
                 // 检查动画名称和类型是否匹配
                 if (displayType.Name == animationName && displayType.Animat == animatType)
@@ -425,7 +424,7 @@ namespace VPetLLM.Handlers.Animation
         /// <returns>true 如果成功继续动画</returns>
         public bool TryContinueCurrentAnimation(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null) return false;
+            if (mainWindow?.Main is null) return false;
 
             return ExecuteOnUIThread(() =>
             {
@@ -437,12 +436,12 @@ namespace VPetLLM.Handlers.Animation
                     var petGrid2Field = mainWindow.Main.GetType().GetField("PetGrid2",
                         System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-                    if (petGridField == null || petGrid2Field == null) return false;
+                    if (petGridField is null || petGrid2Field is null) return false;
 
                     var petGrid = petGridField.GetValue(mainWindow.Main) as System.Windows.Controls.Decorator;
                     var petGrid2 = petGrid2Field.GetValue(mainWindow.Main) as System.Windows.Controls.Decorator;
 
-                    if (petGrid == null || petGrid2 == null) return false;
+                    if (petGrid is null || petGrid2 is null) return false;
 
                     // 检查哪个 Grid 当前可见并尝试继续其动画
                     if (petGrid.Visibility == System.Windows.Visibility.Visible && petGrid.Tag is IGraph ig1)
@@ -474,7 +473,7 @@ namespace VPetLLM.Handlers.Animation
         /// <returns>当前动画是否正在播放</returns>
         public bool IsCurrentAnimationPlaying(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null) return false;
+            if (mainWindow?.Main is null) return false;
 
             return ExecuteOnUIThread(() =>
             {
@@ -485,7 +484,7 @@ namespace VPetLLM.Handlers.Animation
                     var petGrid2Field = mainWindow.Main.GetType().GetField("PetGrid2",
                         System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-                    if (petGridField == null || petGrid2Field == null) return false;
+                    if (petGridField is null || petGrid2Field is null) return false;
 
                     var petGrid = petGridField.GetValue(mainWindow.Main) as System.Windows.Controls.Decorator;
                     var petGrid2 = petGrid2Field.GetValue(mainWindow.Main) as System.Windows.Controls.Decorator;
@@ -514,7 +513,7 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public int GetCurrentLoopCount(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null) return 0;
+            if (mainWindow?.Main is null) return 0;
 
             return ExecuteOnUIThread(() =>
             {
@@ -522,7 +521,7 @@ namespace VPetLLM.Handlers.Animation
                 {
                     var looptimesField = mainWindow.Main.GetType().GetField("looptimes",
                         System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    if (looptimesField != null)
+                    if (looptimesField is not null)
                     {
                         return (int)looptimesField.GetValue(mainWindow.Main);
                     }

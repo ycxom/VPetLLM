@@ -1,5 +1,4 @@
 using VPetLLM.Utils.Audio;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.TTS
 {
@@ -109,7 +108,7 @@ namespace VPetLLM.Handlers.TTS
                     }
 
                     // 尝试重新下载和播放TTS
-                    if (_plugin.TTSService != null && !string.IsNullOrEmpty(text))
+                    if (_plugin.TTSService is not null && !string.IsNullOrEmpty(text))
                     {
                         await _plugin.TTSService.PlayTextAsync(text);
                         Logger.Log($"TTSFailureHandler: 重试第 {attempt} 次成功");
@@ -191,7 +190,7 @@ namespace VPetLLM.Handlers.TTS
         {
             try
             {
-                if (_plugin.TalkBox?.MessageProcessor != null)
+                if (_plugin.TalkBox?.MessageProcessor is not null)
                 {
                     // 使用现有的动作处理器执行动作
                     var actionQueue = _plugin.ActionProcessor.Process(actionContent, _plugin.Settings);
@@ -269,7 +268,7 @@ namespace VPetLLM.Handlers.TTS
         /// <returns>恢复建议</returns>
         private string GenerateRecoverySuggestions(Exception exception)
         {
-            if (exception == null)
+            if (exception is null)
                 return "检查TTS服务是否正常运行";
 
             var exceptionType = exception.GetType().Name;

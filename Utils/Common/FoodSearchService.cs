@@ -1,5 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Common
 {
@@ -99,7 +98,7 @@ namespace VPetLLM.Utils.Common
             {
                 // 直接使用 IMainWindow.Items 属性（新版本 API）
                 var items = _mainWindow.Items;
-                if (items == null || !items.Any())
+                if (items is null || !items.Any())
                 {
                     return inventoryItems;
                 }
@@ -108,7 +107,7 @@ namespace VPetLLM.Utils.Common
                 {
                     // 检查 Visibility 属性（使用反射保持兼容性，因为该属性可能在某些版本中不存在）
                     var visibilityProperty = item.GetType().GetProperty("Visibility");
-                    if (visibilityProperty != null)
+                    if (visibilityProperty is not null)
                     {
                         var visibilityValue = visibilityProperty.GetValue(item);
                         if (visibilityValue is bool visibility && !visibility)
@@ -188,7 +187,7 @@ namespace VPetLLM.Utils.Common
                 string.Equals(i.Name, itemName, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(i.TranslateName, itemName, StringComparison.OrdinalIgnoreCase));
 
-            if (item != null)
+            if (item is not null)
             {
                 return item.CanUse;
             }
@@ -203,7 +202,7 @@ namespace VPetLLM.Utils.Common
         /// </summary>
         public bool HasItemInInventory(string itemName)
         {
-            return FindItemInInventory(itemName) != null;
+            return FindItemInInventory(itemName) is not null;
         }
 
         /// <summary>
@@ -295,7 +294,7 @@ namespace VPetLLM.Utils.Common
                 string.Equals(f.Name, query, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(f.TranslateName, query, StringComparison.OrdinalIgnoreCase));
 
-            if (exactMatch != null)
+            if (exactMatch is not null)
             {
                 Logger.Log($"FoodSearchService: 精确匹配 '{exactMatch.Name}' (type: {exactMatch.ItemType})");
                 return exactMatch.OriginalFood;
@@ -366,7 +365,7 @@ namespace VPetLLM.Utils.Common
                 string.Equals(f.Name, query, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(f.TranslateName, query, StringComparison.OrdinalIgnoreCase));
 
-            if (exactMatch != null)
+            if (exactMatch is not null)
             {
                 return exactMatch.OriginalFood;
             }

@@ -1,5 +1,3 @@
-using Newtonsoft.Json;
-
 namespace VPetLLM.Handlers.State
 {
     /// <summary>

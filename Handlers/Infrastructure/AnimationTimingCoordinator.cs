@@ -1,5 +1,4 @@
 using VPetLLM.Utils.Audio;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Infrastructure
 {
@@ -288,7 +287,7 @@ namespace VPetLLM.Handlers.Infrastructure
         {
             try
             {
-                if (_plugin.TalkBox?.MessageProcessor != null)
+                if (_plugin.TalkBox?.MessageProcessor is not null)
                 {
                     // 使用现有的动作处理器执行动作
                     var actionQueue = _plugin.ActionProcessor.Process(actionContent, _plugin.Settings);
@@ -359,7 +358,7 @@ namespace VPetLLM.Handlers.Infrastructure
                 }
 
                 // 检查 VPet 主程序是否正在播放语音
-                if (_plugin.MW?.Main == null)
+                if (_plugin.MW?.Main is null)
                 {
                     Logger.Log("AnimationTimingCoordinator: MW.Main 为 null，无法检查语音状态");
                     return;

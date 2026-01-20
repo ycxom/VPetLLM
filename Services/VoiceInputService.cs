@@ -1,6 +1,5 @@
 using System.Windows;
 using VPetLLM.UI.Windows;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Services
 {
@@ -46,7 +45,7 @@ namespace VPetLLM.Services
                 }
 
                 var mainWindow = Application.Current.MainWindow;
-                if (mainWindow == null)
+                if (mainWindow is null)
                 {
                     Logger.Log("Main window not found, cannot register voice input hotkey");
                     return;
@@ -130,7 +129,7 @@ namespace VPetLLM.Services
             {
                 Logger.Log("Starting voice input...");
 
-                if (_currentVoiceInputWindow != null)
+                if (_currentVoiceInputWindow is not null)
                 {
                     Logger.Log("Previous voice input window still exists, closing it first");
                     try
@@ -198,7 +197,7 @@ namespace VPetLLM.Services
             {
                 Logger.Log("Stopping voice input...");
 
-                if (_currentVoiceInputWindow == null)
+                if (_currentVoiceInputWindow is null)
                 {
                     Logger.Log("No voice input window to stop, resetting state to Idle");
                     SetState(VoiceInputState.Idle);
@@ -227,7 +226,7 @@ namespace VPetLLM.Services
             try
             {
                 Logger.Log("Canceling voice input...");
-                if (_currentVoiceInputWindow != null)
+                if (_currentVoiceInputWindow is not null)
                 {
                     _currentVoiceInputWindow.Close();
                     _currentVoiceInputWindow = null;
@@ -273,7 +272,7 @@ namespace VPetLLM.Services
             _voiceInputHotkey?.Dispose();
             _voiceInputHotkey = null;
 
-            if (_currentVoiceInputWindow != null)
+            if (_currentVoiceInputWindow is not null)
             {
                 try
                 {

@@ -1,7 +1,5 @@
-using System.IO;
 using System.Windows;
 using System.Windows.Media.Imaging;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -42,7 +40,7 @@ namespace VPetLLM.UI.Windows
         {
             try
             {
-                if (_imageData == null || _imageData.Length == 0)
+                if (_imageData is null || _imageData.Length == 0)
                 {
                     Logger.Log("No image data to display");
                     return;

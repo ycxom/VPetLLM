@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Infrastructure;
-using VPetLLM.Utils.System;
 using VPetLLM.Utils.UI;
 
 namespace VPetLLM.Handlers.State
@@ -47,14 +46,14 @@ namespace VPetLLM.Handlers.State
         {
             // Try field first (VPet uses field)
             var stateField = mainWindow.Main.GetType().GetField("State");
-            if (stateField != null)
+            if (stateField is not null)
             {
                 return stateField.GetValue(mainWindow.Main);
             }
 
             // Fallback to property
             var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-            if (stateProperty != null)
+            if (stateProperty is not null)
             {
                 return stateProperty.GetValue(mainWindow.Main);
             }
@@ -69,7 +68,7 @@ namespace VPetLLM.Handlers.State
         {
             // Try field first (VPet uses field)
             var stateField = mainWindow.Main.GetType().GetField("State");
-            if (stateField != null)
+            if (stateField is not null)
             {
                 stateField.SetValue(mainWindow.Main, newState);
                 return true;
@@ -77,7 +76,7 @@ namespace VPetLLM.Handlers.State
 
             // Fallback to property
             var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-            if (stateProperty != null)
+            if (stateProperty is not null)
             {
                 stateProperty.SetValue(mainWindow.Main, newState);
                 return true;
@@ -93,14 +92,14 @@ namespace VPetLLM.Handlers.State
         {
             // Try field first (VPet uses field)
             var stateField = mainWindow.Main.GetType().GetField("State");
-            if (stateField != null)
+            if (stateField is not null)
             {
                 return stateField.FieldType;
             }
 
             // Fallback to property
             var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-            if (stateProperty != null)
+            if (stateProperty is not null)
             {
                 return stateProperty.PropertyType;
             }
@@ -116,7 +115,7 @@ namespace VPetLLM.Handlers.State
         /// <param name="actionName">The name of the action triggering this state change</param>
         public static void TransitionToState(IMainWindow mainWindow, object newState, string actionName)
         {
-            if (mainWindow == null)
+            if (mainWindow is null)
             {
                 Logger.Log("StateManager: mainWindow is null, cannot queue state transition");
                 return;
@@ -192,7 +191,7 @@ namespace VPetLLM.Handlers.State
         /// <param name="actionName">The name of the action triggering this state change</param>
         private static void ExecuteStateTransition(IMainWindow mainWindow, object newState, string actionName)
         {
-            if (mainWindow == null)
+            if (mainWindow is null)
             {
                 Logger.Log("StateManager: mainWindow is null, cannot transition state");
                 return;
@@ -215,7 +214,7 @@ namespace VPetLLM.Handlers.State
                 previousState = GetState(mainWindow);
                 var workingStateType = GetStateType(mainWindow);
 
-                if (previousState == null || workingStateType == null)
+                if (previousState is null || workingStateType is null)
                 {
                     Logger.Log("StateManager: State field/property not found, using fallback mode for older VPet versions");
                     // Fallback: directly call display methods without state management
@@ -328,7 +327,7 @@ namespace VPetLLM.Handlers.State
                 Logger.Log($"StateManager: Stack trace: {ex.StackTrace}");
 
                 // Attempt rollback if state was changed
-                if (stateChanged && previousState != null)
+                if (stateChanged && previousState is not null)
                 {
                     try
                     {
@@ -381,7 +380,7 @@ namespace VPetLLM.Handlers.State
                 foreach (var methodName in possibleMethods)
                 {
                     var method = mainType.GetMethod(methodName);
-                    if (method != null)
+                    if (method is not null)
                     {
                         Logger.Log($"StateManager: Found method '{methodName}', attempting to invoke");
                         try
@@ -399,7 +398,7 @@ namespace VPetLLM.Handlers.State
 
                 // Try to set NowWork property
                 var nowWorkProperty = mainType.GetProperty("NowWork");
-                if (nowWorkProperty != null && nowWorkProperty.CanWrite)
+                if (nowWorkProperty is not null && nowWorkProperty.CanWrite)
                 {
                     Logger.Log("StateManager: Found NowWork property, attempting to create Work object");
                     // This would require creating a Work object, which is complex
@@ -452,7 +451,7 @@ namespace VPetLLM.Handlers.State
                         WorkManager.RefreshWorkLists(mainWindow);
                         var defaultWork = WorkManager.FindWork("", "work"); // Get first work
 
-                        if (defaultWork != null && WorkManager.StartWork(mainWindow, defaultWork))
+                        if (defaultWork is not null && WorkManager.StartWork(mainWindow, defaultWork))
                         {
                             Logger.Log("StateManager: Fallback - Work mode started via StartWork");
                             break;
@@ -496,7 +495,7 @@ namespace VPetLLM.Handlers.State
                         WorkManager.RefreshWorkLists(mainWindow);
                         var defaultStudy = WorkManager.FindWork("", "study"); // Get first study
 
-                        if (defaultStudy != null && WorkManager.StartWork(mainWindow, defaultStudy))
+                        if (defaultStudy is not null && WorkManager.StartWork(mainWindow, defaultStudy))
                         {
                             Logger.Log("StateManager: Fallback - Study mode started via StartWork");
                             break;
@@ -557,7 +556,7 @@ namespace VPetLLM.Handlers.State
         /// <returns>The current state as an object, or null if unavailable</returns>
         public static object GetCurrentState(IMainWindow mainWindow)
         {
-            if (mainWindow == null)
+            if (mainWindow is null)
             {
                 Logger.Log("StateManager: mainWindow is null, cannot get current state");
                 return null;
@@ -566,7 +565,7 @@ namespace VPetLLM.Handlers.State
             try
             {
                 var state = GetState(mainWindow);
-                if (state == null)
+                if (state is null)
                 {
                     Logger.Log("StateManager: State field/property not found");
                 }
@@ -621,13 +620,13 @@ namespace VPetLLM.Handlers.State
         /// <returns>True if the current state matches the expected state, false otherwise</returns>
         public static bool VerifyStateAfterTransition(IMainWindow mainWindow, object expectedState, string actionName)
         {
-            if (mainWindow == null)
+            if (mainWindow is null)
             {
                 Logger.Log("StateManager: mainWindow is null, cannot verify state");
                 return false;
             }
 
-            if (expectedState == null)
+            if (expectedState is null)
             {
                 Logger.Log("StateManager: expectedState is null, cannot verify state");
                 return false;
@@ -638,7 +637,7 @@ namespace VPetLLM.Handlers.State
                 var currentState = GetState(mainWindow);
                 var workingStateType = GetStateType(mainWindow);
 
-                if (currentState == null || workingStateType == null)
+                if (currentState is null || workingStateType is null)
                 {
                     Logger.Log("StateManager: State field/property not found, cannot verify state");
                     return false;

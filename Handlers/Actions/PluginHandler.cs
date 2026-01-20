@@ -1,7 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Core;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Actions
 {
@@ -42,7 +39,7 @@ namespace VPetLLM.Handlers.Actions
                 {
                     var stats = RateLimiter.GetStats("ai-plugin");
                     VPetLLM.Instance.Log($"PluginHandler: 触发熔断 - 插件调用超限（跨消息）");
-                    if (VPetLLM.Instance?.Settings?.RateLimiter?.LogRateLimitEvents == true && stats != null)
+                    if (VPetLLM.Instance?.Settings?.RateLimiter?.LogRateLimitEvents == true && stats is not null)
                     {
                         VPetLLM.Instance.Log($"  当前: {stats.CurrentCount}/{config?.MaxCount}, 已阻止: {stats.BlockedRequests}次");
                     }
@@ -83,7 +80,7 @@ namespace VPetLLM.Handlers.Actions
             }
 
             var plugin = VPetLLM.Instance.Plugins.Find(p => p.Name.Replace(" ", "_").ToLower() == pluginName.ToLower());
-            if (plugin != null)
+            if (plugin is not null)
             {
                 if (!plugin.Enabled)
                 {

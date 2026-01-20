@@ -1,5 +1,3 @@
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Utils.Audio
 {
     /// <summary>
@@ -15,7 +13,7 @@ namespace VPetLLM.Utils.Audio
         /// <returns>处理后的音频数据</returns>
         public static byte[] ApplyVolumeGain(byte[] audioData, double gainDb)
         {
-            if (audioData == null || audioData.Length == 0)
+            if (audioData is null || audioData.Length == 0)
                 return audioData;
 
             // 如果增益为0，直接返回原数据
@@ -82,7 +80,7 @@ namespace VPetLLM.Utils.Audio
 
                 // 获取音频格式信息
                 var formatInfo = ParseWavFormat(wavData);
-                if (formatInfo == null)
+                if (formatInfo is null)
                 {
                     Logger.Log("AudioProcessor: 无法解析WAV格式信息");
                     return wavData;

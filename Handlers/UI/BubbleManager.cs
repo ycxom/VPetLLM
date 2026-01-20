@@ -2,7 +2,6 @@ using System.Windows;
 using VPetLLM.Handlers.Animation;
 using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Handlers.State;
-using VPetLLM.Utils.System;
 using VPetLLM.Utils.UI;
 
 namespace VPetLLM.Handlers.UI
@@ -144,7 +143,7 @@ namespace VPetLLM.Handlers.UI
         private bool IsAnimationCompatible(string animation)
         {
             if (string.IsNullOrEmpty(animation)) return true;
-            if (_plugin?.MW?.Main == null) return true;
+            if (_plugin?.MW?.Main is null) return true;
 
             try
             {
@@ -160,7 +159,7 @@ namespace VPetLLM.Handlers.UI
                 var mode = _plugin.MW.Main.Core.Save.Mode;
                 var foundGraph = graph.FindGraph(animation, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, mode);
 
-                if (foundGraph == null)
+                if (foundGraph is null)
                 {
                     Logger.Log($"BubbleManager: 动画 '{animation}' 不存在");
                     return false;
@@ -192,7 +191,7 @@ namespace VPetLLM.Handlers.UI
                         try
                         {
                             var msgBar = _plugin.MW.Main.MsgBar;
-                            if (msgBar != null)
+                            if (msgBar is not null)
                             {
                                 MessageBarHelper.ShowBubbleQuick(msgBar, thinkingText,
                                     _plugin.MW.Core.Save.Name);
@@ -286,7 +285,7 @@ namespace VPetLLM.Handlers.UI
 
             try
             {
-                if (lastRequest != null)
+                if (lastRequest is not null)
                 {
                     await ShowBubbleAsync(lastRequest.Text, lastRequest.Animation);
                 }
@@ -313,7 +312,7 @@ namespace VPetLLM.Handlers.UI
                     try
                     {
                         var msgBar = _plugin.MW.Main.MsgBar;
-                        if (msgBar != null)
+                        if (msgBar is not null)
                         {
                             MessageBarHelper.SetVisibility(msgBar, false);
                         }
@@ -364,7 +363,7 @@ namespace VPetLLM.Handlers.UI
             try
             {
                 var msgBar = _plugin.MW.Main.MsgBar;
-                if (msgBar != null)
+                if (msgBar is not null)
                 {
                     MessageBarHelper.ShowBubbleQuick(msgBar, text, _plugin.MW.Core.Save.Name);
                 }

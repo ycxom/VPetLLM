@@ -1,10 +1,8 @@
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.UI.Windows
 {
@@ -88,7 +86,7 @@ namespace VPetLLM.UI.Windows
             // 获取 DPI 缩放因子
             var source = PresentationSource.FromVisual(Application.Current.MainWindow);
             double dpiX = 1.0, dpiY = 1.0;
-            if (source?.CompositionTarget != null)
+            if (source?.CompositionTarget is not null)
             {
                 dpiX = source.CompositionTarget.TransformToDevice.M11;
                 dpiY = source.CompositionTarget.TransformToDevice.M22;
@@ -183,7 +181,7 @@ namespace VPetLLM.UI.Windows
                 // 获取屏幕 DPI 缩放
                 var source = PresentationSource.FromVisual(Application.Current.MainWindow);
                 double dpiX = 1.0, dpiY = 1.0;
-                if (source?.CompositionTarget != null)
+                if (source?.CompositionTarget is not null)
                 {
                     dpiX = source.CompositionTarget.TransformToDevice.M11;
                     dpiY = source.CompositionTarget.TransformToDevice.M22;

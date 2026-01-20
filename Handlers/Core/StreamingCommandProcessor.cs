@@ -1,8 +1,5 @@
-using System.Text;
 using System.Text.RegularExpressions;
 using VPetLLM.Handlers.Infrastructure;
-using VPetLLM.Utils.Common;
-using VPetLLM.Utils.System;
 using TTSServiceType = VPetLLM.Utils.Audio.TTSService;
 
 namespace VPetLLM.Handlers.Core
@@ -66,7 +63,7 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private void OnBatchReady(List<string> commands)
         {
-            if (commands == null || commands.Count == 0) return;
+            if (commands is null || commands.Count == 0) return;
 
             Logger.Log($"StreamingCommandProcessor: 批处理回调，命令数: {commands.Count}");
 
@@ -162,14 +159,14 @@ namespace VPetLLM.Handlers.Core
                     pluginStartIndex = newFormatMatch.Index;
                 }
 
-                if (takeoverMatch != null && !string.IsNullOrEmpty(pluginName))
+                if (takeoverMatch is not null && !string.IsNullOrEmpty(pluginName))
                 {
                     // 查找支持接管的插件
                     var plugin = _plugin?.Plugins.Find(p =>
                         p.Name.Replace(" ", "_").Equals(pluginName, StringComparison.OrdinalIgnoreCase) &&
-                        p is global::VPetLLM.Core.IPluginTakeover takeover && takeover.SupportsTakeover);
+                        p is IPluginTakeover takeover && takeover.SupportsTakeover);
 
-                    if (plugin is global::VPetLLM.Core.IPluginTakeover)
+                    if (plugin is IPluginTakeover)
                     {
                         // 提取从 plugin 开始到当前的内容
                         var pluginContent = currentBuffer.Substring(pluginStartIndex);
@@ -244,7 +241,7 @@ namespace VPetLLM.Handlers.Core
 
                 // 解析新格式: <|command_type_begin|> parameters <|command_type_end|>
                 var command = ParseNewFormatCommand(text, startIndex);
-                if (command == null)
+                if (command is null)
                 {
                     // 不完整的命令，等待更多数据
                     break;
@@ -297,7 +294,7 @@ namespace VPetLLM.Handlers.Core
                 Logger.Log($"StreamingCommandProcessor: 检测到完整命令类型: {commandType}, 格式: 新格式, 命令: {fullCommand.Substring(0, Math.Min(fullCommand.Length, 100))}...");
 
                 // 根据是否启用批处理选择处理方式
-                if (_useBatching && _commandBatcher != null)
+                if (_useBatching && _commandBatcher is not null)
                 {
                     // 批处理模式：添加到批处理器
                     _commandBatcher.AddCommand(fullCommand);
@@ -463,7 +460,7 @@ namespace VPetLLM.Handlers.Core
 
                                     // 检查SmartMessageProcessor是否在处理
                                     var processor = pluginInstance?.TalkBox?.MessageProcessor;
-                                    if (processor != null && processor.IsProcessing)
+                                    if (processor is not null && processor.IsProcessing)
                                     {
                                         // 还在处理中，继续等待
                                         await Task.Delay(500).ConfigureAwait(false);
@@ -493,7 +490,7 @@ namespace VPetLLM.Handlers.Core
                                 if (shouldSetIdle)
                                 {
                                     var processor = pluginInstance?.TalkBox?.MessageProcessor;
-                                    if (processor == null || !processor.IsProcessing)
+                                    if (processor is null || !processor.IsProcessing)
                                     {
                                         Logger.Log("StreamingCommandProcessor: 所有命令处理完成，设置状态灯为Idle");
                                         pluginInstance?.FloatingSidebarManager?.SetIdleStatus();
@@ -524,7 +521,7 @@ namespace VPetLLM.Handlers.Core
 
                     // 如果有TTS下载任务，等待下载完成（不阻塞UI线程）
                     string audioFile = null;
-                    if (commandTask.TTSDownloadTask != null)
+                    if (commandTask.TTSDownloadTask is not null)
                     {
                         try
                         {
@@ -535,7 +532,7 @@ namespace VPetLLM.Handlers.Core
                                 Logger.Log($"StreamingCommandProcessor: TTS音频下载完成: {audioFile}");
 
                                 // 队列模式：下载完成后立即启动下一个下载
-                                if (useQueueDownload && nextCommandTask != null && nextCommandTask.TTSDownloadTask == null)
+                                if (useQueueDownload && nextCommandTask is not null && nextCommandTask.TTSDownloadTask is null)
                                 {
                                     var nextTalkText = ExtractTalkText(nextCommandTask.Command);
                                     TTSServiceType? ttsService = pluginInstance?.TTSService;
@@ -572,7 +569,7 @@ namespace VPetLLM.Handlers.Core
                     if (!string.IsNullOrEmpty(audioFile))
                     {
                         // 将音频文件路径临时存储，供SmartMessageProcessor使用
-                        if (pluginInstance?.TalkBox?.MessageProcessor != null)
+                        if (pluginInstance?.TalkBox?.MessageProcessor is not null)
                         {
                             // 通过自定义属性传递音频文件路径
                             Logger.Log($"StreamingCommandProcessor: 传递预下载音频文件: {audioFile}");
@@ -670,7 +667,7 @@ namespace VPetLLM.Handlers.Core
 
             // 尝试通过静态实例访问 MessageProcessor
             var pluginInstance = _plugin ?? VPetLLM.Instance;
-            Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: plugin = {(pluginInstance != null ? "有效" : "null")}, TalkBox = {(pluginInstance?.TalkBox != null ? "有效" : "null")}, MessageProcessor = {(pluginInstance?.TalkBox?.MessageProcessor != null ? "有效" : "null")}");
+            Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: plugin = {(pluginInstance is not null ? "有效" : "null")}, TalkBox = {(pluginInstance?.TalkBox is not null ? "有效" : "null")}, MessageProcessor = {(pluginInstance?.TalkBox?.MessageProcessor is not null ? "有效" : "null")}");
 
             // 对于plugin和tool命令，使用特殊的等待逻辑
             if (commandType == "plugin" || commandType == "tool")
@@ -688,7 +685,7 @@ namespace VPetLLM.Handlers.Core
             }
 
             // 等待 SmartMessageProcessor 完成当前命令的处理（主要用于talk/say命令）
-            if (pluginInstance?.TalkBox?.MessageProcessor != null)
+            if (pluginInstance?.TalkBox?.MessageProcessor is not null)
             {
                 // 优化：减少初始等待时间
                 await Task.Delay(20).ConfigureAwait(false);
@@ -758,7 +755,7 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task WaitForVoiceCompleteAsync()
         {
-            if (_plugin == null)
+            if (_plugin is null)
             {
                 // 如果没有插件引用，使用保守的延迟估算
                 await Task.Delay(2000);
@@ -788,7 +785,7 @@ namespace VPetLLM.Handlers.Core
                 }
 
                 // 2. 等待 VPet 主程序的语音播放完成（EdgeTTS 或其他 TTS 插件）
-                if (_plugin.MW?.Main != null)
+                if (_plugin.MW?.Main is not null)
                 {
                     int maxWaitTime = 30000; // 最多等待 30 秒
                     int checkInterval = 100; // 每 100ms 检查一次
@@ -875,12 +872,12 @@ namespace VPetLLM.Handlers.Core
             _useBatching = enabled;
             _batchWindowMs = windowMs;
 
-            if (enabled && _commandBatcher == null)
+            if (enabled && _commandBatcher is null)
             {
                 _commandBatcher = new CommandBatcher(windowMs, OnBatchReady);
                 Logger.Log($"StreamingCommandProcessor: 批处理模式已启用，窗口: {windowMs}ms");
             }
-            else if (!enabled && _commandBatcher != null)
+            else if (!enabled && _commandBatcher is not null)
             {
                 _commandBatcher.Flush();
                 _commandBatcher.Dispose();
@@ -920,9 +917,9 @@ namespace VPetLLM.Handlers.Core
         public void Complete()
         {
             Logger.Log("StreamingCommandProcessor: Complete() 调用 - 统一流式处理完成");
-            
+
             // 刷新批处理器，确保所有待处理的命令都被处理
-            if (_useBatching && _commandBatcher != null)
+            if (_useBatching && _commandBatcher is not null)
             {
                 _commandBatcher.Flush();
                 Logger.Log("StreamingCommandProcessor: 批处理器已刷新");
@@ -930,7 +927,7 @@ namespace VPetLLM.Handlers.Core
 
             // 处理任何剩余的完整命令
             ProcessCompleteCommands();
-            
+
             Logger.Log("StreamingCommandProcessor: 统一流式处理完成");
         }
     }

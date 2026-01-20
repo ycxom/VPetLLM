@@ -1,12 +1,11 @@
 using System.Windows;
-using VPetLLM.Core;
 
 namespace VPetLLM.UI.Windows
 {
     public partial class ContextEditorWindow : Window
     {
         private readonly IChatCore _chatCore;
-        private List<Core.Message> _originalHistory;
+        private List<Message> _originalHistory;
 
         public ContextEditorWindow(IChatCore chatCore)
         {

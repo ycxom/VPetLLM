@@ -1,6 +1,4 @@
-using System.IO;
 using System.Reflection;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Configuration
 {
@@ -100,7 +98,7 @@ namespace VPetLLM.Utils.Configuration
         {
             try
             {
-                if (currentValue == null)
+                if (currentValue is null)
                 {
                     // 创建新的List实例
                     var listType = property.PropertyType;
@@ -136,7 +134,7 @@ namespace VPetLLM.Utils.Configuration
                     return;
                 }
 
-                if (currentValue == null)
+                if (currentValue is null)
                 {
                     // 创建新的类实例
                     var classType = property.PropertyType;
@@ -161,7 +159,7 @@ namespace VPetLLM.Utils.Configuration
         /// </summary>
         private void RecursivelyCheckNestedProperties(object obj, string parentPath)
         {
-            if (obj == null) return;
+            if (obj is null) return;
 
             var objType = obj.GetType();
 
@@ -200,7 +198,7 @@ namespace VPetLLM.Utils.Configuration
                 // 检查是否为嵌套类类型
                 else if (propertyType.IsClass && propertyType != typeof(string))
                 {
-                    if (currentValue == null)
+                    if (currentValue is null)
                     {
                         try
                         {
@@ -229,7 +227,7 @@ namespace VPetLLM.Utils.Configuration
         {
             try
             {
-                if (currentValue == null)
+                if (currentValue is null)
                 {
                     var listType = property.PropertyType;
                     var listInstance = Activator.CreateInstance(listType);
@@ -265,7 +263,7 @@ namespace VPetLLM.Utils.Configuration
         /// </summary>
         private void CleanupDuplicateTools()
         {
-            if (_settings.Tools == null) return;
+            if (_settings.Tools is null) return;
 
             var originalCount = _settings.Tools.Count;
             var seenNames = new HashSet<string>();
@@ -273,7 +271,7 @@ namespace VPetLLM.Utils.Configuration
 
             foreach (var tool in _settings.Tools)
             {
-                if (tool == null || string.IsNullOrWhiteSpace(tool.Name)) continue;
+                if (tool is null || string.IsNullOrWhiteSpace(tool.Name)) continue;
 
                 var lowerName = tool.Name.ToLowerInvariant();
                 if (!seenNames.Contains(lowerName))
@@ -296,7 +294,7 @@ namespace VPetLLM.Utils.Configuration
         /// </summary>
         private void CleanupDuplicateOpenAINodes()
         {
-            if (_settings.OpenAI?.OpenAINodes == null) return;
+            if (_settings.OpenAI?.OpenAINodes is null) return;
 
             var originalCount = _settings.OpenAI.OpenAINodes.Count;
             var seenCombinations = new HashSet<string>();
@@ -304,7 +302,7 @@ namespace VPetLLM.Utils.Configuration
 
             foreach (var node in _settings.OpenAI.OpenAINodes)
             {
-                if (node == null) continue;
+                if (node is null) continue;
 
                 var combination = $"{node.Name?.ToLowerInvariant()}|{node.Url}";
                 if (!seenCombinations.Contains(combination))
@@ -327,7 +325,7 @@ namespace VPetLLM.Utils.Configuration
         /// </summary>
         private void CleanupDuplicateGeminiNodes()
         {
-            if (_settings.Gemini?.GeminiNodes == null) return;
+            if (_settings.Gemini?.GeminiNodes is null) return;
 
             var originalCount = _settings.Gemini.GeminiNodes.Count;
             var seenCombinations = new HashSet<string>();
@@ -335,7 +333,7 @@ namespace VPetLLM.Utils.Configuration
 
             foreach (var node in _settings.Gemini.GeminiNodes)
             {
-                if (node == null) continue;
+                if (node is null) continue;
 
                 var combination = $"{node.Name?.ToLowerInvariant()}|{node.ApiKey}";
                 if (!seenCombinations.Contains(combination))
@@ -358,7 +356,7 @@ namespace VPetLLM.Utils.Configuration
         /// </summary>
         private void CleanupDuplicateCustomHeaders()
         {
-            if (_settings.TTS?.DIY?.CustomHeaders == null) return;
+            if (_settings.TTS?.DIY?.CustomHeaders is null) return;
 
             var originalCount = _settings.TTS.DIY.CustomHeaders.Count;
             var seenKeys = new HashSet<string>();
@@ -366,7 +364,7 @@ namespace VPetLLM.Utils.Configuration
 
             foreach (var header in _settings.TTS.DIY.CustomHeaders)
             {
-                if (header == null || string.IsNullOrWhiteSpace(header.Key)) continue;
+                if (header is null || string.IsNullOrWhiteSpace(header.Key)) continue;
 
                 var lowerKey = header.Key.ToLowerInvariant();
                 if (!seenKeys.Contains(lowerKey))
@@ -416,7 +414,7 @@ namespace VPetLLM.Utils.Configuration
         private void ValidateAndFixIndexBounds()
         {
             // OpenAI节点索引
-            if (_settings.OpenAI?.OpenAINodes != null)
+            if (_settings.OpenAI?.OpenAINodes is not null)
             {
                 if (_settings.OpenAI.CurrentNodeIndex < 0 ||
                     _settings.OpenAI.CurrentNodeIndex >= _settings.OpenAI.OpenAINodes.Count)
@@ -427,7 +425,7 @@ namespace VPetLLM.Utils.Configuration
             }
 
             // Gemini节点索引
-            if (_settings.Gemini?.GeminiNodes != null)
+            if (_settings.Gemini?.GeminiNodes is not null)
             {
                 if (_settings.Gemini.CurrentNodeIndex < 0 ||
                     _settings.Gemini.CurrentNodeIndex >= _settings.Gemini.GeminiNodes.Count)
@@ -444,7 +442,7 @@ namespace VPetLLM.Utils.Configuration
         private void ValidateAndFixNumericRanges()
         {
             // TTS音量范围（0-100 百分比）
-            if (_settings.TTS != null)
+            if (_settings.TTS is not null)
             {
                 if (_settings.TTS.Volume < 0 || _settings.TTS.Volume > 100)
                 {
@@ -466,7 +464,7 @@ namespace VPetLLM.Utils.Configuration
         private void ValidateAndFixUrlFormats()
         {
             // Ollama URL
-            if (_settings.Ollama != null && !string.IsNullOrWhiteSpace(_settings.Ollama.Url) &&
+            if (_settings.Ollama is not null && !string.IsNullOrWhiteSpace(_settings.Ollama.Url) &&
                 !_settings.Ollama.Url.StartsWith("http"))
             {
                 _settings.Ollama.Url = "http://" + _settings.Ollama.Url;
@@ -474,7 +472,7 @@ namespace VPetLLM.Utils.Configuration
             }
 
             // 代理地址
-            if (_settings.Proxy != null && _settings.Proxy.IsEnabled &&
+            if (_settings.Proxy is not null && _settings.Proxy.IsEnabled &&
                 !string.IsNullOrWhiteSpace(_settings.Proxy.Address) &&
                 !_settings.Proxy.Address.Contains(":"))
             {
@@ -506,10 +504,10 @@ namespace VPetLLM.Utils.Configuration
         private void CleanupEmptyConfigurations()
         {
             // 清理空的工具列表
-            if (_settings.Tools != null)
+            if (_settings.Tools is not null)
             {
                 var nonEmptyTools = _settings.Tools
-                    .Where(tool => tool != null && !string.IsNullOrWhiteSpace(tool.Name))
+                    .Where(tool => tool is not null && !string.IsNullOrWhiteSpace(tool.Name))
                     .ToList();
 
                 if (nonEmptyTools.Count != _settings.Tools.Count)
@@ -520,10 +518,10 @@ namespace VPetLLM.Utils.Configuration
             }
 
             // 清理空的OpenAI节点
-            if (_settings.OpenAI?.OpenAINodes != null)
+            if (_settings.OpenAI?.OpenAINodes is not null)
             {
                 var nonEmptyNodes = _settings.OpenAI.OpenAINodes
-                    .Where(node => node != null && !string.IsNullOrWhiteSpace(node.Name))
+                    .Where(node => node is not null && !string.IsNullOrWhiteSpace(node.Name))
                     .ToList();
 
                 if (nonEmptyNodes.Count != _settings.OpenAI.OpenAINodes.Count)
@@ -534,10 +532,10 @@ namespace VPetLLM.Utils.Configuration
             }
 
             // 清理空的Gemini节点
-            if (_settings.Gemini?.GeminiNodes != null)
+            if (_settings.Gemini?.GeminiNodes is not null)
             {
                 var nonEmptyNodes = _settings.Gemini.GeminiNodes
-                    .Where(node => node != null && !string.IsNullOrWhiteSpace(node.Name))
+                    .Where(node => node is not null && !string.IsNullOrWhiteSpace(node.Name))
                     .ToList();
 
                 if (nonEmptyNodes.Count != _settings.Gemini.GeminiNodes.Count)
@@ -548,10 +546,10 @@ namespace VPetLLM.Utils.Configuration
             }
 
             // 清理空的自定义头部
-            if (_settings.TTS?.DIY?.CustomHeaders != null)
+            if (_settings.TTS?.DIY?.CustomHeaders is not null)
             {
                 var nonEmptyHeaders = _settings.TTS.DIY.CustomHeaders
-                    .Where(header => header != null && !string.IsNullOrWhiteSpace(header.Key))
+                    .Where(header => header is not null && !string.IsNullOrWhiteSpace(header.Key))
                     .ToList();
 
                 if (nonEmptyHeaders.Count != _settings.TTS.DIY.CustomHeaders.Count)
@@ -568,7 +566,7 @@ namespace VPetLLM.Utils.Configuration
         private void CleanupInvalidReferences()
         {
             // 清理GPT-SoVITS参考音频路径
-            if (_settings.TTS?.GPTSoVITS?.ReferWavPath != null &&
+            if (_settings.TTS?.GPTSoVITS?.ReferWavPath is not null &&
                 !string.IsNullOrWhiteSpace(_settings.TTS.GPTSoVITS.ReferWavPath) &&
                 !File.Exists(_settings.TTS.GPTSoVITS.ReferWavPath))
             {

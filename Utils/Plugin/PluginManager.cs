@@ -1,8 +1,5 @@
-using Newtonsoft.Json;
-using System.IO;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
-using VPetLLM.Core;
 using VPetLLMUtils = VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Plugin
@@ -64,7 +61,7 @@ namespace VPetLLM.Utils.Plugin
 
                             // 检查是否已存在同名插件
                             var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
-                            if (existingPlugin != null)
+                            if (existingPlugin is not null)
                             {
                                 VPetLLMUtils.Logger.Log($"Warning: Plugin with name '{plugin.Name}' already exists. Skipping duplicate from {file}");
                                 VPetLLMUtils.Logger.Log($"Existing plugin from: {existingPlugin.FilePath}");
@@ -83,7 +80,7 @@ namespace VPetLLM.Utils.Plugin
                             if (plugin.Enabled)
                             {
                                 plugin.Initialize(VPetLLM.Instance);
-                                if (chatCore != null)
+                                if (chatCore is not null)
                                 {
                                     chatCore.AddPlugin(plugin);
                                 }
@@ -144,7 +141,7 @@ namespace VPetLLM.Utils.Plugin
                 }
             }
 
-            if (chatCore != null)
+            if (chatCore is not null)
             {
                 chatCore.RemovePlugin(plugin);
             }
@@ -216,7 +213,7 @@ namespace VPetLLM.Utils.Plugin
         }
         public static void UnloadAllPlugins(IChatCore chatCore)
         {
-            if (chatCore != null)
+            if (chatCore is not null)
             {
                 foreach (var p in Plugins.ToList())
                 {
@@ -357,7 +354,7 @@ namespace VPetLLM.Utils.Plugin
                 // 方法1: 文件名匹配（最常见的情况）
                 var exactMatch = allPluginFiles.FirstOrDefault(f =>
                     Path.GetFileNameWithoutExtension(f).Equals(pluginName, StringComparison.OrdinalIgnoreCase));
-                if (exactMatch != null)
+                if (exactMatch is not null)
                 {
                     candidateFiles.Add(exactMatch);
                     VPetLLMUtils.Logger.Log($"DeletePluginByName: Found exact filename match: {exactMatch}");
@@ -376,7 +373,7 @@ namespace VPetLLM.Utils.Plugin
 
                 // 方法3: 检查已加载的插件列�?
                 var loadedPlugin = Plugins.FirstOrDefault(p => p.Name.Equals(pluginName, StringComparison.OrdinalIgnoreCase));
-                if (loadedPlugin != null && !string.IsNullOrEmpty(loadedPlugin.FilePath))
+                if (loadedPlugin is not null && !string.IsNullOrEmpty(loadedPlugin.FilePath))
                 {
                     // 验证FilePath是否是有效的文件路径（而不是目录）
                     string validFilePath = loadedPlugin.FilePath;
@@ -391,13 +388,13 @@ namespace VPetLLM.Utils.Plugin
                             Path.GetFileNameWithoutExtension(f).Equals(pluginName, StringComparison.OrdinalIgnoreCase));
 
                         // 如果没有精确匹配，尝试部分匹�?
-                        if (matchedFile == null)
+                        if (matchedFile is null)
                         {
                             matchedFile = filesInDir.FirstOrDefault(f =>
                                 Path.GetFileNameWithoutExtension(f).Contains(pluginName, StringComparison.OrdinalIgnoreCase));
                         }
 
-                        if (matchedFile != null)
+                        if (matchedFile is not null)
                         {
                             validFilePath = matchedFile;
                             VPetLLMUtils.Logger.Log($"DeletePluginByName: Found matching dll in directory: {validFilePath}");
@@ -424,7 +421,7 @@ namespace VPetLLM.Utils.Plugin
 
                 // 方法4: 检查失败的插件列表
                 var failedPlugin = FailedPlugins.FirstOrDefault(p => p.Name.Equals(pluginName, StringComparison.OrdinalIgnoreCase));
-                if (failedPlugin != null && !string.IsNullOrEmpty(failedPlugin.FilePath))
+                if (failedPlugin is not null && !string.IsNullOrEmpty(failedPlugin.FilePath))
                 {
                     // 验证FilePath是否是有效的文件路径（而不是目录）
                     string validFilePath = failedPlugin.FilePath;
@@ -439,13 +436,13 @@ namespace VPetLLM.Utils.Plugin
                             Path.GetFileNameWithoutExtension(f).Equals(pluginName, StringComparison.OrdinalIgnoreCase));
 
                         // 如果没有精确匹配，尝试部分匹�?
-                        if (matchedFile == null)
+                        if (matchedFile is null)
                         {
                             matchedFile = filesInDir.FirstOrDefault(f =>
                                 Path.GetFileNameWithoutExtension(f).Contains(pluginName, StringComparison.OrdinalIgnoreCase));
                         }
 
-                        if (matchedFile != null)
+                        if (matchedFile is not null)
                         {
                             validFilePath = matchedFile;
                             VPetLLMUtils.Logger.Log($"DeletePluginByName: Found matching dll in failed plugin directory: {validFilePath}");
@@ -476,7 +473,7 @@ namespace VPetLLM.Utils.Plugin
                     try
                     {
                         var pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
-                        if (pluginStates != null && pluginStates.ContainsKey(pluginName))
+                        if (pluginStates is not null && pluginStates.ContainsKey(pluginName))
                         {
                             // 插件在配置中存在，尝试常见的文件名模�?
                             var possibleNames = new[]
@@ -522,7 +519,7 @@ namespace VPetLLM.Utils.Plugin
                                 try
                                 {
                                     var pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
-                                    if (pluginStates != null && pluginStates.Remove(pluginName))
+                                    if (pluginStates is not null && pluginStates.Remove(pluginName))
                                     {
                                         File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
                                         VPetLLMUtils.Logger.Log($"DeletePluginByName: Removed plugin from config: {pluginName}");
@@ -572,13 +569,13 @@ namespace VPetLLM.Utils.Plugin
                 var existingPlugin = Plugins.FirstOrDefault(p => p.FilePath == pluginFilePath);
                 string pluginName = null;
 
-                if (existingPlugin != null)
+                if (existingPlugin is not null)
                 {
                     pluginName = existingPlugin.Name;
                     VPetLLMUtils.Logger.Log($"Found existing plugin to update: {pluginName}");
 
                     // 先卸载旧版本插件
-                    if (chatCore != null)
+                    if (chatCore is not null)
                     {
                         chatCore.RemovePlugin(existingPlugin);
                     }
@@ -657,13 +654,13 @@ namespace VPetLLM.Utils.Plugin
 
                     // 查找是否有其他插件实例使用相同的插件�?
                     var duplicatePlugin = Plugins.FirstOrDefault(p => p.Name == pluginName && p.FilePath == file);
-                    if (duplicatePlugin != null)
+                    if (duplicatePlugin is not null)
                     {
                         VPetLLMUtils.Logger.Log($"Found duplicate plugin file for '{pluginName}': {file}");
                         VPetLLMUtils.Logger.Log($"Removing duplicate plugin instance...");
 
                         // 卸载重复的插�?
-                        if (chatCore != null)
+                        if (chatCore is not null)
                         {
                             chatCore.RemovePlugin(duplicatePlugin);
                         }
@@ -741,7 +738,7 @@ namespace VPetLLM.Utils.Plugin
                         // 在单个插件加载中，不应该有重复插件，因为我们已经在更新前移除了旧插件
                         // 如果仍然存在重复，说明有其他同名插件文件，这是一个问�?
                         var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
-                        if (existingPlugin != null)
+                        if (existingPlugin is not null)
                         {
                             VPetLLMUtils.Logger.Log($"Critical: Plugin with name '{plugin.Name}' already exists during single plugin load!");
                             VPetLLMUtils.Logger.Log($"  Existing plugin from: {existingPlugin.FilePath}");
@@ -750,7 +747,7 @@ namespace VPetLLM.Utils.Plugin
 
                             // 在更新场景下，我们应该替换现有插件而不是跳�?
                             VPetLLMUtils.Logger.Log($"  Removing existing plugin and loading the new one...");
-                            if (chatCore != null)
+                            if (chatCore is not null)
                             {
                                 chatCore.RemovePlugin(existingPlugin);
                             }
@@ -767,7 +764,7 @@ namespace VPetLLM.Utils.Plugin
                             plugin.Enabled = isEnabled;
                         }
 
-                        if (plugin.Enabled && chatCore != null)
+                        if (plugin.Enabled && chatCore is not null)
                         {
                             chatCore.AddPlugin(plugin);
                         }

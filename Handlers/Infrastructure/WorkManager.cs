@@ -1,5 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Handlers.Infrastructure
 {
@@ -21,7 +20,7 @@ namespace VPetLLM.Handlers.Infrastructure
         /// </summary>
         public static void RefreshWorkLists(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main == null)
+            if (mainWindow?.Main is null)
             {
                 Logger.Log("WorkManager: mainWindow is null, cannot refresh work lists");
                 return;
@@ -30,7 +29,7 @@ namespace VPetLLM.Handlers.Infrastructure
             try
             {
                 // Check if we need to refresh cache
-                if (_cachedWorks != null && (DateTime.Now - _lastCacheTime) < CacheExpiration)
+                if (_cachedWorks is not null && (DateTime.Now - _lastCacheTime) < CacheExpiration)
                 {
                     Logger.Log("WorkManager: Using cached work lists");
                     return;
@@ -65,7 +64,7 @@ namespace VPetLLM.Handlers.Infrastructure
                 var mainType = mainWindow.Main.GetType();
                 var workListMethod = mainType.GetMethod("WorkList");
 
-                if (workListMethod == null)
+                if (workListMethod is null)
                 {
                     Logger.Log("WorkManager: WorkList method not found");
                     _cachedWorks = new List<object>();
@@ -112,7 +111,7 @@ namespace VPetLLM.Handlers.Infrastructure
                 _ => _cachedWorks
             };
 
-            if (searchList == null || searchList.Count == 0)
+            if (searchList is null || searchList.Count == 0)
             {
                 Logger.Log($"WorkManager: No {workType} list available");
                 return null;
@@ -126,13 +125,13 @@ namespace VPetLLM.Handlers.Infrastructure
                 var name = GetWorkProperty(work, "Name") as string;
                 var nameTrans = GetWorkProperty(work, "NameTrans") as string;
 
-                if (name != null && name.Equals(workName, StringComparison.OrdinalIgnoreCase))
+                if (name is not null && name.Equals(workName, StringComparison.OrdinalIgnoreCase))
                 {
                     Logger.Log($"WorkManager: Found exact match by Name: {name}");
                     return work;
                 }
 
-                if (nameTrans != null && nameTrans.Equals(workName, StringComparison.OrdinalIgnoreCase))
+                if (nameTrans is not null && nameTrans.Equals(workName, StringComparison.OrdinalIgnoreCase))
                 {
                     Logger.Log($"WorkManager: Found exact match by NameTrans: {nameTrans}");
                     return work;
@@ -145,13 +144,13 @@ namespace VPetLLM.Handlers.Infrastructure
                 var name = GetWorkProperty(work, "Name") as string;
                 var nameTrans = GetWorkProperty(work, "NameTrans") as string;
 
-                if (name != null && name.IndexOf(workName, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (name is not null && name.IndexOf(workName, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     Logger.Log($"WorkManager: Found partial match by Name: {name}");
                     return work;
                 }
 
-                if (nameTrans != null && nameTrans.IndexOf(workName, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (nameTrans is not null && nameTrans.IndexOf(workName, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     Logger.Log($"WorkManager: Found partial match by NameTrans: {nameTrans}");
                     return work;
@@ -164,13 +163,13 @@ namespace VPetLLM.Handlers.Infrastructure
                 var name = GetWorkProperty(work, "Name") as string;
                 var nameTrans = GetWorkProperty(work, "NameTrans") as string;
 
-                if (name != null && workName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (name is not null && workName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     Logger.Log($"WorkManager: Found reverse partial match by Name: {name}");
                     return work;
                 }
 
-                if (nameTrans != null && workName.IndexOf(nameTrans, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (nameTrans is not null && workName.IndexOf(nameTrans, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     Logger.Log($"WorkManager: Found reverse partial match by NameTrans: {nameTrans}");
                     return work;
@@ -186,7 +185,7 @@ namespace VPetLLM.Handlers.Infrastructure
         /// </summary>
         public static bool StartWork(IMainWindow mainWindow, object work)
         {
-            if (mainWindow?.Main == null || work == null)
+            if (mainWindow?.Main is null || work is null)
             {
                 Logger.Log("WorkManager: Invalid parameters for StartWork");
                 return false;
@@ -223,7 +222,7 @@ namespace VPetLLM.Handlers.Infrastructure
                 var mainType = mainWindow.Main.GetType();
                 var startWorkMethod = mainType.GetMethod("StartWork", new[] { work.GetType() });
 
-                if (startWorkMethod == null)
+                if (startWorkMethod is null)
                 {
                     Logger.Log("WorkManager: StartWork method not found with matching parameter type");
                     return false;
@@ -247,7 +246,7 @@ namespace VPetLLM.Handlers.Infrastructure
             {
                 Logger.Log($"WorkManager: Error starting work: {ex.Message}");
                 Logger.Log($"WorkManager: Exception type: {ex.GetType().Name}");
-                if (ex.InnerException != null)
+                if (ex.InnerException is not null)
                 {
                     Logger.Log($"WorkManager: Inner exception: {ex.InnerException.Message}");
                 }
@@ -280,7 +279,7 @@ namespace VPetLLM.Handlers.Infrastructure
 
             var result = new System.Text.StringBuilder();
 
-            if (_cachedWorks != null && _cachedWorks.Count > 0)
+            if (_cachedWorks is not null && _cachedWorks.Count > 0)
             {
                 result.AppendLine("Available Works:");
                 foreach (var work in _cachedWorks.Take(10)) // Limit to first 10
@@ -292,7 +291,7 @@ namespace VPetLLM.Handlers.Infrastructure
                     result.AppendLine($"  ... and {_cachedWorks.Count - 10} more");
             }
 
-            if (_cachedStudies != null && _cachedStudies.Count > 0)
+            if (_cachedStudies is not null && _cachedStudies.Count > 0)
             {
                 result.AppendLine("\nAvailable Studies:");
                 foreach (var study in _cachedStudies.Take(10))
@@ -304,7 +303,7 @@ namespace VPetLLM.Handlers.Infrastructure
                     result.AppendLine($"  ... and {_cachedStudies.Count - 10} more");
             }
 
-            if (_cachedPlays != null && _cachedPlays.Count > 0)
+            if (_cachedPlays is not null && _cachedPlays.Count > 0)
             {
                 result.AppendLine("\nAvailable Plays:");
                 foreach (var play in _cachedPlays.Take(10))
@@ -365,7 +364,7 @@ namespace VPetLLM.Handlers.Infrastructure
         /// <returns>The maximum allowed rate for this work</returns>
         public static int GetMaxRate(IMainWindow mainWindow, object work)
         {
-            if (mainWindow?.GameSavesData?.GameSave == null || work == null)
+            if (mainWindow?.GameSavesData?.GameSave is null || work is null)
             {
                 Logger.Log("WorkManager: Invalid parameters for GetMaxRate, returning 1");
                 return 1;
@@ -380,7 +379,7 @@ namespace VPetLLM.Handlers.Infrastructure
             {
                 levelLimit = ll;
             }
-            else if (levelLimitValue != null && int.TryParse(levelLimitValue.ToString(), out int parsedLimit))
+            else if (levelLimitValue is not null && int.TryParse(levelLimitValue.ToString(), out int parsedLimit))
             {
                 levelLimit = parsedLimit;
             }
@@ -398,7 +397,7 @@ namespace VPetLLM.Handlers.Infrastructure
         /// <returns>True if work started successfully, false otherwise</returns>
         public static bool StartWorkWithRate(IMainWindow mainWindow, object work, int requestedRate)
         {
-            if (mainWindow?.Main == null || work == null)
+            if (mainWindow?.Main is null || work is null)
             {
                 Logger.Log("WorkManager: Invalid parameters for StartWorkWithRate");
                 return false;
@@ -459,7 +458,7 @@ namespace VPetLLM.Handlers.Infrastructure
                     var extensionType = typeof(VPet_Simulator.Windows.Interface.ExtensionFunction);
                     var doubleMethod = extensionType.GetMethod("Double", new[] { work.GetType(), typeof(int) });
 
-                    if (doubleMethod != null)
+                    if (doubleMethod is not null)
                     {
                         var doubledWork = doubleMethod.Invoke(null, new object[] { work, clampedRate });
                         Logger.Log($"WorkManager: Starting work '{workName}' with rate {clampedRate} (via reflection)");
@@ -475,7 +474,7 @@ namespace VPetLLM.Handlers.Infrastructure
             catch (Exception ex)
             {
                 Logger.Log($"WorkManager: Error starting work with rate: {ex.Message}");
-                if (ex.InnerException != null)
+                if (ex.InnerException is not null)
                 {
                     Logger.Log($"WorkManager: Inner exception: {ex.InnerException.Message}");
                 }

@@ -15,7 +15,7 @@ namespace VPetLLM.Utils.System
         {
             // 使用 BeginInvoke 异步调度，避免阻塞调用线程
             var app = SystemWindows.Application.Current;
-            if (app == null) return; // 应用程序未初始化时跳过
+            if (app is null) return; // 应用程序未初始化时跳过
 
             // 预先格式化消息，避免在 UI 线程中进行
             var formattedMessage = FormatLogMessage(message);
@@ -25,7 +25,7 @@ namespace VPetLLM.Utils.System
                 Logs.Add(formattedMessage);
 
                 // 如果超过最大日志数量，移除最早的日志
-                if (VPetLLM.Instance != null && VPetLLM.Instance.Settings != null && Logs.Count > VPetLLM.Instance.Settings.MaxLogCount)
+                if (VPetLLM.Instance is not null && VPetLLM.Instance.Settings is not null && Logs.Count > VPetLLM.Instance.Settings.MaxLogCount)
                 {
                     while (Logs.Count > VPetLLM.Instance.Settings.MaxLogCount)
                     {
@@ -34,7 +34,7 @@ namespace VPetLLM.Utils.System
                 }
 
                 // 如果启用自动滚动，滚动到最新条目
-                if (VPetLLM.Instance != null && VPetLLM.Instance.Settings != null && VPetLLM.Instance.Settings.LogAutoScroll && Logs.Count > 0)
+                if (VPetLLM.Instance is not null && VPetLLM.Instance.Settings is not null && VPetLLM.Instance.Settings.LogAutoScroll && Logs.Count > 0)
                 {
                     // 滚动操作已经在 UI 线程中，使用 BeginInvoke 延迟执行确保 UI 已更新
                     app.Dispatcher.BeginInvoke(SystemWindows.Threading.DispatcherPriority.Background, new Action(() =>
@@ -47,14 +47,14 @@ namespace VPetLLM.Utils.System
                         foreach (SystemWindows.Window window in windows)
                         {
                             var settingWindow = window as winSettingNew;
-                            if (settingWindow != null)
+                            if (settingWindow is not null)
                             {
                                 var logBox = (ListBox)settingWindow.FindName("LogBox");
-                                if (logBox != null)
+                                if (logBox is not null)
                                 {
                                     // 使用 ScrollViewer 进行平滑滚动，而不是按条目跳转
                                     var scrollViewer = FindScrollViewer(logBox);
-                                    if (scrollViewer != null)
+                                    if (scrollViewer is not null)
                                     {
                                         scrollViewer.ScrollToEnd();
                                     }
@@ -106,7 +106,7 @@ namespace VPetLLM.Utils.System
         /// </summary>
         private static ScrollViewer FindScrollViewer(SystemWindows.DependencyObject obj)
         {
-            if (obj == null) return null;
+            if (obj is null) return null;
 
             for (int i = 0; i < SystemWindows.Media.VisualTreeHelper.GetChildrenCount(obj); i++)
             {
@@ -117,7 +117,7 @@ namespace VPetLLM.Utils.System
                 }
 
                 var result = FindScrollViewer(child);
-                if (result != null)
+                if (result is not null)
                 {
                     return result;
                 }
@@ -129,7 +129,7 @@ namespace VPetLLM.Utils.System
         public static void Clear()
         {
             var app = SystemWindows.Application.Current;
-            if (app == null) return;
+            if (app is null) return;
 
             app.Dispatcher.BeginInvoke(new Action(() =>
             {

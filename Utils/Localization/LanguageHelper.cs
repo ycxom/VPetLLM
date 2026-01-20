@@ -1,5 +1,4 @@
 using Newtonsoft.Json.Linq;
-using System.IO;
 
 namespace VPetLLM.Utils.Localization
 {
@@ -30,7 +29,7 @@ namespace VPetLLM.Utils.Localization
             {
                 var json = File.ReadAllText(langFile);
                 _languageData = JObject.Parse(json);
-                if (_languageData["Language"]?["Select"] != null)
+                if (_languageData["Language"]?["Select"] is not null)
                     LanguageDisplayMap = _languageData["Language"]["Select"].ToObject<Dictionary<string, string>>();
             }
 
@@ -44,7 +43,7 @@ namespace VPetLLM.Utils.Localization
 
         public static string Get(string path, string langCode, string defaultValue = null)
         {
-            if (_languageData == null || string.IsNullOrEmpty(langCode))
+            if (_languageData is null || string.IsNullOrEmpty(langCode))
             {
                 return defaultValue ?? $"[{path}]";
             }
@@ -57,7 +56,7 @@ namespace VPetLLM.Utils.Localization
 
         public static string GetError(string key, string langCode)
         {
-            if (_errorData == null || string.IsNullOrEmpty(langCode))
+            if (_errorData is null || string.IsNullOrEmpty(langCode))
             {
                 return $"[{key}]";
             }

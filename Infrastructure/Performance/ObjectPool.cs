@@ -72,7 +72,7 @@ namespace VPetLLM.Infrastructure.Performance
         /// </summary>
         public void Return(T item)
         {
-            if (item == null)
+            if (item is null)
                 return;
 
             // 如果池已满，不再归还

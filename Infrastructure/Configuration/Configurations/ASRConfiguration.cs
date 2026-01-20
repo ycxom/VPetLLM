@@ -1,5 +1,3 @@
-using VPetLLM.Configuration;
-
 namespace VPetLLM.Infrastructure.Configuration.Configurations
 {
     /// <summary>
@@ -93,7 +91,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
             {
                 case "OpenAI":
                     var openaiValidation = OpenAI?.Validate();
-                    if (openaiValidation != null && !openaiValidation.IsValid)
+                    if (openaiValidation is not null && !openaiValidation.IsValid)
                     {
                         result.Errors.AddRange(openaiValidation.Errors.Select(e => $"OpenAI ASR: {e}"));
                         result.IsValid = false;
@@ -102,7 +100,7 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
 
                 case "Soniox":
                     var sonioxValidation = Soniox?.Validate();
-                    if (sonioxValidation != null && !sonioxValidation.IsValid)
+                    if (sonioxValidation is not null && !sonioxValidation.IsValid)
                     {
                         result.Errors.AddRange(sonioxValidation.Errors.Select(e => $"Soniox ASR: {e}"));
                         result.IsValid = false;

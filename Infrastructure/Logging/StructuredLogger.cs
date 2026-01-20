@@ -1,7 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.IO;
-using System.Text.Json;
 
 namespace VPetLLM.Infrastructure.Logging
 {
@@ -82,7 +80,7 @@ namespace VPetLLM.Infrastructure.Logging
 
         public IDisposable BeginScope<TState>(TState state)
         {
-            if (state == null)
+            if (state is null)
                 throw new ArgumentNullException(nameof(state));
 
             _scopes.Value.Push(state);
@@ -104,7 +102,7 @@ namespace VPetLLM.Infrastructure.Logging
             };
 
             // 添加上下文信息
-            if (context != null)
+            if (context is not null)
             {
                 AddContextToLogEntry(logEntry, context);
             }
@@ -116,7 +114,7 @@ namespace VPetLLM.Infrastructure.Logging
             }
 
             // 添加异常上下文
-            if (exception != null)
+            if (exception is not null)
             {
                 AddExceptionContext(logEntry, exception);
             }
@@ -189,7 +187,7 @@ namespace VPetLLM.Infrastructure.Logging
                 logEntry.Context["StackTrace"] = exception.StackTrace;
             }
 
-            if (exception.InnerException != null)
+            if (exception.InnerException is not null)
             {
                 logEntry.Context["InnerException"] = exception.InnerException.Message;
             }
@@ -220,7 +218,7 @@ namespace VPetLLM.Infrastructure.Logging
                     var method = frame.GetMethod();
                     var declaringType = method.DeclaringType;
 
-                    if (declaringType != null &&
+                    if (declaringType is not null &&
                         !declaringType.Namespace.StartsWith("VPetLLM.Infrastructure.Logging") &&
                         !declaringType.Name.Contains("Logger"))
                     {
@@ -375,7 +373,7 @@ namespace VPetLLM.Infrastructure.Logging
                 .Replace("{Source}", logEntry.Source)
                 .Replace("{Message}", logEntry.Message);
 
-            if (logEntry.Exception != null)
+            if (logEntry.Exception is not null)
             {
                 formatted += Environment.NewLine + logEntry.Exception.ToString();
             }

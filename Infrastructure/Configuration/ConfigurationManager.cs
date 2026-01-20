@@ -1,6 +1,4 @@
-using Newtonsoft.Json;
 using System.Collections.Concurrent;
-using System.IO;
 using VPetLLM.Infrastructure.Exceptions;
 using VPetLLM.Infrastructure.Logging;
 
@@ -21,7 +19,7 @@ namespace VPetLLM.Infrastructure.Configuration
         private readonly ConcurrentQueue<Type> _pendingSaves = new();
         private bool _disposed = false;
 
-        public event EventHandler<ConfigurationChangedEventArgs> ConfigurationChanged;
+        public event EventHandler<InfraConfigChangedEventArgs> ConfigurationChanged;
         public event EventHandler<ConfigurationLoadedEventArgs> ConfigurationLoaded;
         public event EventHandler<ConfigurationSavedEventArgs> ConfigurationSaved;
 
@@ -83,7 +81,7 @@ namespace VPetLLM.Infrastructure.Configuration
         public async Task SaveConfigurationAsync<T>(T configuration) where T : class, IConfiguration
         {
             ThrowIfDisposed();
-            if (configuration == null)
+            if (configuration is null)
                 throw new ArgumentNullException(nameof(configuration));
 
             var filePath = GetConfigurationFilePath<T>();
@@ -117,9 +115,9 @@ namespace VPetLLM.Infrastructure.Configuration
                     configuration.IsModified = false;
 
                     // 触发配置变更事件
-                    if (oldConfiguration != null)
+                    if (oldConfiguration is not null)
                     {
-                        OnConfigurationChanged(new ConfigurationChangedEventArgs(
+                        OnConfigurationChanged(new InfraConfigChangedEventArgs(
                             typeof(T), configuration.ConfigurationName, oldConfiguration, configuration,
                             ConfigurationChangeReason.ManualUpdate));
                     }
@@ -169,7 +167,7 @@ namespace VPetLLM.Infrastructure.Configuration
                     {
                         // 使用反射调用泛型方法
                         var method = typeof(ConfigurationManager).GetMethod(nameof(SaveConfigurationAsync))?.MakeGenericMethod(configurationType);
-                        if (method != null)
+                        if (method is not null)
                         {
                             var task = (Task)method.Invoke(this, new object[] { configuration });
                             tasks.Add(task);
@@ -204,9 +202,9 @@ namespace VPetLLM.Infrastructure.Configuration
                 OnConfigurationLoaded(new ConfigurationLoadedEventArgs(
                     typeof(T), newConfiguration.ConfigurationName, newConfiguration, File.Exists(GetConfigurationFilePath<T>())));
 
-                if (oldConfiguration != null)
+                if (oldConfiguration is not null)
                 {
-                    OnConfigurationChanged(new ConfigurationChangedEventArgs(
+                    OnConfigurationChanged(new InfraConfigChangedEventArgs(
                         typeof(T), newConfiguration.ConfigurationName, oldConfiguration, newConfiguration,
                         ConfigurationChangeReason.HotReload));
                 }
@@ -233,7 +231,7 @@ namespace VPetLLM.Infrastructure.Configuration
             foreach (var type in configurationTypes)
             {
                 var method = typeof(ConfigurationManager).GetMethod(nameof(ReloadConfigurationAsync))?.MakeGenericMethod(type);
-                if (method != null)
+                if (method is not null)
                 {
                     var task = (Task)method.Invoke(this, null);
                     reloadTasks.Add(task);
@@ -340,7 +338,7 @@ namespace VPetLLM.Infrastructure.Configuration
                     if (!string.IsNullOrWhiteSpace(json))
                     {
                         var configuration = JsonConvert.DeserializeObject<T>(json);
-                        if (configuration != null)
+                        if (configuration is not null)
                         {
                             configuration.IsModified = false;
                             _logger?.LogDebug("Configuration loaded from file", new
@@ -411,7 +409,7 @@ namespace VPetLLM.Infrastructure.Configuration
 
                     // 使用反射调用泛型方法
                     var method = typeof(ConfigurationManager).GetMethod(nameof(SaveConfigurationAsync))?.MakeGenericMethod(type);
-                    if (method != null)
+                    if (method is not null)
                     {
                         var task = (Task)method.Invoke(this, new object[] { configuration });
                         task.Wait(TimeSpan.FromSeconds(30)); // 等待最多30秒
@@ -424,7 +422,7 @@ namespace VPetLLM.Infrastructure.Configuration
             }
         }
 
-        private void OnConfigurationChanged(ConfigurationChangedEventArgs e)
+        private void OnConfigurationChanged(InfraConfigChangedEventArgs e)
         {
             ConfigurationChanged?.Invoke(this, e);
         }

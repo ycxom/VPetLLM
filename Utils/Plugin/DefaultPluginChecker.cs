@@ -1,6 +1,5 @@
 using System.Windows;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Plugin
 {
@@ -112,7 +111,7 @@ namespace VPetLLM.Utils.Plugin
             try
             {
                 var cGPTConfig = _plugin.MW?.Set?["CGPT"];
-                if (cGPTConfig == null) return false;
+                if (cGPTConfig is null) return false;
 
                 var typeValue = cGPTConfig[(LinePutScript.gstr)"type"] as string;
                 return typeValue == "DIY";
@@ -133,7 +132,7 @@ namespace VPetLLM.Utils.Plugin
                 // 方法1：直接从配置中读取DIY设置值（最可靠）
                 // 这避免了依赖TalkAPIIndex可能未正确更新的问题
                 var cGPTConfig = _plugin.MW?.Set?["CGPT"];
-                if (cGPTConfig != null)
+                if (cGPTConfig is not null)
                 {
                     var diyValue = cGPTConfig[(LinePutScript.gstr)"DIY"] as string;
                     if (diyValue == "VPetLLM")
@@ -145,10 +144,10 @@ namespace VPetLLM.Utils.Plugin
                 // 方法2：通过TalkBoxCurr检查（作为备用）
                 // TalkBoxCurr依赖于TalkAPIIndex，可能在某些情况下不准确
                 var talkBoxCurr = _plugin.MW?.TalkBoxCurr;
-                if (talkBoxCurr != null)
+                if (talkBoxCurr is not null)
                 {
                     var apiNameProperty = talkBoxCurr.GetType().GetProperty("APIName");
-                    if (apiNameProperty != null)
+                    if (apiNameProperty is not null)
                     {
                         var currentApiName = apiNameProperty.GetValue(talkBoxCurr) as string;
                         return currentApiName == "VPetLLM";
@@ -169,12 +168,12 @@ namespace VPetLLM.Utils.Plugin
         {
             try
             {
-                if (_plugin?.SettingWindow != null)
+                if (_plugin?.SettingWindow is not null)
                 {
                     _plugin.SettingWindow.Dispatcher.Invoke(() =>
                     {
                         var window = _plugin.SettingWindow as Window;
-                        if (window != null && window.IsLoaded)
+                        if (window is not null && window.IsLoaded)
                         {
                             window.Title = _plugin.SettingWindow.WindowTitle;
                             Logger.Log($"窗口标题已更新: {window.Title}");

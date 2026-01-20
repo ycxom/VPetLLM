@@ -1,4 +1,3 @@
-using VPetLLM.Core;
 using VPetLLM.Infrastructure.Configuration;
 using VPetLLM.Infrastructure.Configuration.Configurations;
 using VPetLLM.Infrastructure.Events;
@@ -14,18 +13,19 @@ namespace VPetLLM.Infrastructure.Services
     {
         public override string ServiceName => "TTSService";
 
-        private readonly IConfigurationManager _configurationManager;
+        private readonly InfraConfigManager _configurationManager;
         private new readonly IEventBus _eventBus;
         private readonly CoreFactory _coreFactory;
         private readonly Dictionary<string, TTSCoreBase> _ttsCores;
         private TTSCoreBase _currentTTSCore;
-        private TTSConfiguration _ttsConfig;
+        private InfraTTSConfiguration _ttsConfig;
         private readonly Queue<TTSRequest> _requestQueue;
         private readonly SemaphoreSlim _queueSemaphore;
         private CancellationTokenSource _processingCancellation;
+        private readonly EventHandler<InfraConfigChangedEventArgs> _configChangedHandler;
 
         public TTSService(
-            IConfigurationManager configurationManager,
+            InfraConfigManager configurationManager,
             IEventBus eventBus,
             IStructuredLogger logger,
             CoreFactory coreFactory = null) : base(logger)
@@ -36,6 +36,7 @@ namespace VPetLLM.Infrastructure.Services
             _ttsCores = new Dictionary<string, TTSCoreBase>();
             _requestQueue = new Queue<TTSRequest>();
             _queueSemaphore = new SemaphoreSlim(1, 1);
+            _configChangedHandler = OnConfigurationChanged;
         }
 
         protected override async Task OnInitializeAsync(CancellationToken cancellationToken)
@@ -45,10 +46,10 @@ namespace VPetLLM.Infrastructure.Services
                 Logger?.LogInformation("Initializing TTSService");
 
                 // 加载配置
-                _ttsConfig = _configurationManager.GetConfiguration<TTSConfiguration>();
+                _ttsConfig = _configurationManager.GetConfiguration<InfraTTSConfiguration>();
 
                 // 订阅配置变更事件
-                _configurationManager.ConfigurationChanged += OnConfigurationChanged;
+                _configurationManager.ConfigurationChanged += _configChangedHandler;
 
                 // 初始化TTS核心
                 await InitializeTTSCoresAsync();
@@ -113,7 +114,7 @@ namespace VPetLLM.Infrastructure.Services
                 }
 
                 // 取消订阅配置变更事件
-                _configurationManager.ConfigurationChanged -= OnConfigurationChanged;
+                _configurationManager.ConfigurationChanged -= _configChangedHandler;
 
                 // 发布服务停止事件
                 await _eventBus.PublishAsync(new TTSServiceStoppedEvent
@@ -139,11 +140,11 @@ namespace VPetLLM.Infrastructure.Services
                     ["IsEnabled"] = _ttsConfig?.IsEnabled ?? false,
                     ["CurrentProvider"] = _ttsConfig?.Provider ?? "Unknown",
                     ["AvailableCores"] = _ttsCores.Count,
-                    ["CurrentCoreActive"] = _currentTTSCore != null,
+                    ["CurrentCoreActive"] = _currentTTSCore is not null,
                     ["QueueLength"] = _requestQueue.Count
                 };
 
-                if (_currentTTSCore != null)
+                if (_currentTTSCore is not null)
                 {
                     metrics["CurrentCoreName"] = _currentTTSCore.Name;
                     metrics["AudioFormat"] = _currentTTSCore.GetAudioFormat();
@@ -157,7 +158,7 @@ namespace VPetLLM.Infrastructure.Services
                     status = HealthStatus.Degraded;
                     description = "TTS is disabled";
                 }
-                else if (_currentTTSCore == null)
+                else if (_currentTTSCore is null)
                 {
                     status = HealthStatus.Unhealthy;
                     description = "No active TTS core";
@@ -195,7 +196,7 @@ namespace VPetLLM.Infrastructure.Services
                 throw new ServiceException(ServiceName, "TTS service is disabled");
             }
 
-            if (_currentTTSCore == null)
+            if (_currentTTSCore is null)
             {
                 throw new ServiceException(ServiceName, "No active TTS core available");
             }
@@ -361,7 +362,7 @@ namespace VPetLLM.Infrastructure.Services
                         _queueSemaphore.Release();
                     }
 
-                    if (request != null && _currentTTSCore != null)
+                    if (request is not null && _currentTTSCore is not null)
                     {
                         try
                         {
@@ -430,15 +431,15 @@ namespace VPetLLM.Infrastructure.Services
             }
         }
 
-        private async void OnConfigurationChanged(object sender, ConfigurationChangedEventArgs e)
+        private async void OnConfigurationChanged(object sender, InfraConfigChangedEventArgs e)
         {
-            if (e.ConfigurationType == typeof(TTSConfiguration))
+            if (e.ConfigurationType == typeof(InfraTTSConfiguration))
             {
                 try
                 {
                     Logger?.LogInformation("TTS configuration changed, reloading");
 
-                    _ttsConfig = (TTSConfiguration)e.NewConfiguration;
+                    _ttsConfig = (InfraTTSConfiguration)e.NewConfiguration;
 
                     // 如果提供商发生变化，切换TTS核心
                     if (_currentTTSCore?.Name != _ttsConfig.Provider)
@@ -447,9 +448,9 @@ namespace VPetLLM.Infrastructure.Services
                     }
 
                     // 发布配置变更事件
-                    await _eventBus.PublishAsync(new TTSConfigurationChangedEvent
+                    await _eventBus.PublishAsync(new InfraTTSConfigurationChangedEvent
                     {
-                        OldConfiguration = (TTSConfiguration)e.OldConfiguration,
+                        OldConfiguration = (InfraTTSConfiguration)e.OldConfiguration,
                         NewConfiguration = _ttsConfig
                     });
                 }
@@ -525,9 +526,9 @@ namespace VPetLLM.Infrastructure.Services
         public bool IsEnabled { get; set; }
     }
 
-    public class TTSConfigurationChangedEvent
+    public class InfraTTSConfigurationChangedEvent
     {
-        public TTSConfiguration OldConfiguration { get; set; }
-        public TTSConfiguration NewConfiguration { get; set; }
+        public InfraTTSConfiguration OldConfiguration { get; set; }
+        public InfraTTSConfiguration NewConfiguration { get; set; }
     }
 }

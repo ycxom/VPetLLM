@@ -40,7 +40,7 @@ namespace VPetLLM.Utils.Common
         /// </summary>
         /// <param name="messages">消息列表</param>
         /// <returns>估算的总Token数量</returns>
-        public static int EstimateMessagesTokenCount(IEnumerable<Core.Message> messages)
+        public static int EstimateMessagesTokenCount(IEnumerable<Message> messages)
         {
             int totalTokens = 0;
             foreach (var message in messages)

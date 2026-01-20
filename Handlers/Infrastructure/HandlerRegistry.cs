@@ -1,6 +1,3 @@
-using VPetLLM.Handlers.Actions;
-using VPetLLM.Utils.System;
-
 namespace VPetLLM.Handlers.Infrastructure
 {
     /// <summary>
@@ -24,7 +21,7 @@ namespace VPetLLM.Handlers.Infrastructure
                 throw new ArgumentException("Action name cannot be null or empty", nameof(actionName));
             }
 
-            if (handler == null)
+            if (handler is null)
             {
                 throw new ArgumentNullException(nameof(handler));
             }
@@ -43,7 +40,7 @@ namespace VPetLLM.Handlers.Infrastructure
         /// <inheritdoc/>
         public void Register<T>(T handler) where T : IActionHandler
         {
-            if (handler == null)
+            if (handler is null)
             {
                 throw new ArgumentNullException(nameof(handler));
             }

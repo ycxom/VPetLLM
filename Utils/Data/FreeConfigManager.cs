@@ -1,9 +1,6 @@
 using Newtonsoft.Json.Linq;
-using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Text;
-using VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Data
 {
@@ -45,7 +42,7 @@ namespace VPetLLM.Utils.Data
 
                 // 下载版本信息
                 var versionInfo = await DownloadVersionInfoAsync();
-                if (versionInfo == null)
+                if (versionInfo is null)
                 {
                     Logger.Log("FreeConfigManager: 无法获取版本信息，使用本地配置");
                     return File.Exists(GetConfigPath(ASR_CONFIG_NAME)) &&
@@ -343,7 +340,7 @@ namespace VPetLLM.Utils.Data
                             {
                                 var json = JObject.Parse(decryptedContent);
                                 // 检查是否包含预期的字段来判断配置类型
-                                if (json["API_KEY"] != null && json["API_URL"] != null && json["Model"] != null)
+                                if (json["API_KEY"] is not null && json["API_URL"] is not null && json["Model"] is not null)
                                 {
                                     // 通过Model字段判断配置类型
                                     var model = json["Model"]?.ToString();
@@ -395,7 +392,7 @@ namespace VPetLLM.Utils.Data
         {
             try
             {
-                if (config == null) return "";
+                if (config is null) return "";
 
                 var provider = config["Language"]?["Provider"]?[language]?.ToString();
                 return provider ?? "";
@@ -413,7 +410,7 @@ namespace VPetLLM.Utils.Data
         {
             try
             {
-                if (config == null) return "";
+                if (config is null) return "";
 
                 var description = config["Language"]?["Description"]?[language]?.ToString();
                 return description ?? "";
