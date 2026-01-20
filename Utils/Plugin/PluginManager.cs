@@ -1,8 +1,7 @@
 using System.Runtime.Loader;
 using System.Security.Cryptography;
-using VPetLLMUtils = VPetLLM.Utils.System;
-using VPetLLM.Core.Abstractions.Interfaces.Plugin;
 using LegacyPlugin = VPetLLM.Core;
+using VPetLLMUtils = VPetLLM.Utils.System;
 
 namespace VPetLLM.Utils.Plugin
 {
@@ -18,7 +17,7 @@ namespace VPetLLM.Utils.Plugin
         {
             var pluginDir = PluginPath;
             VPetLLMUtils.Logger.Log($"LoadPlugins: PluginPath property returns: {pluginDir}");
-            
+
             if (!Directory.Exists(pluginDir))
             {
                 VPetLLMUtils.Logger.Log($"LoadPlugins: Directory does not exist, creating: {pluginDir}");
@@ -27,7 +26,7 @@ namespace VPetLLM.Utils.Plugin
             }
 
             VPetLLMUtils.Logger.Log($"LoadPlugins: Directory exists, checking contents");
-            
+
             // 详细检查目录内容
             try
             {
@@ -37,7 +36,7 @@ namespace VPetLLM.Utils.Plugin
                 {
                     VPetLLMUtils.Logger.Log($"LoadPlugins: Found file: {Path.GetFileName(file)}");
                 }
-                
+
                 var allDirectories = Directory.GetDirectories(pluginDir);
                 VPetLLMUtils.Logger.Log($"LoadPlugins: Total subdirectories: {allDirectories.Length}");
                 foreach (var dir in allDirectories)
@@ -69,7 +68,7 @@ namespace VPetLLM.Utils.Plugin
             VPetLLMUtils.Logger.Log($"LoadPlugins: Searching for DLL files with pattern '*.dll' in: {pluginDir}");
             var dllFiles = Directory.GetFiles(pluginDir, "*.dll");
             VPetLLMUtils.Logger.Log($"LoadPlugins: Directory.GetFiles returned {dllFiles.Length} DLL files");
-            
+
             if (dllFiles.Length == 0)
             {
                 VPetLLMUtils.Logger.Log($"LoadPlugins: No DLL files found. Checking for case-sensitive issues...");
@@ -78,14 +77,14 @@ namespace VPetLLM.Utils.Plugin
                     .Where(f => f.ToLowerInvariant().EndsWith(".dll"))
                     .ToArray();
                 VPetLLMUtils.Logger.Log($"LoadPlugins: Case-insensitive search found {allDllFiles.Length} .dll files");
-                
+
                 if (allDllFiles.Length > 0)
                 {
                     VPetLLMUtils.Logger.Log($"LoadPlugins: Using case-insensitive results");
                     dllFiles = allDllFiles;
                 }
             }
-            
+
             foreach (var file in dllFiles)
             {
                 VPetLLMUtils.Logger.Log($"LoadPlugins: Processing file: {Path.GetFileName(file)} (Full path: {file})");
@@ -155,7 +154,7 @@ namespace VPetLLM.Utils.Plugin
                             foundCompatiblePlugin = true;
                         }
                     }
-                    
+
                     // 如果没有找到兼容的插件类型，将其标记为失败（可能是旧版本插件）
                     if (!foundCompatiblePlugin)
                     {
@@ -183,7 +182,7 @@ namespace VPetLLM.Utils.Plugin
                     VPetLLMUtils.Logger.Log($"LoadPlugins: Added failed plugin '{Path.GetFileNameWithoutExtension(file)}'. Total failed plugins: {FailedPlugins.Count}");
                 }
             }
-            
+
             VPetLLMUtils.Logger.Log($"LoadPlugins: Completed. Loaded plugins: {Plugins.Count}, Failed plugins: {FailedPlugins.Count}");
         }
 

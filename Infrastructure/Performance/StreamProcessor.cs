@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using VPetLLM.Infrastructure.Logging;
 
 namespace VPetLLM.Infrastructure.Performance
 {

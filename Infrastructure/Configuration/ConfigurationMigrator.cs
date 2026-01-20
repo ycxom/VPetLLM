@@ -1,6 +1,5 @@
 using Newtonsoft.Json.Linq;
 using VPetLLM.Infrastructure.Configuration.Configurations;
-using VPetLLM.Infrastructure.Logging;
 
 namespace VPetLLM.Infrastructure.Configuration
 {

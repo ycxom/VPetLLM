@@ -1,9 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
-using VPetLLM.Infrastructure.Logging;
-using VPetLLMPlugin;
 
 namespace VPetLLM.Core
 {
@@ -104,7 +99,7 @@ namespace VPetLLM.Core
                             !declaringType.Namespace.StartsWith("VPetLLM") &&
                             !declaringType.Namespace.StartsWith("VPet_Simulator"))
                         {
-                            return $"External:{declaringType.Namespace}.{declaringType.Name}";
+                            return $"ExternalProgram:{declaringType.Namespace}.{declaringType.Name}";
                         }
                     }
                 }

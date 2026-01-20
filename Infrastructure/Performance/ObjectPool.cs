@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using VPetLLM.Infrastructure.Logging;
 
 namespace VPetLLM.Infrastructure.Performance
 {

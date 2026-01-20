@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Core.Abstractions.Interfaces.Plugin;
 
 namespace VPetLLM.Core.Abstractions.Base
 {

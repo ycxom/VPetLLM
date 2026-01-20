@@ -2,7 +2,6 @@ using System.Windows;
 using VPetLLM.Handlers.Animation;
 using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Handlers.State;
-using VPetLLM.Utils.UI;
 
 namespace VPetLLM.Handlers.UI
 {

@@ -1,6 +1,3 @@
-using VPetLLM.Infrastructure.Events;
-using VPetLLM.Infrastructure.Logging;
-
 namespace VPetLLM.Infrastructure.Services
 {
     /// <summary>

@@ -1,7 +1,4 @@
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Infrastructure.Configuration;
-using VPetLLM.Infrastructure.Events;
-using VPetLLM.Infrastructure.Logging;
 using VPetLLM.Utils.Localization;
 using Timer = System.Timers.Timer;
 

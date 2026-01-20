@@ -1,7 +1,6 @@
 using System.Net.Http;
 using System.Windows;
 using VPetLLM.Utils.Localization;
-using VPetLLM.Utils.UI;
 
 namespace VPetLLM.UI.Windows
 {

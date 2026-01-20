@@ -9,7 +9,6 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using VPetLLM.UI.Controls;
-using VPetLLM.Utils.Audio;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 using VPetLLM.Utils.Plugin;
@@ -2534,7 +2533,7 @@ namespace VPetLLM.UI.Windows
                 {
                     Logger.Log($"RefreshPluginList: 处理失败插件 - Name: {failedPlugin.Name}, FilePath: {failedPlugin.FilePath}");
                     var id = failedPlugin.Name;
-                    
+
                     // 尝试计算失败插件的 SHA256，用于版本比较
                     string failedPluginSha = null;
                     if (!string.IsNullOrEmpty(failedPlugin.FilePath) && File.Exists(failedPlugin.FilePath))
@@ -2542,7 +2541,7 @@ namespace VPetLLM.UI.Windows
                         failedPluginSha = PluginManager.GetFileSha256(failedPlugin.FilePath);
                         Logger.Log($"RefreshPluginList: 失败插件 {failedPlugin.Name} 的 SHA256: {failedPluginSha}");
                     }
-                    
+
                     pluginItems[id] = new UnifiedPluginItem
                     {
                         IsFailed = true,

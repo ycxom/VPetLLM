@@ -2,7 +2,6 @@ using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Animation;
 using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Handlers.State;
-using VPetLLM.Utils.UI;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Legacy

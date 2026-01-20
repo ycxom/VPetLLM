@@ -1,7 +1,4 @@
 using System.Windows;
-using VPetLLM.Infrastructure.Configuration;
-using VPetLLM.Infrastructure.Events;
-using VPetLLM.Infrastructure.Logging;
 
 namespace VPetLLM.Infrastructure.Services.ApplicationServices
 {

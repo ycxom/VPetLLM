@@ -1,5 +1,3 @@
-using VPetLLM.Infrastructure.Services;
-
 namespace VPetLLM.Infrastructure.Events
 {
     /// <summary>

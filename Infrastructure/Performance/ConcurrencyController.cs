@@ -1,5 +1,3 @@
-using VPetLLM.Infrastructure.Logging;
-
 namespace VPetLLM.Infrastructure.Performance
 {
     /// <summary>

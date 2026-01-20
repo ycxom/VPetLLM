@@ -1,7 +1,6 @@
 using System.Text.RegularExpressions;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Animation;
-using VPetLLM.Utils.UI;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Actions

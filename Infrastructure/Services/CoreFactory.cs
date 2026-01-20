@@ -1,6 +1,5 @@
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Infrastructure.Configuration.Configurations;
-using VPetLLM.Infrastructure.Logging;
 
 namespace VPetLLM.Infrastructure.Services
 {

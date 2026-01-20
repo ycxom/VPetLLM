@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using VPetLLM.Utils.Audio;
 using VPetLLM.Utils.Localization;
 
 namespace VPetLLM.UI.Windows

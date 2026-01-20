@@ -95,6 +95,19 @@ var response = await _vpetLLM.LLMEntry.CallAsync("你的消息");
 var response = await VPetLLM.VPetLLM.Instance.LLMEntry.CallAsync("你的消息");
 ```
 
+**日志示例：**
+```
+插件调用：
+[LLM Call] Plugin:AppLauncher calling LLM
+[LLM Call] Message: 启动 notepad...
+[LLM Call] Plugin:AppLauncher - Response in 2.34s
+
+外部应用调用：
+[LLM Call] ExternalProgram:MyApp.Services.AIService calling LLM
+[LLM Call] Message: 分析这段文本...
+[LLM Call] ExternalProgram:MyApp.Services.AIService - Response in 1.56s
+```
+
 详细文档请参考 [插件开发指南](https://github.com/ycxom/VPetLLM_Plugin)
 
 ## 📁 项目结构

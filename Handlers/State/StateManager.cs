@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Infrastructure;
-using VPetLLM.Utils.UI;
 
 namespace VPetLLM.Handlers.State
 {

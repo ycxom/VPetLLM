@@ -1,11 +1,11 @@
 // Plugin compatibility layer for backward compatibility
 // This file provides conversion utilities between old and new plugin interfaces
 
-using NewIVPetLLMPlugin = global::VPetLLM.Core.Abstractions.Interfaces.Plugin.IVPetLLMPlugin;
 using NewIActionPlugin = global::VPetLLM.Core.Abstractions.Interfaces.Plugin.IActionPlugin;
-using NewIPluginWithData = global::VPetLLM.Core.Abstractions.Interfaces.Plugin.IPluginWithData;
 using NewIDynamicInfoPlugin = global::VPetLLM.Core.Abstractions.Interfaces.Plugin.IDynamicInfoPlugin;
 using NewIPluginTakeover = global::VPetLLM.Core.Abstractions.Interfaces.Plugin.IPluginTakeover;
+using NewIPluginWithData = global::VPetLLM.Core.Abstractions.Interfaces.Plugin.IPluginWithData;
+using NewIVPetLLMPlugin = global::VPetLLM.Core.Abstractions.Interfaces.Plugin.IVPetLLMPlugin;
 
 namespace VPetLLM.Core
 {
@@ -21,26 +21,26 @@ namespace VPetLLM.Core
         string Examples { get; }
         bool Enabled { get; set; }
         string FilePath { get; set; }
-        
+
         void Initialize(VPetLLM plugin);
         void Unload();
     }
-    
+
     public interface IActionPlugin : IVPetLLMPlugin
     {
         Task<string> Function(string arguments);
     }
-    
+
     public interface IPluginWithData : IVPetLLMPlugin
     {
         string PluginDataDir { get; set; }
     }
-    
+
     public interface IDynamicInfoPlugin : IVPetLLMPlugin
     {
         string GetDynamicInfo();
     }
-    
+
     public interface IPluginTakeover : IVPetLLMPlugin
     {
         bool SupportsTakeover { get; }
@@ -56,32 +56,32 @@ namespace VPetLLM.Core
     public class PluginAdapter : IVPetLLMPlugin, IActionPlugin, IPluginWithData, IDynamicInfoPlugin, IPluginTakeover
     {
         private readonly NewIVPetLLMPlugin _newPlugin;
-        
+
         public PluginAdapter(NewIVPetLLMPlugin newPlugin)
         {
             _newPlugin = newPlugin;
         }
-        
+
         // IVPetLLMPlugin implementation
         public string Name => _newPlugin.Name;
         public string Author => _newPlugin.Author;
         public string Description => _newPlugin.Description;
         public string Parameters => _newPlugin.Parameters;
         public string Examples => _newPlugin.Examples;
-        public bool Enabled 
-        { 
-            get => _newPlugin.Enabled; 
-            set => _newPlugin.Enabled = value; 
+        public bool Enabled
+        {
+            get => _newPlugin.Enabled;
+            set => _newPlugin.Enabled = value;
         }
-        public string FilePath 
-        { 
-            get => _newPlugin.FilePath; 
-            set => _newPlugin.FilePath = value; 
+        public string FilePath
+        {
+            get => _newPlugin.FilePath;
+            set => _newPlugin.FilePath = value;
         }
-        
+
         public void Initialize(VPetLLM plugin) => _newPlugin.Initialize(plugin);
         public void Unload() => _newPlugin.Unload();
-        
+
         // IActionPlugin implementation
         public Task<string> Function(string arguments)
         {
@@ -89,7 +89,7 @@ namespace VPetLLM.Core
                 return actionPlugin.Function(arguments);
             return Task.FromResult("Plugin does not support actions");
         }
-        
+
         // IPluginWithData implementation
         public string PluginDataDir
         {
@@ -100,7 +100,7 @@ namespace VPetLLM.Core
                     pluginWithData.PluginDataDir = value;
             }
         }
-        
+
         // IDynamicInfoPlugin implementation
         public string GetDynamicInfo()
         {
@@ -108,44 +108,44 @@ namespace VPetLLM.Core
                 return dynamicInfoPlugin.GetDynamicInfo();
             return "";
         }
-        
+
         // IPluginTakeover implementation
         public bool SupportsTakeover => (_newPlugin as NewIPluginTakeover)?.SupportsTakeover ?? false;
-        
+
         public Task<bool> BeginTakeoverAsync(string initialContent)
         {
             if (_newPlugin is NewIPluginTakeover takeoverPlugin)
                 return takeoverPlugin.BeginTakeoverAsync(initialContent);
             return Task.FromResult(false);
         }
-        
+
         public Task<bool> ProcessTakeoverContentAsync(string content)
         {
             if (_newPlugin is NewIPluginTakeover takeoverPlugin)
                 return takeoverPlugin.ProcessTakeoverContentAsync(content);
             return Task.FromResult(false);
         }
-        
+
         public Task<string> EndTakeoverAsync()
         {
             if (_newPlugin is NewIPluginTakeover takeoverPlugin)
                 return takeoverPlugin.EndTakeoverAsync();
             return Task.FromResult("");
         }
-        
+
         public bool ShouldEndTakeover(string content)
         {
             if (_newPlugin is NewIPluginTakeover takeoverPlugin)
                 return takeoverPlugin.ShouldEndTakeover(content);
             return true;
         }
-        
+
         /// <summary>
         /// Gets the wrapped plugin instance
         /// </summary>
         public NewIVPetLLMPlugin WrappedPlugin => _newPlugin;
     }
-    
+
     /// <summary>
     /// Utility methods for converting between plugin interface types
     /// </summary>
@@ -158,7 +158,7 @@ namespace VPetLLM.Core
         {
             return new PluginAdapter(plugin);
         }
-        
+
         /// <summary>
         /// Converts a legacy plugin to the new interface format
         /// </summary>
@@ -166,7 +166,7 @@ namespace VPetLLM.Core
         {
             if (plugin is PluginAdapter adapter)
                 return adapter.WrappedPlugin;
-                
+
             throw new InvalidOperationException("Cannot convert legacy plugin to new format - plugin is not an adapter");
         }
     }

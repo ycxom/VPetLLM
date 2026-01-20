@@ -1,8 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using VPetLLM.Infrastructure.Configuration;
-using VPetLLM.Infrastructure.Events;
-using VPetLLM.Infrastructure.Logging;
 
 namespace VPetLLM.Infrastructure.Services.ApplicationServices
 {
