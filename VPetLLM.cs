@@ -106,6 +106,11 @@ namespace VPetLLM
         /// </summary>
         public bool IsVPetTTSPluginDetected => _vpetTTSPluginDetected;
 
+        /// <summary>
+        /// LLM 调用入口点（供插件和外部应用使用）
+        /// </summary>
+        public Core.LLMEntryPoint? LLMEntry { get; private set; }
+
         #endregion
 
         #region Private Fields
@@ -189,6 +194,9 @@ namespace VPetLLM
 
             // 初始化默认插件检查器
             _defaultPluginChecker = new DefaultPluginChecker(this);
+
+            // 初始化 LLM 入口点
+            InitializeLLMEntry();
 
             Logger.Log("VPetLLM plugin constructor finished.");
         }
@@ -511,6 +519,19 @@ namespace VPetLLM
             catch (Exception ex)
             {
                 _logger.LogError("Failed to register services", ex);
+            }
+        }
+
+        private void InitializeLLMEntry()
+        {
+            try
+            {
+                LLMEntry = new Core.LLMEntryPoint(this, _logger);
+                _logger.LogInformation("LLM entry point initialized");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to initialize LLM entry point", ex);
             }
         }
 

@@ -81,39 +81,117 @@ VPetLLM 拥有一个强大的插件系统，允许开发者扩展其功能。通
 
 **➡️ [点击这里查看详细的插件开发文档](https://github.com/ycxom/VPetLLM_Plugin)**
 
+### 🚀 LLM 调用接口
+
+插件和外部应用可以通过 `LLMEntry` 接口直接调用 LLM 服务：
+
+**插件调用：**
+```csharp
+var response = await _vpetLLM.LLMEntry.CallAsync("你的消息");
+```
+
+**外部应用调用：**
+```csharp
+var response = await VPetLLM.VPetLLM.Instance.LLMEntry.CallAsync("你的消息");
+```
+
+详细文档请参考 [插件开发指南](https://github.com/ycxom/VPetLLM_Plugin)
+
 ## 📁 项目结构
 
 ```
 VPetLLM/
-├── Configuration/     # 配置管理模块
-│   ├── ISettings.cs          # 设置接口
-│   ├── SettingsManager.cs    # 设置管理器
-│   └── *Settings.cs          # 各类设置（LLM/TTS/ASR/Proxy）
-├── Core/              # 核心业务逻辑
-│   ├── ASRCore/              # 语音识别核心实现
-│   ├── ChatCore/             # 聊天核心实现（Ollama/OpenAI/Gemini/Free）
-│   ├── TTSCore/              # 文本转语音核心实现
-│   ├── ServiceContainer.cs   # 依赖注入容器
-│   └── *Manager.cs           # 各类管理器（历史记录/重要记录）
-├── Handlers/          # 动作处理器
-│   ├── HandlerRegistry.cs    # 处理器注册中心
-│   ├── ActionProcessor.cs    # 动作处理器
-│   ├── SmartMessageProcessor.cs  # 智能消息处理
-│   └── *Handler.cs           # 各类动作处理器
-├── Services/          # 服务层
-│   ├── VoiceInputService.cs  # 语音输入服务
-│   ├── PurchaseService.cs    # 购买服务
-│   └── I*Service.cs          # 服务接口
-├── UI/                # 用户界面
-│   ├── Controls/             # 自定义控件
-│   ├── Styles/               # 样式资源
-│   └── Windows/              # 窗口
-├── Utils/             # 工具类
-│   ├── MpvPlayer.cs          # MPV 音频播放器
-│   ├── TTSService.cs         # TTS 服务
-│   ├── ASRService.cs         # ASR 服务
-│   └── ...                   # 其他工具类
-└── VPetLLM.cs         # 插件主入口
+├── Configuration/          # 配置管理模块
+│   ├── ISettings.cs               # 设置接口
+│   ├── SettingsManager.cs         # 设置管理器
+│   ├── ASRSettings.cs             # ASR 配置
+│   ├── LLMSettings.cs             # LLM 配置
+│   ├── TTSSettings.cs             # TTS 配置
+│   ├── ProxySettings.cs           # 代理配置
+│   ├── ScreenshotSettings.cs      # 截图配置
+│   ├── FloatingSidebarSettings.cs # 悬浮侧边栏配置
+│   └── TTSCoordinationSettings.cs # TTS 协调配置
+├── Core/                   # 核心业务逻辑
+│   ├── Abstractions/              # 抽象层
+│   │   ├── Base/                  # 基类（ChatCoreBase/ASRCoreBase/TTSCoreBase）
+│   │   └── Interfaces/            # 接口定义（IChatCore/IOCREngine）
+│   ├── Cache/                     # 缓存管理
+│   ├── Data/                      # 数据层
+│   │   ├── Database/              # 数据库（聊天历史/重要记录）
+│   │   ├── Managers/              # 数据管理器
+│   │   └── Models/                # 数据模型
+│   ├── Engine/                    # 引擎（OCR）
+│   ├── Integration/               # 集成层
+│   │   ├── UnifiedTTS/            # 统一 TTS 系统
+│   │   ├── TTSIntegrationLayer.cs # TTS 集成层
+│   │   └── UnifiedBubbleFacade.cs # 统一气泡外观
+│   ├── Plugin/                    # 插件相关
+│   ├── Providers/                 # 服务提供商实现
+│   │   ├── ASR/                   # ASR 提供商（OpenAI/Soniox/Free）
+│   │   ├── Chat/                  # Chat 提供商（OpenAI/Ollama/Gemini/Free）
+│   │   └── TTS/                   # TTS 提供商（OpenAI/GPT-SoVITS/DIY/URL/Free）
+│   ├── Services/                  # 核心服务
+│   │   ├── ServiceContainer.cs    # 服务容器
+│   │   ├── SystemMessageProvider.cs # 系统消息提供者
+│   │   └── VPetAPIWrapper.cs      # VPet API 包装器
+│   ├── LLMEntryPoint.cs           # **LLM 调用入口点（供插件和外部应用使用）**
+│   └── PluginAdapter.cs           # 插件适配器
+├── Handlers/               # 动作处理器
+│   ├── Actions/                   # 动作处理器（移动/触摸/购买等）
+│   ├── Animation/                 # 动画处理器
+│   ├── Core/                      # 核心处理器（命令解析/结果聚合）
+│   ├── Infrastructure/            # 基础设施（处理器注册/限流）
+│   ├── State/                     # 状态处理器
+│   ├── TTS/                       # TTS 处理器
+│   └── UI/                        # UI 处理器
+├── Infrastructure/         # 基础设施层
+│   ├── Configuration/             # 配置基础设施
+│   ├── DependencyInjection/       # 依赖注入
+│   ├── Events/                    # 事件总线
+│   ├── Exceptions/                # 异常处理
+│   ├── Logging/                   # 日志系统
+│   ├── Performance/               # 性能监控
+│   ├── Services/                  # 基础设施服务
+│   └── Validation/                # 验证框架
+├── Interfaces/             # 接口定义
+│   └── IVPetAPI.cs                # VPet API 接口
+├── Models/                 # 数据模型
+│   ├── UnifiedTTS/                # 统一 TTS 模型
+│   ├── BubbleDisplayRequest.cs    # 气泡显示请求
+│   ├── TTSOptions.cs              # TTS 选项
+│   ├── TTSState.cs                # TTS 状态
+│   └── ValidationResult.cs        # 验证结果
+├── Services/               # 应用服务层
+│   ├── IASRService.cs             # ASR 服务接口
+│   ├── IMediaPlaybackService.cs   # 媒体播放服务接口
+│   ├── IPreprocessingMultimodal.cs # 预处理多模态接口
+│   ├── IPurchaseService.cs        # 购买服务接口
+│   ├── IScreenshotService.cs      # 截图服务接口
+│   ├── ITTSService.cs             # TTS 服务接口
+│   ├── IVoiceInputService.cs      # 语音输入服务接口
+│   ├── MediaPlaybackService.cs    # 媒体播放服务实现
+│   ├── PreprocessingMultimodal.cs # 预处理多模态实现
+│   ├── PurchaseService.cs         # 购买服务实现
+│   ├── ScreenshotService.cs       # 截图服务实现
+│   └── VoiceInputService.cs       # 语音输入服务实现
+├── UI/                     # 用户界面
+│   ├── Controls/                  # 自定义控件
+│   ├── Styles/                    # 样式资源
+│   └── Windows/                   # 窗口（设置/调试/截图编辑器等）
+├── Utils/                  # 工具类
+│   ├── Audio/                     # 音频工具（MpvPlayer/TTSService）
+│   ├── Common/                    # 通用工具
+│   ├── Configuration/             # 配置工具
+│   ├── Data/                      # 数据工具
+│   ├── Localization/              # 本地化工具
+│   ├── Plugin/                    # 插件工具
+│   ├── System/                    # 系统工具
+│   └── UI/                        # UI 工具
+├── Validation/             # 验证层
+│   └── ParameterValidator.cs      # 参数验证器
+├── VPetLLM.cs              # **插件主入口**
+├── Setting.cs              # 设置类
+└── GlobalUsings.cs         # 全局 using 声明
 ```
 
 ## 🛠️ 开发
