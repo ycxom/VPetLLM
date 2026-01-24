@@ -1,30 +1,28 @@
 using VPetLLM.Interfaces;
+using VPet_Simulator.Windows.Interface;
+using VPetLLM.Utils.Audio;
+using VPetLLM.Core.TTS;
 
 namespace VPetLLM.Core.Integration
 {
     /// <summary>
-    /// Unified TTS processing with proper state management
-    /// Handles both synchronous and asynchronous TTS operations
-    /// Now integrated with UnifiedTTS system
+    /// 使用策略模式的统一 TTS 处理
+    /// 委托给 ITTSProvider 实现以处理提供者特定的逻辑
     /// </summary>
     public class TTSIntegrationLayer
     {
-        private readonly IVPetAPI _vpetAPI;
+        private readonly TTSProviderFactory _providerFactory;
+        private ITTSProvider? _currentProvider;
         private TTSStateInfo _currentState;
         private readonly object _stateLock = new object();
 
-        // 统一TTS系统集成 - 通过依赖注入
-        private readonly ITTSDispatcher? _unifiedTTSDispatcher;
-        private readonly bool _useUnifiedSystem;
-
-        public TTSIntegrationLayer(IVPetAPI vpetAPI, ITTSDispatcher? unifiedTTSDispatcher = null)
+        public TTSIntegrationLayer(TTSProviderFactory providerFactory)
         {
-            _vpetAPI = vpetAPI ?? throw new ArgumentNullException(nameof(vpetAPI));
-            _unifiedTTSDispatcher = unifiedTTSDispatcher;
-            _useUnifiedSystem = _unifiedTTSDispatcher is not null;
+            _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
             _currentState = new TTSStateInfo();
-
-            Logger.Log($"TTSIntegrationLayer: 初始化完成，使用统一系统: {_useUnifiedSystem}");
+            _currentProvider = _providerFactory.GetActiveProvider();
+            
+            Logger.Log($"TTSIntegrationLayer: 使用提供者初始化: {_currentProvider?.ProviderName ?? "无"}");
         }
 
         /// <summary>
@@ -50,12 +48,8 @@ namespace VPetLLM.Core.Integration
         }
 
         /// <summary>
-        /// Process TTS request asynchronously
-        /// Uses UnifiedTTS system when available, falls back to VPetAPI
+        /// 使用当前提供者异步处理 TTS 请求
         /// </summary>
-        /// <param name="text">Text to process</param>
-        /// <param name="options">TTS options</param>
-        /// <returns>Task representing the async operation</returns>
         public async Task ProcessTTSAsync(string text, TTSOptions options)
         {
             if (string.IsNullOrEmpty(text))
@@ -72,30 +66,40 @@ namespace VPetLLM.Core.Integration
 
             try
             {
-                Logger.Log($"TTSIntegrationLayer: Processing TTS for text length {text.Length}, streaming: {options.UseStreaming}");
-
-                // Update state to processing
+                Logger.Log($"TTSIntegrationLayer: 使用提供者处理 TTS: {_currentProvider?.ProviderName}");
                 UpdateState(TTSState.Processing, text);
 
-                if (_useUnifiedSystem && _unifiedTTSDispatcher is not null)
+                // 确保我们有提供者
+                _currentProvider ??= _providerFactory.GetActiveProvider();
+                
+                if (_currentProvider is null || !_currentProvider.IsAvailable())
                 {
-                    // 使用统一TTS系统
-                    await ProcessWithUnifiedSystemAsync(text, options);
-                }
-                else if (_vpetAPI.IsAvailable)
-                {
-                    // 使用传统VPetAPI
-                    await ProcessWithVPetAPIAsync(text, options);
-                }
-                else
-                {
-                    Logger.Log("TTSIntegrationLayer: No TTS system available");
-                    UpdateState(TTSState.Error, text, "No TTS system available");
-                    throw new InvalidOperationException("No TTS system available");
+                    Logger.Log("TTSIntegrationLayer: No TTS provider available");
+                    UpdateState(TTSState.Error, text, "No TTS provider available");
+                    throw new InvalidOperationException("没有可用的 TTS 提供者");
                 }
 
-                Logger.Log("TTSIntegrationLayer: TTS processing completed successfully");
+                // 使用提供者生成音频
+                UpdateProgress(25);
+                var audioResult = await _currentProvider.GenerateAudioAsync(
+                    text, 
+                    options, 
+                    CancellationToken.None);
+
+                if (!audioResult.Success)
+                {
+                    throw new InvalidOperationException($"音频生成失败: {audioResult.ErrorMessage}");
+                }
+
+                UpdateAudioInfo(audioResult.AudioFilePath, audioResult.DurationMs);
+                UpdateProgress(50);
+
+                // 使用提供者等待播放
+                await _currentProvider.WaitForPlaybackAsync(audioResult, CancellationToken.None);
+
+                UpdateProgress(100);
                 UpdateState(TTSState.Completed, text);
+                Logger.Log("TTSIntegrationLayer: TTS processing completed successfully");
             }
             catch (Exception ex)
             {
@@ -106,161 +110,28 @@ namespace VPetLLM.Core.Integration
         }
 
         /// <summary>
-        /// 使用统一TTS系统处理请求
+        /// 切换到不同的 TTS 提供者
         /// </summary>
-        private async Task ProcessWithUnifiedSystemAsync(string text, TTSOptions options)
+        public void SwitchProvider(string providerName)
         {
-            try
+            var newProvider = _providerFactory.GetProviderByName(providerName);
+            if (newProvider is not null && newProvider.IsAvailable())
             {
-                Logger.Log("TTSIntegrationLayer: 使用统一TTS系统处理请求");
-
-                var request = new ModelsTTSRequest
-                {
-                    RequestId = Guid.NewGuid().ToString(),
-                    Text = text,
-                    Settings = new TTSRequestSettings
-                    {
-                        Voice = options.Voice ?? "default",
-                        Speed = options.Speed,
-                        Volume = options.Volume,
-                        UseStreaming = options.UseStreaming,
-                        TimeoutMs = options.TimeoutMs
-                    }
-                };
-
-                if (options.UseStreaming)
-                {
-                    UpdateState(TTSState.Streaming, text);
-                }
-
-                var response = await _unifiedTTSDispatcher.ProcessRequestAsync(request);
-
-                if (!response.Success)
-                {
-                    throw new InvalidOperationException($"Unified TTS processing failed: {response.ErrorMessage}");
-                }
-
-                // 更新音频信息
-                if (response.AudioData is not null)
-                {
-                    var estimatedDuration = response.AudioDurationMs > 0 ? response.AudioDurationMs :
-                                           CalculateAudioDuration(text, options.Speed);
-                    UpdateAudioInfo(null, estimatedDuration);
-                }
-
-                UpdateProgress(100);
+                _currentProvider = newProvider;
+                Logger.Log($"TTSIntegrationLayer: 切换到提供者: {providerName}");
             }
-            catch (Exception ex)
+            else
             {
-                Logger.Log($"TTSIntegrationLayer: 统一TTS系统处理失败: {ex.Message}");
-                throw;
+                Logger.Log($"TTSIntegrationLayer: 提供者 {providerName} 不可用");
             }
         }
 
         /// <summary>
-        /// 使用传统VPetAPI处理请求
+        /// 获取当前提供者名称
         /// </summary>
-        private async Task ProcessWithVPetAPIAsync(string text, TTSOptions options)
+        public string GetCurrentProviderName()
         {
-            try
-            {
-                Logger.Log("TTSIntegrationLayer: 使用传统VPetAPI处理请求");
-
-                // Choose processing method based on options
-                if (options.UseStreaming)
-                {
-                    await ProcessStreamingTTSAsync(text, options);
-                }
-                else
-                {
-                    await ProcessSynchronousTTSAsync(text, options);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"TTSIntegrationLayer: VPetAPI处理失败: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Process streaming TTS request
-        /// Uses SayInfoWithStream for asynchronous streaming
-        /// </summary>
-        /// <param name="text">Text to process</param>
-        /// <param name="options">TTS options</param>
-        /// <returns>Task representing the async operation</returns>
-        public async Task ProcessStreamingTTSAsync(string text, TTSOptions options)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                throw new ArgumentException("Text cannot be null or empty", nameof(text));
-            }
-
-            options ??= new TTSOptions { UseStreaming = true };
-
-            try
-            {
-                Logger.Log($"TTSIntegrationLayer: Processing streaming TTS for text: {text.Substring(0, Math.Min(50, text.Length))}...");
-
-                // Update state to streaming
-                UpdateState(TTSState.Streaming, text);
-
-                // Use VPet API for streaming TTS
-                await _vpetAPI.SayInfoWithStreamAsync(text, options.Voice);
-
-                // Simulate progress updates for streaming
-                for (int progress = 0; progress <= 100; progress += 20)
-                {
-                    UpdateProgress(progress);
-                    await Task.Delay(100); // Small delay to simulate streaming progress
-                }
-
-                Logger.Log("TTSIntegrationLayer: Streaming TTS completed");
-                UpdateState(TTSState.Completed, text);
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"TTSIntegrationLayer: Streaming TTS failed: {ex.Message}");
-                UpdateState(TTSState.Error, text, ex.Message);
-                throw new InvalidOperationException($"Streaming TTS processing failed: {ex.Message}", ex);
-            }
-        }
-
-        /// <summary>
-        /// Process synchronous TTS request
-        /// Uses SayInfoWithOutStream for synchronous operation
-        /// </summary>
-        /// <param name="text">Text to process</param>
-        /// <param name="options">TTS options</param>
-        /// <returns>Task representing the async operation</returns>
-        private async Task ProcessSynchronousTTSAsync(string text, TTSOptions options)
-        {
-            try
-            {
-                Logger.Log($"TTSIntegrationLayer: Processing synchronous TTS for text: {text.Substring(0, Math.Min(50, text.Length))}...");
-
-                // Update progress
-                UpdateProgress(25);
-
-                // Use VPet API for synchronous TTS
-                await _vpetAPI.SayInfoWithOutStreamAsync(text, options.Voice);
-
-                // Update progress
-                UpdateProgress(75);
-
-                // Simulate audio duration calculation
-                var estimatedDuration = CalculateAudioDuration(text, options.Speed);
-                UpdateAudioInfo(null, estimatedDuration);
-
-                UpdateProgress(100);
-                Logger.Log("TTSIntegrationLayer: Synchronous TTS completed");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"TTSIntegrationLayer: Synchronous TTS failed: {ex.Message}");
-                throw new InvalidOperationException($"Synchronous TTS processing failed: {ex.Message}", ex);
-            }
+            return _currentProvider?.ProviderName ?? "无";
         }
 
         /// <summary>
@@ -279,11 +150,14 @@ namespace VPetLLM.Core.Integration
                     if (_currentState.State == TTSState.Processing || _currentState.State == TTSState.Streaming)
                     {
                         // TTS is active, coordinate timing
-                        var estimatedDuration = CalculateAudioDuration(text, 1.0f);
-                        Logger.Log($"TTSIntegrationLayer: Estimated audio duration: {estimatedDuration}ms");
+                        if (_currentProvider is not null)
+                        {
+                            var estimatedDuration = _currentProvider.EstimateDuration(text, 1.0f);
+                            Logger.Log($"TTSIntegrationLayer: Estimated audio duration: {estimatedDuration}ms");
 
-                        // Update audio duration for coordination
-                        _currentState.AudioDurationMs = estimatedDuration;
+                            // Update audio duration for coordination
+                            _currentState.AudioDurationMs = estimatedDuration;
+                        }
                     }
                     else
                     {
@@ -405,73 +279,6 @@ namespace VPetLLM.Core.Integration
                 _currentState.AudioDurationMs = durationMs;
                 Logger.Log($"TTSIntegrationLayer: Audio info updated - Duration: {durationMs}ms");
             }
-        }
-
-        /// <summary>
-        /// Calculate estimated audio duration based on text length and speed
-        /// </summary>
-        private int CalculateAudioDuration(string text, float speed)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return 0;
-            }
-
-            try
-            {
-                // Rough estimation: ~150 words per minute at normal speed
-                // Average 5 characters per word
-                var wordsPerMinute = 150 * speed;
-                var charactersPerMinute = wordsPerMinute * 5;
-                var charactersPerSecond = charactersPerMinute / 60.0;
-
-                var estimatedSeconds = text.Length / charactersPerSecond;
-                var estimatedMs = (int)(estimatedSeconds * 1000);
-
-                // Add some buffer time
-                estimatedMs = (int)(estimatedMs * 1.2);
-
-                // Minimum duration
-                estimatedMs = Math.Max(1000, estimatedMs);
-
-                Logger.Log($"TTSIntegrationLayer: Calculated audio duration: {estimatedMs}ms for {text.Length} characters");
-                return estimatedMs;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"TTSIntegrationLayer: Error calculating audio duration: {ex.Message}");
-                return 3000; // Default 3 seconds
-            }
-        }
-
-        /// <summary>
-        /// Validate TTS options
-        /// </summary>
-        private void ValidateTTSOptions(TTSOptions options)
-        {
-            if (options is null)
-            {
-                throw new ArgumentNullException(nameof(options));
-            }
-
-            if (options.Speed <= 0 || options.Speed > 10)
-            {
-                throw new ArgumentException($"Invalid TTS speed: {options.Speed}. Must be between 0.1 and 10.0");
-            }
-
-            if (options.TimeoutMs <= 0)
-            {
-                throw new ArgumentException($"Invalid TTS timeout: {options.TimeoutMs}. Must be positive");
-            }
-        }
-
-        /// <summary>
-        /// Handle TTS timeout
-        /// </summary>
-        private void HandleTimeout(string text)
-        {
-            Logger.Log($"TTSIntegrationLayer: TTS operation timed out for text: {text?.Substring(0, Math.Min(50, text?.Length ?? 0))}...");
-            UpdateState(TTSState.TimedOut, text, "TTS operation timed out");
         }
     }
 }

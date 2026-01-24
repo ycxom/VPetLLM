@@ -115,6 +115,7 @@ namespace VPetLLM.Handlers.TTS
         /// <summary>
         /// 处理单个TTS请求
         /// 集成现有的TTS处理逻辑，确保与VPetTTS的正确协调
+        /// 支持独占会话中的请求ID提交和等待（通过 VPetTTSIntegrationManager）
         /// </summary>
         /// <param name="request">TTS请求</param>
         private async Task ProcessSingleRequestAsync(TTSRequest request)
@@ -124,16 +125,68 @@ namespace VPetLLM.Handlers.TTS
             // 开始跟踪操作
             _operationTracker.StartOperation(request.Id, request.Text);
 
+            var plugin = VPetLLM.Instance;
+            var vpetTTSIntegration = _smartMessageProcessor?.GetVPetTTSIntegration();
+            var useExclusiveSession = vpetTTSIntegration?.IsInExclusiveSession() ?? false;
+
+            string ttsRequestId = null;
+
             try
             {
+                // 如果在独占会话中，提交TTS请求并获取请求ID
+                if (useExclusiveSession && vpetTTSIntegration != null)
+                {
+                    Logger.Log($"TTSRequestSerializer: 在独占会话中提交TTS请求");
+
+                    // 检查是否启用预加载
+                    if (Configuration.TTSCoordinationSettings.Instance.EnablePreload)
+                    {
+                        try
+                        {
+                            // 尝试预加载（不阻塞）
+                            // 注意：预加载已经在 SmartMessageProcessor 的批量预加载中处理
+                            // 这里只是额外的单个预加载尝试
+                            Logger.Log($"TTSRequestSerializer: 跳过单个预加载（已在批量预加载中处理）");
+                        }
+                        catch (Exception preloadEx)
+                        {
+                            Logger.Log($"TTSRequestSerializer: 预加载异常: {preloadEx.Message}");
+                        }
+                    }
+
+                    // 提交TTS请求
+                    ttsRequestId = await vpetTTSIntegration.SubmitTTSRequestAsync(request.Text);
+                    Logger.Log($"TTSRequestSerializer: TTS请求已提交，请求ID: {ttsRequestId}");
+                }
+
                 // 标记播放开始
                 _operationTracker.MarkPlaybackStart(request.Id);
 
                 // 执行动作指令（显示气泡等）
                 await ExecuteActionAsync(request.ActionContent);
 
-                // 等待外置TTS播放完成
-                await WaitForExternalTTSCompleteAsync(request.Text);
+                // 等待TTS完成
+                if (useExclusiveSession && !string.IsNullOrEmpty(ttsRequestId) && vpetTTSIntegration != null)
+                {
+                    // 在独占会话中，等待请求完成
+                    Logger.Log($"TTSRequestSerializer: 等待TTS请求完成，请求ID: {ttsRequestId}");
+                    var timeout = Configuration.TTSCoordinationSettings.Instance.RequestCompleteTimeoutMs / 1000; // 转换为秒
+                    var completed = await vpetTTSIntegration.WaitForRequestCompleteAsync(ttsRequestId, timeout);
+
+                    if (completed)
+                    {
+                        Logger.Log($"TTSRequestSerializer: TTS请求完成，请求ID: {ttsRequestId}");
+                    }
+                    else
+                    {
+                        Logger.Log($"TTSRequestSerializer: TTS请求等待超时，请求ID: {ttsRequestId}");
+                    }
+                }
+                else
+                {
+                    // 非独占会话，使用传统等待方式
+                    await WaitForExternalTTSCompleteAsync(request.Text);
+                }
 
                 // 标记操作成功完成
                 _operationTracker.CompleteOperation(request.Id, true);
@@ -178,7 +231,6 @@ namespace VPetLLM.Handlers.TTS
 
         /// <summary>
         /// 等待外置TTS播放完成（集成SmartMessageProcessor的逻辑）
-        /// 修复：当VPetTTS检测到不在播放状态时，跳过等待以避免气泡被清除
         /// </summary>
         /// <param name="text">TTS文本</param>
         private async Task WaitForExternalTTSCompleteAsync(string text)
@@ -191,26 +243,6 @@ namespace VPetLLM.Handlers.TTS
                 // 注意：会话跟踪已在 SmartMessageProcessor.WaitForExternalTTSCompleteAsync 中实现
                 if (_smartMessageProcessor is not null)
                 {
-                    // 修复：检查VPetTTS状态，如果不在播放状态则跳过等待
-                    // 这样可以避免VPetTTS插件清除刚刚显示的气泡
-                    var plugin = VPetLLM.Instance;
-                    if (plugin?.IsVPetTTSPluginDetected == true)
-                    {
-                        // 获取VPetTTS状态监控器
-                        var stateMonitorField = _smartMessageProcessor.GetType().GetField("_stateMonitor",
-                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                        if (stateMonitorField?.GetValue(_smartMessageProcessor) is VPetTTSStateMonitor stateMonitor)
-                        {
-                            // 检查当前是否正在播放
-                            if (!stateMonitor.IsPlaying)
-                            {
-                                Logger.Log("TTSRequestSerializer: VPetTTS未在播放，跳过等待以保持气泡显示");
-                                return; // 直接返回，不等待，保持气泡显示
-                            }
-                        }
-                    }
-
                     await _smartMessageProcessor.WaitForExternalTTSInternalAsync(text);
                 }
                 else

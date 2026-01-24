@@ -293,13 +293,13 @@ namespace VPetLLM.Handlers.Actions
                     var plugin = VPetLLM.Instance;
                     if (plugin is not null)
                     {
-                        Logger.Log($"SayHandler: 显示气泡（仅气泡模式）- 文本: \"{text}\"");
+                        Logger.Log($"SayHandler: 显示气泡（仅气泡模式）- 文本: \"{text.Substring(0, Math.Min(30, text.Length))}...\"");
 
                         // 无论是否有VPetTTS插件，都使用VPet原生Say API
                         // 这样可以确保气泡内容正确显示，同时让VPetTTS插件处理TTS协调
                         mainWindow.Main.Say(text, null, false);
 
-                        Logger.Log($"SayHandler: 气泡显示完成（使用VPet原生API）");
+                        Logger.Log($"SayHandler: 气泡显示完成（使用VPet原生API），应该已触发 OnSay 事件和 SayProcess");
                     }
                     else
                     {

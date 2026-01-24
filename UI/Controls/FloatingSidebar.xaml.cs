@@ -161,6 +161,7 @@ namespace VPetLLMPlugin.UI.Controls
 
         /// <summary>
         /// 更新状态灯 - 完全异步，不阻塞任何线程
+        /// 优化：避免重复设置相同状态，减少UI更新频率
         /// </summary>
         /// <param name="status">新状态</param>
         public void UpdateStatusLight(VPetLLMStatus status)
@@ -172,9 +173,17 @@ namespace VPetLLMPlugin.UI.Controls
                     return;
                 }
 
-                Logger.Log($"UpdateStatusLight: Updating to {status}");
+                // 检查状态是否真的改变了，避免重复设置
+                if (_currentStatus == status)
+                {
+                    Logger.Log($"UpdateStatusLight: Status already {status}, skipping update");
+                    return;
+                }
 
-                // 直接更新状态（无锁，因为只在UI线程读取）
+                Logger.Log($"UpdateStatusLight: Updating from {_currentStatus} to {status}");
+
+                // 更新状态
+                var oldStatus = _currentStatus;
                 _currentStatus = status;
 
                 // 计算颜色 - 只改变填充色和发光效果，边框始终保持白色可见
@@ -218,12 +227,19 @@ namespace VPetLLMPlugin.UI.Controls
                     {
                         if (_isClosing) return;
 
+                        // 再次检查状态是否被其他线程改变
+                        // 如果状态已经不是我们要设置的状态，说明有更新的状态请求，跳过本次更新
+                        if (_currentStatus != status)
+                        {
+                            Logger.Log($"UpdateStatusLight: Status changed to {_currentStatus} before UI update, skipping");
+                            return;
+                        }
+
                         // 只更新填充色和发光效果，不改变 Opacity，保持白色边框始终可见
                         StatusLight.Fill = new SolidColorBrush(lightColor);
                         StatusLightGlow.Color = glowColor;
 
-                        Logger.Log($"AnimateStatusLight: Colors set successfully");
-                        Logger.Log($"Status light updated to: {status}");
+                        Logger.Log($"Status light updated: {oldStatus} -> {status}");
                     }
                     catch (Exception ex)
                     {
@@ -234,54 +250,6 @@ namespace VPetLLMPlugin.UI.Controls
             catch (Exception ex)
             {
                 Logger.Log($"Error updating status light: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 内部方法：更新状态灯（在UI线程上执行）- 已废弃，保留兼容性
-        /// </summary>
-        private void UpdateStatusLightInternal(VPetLLMStatus status)
-        {
-            UpdateStatusLight(status);
-        }
-
-        /// <summary>
-        /// 动画更新状态灯颜色 - 已废弃，保留兼容性
-        /// </summary>
-        private void AnimateStatusLight(Color lightColor, Color glowColor, double opacity)
-        {
-            // 直接使用 BeginInvoke 更新
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                try
-                {
-                    if (_isClosing) return;
-                    StatusLight.Fill = new SolidColorBrush(lightColor);
-                    StatusLightGlow.Color = glowColor;
-                    StatusLight.Opacity = opacity;
-                }
-                catch { }
-            }), System.Windows.Threading.DispatcherPriority.Background);
-        }
-
-        /// <summary>
-        /// 内部方法：设置状态灯颜色（在UI线程上执行）- 已废弃，保留兼容性
-        /// </summary>
-        private void AnimateStatusLightInternal(Color lightColor, Color glowColor, double opacity)
-        {
-            try
-            {
-                if (_isClosing) return;
-
-                StatusLight.Fill = new SolidColorBrush(lightColor);
-                StatusLightGlow.Color = glowColor;
-                StatusLight.Opacity = opacity;
-
-                Logger.Log("AnimateStatusLight: Colors set successfully");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error in AnimateStatusLightInternal: {ex.Message}");
             }
         }
 

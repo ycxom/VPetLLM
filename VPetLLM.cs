@@ -102,6 +102,11 @@ namespace VPetLLM
         public bool IsVPetTTSPluginDetected => _vpetTTSPluginDetected;
 
         /// <summary>
+        /// VPetTTS 协调器（用于独占会话管理）
+        /// </summary>
+        public VPetTTSCoordinator? VPetTTSCoordinator { get; private set; }
+
+        /// <summary>
         /// LLM 调用入口点（供插件和外部应用使用）
         /// </summary>
         public Core.LLMEntryPoint? LLMEntry { get; private set; }
@@ -638,6 +643,43 @@ namespace VPetLLM
                 {
                     Logger.Log($"检测到其他已启用的 TTS 插件 ({allPluginsResult.EnabledPluginNames})，内置 TTS 将自动避让");
                     _vpetTTSPluginDetected = true;
+
+                    // 初始化 VPetTTS 协调器（使用延迟重试机制）
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // 等待 VPetTTS 插件完成初始化（最多重试 10 次，每次间隔 500ms）
+                            for (int i = 0; i < 10; i++)
+                            {
+                                Logger.Log($"尝试初始化 VPetTTS 协调器（第 {i + 1} 次）...");
+                                
+                                VPetTTSCoordinator = new VPetTTSCoordinator(MW);
+                                if (VPetTTSCoordinator.Initialize())
+                                {
+                                    Logger.Log("VPetTTS 协调器初始化成功");
+                                    return;
+                                }
+                                else
+                                {
+                                    Logger.Log($"VPetTTS 协调器初始化失败（第 {i + 1} 次），{(i < 9 ? "500ms 后重试" : "放弃重试")}");
+                                    VPetTTSCoordinator = null;
+                                    
+                                    if (i < 9)
+                                    {
+                                        await Task.Delay(500);
+                                    }
+                                }
+                            }
+                            
+                            Logger.Log("VPetTTS 协调器初始化失败：已达到最大重试次数");
+                        }
+                        catch (Exception coordEx)
+                        {
+                            Logger.Log($"初始化 VPetTTS 协调器时发生错误: {coordEx.Message}");
+                            VPetTTSCoordinator = null;
+                        }
+                    });
                 }
                 else
                 {

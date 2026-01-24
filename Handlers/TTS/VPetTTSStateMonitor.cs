@@ -1,48 +1,23 @@
 namespace VPetLLM.Handlers.TTS
 {
     /// <summary>
-    /// VPetTTS状态监控器，提供实时状态检测和变化通知
+    /// VPetTTS状态监控器，提供按需状态检测
     /// 解决VPetLLM与VPetTTS协作时的状态同步问题
+    /// 注意：按需检查模式，不启动后台定时器或监控线程
     /// </summary>
     public class VPetTTSStateMonitor : IDisposable
     {
         private readonly object _vpetTTSPlugin;
-        private readonly Timer _statusCheckTimer;
-        private volatile bool _lastKnownPlayingState = false;
-        private readonly List<StateChangeRecord> _stateHistory = new List<StateChangeRecord>();
-        private readonly object _lockObject = new object();
         private bool _disposed = false;
-
-        /// <summary>
-        /// 状态变化记录
-        /// </summary>
-        public class StateChangeRecord
-        {
-            public DateTime Timestamp { get; set; }
-            public bool IsPlaying { get; set; }
-            public string Reason { get; set; }
-        }
-
-        /// <summary>
-        /// 播放状态变化事件
-        /// </summary>
-        public event EventHandler<bool> PlayingStateChanged;
 
         public VPetTTSStateMonitor(object vpetTTSPlugin)
         {
             _vpetTTSPlugin = vpetTTSPlugin ?? throw new ArgumentNullException(nameof(vpetTTSPlugin));
-
-            Logger.Log("VPetTTSStateMonitor: 初始化状态监控器");
-
-            // 启动定时状态检查（可配置间隔，默认200ms）
-            var interval = GetPollingInterval();
-            _statusCheckTimer = new Timer(CheckPlayingState, null, 0, interval);
-
-            Logger.Log($"VPetTTSStateMonitor: 状态检查定时器已启动，间隔: {interval}ms");
+            Logger.Log("VPetTTSStateMonitor: 初始化状态监控器（按需检查模式）");
         }
 
         /// <summary>
-        /// 获取当前播放状态
+        /// 获取当前播放状态（按需检查，不缓存）
         /// </summary>
         public bool IsPlaying
         {
@@ -77,68 +52,7 @@ namespace VPetLLM.Handlers.TTS
         }
 
         /// <summary>
-        /// 获取状态变化历史
-        /// </summary>
-        public List<StateChangeRecord> GetStateHistory()
-        {
-            lock (_stateHistory)
-            {
-                return new List<StateChangeRecord>(_stateHistory);
-            }
-        }
-
-        /// <summary>
-        /// 定时检查播放状态
-        /// </summary>
-        private void CheckPlayingState(object state)
-        {
-            if (_disposed) return;
-
-            try
-            {
-                var currentState = IsPlaying;
-                if (currentState != _lastKnownPlayingState)
-                {
-                    var record = new StateChangeRecord
-                    {
-                        Timestamp = DateTime.Now,
-                        IsPlaying = currentState,
-                        Reason = currentState ? "播放开始" : "播放结束"
-                    };
-
-                    lock (_stateHistory)
-                    {
-                        _stateHistory.Add(record);
-                        // 保留最近100条记录
-                        if (_stateHistory.Count > 100)
-                        {
-                            _stateHistory.RemoveAt(0);
-                        }
-                    }
-
-                    Logger.Log($"VPetTTSStateMonitor: 状态变化 {_lastKnownPlayingState} -> {currentState}");
-                    _lastKnownPlayingState = currentState;
-
-                    // 触发状态变化事件
-                    try
-                    {
-                        PlayingStateChanged?.Invoke(this, currentState);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"VPetTTSStateMonitor: 状态变化事件处理异常: {ex.Message}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"VPetTTSStateMonitor: 状态检查异常: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 等待播放完成
-        /// 优化：使用事件驱动方式，订阅VPetTTS的PlaybackCompleted事件
+        /// 等待播放完成（按需轮询模式）
         /// </summary>
         /// <param name="timeoutMs">最大超时时间（毫秒），作为安全保护，默认5分钟</param>
         /// <returns>是否成功完成</returns>
@@ -150,7 +64,7 @@ namespace VPetLLM.Handlers.TTS
             var maxTimeout = timeoutMs ?? 300000;
             var startTime = DateTime.Now;
 
-            Logger.Log($"VPetTTSStateMonitor: 开始等待播放完成（事件驱动模式）");
+            Logger.Log($"VPetTTSStateMonitor: 开始等待播放完成（按需轮询模式）");
 
             // 尝试使用事件驱动方式
             var eventResult = await WaitForPlaybackCompleteViaEventsAsync(maxTimeout);
@@ -185,6 +99,39 @@ namespace VPetLLM.Handlers.TTS
 
                 Logger.Log($"VPetTTSStateMonitor: 使用事件驱动方式，订阅PlaybackCompleted事件");
 
+                // 关键修复：在订阅事件之前，先等待播放开始
+                // 这样可以避免收到上一次播放的完成事件
+                var waitStartTime = DateTime.Now;
+                var maxWaitForPlaybackStart = 10000; // 最多等待10秒让播放开始
+                var playbackStarted = false;
+                
+                Logger.Log($"VPetTTSStateMonitor: 等待播放开始...");
+                while ((DateTime.Now - waitStartTime).TotalMilliseconds < maxWaitForPlaybackStart)
+                {
+                    if (IsPlaying)
+                    {
+                        playbackStarted = true;
+                        var waitTime = (DateTime.Now - waitStartTime).TotalMilliseconds;
+                        Logger.Log($"VPetTTSStateMonitor: 检测到播放已开始，等待时间: {waitTime}ms");
+                        break;
+                    }
+                    await Task.Delay(50);
+                }
+                
+                if (!playbackStarted)
+                {
+                    var waitTime = (DateTime.Now - waitStartTime).TotalMilliseconds;
+                    Logger.Log($"VPetTTSStateMonitor: 播放未在超时时间内开始 ({waitTime}ms)，可能已完成或失败");
+                    // 检查是否已经完成
+                    if (IsPlaybackComplete())
+                    {
+                        Logger.Log($"VPetTTSStateMonitor: 播放已经完成");
+                        return true;
+                    }
+                    return false;
+                }
+
+                // 现在订阅事件，等待播放完成
                 var completionSource = new TaskCompletionSource<bool>();
                 EventHandler<object> handler = null;
 
@@ -201,10 +148,10 @@ namespace VPetLLM.Handlers.TTS
 
                 try
                 {
-                    // 检查是否已经完成（避免竞态条件）
+                    // 再次检查当前状态（可能在订阅事件之前就已经完成了）
                     if (!IsPlaying && IsPlaybackComplete())
                     {
-                        Logger.Log($"VPetTTSStateMonitor: 播放已经完成，无需等待");
+                        Logger.Log($"VPetTTSStateMonitor: 播放已经完成，无需等待事件");
                         return true;
                     }
 
@@ -236,12 +183,12 @@ namespace VPetLLM.Handlers.TTS
         }
 
         /// <summary>
-        /// 通过轮询方式等待播放完成（回退方案）
+        /// 通过轮询方式等待播放完成（回退方案，按需检查）
         /// </summary>
         private async Task<bool> WaitForPlaybackCompleteViaPollingAsync(int maxTimeout)
         {
             var startTime = DateTime.Now;
-            var pollingInterval = GetPollingInterval();
+            var pollingInterval = 200; // 固定200ms轮询间隔
 
             // 等待播放开始的超时时间（10秒）
             var startWaitTimeout = 10000;
@@ -367,7 +314,7 @@ namespace VPetLLM.Handlers.TTS
         }
 
         /// <summary>
-        /// 获取播放进度信息
+        /// 获取播放进度信息（按需查询）
         /// </summary>
         public PlaybackProgressInfo GetPlaybackProgress()
         {
@@ -448,99 +395,6 @@ namespace VPetLLM.Handlers.TTS
         }
 
         /// <summary>
-        /// 获取轮询间隔
-        /// </summary>
-        private int GetPollingInterval()
-        {
-            // 从配置获取轮询间隔，默认200ms，范围50-1000ms
-            try
-            {
-                var configInterval = TTSCoordinationSettings.Instance.PollingIntervalMs;
-                return Math.Max(50, Math.Min(1000, configInterval));
-            }
-            catch
-            {
-                return 200; // 默认值
-            }
-        }
-
-        /// <summary>
-        /// 清除状态历史
-        /// </summary>
-        public void ClearHistory()
-        {
-            lock (_stateHistory)
-            {
-                _stateHistory.Clear();
-            }
-            Logger.Log("VPetTTSStateMonitor: 状态历史已清除");
-        }
-
-        /// <summary>
-        /// 获取状态统计信息
-        /// </summary>
-        public StateStatistics GetStatistics()
-        {
-            lock (_stateHistory)
-            {
-                var stats = new StateStatistics();
-
-                if (_stateHistory.Count == 0)
-                {
-                    return stats;
-                }
-
-                stats.TotalStateChanges = _stateHistory.Count;
-                stats.FirstRecordTime = _stateHistory[0].Timestamp;
-                stats.LastRecordTime = _stateHistory[_stateHistory.Count - 1].Timestamp;
-
-                // 计算播放次数和总播放时间
-                DateTime? playStartTime = null;
-                foreach (var record in _stateHistory)
-                {
-                    if (record.IsPlaying && playStartTime is null)
-                    {
-                        playStartTime = record.Timestamp;
-                        stats.PlaybackCount++;
-                    }
-                    else if (!record.IsPlaying && playStartTime.HasValue)
-                    {
-                        var duration = record.Timestamp - playStartTime.Value;
-                        stats.TotalPlaybackTime += duration;
-                        playStartTime = null;
-                    }
-                }
-
-                // 如果当前还在播放，计算到现在的时间
-                if (playStartTime.HasValue && _lastKnownPlayingState)
-                {
-                    var duration = DateTime.Now - playStartTime.Value;
-                    stats.TotalPlaybackTime += duration;
-                }
-
-                return stats;
-            }
-        }
-
-        /// <summary>
-        /// 状态统计信息
-        /// </summary>
-        public class StateStatistics
-        {
-            public int TotalStateChanges { get; set; }
-            public int PlaybackCount { get; set; }
-            public TimeSpan TotalPlaybackTime { get; set; }
-            public DateTime FirstRecordTime { get; set; }
-            public DateTime LastRecordTime { get; set; }
-
-            public override string ToString()
-            {
-                return $"状态变化: {TotalStateChanges}, 播放次数: {PlaybackCount}, " +
-                       $"总播放时间: {TotalPlaybackTime.TotalSeconds:F1}秒";
-            }
-        }
-
-        /// <summary>
         /// 释放资源
         /// </summary>
         public void Dispose()
@@ -548,16 +402,7 @@ namespace VPetLLM.Handlers.TTS
             if (!_disposed)
             {
                 _disposed = true;
-
-                try
-                {
-                    _statusCheckTimer?.Dispose();
-                    Logger.Log("VPetTTSStateMonitor: 资源已释放");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"VPetTTSStateMonitor: 释放资源时发生异常: {ex.Message}");
-                }
+                Logger.Log("VPetTTSStateMonitor: 资源已释放");
             }
         }
     }

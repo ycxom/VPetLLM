@@ -675,18 +675,35 @@ namespace VPetLLM.UI.Windows
         /// <summary>
         /// 将完整消息按流式方式处理
         /// 统一流式和非流式的处理逻辑，避免架构复杂性
+        /// 修复：等待所有命令真正处理完成后再结束会话
+        /// 注意：独占会话管理由 SmartMessageProcessor 统一处理
         /// </summary>
         private async Task ProcessCompleteMessageAsStreaming(string completeMessage)
         {
             try
             {
+                // 创建一个任务完成信号
+                var allCommandsCompleted = new TaskCompletionSource<bool>();
+                var commandTasks = new List<Task>();
+                var lockObject = new object();
+
                 // 创建StreamingCommandProcessor来处理完整消息
                 var streamProcessor = new Handlers.Core.StreamingCommandProcessor(
                     async (command) =>
                     {
                         // 每个完整命令都通过现有的流式处理逻辑处理
+                        // skipInitialization = true 表示不要重复启动会话
                         Logger.Log($"统一流式处理: 处理命令片段: {command}");
-                        await _messageProcessor.ProcessMessageAsync(command, true, autoSetIdleOnComplete: false);
+                        
+                        // 创建命令处理任务并跟踪
+                        var commandTask = _messageProcessor.ProcessMessageAsync(command, true, autoSetIdleOnComplete: false);
+                        
+                        lock (lockObject)
+                        {
+                            commandTasks.Add(commandTask);
+                        }
+                        
+                        await commandTask;
                     },
                     _plugin
                 );
@@ -698,10 +715,28 @@ namespace VPetLLM.UI.Windows
                     streamProcessor.AddText(c.ToString());
                 }
 
-                // 完成处理
+                // 完成处理（触发所有命令的处理）
                 streamProcessor.Complete();
 
-                Logger.Log("统一流式处理: 完整消息处理完成");
+                Logger.Log("统一流式处理: StreamingCommandProcessor.Complete() 已调用");
+
+                // 等待所有命令真正处理完成
+                Task[] tasksToWait;
+                lock (lockObject)
+                {
+                    tasksToWait = commandTasks.ToArray();
+                }
+
+                if (tasksToWait.Length > 0)
+                {
+                    Logger.Log($"统一流式处理: 等待 {tasksToWait.Length} 个命令处理完成...");
+                    await Task.WhenAll(tasksToWait);
+                    Logger.Log("统一流式处理: 所有命令处理完成");
+                }
+                else
+                {
+                    Logger.Log("统一流式处理: 没有命令需要等待");
+                }
             }
             catch (Exception ex)
             {

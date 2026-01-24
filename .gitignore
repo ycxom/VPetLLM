@@ -49,7 +49,7 @@
 
 # all debug
 *debug*
-!Utils/TTSDebugLogger.cs
+!Utils/Audio/TTSDebugLogger.cs
 
 
 archive

@@ -3,7 +3,7 @@ using SystemWindows = System.Windows;
 namespace VPetLLM.Utils.UI
 {
     /// <summary>
-    /// 直接气泡管理器 - 替代已弃用的BubbleDisplayHelper
+    /// 直接气泡管理器
     /// 提供更直接和高效的气泡显示功能，直接调用VPet原生API
     /// </summary>
     public static class DirectBubbleManager
