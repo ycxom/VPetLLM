@@ -100,21 +100,36 @@ namespace VPetLLM.Handlers.UI
         }
 
         /// <summary>
-        /// 基于 VPet 实际打印速度计算显示时间
-        /// VPet MessageBar: 每 150ms 显示 2-3 个字符（平均 2.5 个）
-        /// 公式: (text.Length / 2.5) * 150 + 300 毫秒缓冲
+        /// 基于 VPet 实际打印速度和显示时间计算总等待时间
+        /// 
+        /// VPet MessageBar 逻辑：
+        /// 1. 打印阶段：ShowTimer.Interval = 150ms，每次打印 2-3 个字符（平均 2.5 个）
+        ///    打印时间 = (字符数 / 2.5) * 150ms = 字符数 * 60ms
+        /// 
+        /// 2. 显示阶段：使用简化公式
+        ///    显示时间 = 2000ms（固定 2 秒，足够阅读）
+        /// 
+        /// 3. 额外缓冲：打印时间 * 1（额外添加 1 倍打印时间作为缓冲）
+        /// 
+        /// 4. 总时间 = 打印时间 * 2 + 显示时间
         /// </summary>
         /// <param name="text">文本内容</param>
-        /// <returns>预估显示时间（毫秒），最小 500ms</returns>
+        /// <returns>预估显示时间（毫秒），最小 1000ms</returns>
         public static int CalculateActualDisplayTime(string text)
         {
-            if (string.IsNullOrEmpty(text)) return 500;
+            if (string.IsNullOrEmpty(text)) return 1000;
 
-            // 公式: (字符数 / 2.5) * 150ms + 300ms 缓冲
-            int estimatedMs = (int)((text.Length / 2.5) * 150) + 300;
+            // 1. 计算打印时间：字符数 * 60ms
+            int printTime = text.Length * 60;
 
-            // 最小 500ms
-            return Math.Max(500, estimatedMs);
+            // 2. 固定显示时间：2 秒
+            int displayTime = 2000;
+
+            // 3. 总时间 = 打印时间 * 2 + 显示时间（额外添加 1 倍打印时间）
+            int totalTime = printTime * 2 + displayTime;
+
+            // 最小 1000ms，最大 20000ms（避免过长）
+            return Math.Max(1000, Math.Min(20000, totalTime));
         }
 
         /// <summary>

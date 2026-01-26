@@ -537,6 +537,11 @@ namespace VPetLLM.Utils.UI
         /// 通过检查ShowTimer.Enabled 状态判断气泡是否正在逐字打印
         /// </summary>
         /// <param name="msgBar">MessageBar 实例</param>
+        /// <summary>
+        /// 检查气泡是否正在打印
+        /// 注意：此方法已不再使用，保留以备将来需要
+        /// </summary>
+        /// <param name="msgBar">MessageBar 实例</param>
         /// <returns>true 表示正在打印，false 表示打印完成或无法检测</returns>
         public static bool IsBubblePrinting(object msgBar)
         {
@@ -549,11 +554,13 @@ namespace VPetLLM.Utils.UI
 
             try
             {
+                // 检查 ShowTimer
                 if (_showTimerField is not null)
                 {
                     var showTimer = _showTimerField.GetValue(msgBar) as SystemTimers.Timer;
                     return showTimer?.Enabled ?? false;
                 }
+                
                 return false;
             }
             catch (Exception ex)
@@ -565,7 +572,7 @@ namespace VPetLLM.Utils.UI
 
         /// <summary>
         /// 等待气泡打印完成
-        /// 每100ms 轮询检测状态直到打印完成或超时
+        /// 根据 VPet 源代码的逻辑计算准确的等待时间
         /// </summary>
         /// <param name="msgBar">MessageBar 实例</param>
         /// <param name="maxWaitMs">最大等待时间（毫秒），默认 10000ms</param>
@@ -573,23 +580,26 @@ namespace VPetLLM.Utils.UI
         {
             if (msgBar is null) return;
 
-            int elapsed = 0;
-            const int checkInterval = 100;
-
-            while (IsBubblePrinting(msgBar) && elapsed < maxWaitMs)
-            {
-                await Task.Delay(checkInterval).ConfigureAwait(false);
-                elapsed += checkInterval;
-            }
-
-            if (elapsed >= maxWaitMs)
-            {
-                VPetLLMUtils.Logger.Log($"MessageBarHelper: 气泡打印等待超时: {maxWaitMs}ms");
-            }
-            else if (elapsed > 0)
-            {
-                VPetLLMUtils.Logger.Log($"MessageBarHelper: 气泡打印完成，等待时间: {elapsed}ms");
-            }
+            // 根据 VPet 源代码计算准确的等待时间
+            // 参考：VPet/VPet-Simulator.Core/Display/MessageBar.xaml.cs
+            // 
+            // 1. 打印时间：ShowTimer.Interval = 150ms，每次打印 2-3 个字符
+            //    打印总时间 ≈ (字符数 / 2.5) * 150ms
+            // 
+            // 2. 显示时间：timeleft = ComCheck(text) * 10 + 20
+            //    EndTimer.Interval = 200ms
+            //    显示总时间 = timeleft * 200ms
+            // 
+            // 3. 总等待时间 = 打印时间 + 显示时间
+            
+            // 由于我们使用的是预估时间（BubbleDisplayConfig.CalculateActualDisplayTime），
+            // 它已经包含了打印和显示的时间，所以直接使用即可
+            
+            VPetLLMUtils.Logger.Log($"MessageBarHelper: 开始等待气泡显示，预估时间: {maxWaitMs}ms");
+            
+            await Task.Delay(maxWaitMs).ConfigureAwait(false);
+            
+            VPetLLMUtils.Logger.Log($"MessageBarHelper: 气泡显示等待完成，等待时间: {maxWaitMs}ms");
         }
 
         /// <summary>

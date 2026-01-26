@@ -97,9 +97,33 @@ namespace VPetLLM
         public FloatingSidebarManager? FloatingSidebarManager => _floatingSidebarManager;
 
         /// <summary>
-        /// VPet TTS 插件是否被检测到
+        /// VPet TTS 插件是否被检测到（实时检测）
         /// </summary>
-        public bool IsVPetTTSPluginDetected => _vpetTTSPluginDetected;
+        public bool IsVPetTTSPluginDetected
+        {
+            get
+            {
+                // 实时检测，确保能检测到后加载的插件
+                try
+                {
+                    var result = TTSPluginDetector.DetectAllOtherTTSPlugins(MW);
+                    var hasEnabledPlugin = result.HasOtherEnabledTTSPlugin;
+                    
+                    // 如果检测结果与缓存不同，更新缓存并记录日志
+                    if (hasEnabledPlugin != _vpetTTSPluginDetected)
+                    {
+                        _vpetTTSPluginDetected = hasEnabledPlugin;
+                        Logger.Log($"VPetTTS插件状态变化: {(hasEnabledPlugin ? "已启用" : "已禁用")} ({result.EnabledPluginNames})");
+                    }
+                    
+                    return hasEnabledPlugin;
+                }
+                catch
+                {
+                    return _vpetTTSPluginDetected; // 出错时返回缓存值
+                }
+            }
+        }
 
         /// <summary>
         /// VPetTTS 协调器（用于独占会话管理）
@@ -626,23 +650,23 @@ namespace VPetLLM
         }
 
         /// <summary>
-        /// 检测并处理 VPet.Plugin.VPetTTS 插件
+        /// 检测并处理 VPet.Plugin.VPetTTS 插件，包括其他的
+        /// 注意：现在 IsVPetTTSPluginDetected 属性已改为实时检测，此方法主要用于初始化协调器
         /// </summary>
         private void DetectAndHandleVPetTTSPlugin()
         {
             try
             {
-                // 检测所有其他 TTS 插件
-                var allPluginsResult = TTSPluginDetector.DetectAllOtherTTSPlugins(MW);
-
                 // 设置实时检测委托，每次调用 TTS 时都会检测插件状态
                 TTSService?.SetVPetTTSPluginChecker(() => CheckAnyTTSPluginEnabled());
 
                 // 执行一次初始检测并记录日志
+                var allPluginsResult = TTSPluginDetector.DetectAllOtherTTSPlugins(MW);
+                
                 if (allPluginsResult.HasOtherEnabledTTSPlugin)
                 {
                     Logger.Log($"检测到其他已启用的 TTS 插件 ({allPluginsResult.EnabledPluginNames})，内置 TTS 将自动避让");
-                    _vpetTTSPluginDetected = true;
+                    _vpetTTSPluginDetected = true; // 初始化缓存值
 
                     // 初始化 VPetTTS 协调器（使用延迟重试机制）
                     _ = Task.Run(async () =>
@@ -684,7 +708,7 @@ namespace VPetLLM
                 else
                 {
                     Logger.Log("未检测到其他已启用的 TTS 插件，保持内置 TTS 功能");
-                    _vpetTTSPluginDetected = false;
+                    _vpetTTSPluginDetected = false; // 初始化缓存值
                 }
 
                 // 记录每个检测到的插件的详细信息
@@ -705,7 +729,7 @@ namespace VPetLLM
             catch (Exception ex)
             {
                 Logger.Log($"检测 TTS 插件时发生错误: {ex.Message}");
-                _vpetTTSPluginDetected = false;
+                _vpetTTSPluginDetected = false; // 初始化缓存值
             }
         }
 

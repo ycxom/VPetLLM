@@ -94,7 +94,7 @@ namespace VPetLLM.Infrastructure.Validation
                 // 测试依赖验证
                 container.ValidateDependencies();
 
-                Console.WriteLine("✅ 依赖注入容器验证成功");
+                Console.WriteLine("依赖注入容器验证成功");
                 return true;
             }
             catch (Exception ex)
@@ -137,7 +137,7 @@ namespace VPetLLM.Infrastructure.Validation
                     return false;
                 }
 
-                Console.WriteLine("✅ 事件总线验证成功");
+                Console.WriteLine("事件总线验证成功");
                 return true;
             }
             catch (Exception ex)
@@ -177,7 +177,7 @@ namespace VPetLLM.Infrastructure.Validation
                     logger.LogError(ex, "Test error message");
                 }
 
-                Console.WriteLine("✅ 结构化日志验证成功");
+                Console.WriteLine("结构化日志验证成功");
                 return true;
             }
             catch (Exception ex)
@@ -215,7 +215,7 @@ namespace VPetLLM.Infrastructure.Validation
                     return false;
                 }
 
-                Console.WriteLine("✅ 配置管理验证成功");
+                Console.WriteLine("配置管理验证成功");
                 return true;
             }
             catch (Exception ex)
@@ -259,7 +259,7 @@ namespace VPetLLM.Infrastructure.Validation
                     return false;
                 }
 
-                Console.WriteLine("✅ 服务管理验证成功");
+                Console.WriteLine("服务管理验证成功");
                 return true;
             }
             catch (Exception ex)
@@ -306,7 +306,7 @@ namespace VPetLLM.Infrastructure.Validation
                     return false;
                 }
 
-                Console.WriteLine("✅ 核心服务验证成功");
+                Console.WriteLine("核心服务验证成功");
                 return true;
             }
             catch (Exception ex)

@@ -676,34 +676,73 @@ namespace VPetLLM.UI.Windows
         /// 将完整消息按流式方式处理
         /// 统一流式和非流式的处理逻辑，避免架构复杂性
         /// 修复：等待所有命令真正处理完成后再结束会话
-        /// 注意：独占会话管理由 SmartMessageProcessor 统一处理
+        /// 修复：在外层管理独占会话，让会话覆盖所有命令
         /// </summary>
         private async Task ProcessCompleteMessageAsStreaming(string completeMessage)
         {
+            // 检查是否需要使用独占会话模式
+            var vpetTTSIntegration = _messageProcessor.GetVPetTTSIntegration();
+            var useExclusiveSession = vpetTTSIntegration?.CanUseExclusiveMode() ?? false;
+            string exclusiveSessionId = null;
+
             try
             {
-                // 创建一个任务完成信号
-                var allCommandsCompleted = new TaskCompletionSource<bool>();
-                var commandTasks = new List<Task>();
+                // 如果启用独占模式，在处理所有命令前启动独占会话
+                if (useExclusiveSession)
+                {
+                    Logger.Log("统一流式处理: 启动独占会话（覆盖所有命令）");
+                    exclusiveSessionId = await vpetTTSIntegration.StartExclusiveSessionAsync();
+                    Logger.Log($"统一流式处理: 独占会话已启动，会话 ID: {exclusiveSessionId}");
+
+                    // 使用 VPetTTSIntegrationManager 提取所有 talk 文本进行批量预加载
+                    var talkTexts = vpetTTSIntegration.ExtractAllTalkTexts(completeMessage);
+                    if (talkTexts.Count > 0)
+                    {
+                        Logger.Log($"统一流式处理: 批量预加载 {talkTexts.Count} 个文本");
+                        var preloadCount = await vpetTTSIntegration.PreloadTextsAsync(talkTexts);
+                        Logger.Log($"统一流式处理: 批量预加载完成，成功: {preloadCount}/{talkTexts.Count}");
+                    }
+                }
+
+                // 创建一个完成信号，用于等待所有命令处理完成
+                var allCommandsCompletedSource = new TaskCompletionSource<bool>();
+                var commandCount = 0;
+                var completedCount = 0;
                 var lockObject = new object();
 
                 // 创建StreamingCommandProcessor来处理完整消息
                 var streamProcessor = new Handlers.Core.StreamingCommandProcessor(
                     async (command) =>
                     {
-                        // 每个完整命令都通过现有的流式处理逻辑处理
-                        // skipInitialization = true 表示不要重复启动会话
                         Logger.Log($"统一流式处理: 处理命令片段: {command}");
                         
-                        // 创建命令处理任务并跟踪
-                        var commandTask = _messageProcessor.ProcessMessageAsync(command, true, autoSetIdleOnComplete: false);
-                        
-                        lock (lockObject)
+                        try
                         {
-                            commandTasks.Add(commandTask);
+                            // 所有命令都传递 skipInit=true，因为独占会话已经在外层启动
+                            // autoSetIdleOnComplete=false，让最后统一管理状态灯
+                            // 传递会话 ID，让 SmartMessageProcessor 知道外部会话的存在
+                            await _messageProcessor.ProcessMessageAsync(
+                                command, 
+                                skipInitialization: true, 
+                                autoSetIdleOnComplete: false,
+                                existingSessionId: exclusiveSessionId  // 传递会话 ID
+                            );
                         }
-                        
-                        await commandTask;
+                        finally
+                        {
+                            // 命令处理完成，增加计数
+                            lock (lockObject)
+                            {
+                                completedCount++;
+                                Logger.Log($"统一流式处理: 命令完成 {completedCount}/{commandCount}");
+                                
+                                // 如果所有命令都完成了，设置完成信号
+                                if (completedCount >= commandCount)
+                                {
+                                    allCommandsCompletedSource.TrySetResult(true);
+                                }
+                            }
+                        }
                     },
                     _plugin
                 );
@@ -718,31 +757,54 @@ namespace VPetLLM.UI.Windows
                 // 完成处理（触发所有命令的处理）
                 streamProcessor.Complete();
 
-                Logger.Log("统一流式处理: StreamingCommandProcessor.Complete() 已调用");
-
-                // 等待所有命令真正处理完成
-                Task[] tasksToWait;
+                // 获取命令总数
                 lock (lockObject)
                 {
-                    tasksToWait = commandTasks.ToArray();
+                    // StreamingCommandProcessor 会在 Complete() 后知道总共有多少命令
+                    // 我们需要从 StreamingCommandProcessor 获取这个信息
+                    // 暂时使用一个简单的方法：计算消息中的命令数量
+                    commandCount = System.Text.RegularExpressions.Regex.Matches(
+                        completeMessage, 
+                        @"<\|\w+_begin\|>"
+                    ).Count;
+                    
+                    Logger.Log($"统一流式处理: 检测到 {commandCount} 个命令");
+                    
+                    // 如果没有命令，直接完成
+                    if (commandCount == 0)
+                    {
+                        allCommandsCompletedSource.TrySetResult(true);
+                    }
                 }
 
-                if (tasksToWait.Length > 0)
-                {
-                    Logger.Log($"统一流式处理: 等待 {tasksToWait.Length} 个命令处理完成...");
-                    await Task.WhenAll(tasksToWait);
-                    Logger.Log("统一流式处理: 所有命令处理完成");
-                }
-                else
-                {
-                    Logger.Log("统一流式处理: 没有命令需要等待");
-                }
+                Logger.Log("统一流式处理: StreamingCommandProcessor.Complete() 已调用，等待所有命令处理完成...");
+
+                // 等待所有命令真正处理完成
+                await allCommandsCompletedSource.Task;
+                Logger.Log("统一流式处理: 所有命令处理完成");
             }
             catch (Exception ex)
             {
                 Logger.Log($"统一流式处理: 处理完整消息失败: {ex.Message}");
                 throw;
             }
+            finally
+            {
+                // 确保独占会话一定会结束（在所有命令处理完成后）
+                if (useExclusiveSession && !string.IsNullOrEmpty(exclusiveSessionId))
+                {
+                    try
+                    {
+                        await vpetTTSIntegration.EndExclusiveSessionAsync();
+                        Logger.Log($"统一流式处理: 结束独占会话（所有命令完成后），会话 ID: {exclusiveSessionId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"统一流式处理: 结束独占会话失败: {ex.Message}");
+                    }
+                }
+            }
         }
+
     }
 }

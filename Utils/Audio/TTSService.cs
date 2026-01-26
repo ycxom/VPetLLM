@@ -260,7 +260,7 @@ namespace VPetLLM.Utils.Audio
         /// <summary>
         /// 等待当前播放完成
         /// </summary>
-        private async Task WaitForCurrentPlaybackAsync()
+        public async Task WaitForCurrentPlaybackAsync()
         {
             TaskCompletionSource<bool>? currentTask = null;
 
@@ -553,7 +553,7 @@ namespace VPetLLM.Utils.Audio
         /// </summary>
         /// <param name="filePath">音频文件路径</param>
         /// <returns></returns>
-        private async Task PlayAudioFileAsync(string filePath)
+        public async Task PlayAudioFileAsync(string filePath)
         {
             try
             {
