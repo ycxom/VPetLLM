@@ -1,6 +1,7 @@
+using System.Collections.Concurrent;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json;
-using System.Collections.Concurrent;
+using Newtonsoft.Json.Linq;
 
 namespace VPetLLM.Infrastructure.Configuration;
 
@@ -27,6 +28,14 @@ public class SQLiteSettingStorage : ISettingStorage
         "Role",
         "Language",
         "PromptLanguage"
+    };
+
+    // Settings that should not be saved to settings table (managed elsewhere)
+    private static readonly HashSet<string> ExcludedFromSettingsTable = new HashSet<string>
+    {
+        // Provider node lists are managed in provider_nodes table
+        // We only save the parent objects (OpenAI, Gemini) for backward compatibility
+        // but the node lists themselves are excluded
     };
 
     public SQLiteSettingStorage(string baseDirectory, string? instanceId = null)
@@ -75,6 +84,82 @@ public class SQLiteSettingStorage : ISettingStorage
         return InstanceSpecificKeys.Contains(key);
     }
 
+    /// <summary>
+    /// Serialize provider settings (OpenAI/Gemini) without node lists
+    /// Node lists are managed separately in provider_nodes table
+    /// </summary>
+    private string SerializeProviderSettingWithoutNodes(object value, string providerType)
+    {
+        try
+        {
+            // Create custom serializer settings to ignore node lists
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
+                {
+                    IgnoreSerializableAttribute = false
+                },
+                Formatting = Formatting.None
+            };
+
+            // Serialize to JObject first
+            var json = JsonConvert.SerializeObject(value, settings);
+            var jObject = JObject.Parse(json);
+
+            // Remove node lists and legacy single-node properties
+            if (providerType == "OpenAI")
+            {
+                jObject.Remove("OpenAINodes");
+                
+                // Remove legacy single-node properties (向后兼容属性)
+                // 这些属性在旧版本中用于单节点配置，现在由 provider_nodes 表管理
+                jObject.Remove("ApiKey");
+                jObject.Remove("Model");
+                jObject.Remove("Url");
+                jObject.Remove("Temperature");
+                jObject.Remove("MaxTokens");
+                jObject.Remove("EnableAdvanced");
+                jObject.Remove("EnableStreaming");
+                jObject.Remove("Enabled");
+                jObject.Remove("Name");
+                
+                Logger.Log("Excluded OpenAINodes and legacy properties from settings table (managed in provider_nodes)");
+            }
+            else if (providerType == "Gemini")
+            {
+                jObject.Remove("GeminiNodes");
+                
+                // Remove legacy single-node properties
+                jObject.Remove("ApiKey");
+                jObject.Remove("Model");
+                jObject.Remove("Url");
+                jObject.Remove("Temperature");
+                jObject.Remove("MaxTokens");
+                jObject.Remove("EnableAdvanced");
+                jObject.Remove("EnableStreaming");
+                
+                Logger.Log("Excluded GeminiNodes and legacy properties from settings table (managed in provider_nodes)");
+            }
+
+            return jObject.ToString(Formatting.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Failed to serialize {providerType} without nodes: {ex.Message}");
+            // Fallback to normal serialization
+            return JsonConvert.SerializeObject(value);
+        }
+    }
+
+    /// <summary>
+    /// Get the database connection for advanced operations
+    /// </summary>
+    /// <returns>SQLite connection or null if not initialized</returns>
+    public SqliteConnection? GetConnection()
+    {
+        return _connection;
+    }
+
     public bool Initialize(string? instanceId = null)
     {
         try
@@ -103,17 +188,22 @@ public class SQLiteSettingStorage : ISettingStorage
 
             // Check schema version
             var currentVersion = _schemaManager.GetSchemaVersion(_connection);
+            var targetVersion = 5; // CurrentSchemaVersion
             
             if (currentVersion == 0)
             {
                 // Create initial schema
                 _schemaManager.CreateSchema(_connection);
             }
-            else if (currentVersion < 1) // CurrentSchemaVersion
+            else if (currentVersion < targetVersion)
             {
                 // Upgrade schema
                 _schemaManager.UpgradeSchema(_connection, currentVersion);
             }
+
+            // Always check for plugin config files to migrate (similar to VPetLLM.json handling)
+            // This ensures that if JSON files exist, they will be migrated/updated in database
+            _schemaManager.MigratePluginConfigFiles(_connection);
 
             return true;
         }
@@ -241,7 +331,11 @@ public class SQLiteSettingStorage : ISettingStorage
 
         try
         {
-            using var cmd = _connection!.CreateCommand();
+            if (_connection == null)
+                return 0;
+
+            var connection = _connection; // 使用局部变量避免可空类型问题
+            using var cmd = connection.CreateCommand();
             cmd.CommandText = $"SELECT key, value, type FROM `{tableName}`";
 
             using var reader = cmd.ExecuteReader();
@@ -318,7 +412,11 @@ public class SQLiteSettingStorage : ISettingStorage
     {
         try
         {
-            using var cmd = _connection!.CreateCommand();
+            if (_connection == null)
+                return;
+
+            var connection = _connection; // 使用局部变量避免可空类型问题
+            using var cmd = connection.CreateCommand();
             cmd.CommandText = $@"
                 CREATE TABLE IF NOT EXISTS `{tableName}` (
                     key TEXT PRIMARY KEY,
@@ -403,7 +501,8 @@ public class SQLiteSettingStorage : ISettingStorage
                 var instanceTableName = GetInstanceTableName();
                 EnsureInstanceTableExists(instanceTableName);
 
-                using var transaction = _connection.BeginTransaction();
+                var connection = _connection; // 使用局部变量避免可空类型问题
+                using var transaction = connection.BeginTransaction();
                 try
                 {
                     var properties = typeof(T).GetProperties();
@@ -436,13 +535,28 @@ public class SQLiteSettingStorage : ISettingStorage
                         else
                         {
                             // Complex type - serialize to JSON
-                            serializedValue = JsonConvert.SerializeObject(value);
+                            // For OpenAI and Gemini settings, exclude node lists (managed in provider_nodes table)
+                            // For Tools, exclude the list (managed in plugin_data table)
+                            if (key == "OpenAI" || key == "Gemini")
+                            {
+                                serializedValue = SerializeProviderSettingWithoutNodes(value, key);
+                            }
+                            else if (key == "Tools")
+                            {
+                                // Skip Tools list - managed in plugin_data table
+                                Logger.Log("Excluded Tools list from settings table (managed in plugin_data)");
+                                continue;
+                            }
+                            else
+                            {
+                                serializedValue = JsonConvert.SerializeObject(value);
+                            }
                         }
 
                         // Determine which table to save to
                         var tableName = IsInstanceSpecificSetting(key) ? instanceTableName : "settings";
 
-                        using var cmd = _connection.CreateCommand();
+                        using var cmd = connection.CreateCommand();
                         cmd.CommandText = $@"
                             INSERT OR REPLACE INTO `{tableName}` (key, value, type, updated_at)
                             VALUES (@key, @value, @type, CURRENT_TIMESTAMP)
@@ -533,8 +647,9 @@ public class SQLiteSettingStorage : ISettingStorage
                     return;
                 }
 
+                var connection = _connection; // 使用局部变量避免可空类型问题
                 Logger.Log("Running VACUUM operation to optimize database...");
-                using var cmd = _connection.CreateCommand();
+                using var cmd = connection.CreateCommand();
                 cmd.CommandText = "VACUUM;";
                 cmd.ExecuteNonQuery();
                 Logger.Log("VACUUM operation completed successfully");

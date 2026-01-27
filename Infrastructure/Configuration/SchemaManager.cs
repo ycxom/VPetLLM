@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Newtonsoft.Json.Linq;
 
 namespace VPetLLM.Infrastructure.Configuration;
 
@@ -7,7 +8,7 @@ namespace VPetLLM.Infrastructure.Configuration;
 /// </summary>
 public class SchemaManager
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 5;
 
     /// <summary>
     /// Create the initial database schema
@@ -83,6 +84,42 @@ public class SchemaManager
             {
                 cmd.CommandText = @"
                     CREATE INDEX IF NOT EXISTS idx_provider_type ON provider_nodes(provider_type);
+                ";
+                cmd.ExecuteNonQuery();
+            }
+
+            // Create plugin_data table
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS plugin_data (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        config_data TEXT NOT NULL,
+                        enabled INTEGER DEFAULT 1,
+                        display_order INTEGER DEFAULT 0,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    );
+                ";
+                cmd.ExecuteNonQuery();
+            }
+
+            // Create index on plugin type
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    CREATE INDEX IF NOT EXISTS idx_plugin_type ON plugin_data(type);
+                ";
+                cmd.ExecuteNonQuery();
+            }
+
+            // Create index on plugin display_order
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    CREATE INDEX IF NOT EXISTS idx_plugin_order ON plugin_data(display_order);
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -207,6 +244,18 @@ public class SchemaManager
                 ApplyMigrationV2(connection);
                 break;
             
+            case 3:
+                ApplyMigrationV3(connection);
+                break;
+            
+            case 4:
+                ApplyMigrationV4(connection);
+                break;
+            
+            case 5:
+                ApplyMigrationV5(connection);
+                break;
+            
             default:
                 throw new StorageException($"Unknown migration version: {toVersion}");
         }
@@ -281,5 +330,335 @@ public class SchemaManager
         }
 
         Logger.Log("Migration to version 2 completed");
+    }
+
+    /// <summary>
+    /// Apply migration to version 3: Migrate provider nodes to provider_nodes table
+    /// </summary>
+    private void ApplyMigrationV3(SqliteConnection connection)
+    {
+        Logger.Log("Applying migration to version 3: Migrating provider nodes to provider_nodes table");
+
+        try
+        {
+            // 1. Read OpenAI nodes from settings table
+            MigrateProviderNodes(connection, "OpenAI");
+
+            // 2. Read Gemini nodes from settings table
+            MigrateProviderNodes(connection, "Gemini");
+
+            Logger.Log("Migration to version 3 completed");
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Warning: Migration to version 3 encountered errors: {ex.Message}");
+            // Continue anyway - this is not critical
+        }
+    }
+
+    /// <summary>
+    /// Migrate provider nodes from settings table to provider_nodes table
+    /// </summary>
+    private void MigrateProviderNodes(SqliteConnection connection, string providerType)
+    {
+        try
+        {
+            // Read the provider setting from settings table
+            using var readCmd = connection.CreateCommand();
+            readCmd.CommandText = "SELECT value FROM settings WHERE key = @key";
+            readCmd.Parameters.AddWithValue("@key", providerType);
+
+            var settingJson = readCmd.ExecuteScalar() as string;
+            if (string.IsNullOrWhiteSpace(settingJson))
+            {
+                Logger.Log($"No {providerType} settings found to migrate");
+                return;
+            }
+
+            // Parse the setting JSON
+            var setting = JObject.Parse(settingJson);
+            
+            // Determine the nodes array key based on provider type
+            string nodesKey = providerType switch
+            {
+                "OpenAI" => "OpenAINodes",
+                "Gemini" => "GeminiNodes",
+                _ => $"{providerType}Nodes"
+            };
+
+            var nodesArray = setting[nodesKey] as JArray;
+            if (nodesArray == null || nodesArray.Count == 0)
+            {
+                Logger.Log($"No {providerType} nodes found to migrate");
+                return;
+            }
+
+            // Migrate each node to provider_nodes table
+            var nodeService = new ProviderNodeService(connection);
+            var migratedCount = 0;
+
+            foreach (var nodeToken in nodesArray)
+            {
+                try
+                {
+                    var nodeJson = nodeToken.ToString();
+                    var nodeId = nodeService.AddNode(providerType, nodeJson, enabled: true);
+                    
+                    if (nodeId > 0)
+                    {
+                        migratedCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to migrate a {providerType} node: {ex.Message}");
+                }
+            }
+
+            Logger.Log($"Migrated {migratedCount} {providerType} nodes to provider_nodes table");
+
+            // Note: We keep the nodes in settings table for backward compatibility
+            // They will be ignored when loading if provider_nodes table has data
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Failed to migrate {providerType} nodes: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Apply migration to version 4: Migrate plugin/tool data to plugin_data table
+    /// </summary>
+    private void ApplyMigrationV4(SqliteConnection connection)
+    {
+        Logger.Log("Applying migration to version 4: Migrating plugin/tool data to plugin_data table");
+
+        try
+        {
+            // Read Tools list from settings table
+            MigratePluginData(connection);
+
+            Logger.Log("Migration to version 4 completed");
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Warning: Migration to version 4 encountered errors: {ex.Message}");
+            // Continue anyway - this is not critical
+        }
+    }
+
+    /// <summary>
+    /// Migrate plugin/tool data from settings table to plugin_data table
+    /// </summary>
+    private void MigratePluginData(SqliteConnection connection)
+    {
+        try
+        {
+            // Read the Tools setting from settings table
+            using var readCmd = connection.CreateCommand();
+            readCmd.CommandText = "SELECT value FROM settings WHERE key = @key";
+            readCmd.Parameters.AddWithValue("@key", "Tools");
+
+            var toolsJson = readCmd.ExecuteScalar() as string;
+            if (string.IsNullOrWhiteSpace(toolsJson))
+            {
+                Logger.Log("No Tools settings found to migrate");
+                return;
+            }
+
+            // Parse the tools JSON array
+            var toolsArray = JArray.Parse(toolsJson);
+            if (toolsArray.Count == 0)
+            {
+                Logger.Log("No tools found to migrate");
+                return;
+            }
+
+            // Migrate each tool to plugin_data table
+            var pluginService = new PluginDataService(connection);
+            var migratedCount = 0;
+
+            for (int i = 0; i < toolsArray.Count; i++)
+            {
+                try
+                {
+                    var toolToken = toolsArray[i];
+                    var toolName = toolToken["Name"]?.ToString() ?? $"Tool{i + 1}";
+                    var isEnabled = toolToken["IsEnabled"]?.ToObject<bool>() ?? true;
+                    var toolJson = toolToken.ToString();
+                    
+                    var pluginId = pluginService.AddPlugin(
+                        name: toolName,
+                        type: "Tool",
+                        configData: toolJson,
+                        enabled: isEnabled,
+                        displayOrder: i
+                    );
+                    
+                    if (pluginId > 0)
+                    {
+                        migratedCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to migrate a tool: {ex.Message}");
+                }
+            }
+
+            Logger.Log($"Migrated {migratedCount} tools to plugin_data table");
+
+            // Note: We keep the tools in settings table for backward compatibility
+            // They will be ignored when loading if plugin_data table has data
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Failed to migrate plugin data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Apply migration to version 5: Migrate plugin configuration files to plugin_data table
+    /// </summary>
+    private void ApplyMigrationV5(SqliteConnection connection)
+    {
+        Logger.Log("Applying migration to version 5: Migrating plugin configuration files to plugin_data table");
+        MigratePluginConfigFiles(connection);
+    }
+
+    /// <summary>
+    /// Migrate plugin configuration files to plugin_data table
+    /// This method can be called independently to check for new plugin config files
+    /// </summary>
+    public void MigratePluginConfigFiles(SqliteConnection connection)
+    {        try
+        {
+            // Get plugin data directory path
+            var pluginDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                "VPetLLM",
+                "Plugin",
+                "PluginData"
+            );
+
+            if (!Directory.Exists(pluginDataPath))
+            {
+                Logger.Log($"Plugin data directory not found: {pluginDataPath}");
+                return;
+            }
+
+            var pluginService = new PluginDataService(connection);
+            var migratedCount = 0;
+
+            // Scan each plugin subdirectory
+            var pluginDirs = Directory.GetDirectories(pluginDataPath);
+            Logger.Log($"Found {pluginDirs.Length} plugin directories to scan");
+
+            foreach (var pluginDir in pluginDirs)
+            {
+                try
+                {
+                    var pluginName = Path.GetFileName(pluginDir);
+                    
+                    // Try to find the plugin configuration file
+                    // Common patterns: {PluginName}.json, {PluginName}Plugin.json, {PluginName}Settings.json
+                    var possibleFiles = new[]
+                    {
+                        Path.Combine(pluginDir, $"{pluginName}.json"),
+                        Path.Combine(pluginDir, $"{pluginName}Plugin.json"),
+                        Path.Combine(pluginDir, $"{pluginName}Settings.json")
+                    };
+
+                    string configFile = null;
+                    foreach (var file in possibleFiles)
+                    {
+                        if (File.Exists(file))
+                        {
+                            configFile = file;
+                            break;
+                        }
+                    }
+
+                    // If no match found, try to find any .json file (excluding .cache.json)
+                    if (configFile == null)
+                    {
+                        var jsonFiles = Directory.GetFiles(pluginDir, "*.json")
+                            .Where(f => !f.EndsWith(".cache.json", StringComparison.OrdinalIgnoreCase))
+                            .ToArray();
+                        
+                        if (jsonFiles.Length > 0)
+                        {
+                            configFile = jsonFiles[0];
+                        }
+                    }
+
+                    if (configFile == null)
+                    {
+                        Logger.Log($"No configuration file found for plugin: {pluginName}");
+                        continue;
+                    }
+
+                    // Read the configuration file
+                    var configJson = File.ReadAllText(configFile);
+                    if (string.IsNullOrWhiteSpace(configJson))
+                    {
+                        Logger.Log($"Empty configuration file for plugin: {pluginName}");
+                        continue;
+                    }
+
+                    // Check if plugin config already exists in database
+                    var existingPlugin = pluginService.GetPluginByName(pluginName, "Plugin");
+                    int pluginId;
+                    
+                    if (existingPlugin != null)
+                    {
+                        // Update existing plugin config
+                        pluginService.UpdatePlugin(existingPlugin.Id, configJson);
+                        pluginId = existingPlugin.Id;
+                        Logger.Log($"Updated plugin config: {pluginName} from {Path.GetFileName(configFile)}");
+                    }
+                    else
+                    {
+                        // Insert new plugin config
+                        pluginId = pluginService.AddPlugin(
+                            name: pluginName,
+                            type: "Plugin",
+                            configData: configJson,
+                            enabled: true,
+                            displayOrder: migratedCount
+                        );
+                        Logger.Log($"Migrated plugin config: {pluginName} from {Path.GetFileName(configFile)}");
+                    }
+
+                    if (pluginId > 0)
+                    {
+                        migratedCount++;
+                        
+                        // Delete the JSON file after successful migration
+                        try
+                        {
+                            File.Delete(configFile);
+                            Logger.Log($"Deleted migrated config file: {Path.GetFileName(configFile)}");
+                        }
+                        catch (Exception deleteEx)
+                        {
+                            Logger.Log($"Warning: Failed to delete config file {Path.GetFileName(configFile)}: {deleteEx.Message}");
+                            // Continue anyway - file deletion is not critical
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to migrate plugin config from {Path.GetFileName(pluginDir)}: {ex.Message}");
+                }
+            }
+
+            Logger.Log($"Migration to version 5 completed: Migrated {migratedCount} plugin configurations");
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Warning: Migration to version 5 encountered errors: {ex.Message}");
+            // Continue anyway - this is not critical
+        }
     }
 }

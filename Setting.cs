@@ -1,5 +1,6 @@
 using VPetLLM.Handlers.State;
 using VPetLLM.Infrastructure.Configuration;
+using Microsoft.Data.Sqlite;
 
 namespace VPetLLM
 {
@@ -123,6 +124,13 @@ namespace VPetLLM
                                 _storage.Save(this);
                                 Logger.Log("Successfully saved settings to SQLite");
                                 
+                                // Save provider nodes and plugin data
+                                if (_storage is SQLiteSettingStorage sqliteStorage)
+                                {
+                                    SaveProviderNodes(sqliteStorage);
+                                    Logger.Log("Successfully saved provider nodes and plugin data");
+                                }
+                                
                                 // Create backup of JSON file
                                 var backupPath = jsonPath + ".backup";
                                 File.Copy(jsonPath, backupPath, overwrite: true);
@@ -231,6 +239,9 @@ namespace VPetLLM
                     {
                         JsonConvert.PopulateObject(json, this);
                         Logger.Log("Settings loaded successfully from SQLite storage");
+                        
+                        // Load provider nodes from provider_nodes table
+                        LoadProviderNodes(sqliteStorage);
                     }
                     else
                     {
@@ -253,6 +264,137 @@ namespace VPetLLM
                 Logger.Log($"Failed to load settings: {ex.Message}");
                 Logger.Log($"Stack trace: {ex.StackTrace}");
                 // Continue with default values
+            }
+        }
+
+        /// <summary>
+        /// Load provider nodes from provider_nodes table
+        /// </summary>
+        private void LoadProviderNodes(SQLiteSettingStorage sqliteStorage)
+        {
+            try
+            {
+                var connection = sqliteStorage.GetConnection();
+                if (connection == null)
+                {
+                    Logger.Log("Cannot load provider nodes: database connection is null");
+                    return;
+                }
+
+                var nodeService = new ProviderNodeService(connection);
+
+                // Load OpenAI nodes
+                var openAINodeConfigs = nodeService.GetNodeConfigs<OpenAINodeSetting>("OpenAI", enabledOnly: false);
+                if (openAINodeConfigs.Count > 0)
+                {
+                    OpenAI.OpenAINodes = openAINodeConfigs;
+                    Logger.Log($"Loaded {openAINodeConfigs.Count} OpenAI nodes from provider_nodes table");
+                }
+                else
+                {
+                    Logger.Log("No OpenAI nodes found in provider_nodes table, using nodes from settings");
+                }
+
+                // Load Gemini nodes
+                var geminiNodeConfigs = nodeService.GetNodeConfigs<GeminiNodeSetting>("Gemini", enabledOnly: false);
+                if (geminiNodeConfigs.Count > 0)
+                {
+                    Gemini.GeminiNodes = geminiNodeConfigs;
+                    Logger.Log($"Loaded {geminiNodeConfigs.Count} Gemini nodes from provider_nodes table");
+                }
+                else
+                {
+                    Logger.Log("No Gemini nodes found in provider_nodes table, using nodes from settings");
+                }
+
+                // Load plugin/tool data
+                LoadPluginData(connection);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to load provider nodes: {ex.Message}");
+                Logger.Log($"Stack trace: {ex.StackTrace}");
+                // Continue with nodes from settings table (backward compatibility)
+            }
+        }
+
+        /// <summary>
+        /// Load plugin/tool data from plugin_data table
+        /// </summary>
+        private void LoadPluginData(SqliteConnection connection)
+        {
+            try
+            {
+                var pluginService = new PluginDataService(connection);
+
+                // Load tools
+                var toolConfigs = pluginService.GetPluginConfigs<ToolSetting>("Tool", enabledOnly: false);
+                if (toolConfigs.Count > 0)
+                {
+                    Tools = toolConfigs;
+                    Logger.Log($"Loaded {toolConfigs.Count} tools from plugin_data table");
+                }
+                else
+                {
+                    Logger.Log("No tools found in plugin_data table, attempting recovery...");
+                    
+                    // Try to recover from JSON backup file
+                    var jsonBackupPath = Path.Combine(_path, "..", "VPetLLM.json.backup");
+                    if (File.Exists(jsonBackupPath))
+                    {
+                        Logger.Log($"Found JSON backup at {jsonBackupPath}, attempting to recover Tools data...");
+                        
+                        try
+                        {
+                            var jsonBackup = File.ReadAllText(jsonBackupPath);
+                            var backupSettings = JsonConvert.DeserializeObject<Setting>(jsonBackup);
+                            
+                            if (backupSettings?.Tools != null && backupSettings.Tools.Count > 0)
+                            {
+                                Logger.Log($"Found {backupSettings.Tools.Count} tools in JSON backup, migrating to plugin_data table...");
+                                
+                                for (int i = 0; i < backupSettings.Tools.Count; i++)
+                                {
+                                    var tool = backupSettings.Tools[i];
+                                    var pluginId = pluginService.AddPlugin(
+                                        name: tool.Name,
+                                        type: "Tool",
+                                        config: tool,
+                                        enabled: tool.IsEnabled,
+                                        displayOrder: i
+                                    );
+                                    
+                                    if (pluginId > 0)
+                                    {
+                                        Logger.Log($"Recovered tool '{tool.Name}' to plugin_data table (ID: {pluginId})");
+                                    }
+                                }
+                                
+                                // Reload tools from plugin_data table
+                                Tools = pluginService.GetPluginConfigs<ToolSetting>("Tool", enabledOnly: false);
+                                Logger.Log($"Successfully recovered {Tools.Count} tools from JSON backup");
+                            }
+                            else
+                            {
+                                Logger.Log("No tools found in JSON backup");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Failed to recover tools from JSON backup: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log($"JSON backup not found at {jsonBackupPath}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to load plugin data: {ex.Message}");
+                Logger.Log($"Stack trace: {ex.StackTrace}");
+                // Continue with tools from settings table (backward compatibility)
             }
         }
 
@@ -454,6 +596,12 @@ namespace VPetLLM
                 {
                     _storage.Save(this);
                     Logger.Log("Settings saved successfully to storage");
+                    
+                    // Save provider nodes to provider_nodes table
+                    if (_storage is SQLiteSettingStorage sqliteStorage)
+                    {
+                        SaveProviderNodes(sqliteStorage);
+                    }
                 }
                 else
                 {
@@ -467,6 +615,146 @@ namespace VPetLLM
             {
                 Logger.Log($"Failed to save settings: {ex.Message}");
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Save provider nodes to provider_nodes table
+        /// </summary>
+        private void SaveProviderNodes(SQLiteSettingStorage sqliteStorage)
+        {
+            try
+            {
+                var connection = sqliteStorage.GetConnection();
+                if (connection == null)
+                {
+                    Logger.Log("Cannot save provider nodes: database connection is null");
+                    return;
+                }
+
+                var nodeService = new ProviderNodeService(connection);
+
+                // Save OpenAI nodes
+                if (OpenAI?.OpenAINodes != null && OpenAI.OpenAINodes.Count > 0)
+                {
+                    // Get existing nodes
+                    var existingNodes = nodeService.GetNodes("OpenAI", enabledOnly: false);
+                    
+                    // Update or add nodes
+                    for (int i = 0; i < OpenAI.OpenAINodes.Count; i++)
+                    {
+                        var node = OpenAI.OpenAINodes[i];
+                        
+                        if (i < existingNodes.Count)
+                        {
+                            // Update existing node
+                            nodeService.UpdateNode(existingNodes[i].Id, node);
+                        }
+                        else
+                        {
+                            // Add new node
+                            nodeService.AddNode("OpenAI", node, node.Enabled);
+                        }
+                    }
+                    
+                    // Delete extra nodes if list was shortened
+                    for (int i = OpenAI.OpenAINodes.Count; i < existingNodes.Count; i++)
+                    {
+                        nodeService.DeleteNode(existingNodes[i].Id);
+                    }
+                    
+                    Logger.Log($"Saved {OpenAI.OpenAINodes.Count} OpenAI nodes to provider_nodes table");
+                }
+
+                // Save Gemini nodes
+                if (Gemini?.GeminiNodes != null && Gemini.GeminiNodes.Count > 0)
+                {
+                    // Get existing nodes
+                    var existingNodes = nodeService.GetNodes("Gemini", enabledOnly: false);
+                    
+                    // Update or add nodes
+                    for (int i = 0; i < Gemini.GeminiNodes.Count; i++)
+                    {
+                        var node = Gemini.GeminiNodes[i];
+                        
+                        if (i < existingNodes.Count)
+                        {
+                            // Update existing node
+                            nodeService.UpdateNode(existingNodes[i].Id, node);
+                        }
+                        else
+                        {
+                            // Add new node
+                            nodeService.AddNode("Gemini", node, node.Enabled);
+                        }
+                    }
+                    
+                    // Delete extra nodes if list was shortened
+                    for (int i = Gemini.GeminiNodes.Count; i < existingNodes.Count; i++)
+                    {
+                        nodeService.DeleteNode(existingNodes[i].Id);
+                    }
+                    
+                    Logger.Log($"Saved {Gemini.GeminiNodes.Count} Gemini nodes to provider_nodes table");
+                }
+
+                // Save plugin/tool data
+                SavePluginData(connection);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to save provider nodes: {ex.Message}");
+                Logger.Log($"Stack trace: {ex.StackTrace}");
+                // Continue anyway - nodes will remain in settings table for backward compatibility
+            }
+        }
+
+        /// <summary>
+        /// Save plugin/tool data to plugin_data table
+        /// </summary>
+        private void SavePluginData(SqliteConnection connection)
+        {
+            try
+            {
+                var pluginService = new PluginDataService(connection);
+
+                // Save tools
+                if (Tools != null && Tools.Count > 0)
+                {
+                    // Get existing plugins
+                    var existingPlugins = pluginService.GetPlugins("Tool", enabledOnly: false);
+                    
+                    // Update or add tools
+                    for (int i = 0; i < Tools.Count; i++)
+                    {
+                        var tool = Tools[i];
+                        
+                        if (i < existingPlugins.Count)
+                        {
+                            // Update existing tool
+                            pluginService.UpdatePlugin(existingPlugins[i].Id, tool);
+                        }
+                        else
+                        {
+                            // Add new tool
+                            pluginService.AddPlugin(tool.Name, "Tool", tool, tool.IsEnabled, i);
+                        }
+                    }
+                    
+                    // Delete extra tools if list was shortened
+                    for (int i = Tools.Count; i < existingPlugins.Count; i++)
+                    {
+                        pluginService.DeletePlugin(existingPlugins[i].Id);
+                    }
+                    
+                    Logger.Log($"Saved {Tools.Count} tools to plugin_data table");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to save plugin data: {ex.Message}");
+                Logger.Log($"Stack trace: {ex.StackTrace}");
+                // Continue anyway - tools will remain in settings table for backward compatibility
             }
         }
 
