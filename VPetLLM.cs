@@ -169,8 +169,10 @@ namespace VPetLLM
             // 初始化日志
             Logger.Log("VPetLLM plugin constructor started (refactored version).");
 
-            // 加载设置
-            Settings = new Setting(ExtensionValue.BaseDirectory);
+            // 加载设置 - 传递 PrefixSave 作为 instanceId
+            var instanceId = mainwin?.PrefixSave ?? "";
+            Logger.Log($"Initializing settings with instanceId: '{instanceId}'");
+            Settings = new Setting(ExtensionValue.BaseDirectory, instanceId);
             Logger.Log("Settings loaded.");
 
             // 初始化语言和提示词
@@ -1636,7 +1638,8 @@ namespace VPetLLM
         /// </summary>
         public void ResetSettings()
         {
-            Settings = new Setting(ExtensionValue.BaseDirectory);
+            var instanceId = MW?.PrefixSave ?? "";
+            Settings = new Setting(ExtensionValue.BaseDirectory, instanceId);
             Settings.Save();
         }
 

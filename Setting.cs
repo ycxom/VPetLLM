@@ -1,4 +1,5 @@
 using VPetLLM.Handlers.State;
+using VPetLLM.Infrastructure.Configuration;
 
 namespace VPetLLM
 {
@@ -56,42 +57,231 @@ namespace VPetLLM
         public MediaPlaybackSetting MediaPlayback { get; set; } = new MediaPlaybackSetting();
         public Configuration.FloatingSidebarSettings FloatingSidebar { get; set; } = new Configuration.FloatingSidebarSettings();
         public Configuration.ScreenshotSettings Screenshot { get; set; } = new Configuration.ScreenshotSettings();
+        
         private readonly string _path;
+        private static ISettingStorage? _storage;
+        private readonly string? _instanceId;
 
-        public Setting(string path)
+        public Setting(string path, string? instanceId = null)
         {
             _path = Path.Combine(path, "VPetLLM.json");
-            if (File.Exists(_path))
+            _instanceId = instanceId;
+            
+            // Initialize storage system
+            InitializeStorage(path, instanceId);
+            
+            // Load settings from storage
+            LoadSettings();
+            
+            // Ensure all properties have default values (legacy compatibility)
+            EnsureDefaultValues();
+        }
+
+        private void InitializeStorage(string path, string? instanceId)
+        {
+            try
             {
+                // Check if JSON file exists for migration
+                var jsonPath = Path.Combine(path, "VPetLLM.json");
+                var needsMigration = File.Exists(jsonPath);
+
+                // Try SQLite first
+                _storage = new SQLiteSettingStorage(path, instanceId);
+                if (_storage.Initialize(instanceId))
+                {
+                    Logger.Log($"SQLite storage initialized successfully: {_storage.GetStorageLocation()}");
+                    
+                    // If JSON file exists, perform migration
+                    if (needsMigration)
+                    {
+                        Logger.Log($"JSON file found at {jsonPath}, starting migration...");
+                        
+                        try
+                        {
+                            // Load JSON using the original method (JsonConvert.PopulateObject)
+                            var json = File.ReadAllText(jsonPath);
+                            if (!string.IsNullOrWhiteSpace(json))
+                            {
+                                Logger.Log($"Read {json.Length} characters from JSON file");
+                                
+                                // Populate this instance with JSON data
+                                JsonConvert.PopulateObject(json, this);
+                                Logger.Log("Successfully loaded settings from JSON");
+                                
+                                // 迁移时去重 EnabledButtons 列表，修复重复添加的问题
+                                if (FloatingSidebar?.EnabledButtons != null && FloatingSidebar.EnabledButtons.Count > 0)
+                                {
+                                    var uniqueButtons = FloatingSidebar.EnabledButtons.Distinct().ToList();
+                                    if (uniqueButtons.Count != FloatingSidebar.EnabledButtons.Count)
+                                    {
+                                        Logger.Log($"Migration: Deduplicating FloatingSidebar.EnabledButtons: {FloatingSidebar.EnabledButtons.Count} -> {uniqueButtons.Count}");
+                                        FloatingSidebar.EnabledButtons = uniqueButtons;
+                                    }
+                                }
+                                
+                                // Save to SQLite
+                                _storage.Save(this);
+                                Logger.Log("Successfully saved settings to SQLite");
+                                
+                                // Create backup of JSON file
+                                var backupPath = jsonPath + ".backup";
+                                File.Copy(jsonPath, backupPath, overwrite: true);
+                                Logger.Log($"Created backup: {backupPath}");
+                                
+                                // Delete original JSON file to mark migration as complete
+                                File.Delete(jsonPath);
+                                Logger.Log($"Deleted original JSON file: {jsonPath}");
+                                Logger.Log("Migration completed successfully!");
+                            }
+                            else
+                            {
+                                Logger.Log("JSON file is empty, skipping migration");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Migration failed: {ex.Message}");
+                            Logger.Log($"Stack trace: {ex.StackTrace}");
+                            Logger.Log("Will continue using SQLite with default values");
+                        }
+                    }
+                    
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SQLite initialization failed: {ex.Message}, falling back to JSON");
+            }
+
+            // Fallback to JSON
+            Logger.Log("Using JSON storage as fallback");
+            _storage = new JSONSettingStorage(_path);
+            _storage.Initialize(instanceId);
+        }
+
+        private bool ShouldMigrate(ISettingStorage jsonStorage, ISettingStorage sqliteStorage)
+        {
+            try
+            {
+                Logger.Log("Checking if migration is needed...");
+                
+                // Check if JSON file exists
+                var jsonPath = jsonStorage.GetStorageLocation();
+                Logger.Log($"JSON path: {jsonPath}");
+                
+                if (!File.Exists(jsonPath))
+                {
+                    Logger.Log("JSON file does not exist, no migration needed");
+                    return false;
+                }
+
+                // Check if JSON file has content
+                var jsonContent = File.ReadAllText(jsonPath);
+                if (string.IsNullOrWhiteSpace(jsonContent))
+                {
+                    Logger.Log("JSON file is empty, no migration needed");
+                    return false;
+                }
+                
+                Logger.Log($"JSON file exists with {jsonContent.Length} characters");
+
+                // Check if SQLite database already has data
                 try
                 {
-                    var json = File.ReadAllText(_path);
-                    // 检查JSON内容是否为空或只包含空白字符
-                    if (!string.IsNullOrWhiteSpace(json))
+                    var existingSettings = sqliteStorage.Load<Setting>();
+                    if (existingSettings != null)
                     {
-                        JsonConvert.PopulateObject(json, this);
+                        Logger.Log("SQLite database already has data, no migration needed");
+                        return false;
                     }
-                    else
-                    {
-                        Logger.Log($"Settings file {_path} is empty, using default settings.");
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    // JSON解析失败时记录错误，但已经加载的部分配置会保留
-                    // 缺失的字段会在后面的初始化代码中补全为默认值
-                    Logger.Log($"Warning: Failed to fully parse settings from {_path}: {ex.Message}");
-                    Logger.Log("Partially loaded settings will be used, missing values will use defaults.");
                 }
                 catch (Exception ex)
                 {
-                    // 其他错误也记录但不中断加载
-                    Logger.Log($"Warning: Error reading settings file {_path}: {ex.Message}");
-                    Logger.Log("Using default settings for all values.");
+                    Logger.Log($"Failed to check SQLite database: {ex.Message}");
+                    // If we can't check, assume we need to migrate
+                }
+
+                Logger.Log("Migration needed: JSON file exists but SQLite database is empty");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error checking migration status: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                if (_storage == null)
+                {
+                    Logger.Log("Storage not initialized, using default settings");
+                    return;
+                }
+
+                // For SQLite storage, we need to get the JSON string and use PopulateObject
+                // to avoid calling the constructor
+                if (_storage is SQLiteSettingStorage sqliteStorage)
+                {
+                    var json = sqliteStorage.LoadAsJson();
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        JsonConvert.PopulateObject(json, this);
+                        Logger.Log("Settings loaded successfully from SQLite storage");
+                    }
+                    else
+                    {
+                        Logger.Log("No settings found in SQLite, using defaults");
+                    }
+                }
+                else
+                {
+                    // For JSON storage, use the normal Load method
+                    var loadedSettings = _storage.Load<Setting>();
+                    if (loadedSettings != null)
+                    {
+                        CopyPropertiesFrom(loadedSettings);
+                        Logger.Log("Settings loaded successfully from JSON storage");
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to load settings: {ex.Message}");
+                Logger.Log($"Stack trace: {ex.StackTrace}");
+                // Continue with default values
+            }
+        }
 
-            // 确保所有属性都有默认值
+        private void CopyPropertiesFrom(Setting source)
+        {
+            // Copy all public properties from source to this instance
+            var properties = typeof(Setting).GetProperties();
+            foreach (var property in properties)
+            {
+                if (property.CanRead && property.CanWrite && property.Name != "_path" && property.Name != "_storage" && property.Name != "_instanceId")
+                {
+                    try
+                    {
+                        var value = property.GetValue(source);
+                        if (value != null)
+                        {
+                            property.SetValue(this, value);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Failed to copy property {property.Name}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        private void EnsureDefaultValues()
+        {
             if (Ollama is null)
             {
                 Ollama = new OllamaSetting();
@@ -258,8 +448,26 @@ namespace VPetLLM
 
         public void Save()
         {
-            var json = JsonConvert.SerializeObject(this, Formatting.Indented);
-            File.WriteAllText(_path, json);
+            try
+            {
+                if (_storage != null)
+                {
+                    _storage.Save(this);
+                    Logger.Log("Settings saved successfully to storage");
+                }
+                else
+                {
+                    // Fallback to old JSON method
+                    var json = JsonConvert.SerializeObject(this, Formatting.Indented);
+                    File.WriteAllText(_path, json);
+                    Logger.Log("Settings saved to JSON (fallback)");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to save settings: {ex.Message}");
+                throw;
+            }
         }
 
         public class OllamaSetting
