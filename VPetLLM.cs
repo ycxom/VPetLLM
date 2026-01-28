@@ -169,6 +169,21 @@ namespace VPetLLM
             // 初始化日志
             Logger.Log("VPetLLM plugin constructor started (refactored version).");
 
+            // **优先初始化 SQLite，避免后续数据库操作失败**
+            Logger.Log("Initializing SQLite native library...");
+            if (!SQLiteHelper.Initialize())
+            {
+                Logger.Log($"WARNING: SQLite initialization failed: {SQLiteHelper.GetErrorMessage()}");
+                Logger.Log("Database features may not work properly. Please check:");
+                Logger.Log("1. Visual C++ Redistributable is installed");
+                Logger.Log("2. e_sqlite3.dll exists in runtimes folder");
+                Logger.Log("3. System architecture matches (x64/x86)");
+            }
+            else
+            {
+                Logger.Log("SQLite native library initialized successfully");
+            }
+
             // 加载设置 - 传递 PrefixSave 作为 instanceId
             var instanceId = mainwin?.PrefixSave ?? "";
             Logger.Log($"Initializing settings with instanceId: '{instanceId}'");
@@ -334,6 +349,13 @@ namespace VPetLLM
         {
             try
             {
+                // 检查 SQLite 是否成功加载
+                if (!SQLiteHelper.IsLoaded())
+                {
+                    Logger.Log($"WARNING: Initializing ChatCore without SQLite support: {SQLiteHelper.GetErrorMessage()}");
+                    Logger.Log("Chat history and database features will be limited");
+                }
+
                 switch (Settings.Provider)
                 {
                     case SettingClass.LLMType.Ollama:
@@ -353,11 +375,39 @@ namespace VPetLLM
                         Logger.Log("Chat core set to Free.");
                         break;
                 }
-                _logger.LogInformation($"ChatCore initialized: {ChatCore?.GetType().Name}");
+                
+                if (ChatCore != null)
+                {
+                    _logger.LogInformation($"ChatCore initialized successfully: {ChatCore.GetType().Name}");
+                }
+                else
+                {
+                    Logger.Log("ERROR: ChatCore is null after initialization");
+                }
+            }
+            catch (TypeInitializationException ex)
+            {
+                Logger.Log($"CRITICAL: ChatCore initialization failed due to type initialization error");
+                Logger.Log($"  Error: {ex.Message}");
+                Logger.Log($"  Inner Exception: {ex.InnerException?.Message}");
+                
+                if (ex.InnerException?.Message?.Contains("e_sqlite3") == true)
+                {
+                    Logger.Log("  This is a SQLite loading error. Possible solutions:");
+                    Logger.Log("  1. Install Visual C++ Redistributable 2015-2022");
+                    Logger.Log("  2. Check if e_sqlite3.dll exists in runtimes folder");
+                    Logger.Log("  3. Verify system architecture (x64/x86) matches");
+                }
+                
+                _logger.LogError("Failed to initialize ChatCore", ex);
+                ChatCore = null;
             }
             catch (Exception ex)
             {
+                Logger.Log($"ERROR: Failed to initialize ChatCore: {ex.Message}");
+                Logger.Log($"  Stack trace: {ex.StackTrace}");
                 _logger.LogError("Failed to initialize ChatCore", ex);
+                ChatCore = null;
             }
         }
 
