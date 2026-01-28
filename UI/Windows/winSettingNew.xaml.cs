@@ -807,7 +807,25 @@ namespace VPetLLM.UI.Windows
             // 加载Free Chat配置的提供者信息
             LoadFreeProviderInfo();
 
-            ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+            // 安全地加载上下文长度，避免 ChatCore 为 null 时出现空引用异常
+            if (_plugin.ChatCore != null)
+            {
+                try
+                {
+                    ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Error loading context length: {ex.Message}");
+                    ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = "0";
+                }
+            }
+            else
+            {
+                ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = "0";
+                Logger.Log("ChatCore is null when loading settings, context length set to 0");
+            }
+            
             // 异步加载日志，避免日志过多时阻塞 UI
             LoadLogsAsync();
 
@@ -1628,12 +1646,50 @@ namespace VPetLLM.UI.Windows
         private void Button_ClearContext_Click(object sender, RoutedEventArgs e)
         {
             _plugin.ChatCore?.ClearContext();
-            ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+            if (_plugin.ChatCore != null)
+            {
+                try
+                {
+                    ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Error updating context length after clear: {ex.Message}");
+                    ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = "0";
+                }
+            }
+            else
+            {
+                ((TextBlock)this.FindName("TextBlock_CurrentContextLength")).Text = "0";
+            }
         }
         private void Button_EditContext_Click(object sender, RoutedEventArgs e)
         {
-            var contextEditor = new winContextEditor(_plugin);
-            contextEditor.Show();
+            if (_plugin.ChatCore == null)
+            {
+                MessageBox.Show(
+                    LanguageHelper.Get("Error.ChatCoreNotInitialized", _plugin.Settings.Language) ?? "Chat core is not initialized. Please restart the application.",
+                    LanguageHelper.Get("Error.Title", _plugin.Settings.Language) ?? "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                Logger.Log("Cannot open context editor: ChatCore is null");
+                return;
+            }
+
+            try
+            {
+                var contextEditor = new winContextEditor(_plugin);
+                contextEditor.Show();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error opening context editor: {ex.Message}");
+                MessageBox.Show(
+                    $"Failed to open context editor: {ex.Message}",
+                    LanguageHelper.Get("Error.Title", _plugin.Settings.Language) ?? "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         private void Button_ClearRecords_Click(object sender, RoutedEventArgs e)
@@ -2241,12 +2297,48 @@ namespace VPetLLM.UI.Windows
             // 消息数量阈值
             if (FindName("TextBlock_HistoryCompressionThreshold") is TextBlock textBlockHistoryCompressionThreshold) textBlockHistoryCompressionThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionThreshold", langCode);
             if (FindName("TextBlock_CurrentContextLengthLabel") is TextBlock textBlockCurrentContextLengthLabel) textBlockCurrentContextLengthLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentContextLength", langCode);
-            if (FindName("TextBlock_CurrentContextLength") is TextBlock textBlockCurrentContextLength) textBlockCurrentContextLength.Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+            if (FindName("TextBlock_CurrentContextLength") is TextBlock textBlockCurrentContextLength)
+            {
+                if (_plugin.ChatCore != null)
+                {
+                    try
+                    {
+                        textBlockCurrentContextLength.Text = _plugin.ChatCore.GetChatHistory().Count.ToString();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error getting chat history count: {ex.Message}");
+                        textBlockCurrentContextLength.Text = "0";
+                    }
+                }
+                else
+                {
+                    textBlockCurrentContextLength.Text = "0";
+                }
+            }
 
             // Token数量阈值
             if (FindName("TextBlock_HistoryCompressionTokenThreshold") is TextBlock textBlockHistoryCompressionTokenThreshold) textBlockHistoryCompressionTokenThreshold.Text = LanguageHelper.Get("Advanced_Options.HistoryCompressionTokenThreshold", langCode);
             if (FindName("TextBlock_CurrentTokenCountLabel") is TextBlock textBlockCurrentTokenCountLabel) textBlockCurrentTokenCountLabel.Text = LanguageHelper.Get("Advanced_Options.CurrentTokenCount", langCode);
-            if (FindName("TextBlock_CurrentTokenCount") is TextBlock textBlockCurrentTokenCount) textBlockCurrentTokenCount.Text = _plugin.ChatCore.GetCurrentTokenCount().ToString();
+            if (FindName("TextBlock_CurrentTokenCount") is TextBlock textBlockCurrentTokenCount)
+            {
+                if (_plugin.ChatCore != null)
+                {
+                    try
+                    {
+                        textBlockCurrentTokenCount.Text = _plugin.ChatCore.GetCurrentTokenCount().ToString();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error getting current token count: {ex.Message}");
+                        textBlockCurrentTokenCount.Text = "0";
+                    }
+                }
+                else
+                {
+                    textBlockCurrentTokenCount.Text = "0";
+                }
+            }
 
             // 记录器高级设置本地化
             if (FindName("TextBlock_RecordsAdvancedTitle") is TextBlock textBlockRecordsAdvancedTitle) textBlockRecordsAdvancedTitle.Text = LanguageHelper.Get("Advanced_Options.RecordsAdvancedTitle", langCode);

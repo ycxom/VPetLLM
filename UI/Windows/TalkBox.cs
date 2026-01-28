@@ -229,6 +229,16 @@ namespace VPetLLM.UI.Windows
                 }
 
                 Logger.Log("Calling ChatCore.Chat...");
+                if (_plugin.ChatCore == null)
+                {
+                    Logger.Log("ChatCore is null, cannot process chat");
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        DirectBubbleManager.ShowBubble(_plugin, "Chat core is not initialized. Please restart the application.");
+                    });
+                    return;
+                }
+                
                 await Task.Run(() => _plugin.ChatCore.Chat(text));
 
                 Logger.Log("Processing tools...");

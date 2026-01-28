@@ -117,6 +117,11 @@ namespace VPetLLM.UI.Windows
             InitializeComponent();
             _plugin = plugin;
 
+            if (_plugin.ChatCore == null)
+            {
+                throw new InvalidOperationException("ChatCore is not initialized");
+            }
+
             _originalHistory = _plugin.ChatCore.GetChatHistory();
 
             // 备份原始图像数据
@@ -136,21 +141,44 @@ namespace VPetLLM.UI.Windows
 
         private void Button_Save_Click(object sender, RoutedEventArgs e)
         {
-            var systemMessages = _originalHistory.Where(m => m.Role == "system").ToList();
-            var newHistory = new List<Message>(systemMessages);
-
-            foreach (var item in DisplayHistory)
+            if (_plugin.ChatCore == null)
             {
-                // 同步文本内容
-                item.OriginalMessage.Content = item.Content;
-                // 同步图像数据（支持删除操作）
-                item.OriginalMessage.ImageData = item.ImageData;
-                newHistory.Add(item.OriginalMessage);
+                MessageBox.Show(
+                    "Chat core is not initialized. Cannot save changes.",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                Logger.Log("Cannot save context: ChatCore is null");
+                return;
             }
 
-            _plugin.ChatCore.SetChatHistory(newHistory);
-            Logger.Log("上下文编辑器: 保存成功");
-            Close();
+            try
+            {
+                var systemMessages = _originalHistory.Where(m => m.Role == "system").ToList();
+                var newHistory = new List<Message>(systemMessages);
+
+                foreach (var item in DisplayHistory)
+                {
+                    // 同步文本内容
+                    item.OriginalMessage.Content = item.Content;
+                    // 同步图像数据（支持删除操作）
+                    item.OriginalMessage.ImageData = item.ImageData;
+                    newHistory.Add(item.OriginalMessage);
+                }
+
+                _plugin.ChatCore.SetChatHistory(newHistory);
+                Logger.Log("上下文编辑器: 保存成功");
+                Close();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error saving context: {ex.Message}");
+                MessageBox.Show(
+                    $"Failed to save context: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         private void Button_Cancel_Click(object sender, RoutedEventArgs e)
