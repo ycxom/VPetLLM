@@ -59,6 +59,9 @@ namespace VPetLLM.Handlers.Legacy
 
         public async Task Execute(string actionName, IMainWindow mainWindow)
         {
+            // 添加UI操作延迟，减少瞬时性能压力
+            Utils.UI.BubbleDelayController.ApplyUIDelay();
+            
             // 检查是否为默认插件
             if (VPetLLM.Instance?.IsVPetLLMDefaultPlugin() != true)
             {

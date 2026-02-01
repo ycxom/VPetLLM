@@ -246,7 +246,10 @@ namespace VPetLLM.Handlers.Actions
                             animName = "say";
                         }
 
-                        // 播放说话动画 - 使用标准的Say方法
+                        // 添加UI操作延迟，减少瞬时性能压力
+                        Utils.UI.BubbleDelayController.ApplyUIDelay();
+                        
+                        // 播放说话动画 - 直接使用VPet原生API
                         mainWindow.Main.Say(text, animName, true);
                         Logger.Log($"SayHandler: 显示完成 - 文本: \"{text}\", 动画: {animName}, 模式: {currentMode}");
 
@@ -295,11 +298,13 @@ namespace VPetLLM.Handlers.Actions
                     {
                         Logger.Log($"SayHandler: 显示气泡（仅气泡模式）- 文本: \"{text.Substring(0, Math.Min(30, text.Length))}...\"");
 
-                        // 无论是否有VPetTTS插件，都使用VPet原生Say API
-                        // 这样可以确保气泡内容正确显示，同时让VPetTTS插件处理TTS协调
+                        // 添加UI操作延迟，减少瞬时性能压力
+                        Utils.UI.BubbleDelayController.ApplyUIDelay();
+                        
+                        // 直接使用VPet原生API
                         mainWindow.Main.Say(text, null, false);
 
-                        Logger.Log($"SayHandler: 气泡显示完成（使用VPet原生API），应该已触发 OnSay 事件和 SayProcess");
+                        Logger.Log($"SayHandler: 气泡显示完成（使用VPet原生API）");
                     }
                     else
                     {

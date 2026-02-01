@@ -621,6 +621,9 @@ namespace VPetLLM
             {
                 Logger.Log("LoadPlugin started.");
 
+                // 初始化气泡延迟控制（性能优化）
+                InitializeBubbleDelayControl();
+
                 // 检测 VPet.Plugin.VPetTTS 插件
                 DetectAndHandleVPetTTSPlugin();
 
@@ -837,6 +840,28 @@ namespace VPetLLM
             catch (Exception ex)
             {
                 _logger.LogError("Failed to initialize rate limiter", ex);
+            }
+        }
+
+        /// <summary>
+        /// 初始化气泡延迟控制（性能优化）
+        /// </summary>
+        private void InitializeBubbleDelayControl()
+        {
+            try
+            {
+                Logger.Log("开始初始化气泡延迟控制系统...");
+                
+                // 启用延迟控制
+                Utils.UI.DirectBubbleManager.EnableDelayControl(true);
+                
+                Logger.Log("气泡延迟控制系统初始化完成");
+                Logger.Log("设备性能检测将在首次显示气泡时自动执行");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"初始化气泡延迟控制系统时发生错误: {ex.Message}");
+                _logger.LogError("Failed to initialize bubble delay control", ex);
             }
         }
 

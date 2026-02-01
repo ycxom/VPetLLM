@@ -5,9 +5,49 @@ namespace VPetLLM.Utils.UI
     /// <summary>
     /// 直接气泡管理器
     /// 提供更直接和高效的气泡显示功能，直接调用VPet原生API
+    /// 支持延迟控制以减少瞬时性能压力
     /// </summary>
     public static class DirectBubbleManager
     {
+        private static bool _delayControlEnabled = false;
+        
+        /// <summary>
+        /// 启用延迟控制（推荐在低性能设备上启用）
+        /// </summary>
+        /// <param name="enable">是否启用延迟控制</param>
+        public static async Task EnableDelayControlAsync(bool enable = true)
+        {
+            _delayControlEnabled = enable;
+            if (enable)
+            {
+                await BubbleDelayController.InitializeAsync();
+                Logger.Log("DirectBubbleManager: 已启用延迟控制（支持设备识别和缓存）");
+            }
+            else
+            {
+                Logger.Log("DirectBubbleManager: 已禁用延迟控制");
+            }
+        }
+        
+        /// <summary>
+        /// 启用延迟控制（同步版本，兼容旧代码）
+        /// </summary>
+        /// <param name="enable">是否启用延迟控制</param>
+        public static void EnableDelayControl(bool enable = true)
+        {
+            _delayControlEnabled = enable;
+            if (enable)
+            {
+                // 在后台异步初始化
+                _ = Task.Run(async () => await BubbleDelayController.InitializeAsync());
+                Logger.Log("DirectBubbleManager: 已启用延迟控制（后台初始化中）");
+            }
+            else
+            {
+                Logger.Log("DirectBubbleManager: 已禁用延迟控制");
+            }
+        }
+        
         /// <summary>
         /// 显示气泡（异步版本 - 直接调用VPet API）
         /// </summary>
@@ -24,7 +64,13 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                // 直接调用VPet原生API，移除多层抽象
+                // 如果启用了延迟控制，使用带延迟的显示方法
+                if (_delayControlEnabled)
+                {
+                    return await BubbleDelayController.ShowBubbleWithDelay(plugin, text, animation);
+                }
+                
+                // 原有的直接显示逻辑
                 await SystemWindows.Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     try
@@ -78,7 +124,13 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                // 直接调用VPet原生API，移除多层抽象
+                // 添加UI操作延迟，减少瞬时性能压力
+                if (_delayControlEnabled)
+                {
+                    BubbleDelayController.ApplyUIDelay();
+                }
+                
+                // 直接调用VPet原生API
                 if (!string.IsNullOrEmpty(animation))
                 {
                     plugin.MW.Main.Say(text, animation, true);
@@ -113,7 +165,15 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                // 确保在UI线程中执行MessageBarHelper操作
+                // 如果启用了延迟控制，使用异步方法
+                if (_delayControlEnabled)
+                {
+                    // 对于同步调用，我们使用 Task.Run 来避免阻塞
+                    _ = Task.Run(async () => await BubbleDelayController.ShowThinkingBubbleWithDelay(plugin, thinkingText));
+                    return true;
+                }
+                
+                // 原有的直接显示逻辑
                 var result = false;
                 SystemWindows.Application.Current.Dispatcher.Invoke(() =>
                 {
