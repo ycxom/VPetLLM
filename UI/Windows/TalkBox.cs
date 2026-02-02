@@ -168,6 +168,16 @@ namespace VPetLLM.UI.Windows
             OnSendMessage?.Invoke(text);
             Logger.Log($"Responded called with text: {text}");
 
+            // 通知生命周期插件：处理开始
+            try
+            {
+                await _plugin.ProcessingLifecycleManager?.NotifyProcessingStartAsync(text);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ProcessingLifecycleManager.NotifyProcessingStartAsync failed: {ex.Message}");
+            }
+
             // 更新状态灯为处理中
             // 注意：不在这里调用 BeginActiveSession()，会话跟踪由 StreamingCommandProcessor 和 ResultAggregator 管理
             _plugin.FloatingSidebarManager?.SetProcessingStatus();
@@ -248,6 +258,17 @@ namespace VPetLLM.UI.Windows
             catch (Exception e)
             {
                 Logger.Log($"An error occurred in Responded: {e}");
+                
+                // 通知生命周期插件：处理错误
+                try
+                {
+                    await _plugin.ProcessingLifecycleManager?.NotifyProcessingErrorAsync(e);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"ProcessingLifecycleManager.NotifyProcessingErrorAsync failed: {ex.Message}");
+                }
+                
                 // 更新状态灯为错误状态
                 _plugin.FloatingSidebarManager?.SetErrorStatus();
                 await Application.Current.Dispatcher.InvokeAsync(() =>
@@ -258,6 +279,10 @@ namespace VPetLLM.UI.Windows
             }
             finally
             {
+                // 注意：不在这里调用 NotifyProcessingCompleteAsync
+                // 因为 LLM 的响应是异步处理的，在 HandleResponse 中处理
+                // 会话结束将在 SmartMessageProcessor 完成所有处理后调用
+                
                 // 停止思考动画（确保清除）- 这是第二次调用，确保思考动画完全停止
                 Logger.Log("Responded: 准备停止思考动画（确保清除）");
                 StopThinkingAnimationWithoutHide();
@@ -841,6 +866,17 @@ namespace VPetLLM.UI.Windows
                     {
                         Logger.Log($"统一流式处理: 结束独占会话失败: {ex.Message}");
                     }
+                }
+                
+                // 通知生命周期插件：处理完成（流式处理）
+                try
+                {
+                    await _plugin.ProcessingLifecycleManager?.NotifyProcessingCompleteAsync();
+                    Logger.Log("统一流式处理: 已通知生命周期插件处理完成");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"统一流式处理: 通知生命周期插件失败: {ex.Message}");
                 }
             }
         }

@@ -300,6 +300,17 @@ namespace VPetLLM.Handlers.Core
                     {
                         _plugin.FloatingSidebarManager?.SetIdleStatus();
                         Logger.Log("SmartMessageProcessor: 处理完成，状态灯已切换回Idle");
+                        
+                        // 通知生命周期插件：处理完成
+                        try
+                        {
+                            await _plugin.ProcessingLifecycleManager?.NotifyProcessingCompleteAsync();
+                            Logger.Log("SmartMessageProcessor: 已通知生命周期插件处理完成");
+                        }
+                        catch (Exception lifecycleEx)
+                        {
+                            Logger.Log($"SmartMessageProcessor: 通知生命周期插件失败: {lifecycleEx.Message}");
+                        }
                     }
                     catch (Exception ex)
                     {

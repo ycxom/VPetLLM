@@ -97,6 +97,11 @@ namespace VPetLLM
         public FloatingSidebarManager? FloatingSidebarManager => _floatingSidebarManager;
 
         /// <summary>
+        /// 处理生命周期管理器
+        /// </summary>
+        public Services.ProcessingLifecycleManager? ProcessingLifecycleManager => _processingLifecycleManager;
+
+        /// <summary>
         /// VPet TTS 插件是否被检测到（实时检测）
         /// </summary>
         public bool IsVPetTTSPluginDetected
@@ -147,6 +152,7 @@ namespace VPetLLM
         private Infrastructure.Services.ApplicationServices.MediaPlaybackService? _mediaPlaybackService;
         private DefaultPluginChecker? _defaultPluginChecker;
         private FloatingSidebarManager? _floatingSidebarManager;
+        private Services.ProcessingLifecycleManager? _processingLifecycleManager;
         private bool _vpetTTSPluginDetected = false;
         private byte[]? _pendingImageData;
 
@@ -501,6 +507,10 @@ namespace VPetLLM
 
                 // 初始化媒体播放服务
                 InitializeMediaPlaybackService();
+
+                // 初始化处理生命周期管理器
+                _processingLifecycleManager = new Services.ProcessingLifecycleManager(this);
+                Logger.Log("ProcessingLifecycleManager initialized");
 
                 _logger.LogInformation("Application services initialized");
             }
