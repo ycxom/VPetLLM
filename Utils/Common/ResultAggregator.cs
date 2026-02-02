@@ -75,6 +75,25 @@ namespace VPetLLM.Utils.Common
             }
         }
 
+        /// <summary>
+        /// 刷新会话缓冲区（异步版本，可等待）
+        /// </summary>
+        public static async Task FlushSessionAsync(Guid sessionId)
+        {
+            try
+            {
+                var key = $"session:{sessionId}";
+                await FlushAsync(key);
+            }
+            catch (Exception ex)
+            {
+                VPetLLMUtils.Logger.Log($"ResultAggregator.FlushSessionAsync 异常: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 刷新会话缓冲区（同步版本，兼容旧代码）
+        /// </summary>
         public static void FlushSession(Guid sessionId)
         {
             try
@@ -88,7 +107,10 @@ namespace VPetLLM.Utils.Common
             }
         }
 
-        private static async void Flush(string key)
+        /// <summary>
+        /// 异步刷新缓冲区（可等待版本）
+        /// </summary>
+        private static async Task FlushAsync(string key)
         {
             string aggregated = null;
             try
@@ -131,10 +153,18 @@ namespace VPetLLM.Utils.Common
             }
             catch (Exception ex)
             {
-                VPetLLMUtils.Logger.Log($"ResultAggregator.Flush 异常: {ex.Message}, key={key}, aggregated={aggregated}");
+                VPetLLMUtils.Logger.Log($"ResultAggregator.FlushAsync 异常: {ex.Message}, key={key}, aggregated={aggregated}");
                 // 确保异常时也结束会话
                 VPetLLM.Instance?.FloatingSidebarManager?.EndActiveSession("ResultAggregator");
             }
+        }
+
+        /// <summary>
+        /// 同步刷新缓冲区（fire-and-forget 版本）
+        /// </summary>
+        private static async void Flush(string key)
+        {
+            await FlushAsync(key);
         }
     }
 }

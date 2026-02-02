@@ -267,7 +267,10 @@ namespace VPetLLM.Handlers.Core
                     TouchInteractionHandler.NotifyVPetLLMActionEnd();
 
                     // 先统一Flush一次本次会话内所有聚合结果，确保只回灌一次
-                    global::VPetLLM.Utils.Common.ResultAggregator.FlushSession(_sessionId);
+                    // 修复：使用异步版本并等待完成，确保 Plugin 回灌完成后再结束会话
+                    Logger.Log("SmartMessageProcessor: 等待 ResultAggregator 回灌完成...");
+                    await global::VPetLLM.Utils.Common.ResultAggregator.FlushSessionAsync(_sessionId);
+                    Logger.Log("SmartMessageProcessor: ResultAggregator 回灌已完成");
 
                     // 退出本次会话，恢复上下文
                     if (global::VPetLLM.Utils.System.ExecutionContext.CurrentMessageId.Value == _sessionId)
@@ -1506,9 +1509,31 @@ namespace VPetLLM.Handlers.Core
                 {
                     Logger.Log($"SmartMessageProcessor: 设置PluginExecuting状态失败: {ex.Message}");
                 }
+                
+                // 修复：在 Plugin 执行前添加延迟，确保状态灯更新完成，防止 UI 竞态条件
+                var delayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
+                if (delayMs > 0)
+                {
+                    await Task.Delay(delayMs);
+                    Logger.Log($"SmartMessageProcessor: Plugin执行前延迟 {delayMs}ms 完成，状态灯已更新");
+                }
             }
 
+            // 执行动作
             await ExecuteActionAsync(segment.Content);
+            
+            // 修复：Plugin 执行后添加延迟，确保 UI 处理完成
+            // 这对于 TTS 关闭时的气泡显示尤其重要
+            if (isPluginAction)
+            {
+                // 使用性能自适应延迟，确保 Plugin 执行和可能的 UI 更新完成
+                var delayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
+                if (delayMs > 0)
+                {
+                    await Task.Delay(delayMs);
+                    Logger.Log($"SmartMessageProcessor: Plugin执行后延迟 {delayMs}ms 完成，确保UI处理完成");
+                }
+            }
         }
 
         /// <summary>
