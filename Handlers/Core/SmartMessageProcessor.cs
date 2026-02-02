@@ -208,19 +208,25 @@ namespace VPetLLM.Handlers.Core
                     _unifiedBubbleFacade.Clear();
                     Logger.Log("SmartMessageProcessor: 使用UnifiedBubbleFacade清理状态");
 
-                    // 预初始化 MessageBarHelper（如果尚未初始化）
-                    _ = System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                    // 立即停止思考动画，防止覆盖正常气泡
+                    try
                     {
-                        try
-                        {
-                            var msgBar = _plugin.MW.Main.MsgBar;
-                            if (msgBar is not null && !MessageBarHelper.IsInitialized)
-                            {
-                                MessageBarHelper.PreInitialize(msgBar);
-                            }
-                        }
-                        catch { /* 忽略初始化错误 */ }
-                    }));
+                        _plugin?.TalkBox?.StopThinkingAnimationWithoutHide();
+                        Logger.Log("SmartMessageProcessor: 已停止思考动画");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"SmartMessageProcessor: 停止思考动画失败: {ex.Message}");
+                    }
+                    
+                    // 添加性能自适应延迟，确保思考动画循环完全退出
+                    // 使用 BubbleDelayController 根据设备性能决定延迟时间
+                    var delayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
+                    if (delayMs > 0)
+                    {
+                        await Task.Delay(delayMs);
+                        Logger.Log($"SmartMessageProcessor: 延迟 {delayMs}ms 完成，思考动画已完全停止");
+                    }
                 }
 
                 // 标记进入单条 AI 回复的处理会话，期间豁免插件/工具限流

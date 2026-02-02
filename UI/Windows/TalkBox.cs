@@ -258,8 +258,8 @@ namespace VPetLLM.UI.Windows
             }
             finally
             {
-                // 停止思考动画（如果有的话）- 但不隐藏气泡，因为流式消息可能还在处理中
-                Logger.Log("Responded: 准备停止思考动画（仅停止动画，不隐藏气泡）");
+                // 停止思考动画（确保清除）- 这是第二次调用，确保思考动画完全停止
+                Logger.Log("Responded: 准备停止思考动画（确保清除）");
                 StopThinkingAnimationWithoutHide();
 
                 // 重置流式处理状态，为下一次对话做准备
@@ -268,7 +268,7 @@ namespace VPetLLM.UI.Windows
                 // 注意：不在这里调用 EndActiveSession()，会话跟踪由 StreamingCommandProcessor 管理
                 // StreamingCommandProcessor 会在所有命令处理完成后自动设置状态灯为 Idle
 
-                Logger.Log("Responded: 思考动画已停止，状态灯由 StreamingCommandProcessor 管理");
+                Logger.Log("Responded: 思考动画已停止（确保清除完成），状态灯由 StreamingCommandProcessor 管理");
             }
         }
 
@@ -525,6 +525,7 @@ namespace VPetLLM.UI.Windows
 
         /// <summary>
         /// 直接思考动画实现（使用DirectBubbleManager）
+        /// 优化：增强退出检查，防止残留调用
         /// </summary>
         private void StartThinkingAnimationDirect(string baseText, System.Threading.CancellationTokenSource cts)
         {
@@ -538,20 +539,31 @@ namespace VPetLLM.UI.Windows
                 {
                     var text = baseText + dots[i++ % dots.Length];
 
-                    // 直接使用DirectBubbleManager显示思考气泡
-                    if (_isThinking)
-                    {
-                        DirectBubbleManager.ShowThinkingBubble(_plugin, text);
-                    }
+                    // 三重检查：显示前、显示后、延迟后都检查状态
+                    // 防止竞态条件导致的残留调用
+                    if (!_isThinking || cts.Token.IsCancellationRequested)
+                        break;
+
+                    DirectBubbleManager.ShowThinkingBubble(_plugin, text);
+
+                    if (!_isThinking || cts.Token.IsCancellationRequested)
+                        break;
 
                     try { await Task.Delay(450, cts.Token); }
                     catch (TaskCanceledException) { break; }
+                    
+                    // 延迟后再次检查，确保及时退出
+                    if (!_isThinking || cts.Token.IsCancellationRequested)
+                        break;
                 }
+                
+                Logger.Log("TalkBox: 思考动画循环已退出");
             });
         }
 
         /// <summary>
         /// 回退的思考动画实现（保留用于兼容性）
+        /// 优化：增强退出检查，防止残留调用
         /// </summary>
         private void StartThinkingAnimationFallback(string baseText, System.Threading.CancellationTokenSource cts)
         {
@@ -565,21 +577,30 @@ namespace VPetLLM.UI.Windows
                 {
                     var text = baseText + dots[i++ % dots.Length];
 
-                    // 使用直接气泡管理器显示思考气泡
-                    if (_isThinking)
-                    {
-                        DirectBubbleManager.ShowThinkingBubble(_plugin, text);
-                    }
+                    // 三重检查：显示前、显示后、延迟后都检查状态
+                    if (!_isThinking || cts.Token.IsCancellationRequested)
+                        break;
+
+                    DirectBubbleManager.ShowThinkingBubble(_plugin, text);
+
+                    if (!_isThinking || cts.Token.IsCancellationRequested)
+                        break;
 
                     try { await Task.Delay(450, cts.Token); }
                     catch (TaskCanceledException) { break; }
+                    
+                    // 延迟后再次检查
+                    if (!_isThinking || cts.Token.IsCancellationRequested)
+                        break;
                 }
+                
+                Logger.Log("TalkBox: 思考动画循环已退出（Fallback）");
             });
         }
 
         /// <summary>
         /// 停止思考动画但不隐藏气泡（用于流式响应，让新气泡直接覆盖）
-        /// 优化：直接使用 DirectBubbleManager
+        /// 优化：改为同步清理，确保在返回前完成状态清理
         /// </summary>
         public void StopThinkingAnimationWithoutHide()
         {
@@ -594,13 +615,12 @@ namespace VPetLLM.UI.Windows
                 try { cts.Cancel(); cts.Dispose(); } catch { }
             }
 
-            // 直接使用DirectBubbleManager进行状态清理（不隐藏气泡）
-            Logger.Log("TalkBox: 使用DirectBubbleManager停止思考动画（无隐藏，直接覆盖模式）");
-
-            // 使用低优先级异步清理流式状态
-            Application.Current.Dispatcher.BeginInvoke(
-                System.Windows.Threading.DispatcherPriority.Background,
-                new Action(() =>
+            // 改为同步执行，确保在返回前完成清理
+            Logger.Log("TalkBox: 使用DirectBubbleManager停止思考动画（同步清理模式）");
+            
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     try
                     {
@@ -608,10 +628,19 @@ namespace VPetLLM.UI.Windows
                         if (msgBar is not null)
                         {
                             MessageBarHelper.ClearStreamState(msgBar);
+                            Logger.Log("TalkBox: 流式状态已清理");
                         }
                     }
-                    catch { }
-                }));
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"TalkBox: 清理流式状态失败: {ex.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"TalkBox: 同步清理失败: {ex.Message}");
+            }
         }
 
         /// <summary>
