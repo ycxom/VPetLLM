@@ -1,10 +1,8 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Data.Sqlite;
-using System.Windows;
-using System.Windows.Threading;
 using Microsoft.Win32;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Windows;
 
 namespace VPetLLM.Utils.UI
 {
@@ -17,16 +15,16 @@ namespace VPetLLM.Utils.UI
     {
         private static DateTime _lastBubbleTime = DateTime.MinValue;
         private static readonly object _delayLock = new object();
-        
+
         // 延迟配置
         private static int _minDelayMs = 50;        // 最小延迟
         private static int _adaptiveDelayMs = 100;  // 自适应延迟
         private static bool _enableAdaptiveDelay = true;
-        
+
         // 设备识别和缓存
         private static string _currentDeviceHash = null;
         private static DevicePerformanceProfile _cachedProfile = null;
-        
+
         /// <summary>
         /// 获取设置数据库路径（复用现有的 settings.db）
         /// </summary>
@@ -35,9 +33,9 @@ namespace VPetLLM.Utils.UI
             var docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             return Path.Combine(docPath, "VPetLLM", "settings.db");
         }
-        
+
         private static readonly string _dbFilePath = GetDatabasePath();
-        
+
         // 防抖控制
         //private const int DEBOUNCE_MS = 100;
 
@@ -49,14 +47,14 @@ namespace VPetLLM.Utils.UI
             try
             {
                 Logger.Log("BubbleDelayController: 开始初始化设备性能检测");
-                
+
                 // 生成当前设备的唯一标识
                 _currentDeviceHash = await GenerateDeviceHashAsync();
                 Logger.Log($"BubbleDelayController: 设备标识: {_currentDeviceHash?.Substring(0, 8)}...");
-                
+
                 // 尝试加载缓存的性能配置
                 _cachedProfile = LoadCachedProfile(_currentDeviceHash);
-                
+
                 if (_cachedProfile != null)
                 {
                     // 使用缓存的配置
@@ -68,11 +66,11 @@ namespace VPetLLM.Utils.UI
                     // 执行性能检测
                     Logger.Log("BubbleDelayController: 执行设备性能检测...");
                     var profile = await PerformDevicePerformanceTestAsync();
-                    
+
                     // 保存检测结果
                     SavePerformanceProfile(_currentDeviceHash, profile);
                     ApplyPerformanceProfile(profile);
-                    
+
                     Logger.Log($"BubbleDelayController: 性能检测完成 - {profile.DeviceType}");
                 }
             }
@@ -82,7 +80,7 @@ namespace VPetLLM.Utils.UI
                 ConfigureDelay(); // 使用默认配置
             }
         }
-        
+
         /// <summary>
         /// 生成设备唯一标识（CPU + 内存 + 显卡 + 系统信息的MD5）
         /// </summary>
@@ -93,7 +91,7 @@ namespace VPetLLM.Utils.UI
                 try
                 {
                     var deviceInfo = new StringBuilder();
-                    
+
                     // CPU 信息（从注册表获取）
                     try
                     {
@@ -112,7 +110,7 @@ namespace VPetLLM.Utils.UI
                         Logger.Log($"BubbleDelayController: 获取CPU信息失败: {ex.Message}");
                         deviceInfo.Append($"CPU:{Environment.ProcessorCount}cores;");
                     }
-                    
+
                     // 内存信息（使用 .NET 方法）
                     try
                     {
@@ -133,7 +131,7 @@ namespace VPetLLM.Utils.UI
                         Logger.Log($"BubbleDelayController: 获取内存信息失败: {ex.Message}");
                         deviceInfo.Append($"MEM:{GC.GetTotalMemory(false)};");
                     }
-                    
+
                     // 显卡信息（从注册表获取）
                     bool hasDiscreteGPU = false;
                     try
@@ -150,9 +148,9 @@ namespace VPetLLM.Utils.UI
                                         {
                                             var driverDesc = subKey?.GetValue("DriverDesc")?.ToString() ?? "";
                                             var memorySize = subKey?.GetValue("HardwareInformation.MemorySize")?.ToString() ?? "0";
-                                            
+
                                             deviceInfo.Append($"GPU:{driverDesc}:{memorySize};");
-                                            
+
                                             // 简单判断是否为独立显卡
                                             if (!driverDesc.Contains("Intel") && !string.IsNullOrEmpty(driverDesc))
                                             {
@@ -170,14 +168,14 @@ namespace VPetLLM.Utils.UI
                         deviceInfo.Append("GPU:Unknown;");
                     }
                     deviceInfo.Append($"DISCRETE_GPU:{hasDiscreteGPU};");
-                    
+
                     // 系统信息
                     try
                     {
                         deviceInfo.Append($"MACHINE:{Environment.MachineName};");
                         deviceInfo.Append($"USER:{Environment.UserName};");
                         deviceInfo.Append($"OS:{Environment.OSVersion};");
-                        
+
                         // 尝试获取系统序列号
                         using (var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS"))
                         {
@@ -193,7 +191,7 @@ namespace VPetLLM.Utils.UI
                         Logger.Log($"BubbleDelayController: 获取系统信息失败: {ex.Message}");
                         deviceInfo.Append($"SYS:{Environment.MachineName};");
                     }
-                    
+
                     // 生成 MD5 哈希
                     using (var md5 = MD5.Create())
                     {
@@ -214,7 +212,7 @@ namespace VPetLLM.Utils.UI
                 }
             });
         }
-        
+
         /// <summary>
         /// 执行设备性能测试
         /// </summary>
@@ -229,13 +227,13 @@ namespace VPetLLM.Utils.UI
                         DeviceHash = _currentDeviceHash,
                         TestDate = DateTime.Now
                     };
-                    
+
                     Logger.Log("BubbleDelayController: 开始CPU计算能力测试（3秒圆周率运算）...");
-                    
+
                     // 执行3秒的圆周率计算测试
                     var cpuScore = PerformPiCalculationTest(3000); // 3秒测试
                     Logger.Log($"BubbleDelayController: CPU计算得分: {cpuScore}");
-                    
+
                     // 内存测试
                     var memoryScore = 100; // 默认分数
                     try
@@ -254,15 +252,15 @@ namespace VPetLLM.Utils.UI
                     {
                         Logger.Log($"BubbleDelayController: 内存测试失败: {ex.Message}");
                     }
-                    
+
                     // 显卡测试
                     var gpuScore = HasDiscreteGPUFromRegistry() ? 200 : 50;
                     Logger.Log($"BubbleDelayController: GPU得分: {gpuScore}");
-                    
+
                     // 综合评分
                     var totalScore = cpuScore + memoryScore + gpuScore;
                     Logger.Log($"BubbleDelayController: 综合性能评分: {totalScore}");
-                    
+
                     // 根据评分确定设备类型和配置
                     if (totalScore >= 1000)
                     {
@@ -288,9 +286,9 @@ namespace VPetLLM.Utils.UI
                         profile.EnableAdaptive = true;
                         Logger.Log("BubbleDelayController: 设备类型: 低端 (延迟: 100-200ms)");
                     }
-                    
+
                     profile.PerformanceScore = totalScore;
-                    
+
                     return profile;
                 }
                 catch (Exception ex)
@@ -309,7 +307,7 @@ namespace VPetLLM.Utils.UI
                 }
             });
         }
-        
+
         /// <summary>
         /// 执行圆周率计算测试（Leibniz公式）
         /// 在指定时间内计算尽可能多的迭代次数
@@ -324,7 +322,7 @@ namespace VPetLLM.Utils.UI
                 long iterations = 0;
                 double pi = 0.0;
                 int sign = 1;
-                
+
                 // 使用 Leibniz 公式计算 π: π/4 = 1 - 1/3 + 1/5 - 1/7 + 1/9 - ...
                 while (stopwatch.ElapsedMilliseconds < durationMs)
                 {
@@ -332,20 +330,20 @@ namespace VPetLLM.Utils.UI
                     sign = -sign;
                     iterations++;
                 }
-                
+
                 stopwatch.Stop();
-                
+
                 // 计算实际的π值
                 pi *= 4;
-                
+
                 Logger.Log($"BubbleDelayController: π计算完成 - 迭代次数: {iterations:N0}, 计算结果: {pi:F10}");
-                
+
                 // 根据迭代次数计算得分
                 // 现代CPU在3秒内通常能完成数亿次迭代
                 // 高端: > 500M 迭代/3秒 = 500分
                 // 中端: 100M-500M 迭代/3秒 = 200-500分
                 // 低端: < 100M 迭代/3秒 = 100-200分
-                
+
                 int score;
                 if (iterations > 500_000_000)
                 {
@@ -367,9 +365,9 @@ namespace VPetLLM.Utils.UI
                 {
                     score = 100; // 低端CPU
                 }
-                
+
                 Logger.Log($"BubbleDelayController: CPU性能等级 - 迭代: {iterations:N0}, 得分: {score}");
-                
+
                 return score;
             }
             catch (Exception ex)
@@ -378,7 +376,7 @@ namespace VPetLLM.Utils.UI
                 return 100; // 默认低端得分
             }
         }
-        
+
         /// <summary>
         /// 从注册表检测是否有独立显卡
         /// </summary>
@@ -397,7 +395,7 @@ namespace VPetLLM.Utils.UI
                                 using (var subKey = key.OpenSubKey(subKeyName))
                                 {
                                     var driverDesc = subKey?.GetValue("DriverDesc")?.ToString() ?? "";
-                                    
+
                                     // 简单判断：非Intel集显
                                     if (!driverDesc.Contains("Intel") && !string.IsNullOrEmpty(driverDesc))
                                     {
@@ -415,7 +413,7 @@ namespace VPetLLM.Utils.UI
             }
             return false;
         }
-        
+
         /// <summary>
         /// 获取数据库连接（确保数据库已初始化）
         /// </summary>
@@ -480,7 +478,7 @@ namespace VPetLLM.Utils.UI
                 Logger.Log($"BubbleDelayController: 创建数据库表失败: {ex.Message}");
             }
         }
-        
+
         /// <summary>
         /// 加载缓存的性能配置
         /// </summary>
@@ -501,7 +499,7 @@ namespace VPetLLM.Utils.UI
                     using (var command = new SqliteCommand(selectSql, connection))
                     {
                         command.Parameters.AddWithValue("@DeviceHash", deviceHash);
-                        
+
                         using (var reader = command.ExecuteReader())
                         {
                             if (reader.Read())
@@ -537,7 +535,7 @@ namespace VPetLLM.Utils.UI
             }
             return null;
         }
-        
+
         /// <summary>
         /// 保存性能配置到数据库
         /// </summary>
@@ -579,7 +577,7 @@ namespace VPetLLM.Utils.UI
                     {
                         var cutoffDate = DateTime.Now.AddDays(-30).ToString("yyyy-MM-dd HH:mm:ss");
                         command.Parameters.AddWithValue("@CutoffDate", cutoffDate);
-                        
+
                         var deletedRows = command.ExecuteNonQuery();
                         if (deletedRows > 0)
                         {
@@ -595,7 +593,7 @@ namespace VPetLLM.Utils.UI
                 Logger.Log($"BubbleDelayController: 保存到数据库失败: {ex.Message}");
             }
         }
-        
+
         /// <summary>
         /// 应用性能配置
         /// </summary>
@@ -604,7 +602,7 @@ namespace VPetLLM.Utils.UI
             _cachedProfile = profile;
             ConfigureDelay(profile.MinDelay, profile.AdaptiveDelay, profile.EnableAdaptive);
         }
-        
+
         /// <summary>
         /// 设置延迟配置
         /// </summary>
@@ -616,10 +614,10 @@ namespace VPetLLM.Utils.UI
             _minDelayMs = Math.Max(0, minDelay);
             _adaptiveDelayMs = Math.Max(_minDelayMs, adaptiveDelay);
             _enableAdaptiveDelay = enableAdaptive;
-            
+
             Logger.Log($"BubbleDelayController: 延迟配置已更新 - 最小:{_minDelayMs}ms, 自适应:{_adaptiveDelayMs}ms, 启用自适应:{_enableAdaptiveDelay}");
         }
-        
+
         /// <summary>
         /// 显示气泡前的延迟处理
         /// </summary>
@@ -631,21 +629,21 @@ namespace VPetLLM.Utils.UI
             {
                 var now = DateTime.Now;
                 var timeSinceLastBubble = (now - _lastBubbleTime).TotalMilliseconds;
-                
+
                 // 计算需要的延迟时间
                 int requiredDelay = CalculateRequiredDelay(text, timeSinceLastBubble);
-                
+
                 if (requiredDelay > 0)
                 {
                     _lastBubbleTime = now.AddMilliseconds(requiredDelay);
                     return requiredDelay;
                 }
-                
+
                 _lastBubbleTime = now;
                 return 0;
             }
         }
-        
+
         /// <summary>
         /// 计算所需的延迟时间
         /// </summary>
@@ -653,31 +651,31 @@ namespace VPetLLM.Utils.UI
         {
             // 始终应用基础延迟（性能优化的核心）
             int baseDelay = _minDelayMs;
-            
+
             // 如果距离上次显示时间太短，增加额外延迟
             if (timeSinceLastBubble < _minDelayMs)
             {
                 int additionalDelay = _minDelayMs - (int)timeSinceLastBubble;
                 baseDelay += additionalDelay;
             }
-            
+
             // 自适应延迟（根据文本长度和系统状态）
             if (_enableAdaptiveDelay)
             {
                 int adaptiveDelay = CalculateAdaptiveDelay(text);
                 baseDelay = Math.Max(baseDelay, adaptiveDelay);
             }
-            
+
             return Math.Max(0, baseDelay);
         }
-        
+
         /// <summary>
         /// 计算自适应延迟
         /// </summary>
         private static int CalculateAdaptiveDelay(string text)
         {
             int adaptiveDelay = 0;
-            
+
             // 根据文本长度调整延迟
             if (!string.IsNullOrEmpty(text))
             {
@@ -690,7 +688,7 @@ namespace VPetLLM.Utils.UI
                     adaptiveDelay += 25; // 中等文本增加少量延迟
                 }
             }
-            
+
             // 根据内存压力调整延迟
             try
             {
@@ -704,10 +702,10 @@ namespace VPetLLM.Utils.UI
             {
                 // 忽略内存检查异常
             }
-            
+
             return Math.Min(adaptiveDelay, _adaptiveDelayMs);
         }
-        
+
         /// <summary>
         /// 获取配置的延迟时间（简单版本）
         /// </summary>
@@ -715,7 +713,7 @@ namespace VPetLLM.Utils.UI
         {
             return _minDelayMs;
         }
-        
+
         /// <summary>
         /// 应用UI操作延迟（减少瞬时性能压力）
         /// </summary>
@@ -727,7 +725,7 @@ namespace VPetLLM.Utils.UI
                 global::System.Threading.Thread.Sleep(_minDelayMs);
             }
         }
-        
+
         /// <summary>
         /// 带延迟的气泡显示（扩展 DirectBubbleManager）
         /// </summary>
@@ -735,7 +733,7 @@ namespace VPetLLM.Utils.UI
         {
             if (plugin == null || string.IsNullOrEmpty(text))
                 return false;
-            
+
             try
             {
                 // 应用延迟
@@ -745,7 +743,7 @@ namespace VPetLLM.Utils.UI
                     await Task.Delay(delayMs);
                     Logger.Log($"BubbleDelayController: 应用延迟 {delayMs}ms");
                 }
-                
+
                 // 显示气泡
                 return await ShowBubbleInternal(plugin, text, animation);
             }
@@ -755,7 +753,7 @@ namespace VPetLLM.Utils.UI
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 带延迟的思考气泡显示
         /// </summary>
@@ -763,7 +761,7 @@ namespace VPetLLM.Utils.UI
         {
             if (plugin == null)
                 return false;
-            
+
             try
             {
                 // 思考气泡使用较短的延迟
@@ -772,7 +770,7 @@ namespace VPetLLM.Utils.UI
                 {
                     await Task.Delay(delayMs);
                 }
-                
+
                 // 显示思考气泡
                 return await ShowThinkingBubbleInternal(plugin, thinkingText);
             }
@@ -782,7 +780,7 @@ namespace VPetLLM.Utils.UI
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 内部气泡显示逻辑
         /// </summary>
@@ -809,7 +807,7 @@ namespace VPetLLM.Utils.UI
                 }
             });
         }
-        
+
         /// <summary>
         /// 内部思考气泡显示逻辑
         /// </summary>
@@ -834,185 +832,185 @@ namespace VPetLLM.Utils.UI
                 }
             });
         }
-/*
-        /// <summary>
-        /// 重置延迟状态
-        /// </summary>
-        public static void ResetDelayState()
-        {
-            lock (_delayLock)
-            {
-                _lastBubbleTime = DateTime.MinValue;
-                Logger.Log("BubbleDelayController: 延迟状态已重置");
-            }
-        }
-
-        /// <summary>
-        /// 获取当前延迟配置信息
-        /// </summary>
-        public static string GetDelayInfo()
-        {
-            var deviceInfo = _cachedProfile != null ? $"设备类型:{_cachedProfile.DeviceType}, " : "";
-            return $"{deviceInfo}最小延迟:{_minDelayMs}ms, 自适应延迟:{_adaptiveDelayMs}ms, 启用自适应:{_enableAdaptiveDelay}";
-        }
-
-        /// <summary>
-        /// 获取当前设备信息
-        /// </summary>
-        public static string GetDeviceInfo()
-        {
-            if (_cachedProfile == null)
-                return "设备信息未初始化";
-
-            return $"设备标识: {_currentDeviceHash?.Substring(0, 8)}..., " +
-                   $"设备类型: {_cachedProfile.DeviceType}, " +
-                   $"性能评分: {_cachedProfile.PerformanceScore}, " +
-                   $"检测时间: {_cachedProfile.TestDate:yyyy-MM-dd HH:mm:ss}";
-        }
-
-        /// <summary>
-        /// 获取所有设备的性能记录
-        /// </summary>
-        public static List<DevicePerformanceProfile> GetAllDeviceProfiles()
-        {
-            var profiles = new List<DevicePerformanceProfile>();
-
-            try
-            {
-                using (var connection = GetDatabaseConnection())
+        /*
+                /// <summary>
+                /// 重置延迟状态
+                /// </summary>
+                public static void ResetDelayState()
                 {
-                    var selectSql = @"
-                        SELECT DeviceHash, DeviceType, MinDelay, AdaptiveDelay, EnableAdaptive, 
-                               PerformanceScore, TestDate
-                        FROM DevicePerformance 
-                        ORDER BY TestDate DESC";
-
-                    using (var command = new SqliteCommand(selectSql, connection))
-                    using (var reader = command.ExecuteReader())
+                    lock (_delayLock)
                     {
-                        while (reader.Read())
+                        _lastBubbleTime = DateTime.MinValue;
+                        Logger.Log("BubbleDelayController: 延迟状态已重置");
+                    }
+                }
+
+                /// <summary>
+                /// 获取当前延迟配置信息
+                /// </summary>
+                public static string GetDelayInfo()
+                {
+                    var deviceInfo = _cachedProfile != null ? $"设备类型:{_cachedProfile.DeviceType}, " : "";
+                    return $"{deviceInfo}最小延迟:{_minDelayMs}ms, 自适应延迟:{_adaptiveDelayMs}ms, 启用自适应:{_enableAdaptiveDelay}";
+                }
+
+                /// <summary>
+                /// 获取当前设备信息
+                /// </summary>
+                public static string GetDeviceInfo()
+                {
+                    if (_cachedProfile == null)
+                        return "设备信息未初始化";
+
+                    return $"设备标识: {_currentDeviceHash?.Substring(0, 8)}..., " +
+                           $"设备类型: {_cachedProfile.DeviceType}, " +
+                           $"性能评分: {_cachedProfile.PerformanceScore}, " +
+                           $"检测时间: {_cachedProfile.TestDate:yyyy-MM-dd HH:mm:ss}";
+                }
+
+                /// <summary>
+                /// 获取所有设备的性能记录
+                /// </summary>
+                public static List<DevicePerformanceProfile> GetAllDeviceProfiles()
+                {
+                    var profiles = new List<DevicePerformanceProfile>();
+
+                    try
+                    {
+                        using (var connection = GetDatabaseConnection())
                         {
-                            profiles.Add(new DevicePerformanceProfile
+                            var selectSql = @"
+                                SELECT DeviceHash, DeviceType, MinDelay, AdaptiveDelay, EnableAdaptive, 
+                                       PerformanceScore, TestDate
+                                FROM DevicePerformance 
+                                ORDER BY TestDate DESC";
+
+                            using (var command = new SqliteCommand(selectSql, connection))
+                            using (var reader = command.ExecuteReader())
                             {
-                                DeviceHash = reader.GetString(0),
-                                DeviceType = reader.GetString(1),
-                                MinDelay = reader.GetInt32(2),
-                                AdaptiveDelay = reader.GetInt32(3),
-                                EnableAdaptive = reader.GetInt32(4) == 1,
-                                PerformanceScore = reader.GetInt32(5),
-                                TestDate = DateTime.Parse(reader.GetString(6))
-                            });
+                                while (reader.Read())
+                                {
+                                    profiles.Add(new DevicePerformanceProfile
+                                    {
+                                        DeviceHash = reader.GetString(0),
+                                        DeviceType = reader.GetString(1),
+                                        MinDelay = reader.GetInt32(2),
+                                        AdaptiveDelay = reader.GetInt32(3),
+                                        EnableAdaptive = reader.GetInt32(4) == 1,
+                                        PerformanceScore = reader.GetInt32(5),
+                                        TestDate = DateTime.Parse(reader.GetString(6))
+                                    });
+                                }
+                            }
                         }
                     }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"BubbleDelayController: 获取设备记录失败: {ex.Message}");
-            }
-
-            return profiles;
-        }
-
-        /// <summary>
-        /// 清理数据库（删除所有记录）
-        /// </summary>
-        public static void ClearDatabase()
-        {
-            try
-            {
-                using (var connection = GetDatabaseConnection())
-                {
-                    var deleteSql = "DELETE FROM DevicePerformance";
-                    using (var command = new SqliteCommand(deleteSql, connection))
+                    catch (Exception ex)
                     {
-                        var deletedRows = command.ExecuteNonQuery();
-                        Logger.Log($"BubbleDelayController: 已清理数据库，删除了 {deletedRows} 条记录");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"BubbleDelayController: 清理数据库失败: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 获取数据库统计信息
-        /// </summary>
-        public static string GetDatabaseStats()
-        {
-            try
-            {
-                using (var connection = GetDatabaseConnection())
-                {
-                    // 获取总记录数
-                    var countSql = "SELECT COUNT(*) FROM DevicePerformance";
-                    int totalRecords = 0;
-                    using (var command = new SqliteCommand(countSql, connection))
-                    {
-                        totalRecords = Convert.ToInt32(command.ExecuteScalar());
+                        Logger.Log($"BubbleDelayController: 获取设备记录失败: {ex.Message}");
                     }
 
-                    // 获取设备类型分布
-                    var typeSql = @"
-                        SELECT DeviceType, COUNT(*) as Count 
-                        FROM DevicePerformance 
-                        GROUP BY DeviceType 
-                        ORDER BY Count DESC";
+                    return profiles;
+                }
 
-                    var typeStats = new List<string>();
-                    using (var command = new SqliteCommand(typeSql, connection))
-                    using (var reader = command.ExecuteReader())
+                /// <summary>
+                /// 清理数据库（删除所有记录）
+                /// </summary>
+                public static void ClearDatabase()
+                {
+                    try
                     {
-                        while (reader.Read())
+                        using (var connection = GetDatabaseConnection())
                         {
-                            typeStats.Add($"{reader.GetString(0)}: {reader.GetInt32(1)}");
+                            var deleteSql = "DELETE FROM DevicePerformance";
+                            using (var command = new SqliteCommand(deleteSql, connection))
+                            {
+                                var deletedRows = command.ExecuteNonQuery();
+                                Logger.Log($"BubbleDelayController: 已清理数据库，删除了 {deletedRows} 条记录");
+                            }
                         }
                     }
-
-                    // 获取数据库文件大小
-                    var fileSize = File.Exists(_dbFilePath) ? new FileInfo(_dbFilePath).Length : 0;
-                    var fileSizeKB = fileSize / 1024.0;
-
-                    return $"数据库统计 - 总记录: {totalRecords}, 文件大小: {fileSizeKB:F1}KB, " +
-                           $"设备类型分布: [{string.Join(", ", typeStats)}]";
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"BubbleDelayController: 清理数据库失败: {ex.Message}");
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"BubbleDelayController: 获取数据库统计失败: {ex.Message}");
-                return $"数据库统计获取失败: {ex.Message}";
-            }
-        }
 
-        /// <summary>
-        /// 强制重新检测设备性能
-        /// </summary>
-        public static async Task ForceRedetectAsync()
-        {
-            try
-            {
-                Logger.Log("BubbleDelayController: 强制重新检测设备性能");
-
-                if (string.IsNullOrEmpty(_currentDeviceHash))
+                /// <summary>
+                /// 获取数据库统计信息
+                /// </summary>
+                public static string GetDatabaseStats()
                 {
-                    _currentDeviceHash = await GenerateDeviceHashAsync();
+                    try
+                    {
+                        using (var connection = GetDatabaseConnection())
+                        {
+                            // 获取总记录数
+                            var countSql = "SELECT COUNT(*) FROM DevicePerformance";
+                            int totalRecords = 0;
+                            using (var command = new SqliteCommand(countSql, connection))
+                            {
+                                totalRecords = Convert.ToInt32(command.ExecuteScalar());
+                            }
+
+                            // 获取设备类型分布
+                            var typeSql = @"
+                                SELECT DeviceType, COUNT(*) as Count 
+                                FROM DevicePerformance 
+                                GROUP BY DeviceType 
+                                ORDER BY Count DESC";
+
+                            var typeStats = new List<string>();
+                            using (var command = new SqliteCommand(typeSql, connection))
+                            using (var reader = command.ExecuteReader())
+                            {
+                                while (reader.Read())
+                                {
+                                    typeStats.Add($"{reader.GetString(0)}: {reader.GetInt32(1)}");
+                                }
+                            }
+
+                            // 获取数据库文件大小
+                            var fileSize = File.Exists(_dbFilePath) ? new FileInfo(_dbFilePath).Length : 0;
+                            var fileSizeKB = fileSize / 1024.0;
+
+                            return $"数据库统计 - 总记录: {totalRecords}, 文件大小: {fileSizeKB:F1}KB, " +
+                                   $"设备类型分布: [{string.Join(", ", typeStats)}]";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"BubbleDelayController: 获取数据库统计失败: {ex.Message}");
+                        return $"数据库统计获取失败: {ex.Message}";
+                    }
                 }
 
-                var profile = await PerformDevicePerformanceTestAsync();
-                SavePerformanceProfile(_currentDeviceHash, profile);
-                ApplyPerformanceProfile(profile);
+                /// <summary>
+                /// 强制重新检测设备性能
+                /// </summary>
+                public static async Task ForceRedetectAsync()
+                {
+                    try
+                    {
+                        Logger.Log("BubbleDelayController: 强制重新检测设备性能");
 
-                Logger.Log($"BubbleDelayController: 重新检测完成 - {profile.DeviceType}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"BubbleDelayController: 强制重新检测失败: {ex.Message}");
-            }
-        }*/
+                        if (string.IsNullOrEmpty(_currentDeviceHash))
+                        {
+                            _currentDeviceHash = await GenerateDeviceHashAsync();
+                        }
+
+                        var profile = await PerformDevicePerformanceTestAsync();
+                        SavePerformanceProfile(_currentDeviceHash, profile);
+                        ApplyPerformanceProfile(profile);
+
+                        Logger.Log($"BubbleDelayController: 重新检测完成 - {profile.DeviceType}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"BubbleDelayController: 强制重新检测失败: {ex.Message}");
+                    }
+                }*/
     }
-    
+
     /// <summary>
     /// 设备性能配置文件
     /// </summary>
@@ -1026,7 +1024,7 @@ namespace VPetLLM.Utils.UI
         public int PerformanceScore { get; set; }
         public DateTime TestDate { get; set; }
     }
-    
+
     /// <summary>
     /// Windows API 内存状态结构
     /// </summary>
@@ -1042,13 +1040,13 @@ namespace VPetLLM.Utils.UI
         public ulong ullTotalVirtual;
         public ulong ullAvailVirtual;
         public ulong ullAvailExtendedVirtual;
-        
+
         public MEMORYSTATUSEX()
         {
             this.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
         }
     }
-    
+
     /// <summary>
     /// Windows API 声明
     /// </summary>

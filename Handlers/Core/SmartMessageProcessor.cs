@@ -1511,16 +1511,29 @@ namespace VPetLLM.Handlers.Core
 
             if (isPluginAction)
             {
+                // 从 say 处理切换到 plugin 处理前，添加延迟确保 say 有足够时间完成
+                // 使用 BubbleDelayController 根据设备性能决定延迟时间
+                var transitionDelayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
+                if (transitionDelayMs > 0)
+                {
+                    await Task.Delay(transitionDelayMs);
+                    Logger.Log($"SmartMessageProcessor: say->plugin 过渡延迟 {transitionDelayMs}ms 完成");
+                }
+
                 try
                 {
                     _plugin.FloatingSidebarManager?.SetPluginExecutingStatus();
                     Logger.Log($"SmartMessageProcessor: 检测到plugin命令({segment.ActionType})，状态灯切换为蓝色");
+
+                    // 如果宠物正在思考状态，立即停止思考动画
+                    // Plugin 执行不需要显示思考动画
+                    await StopThinkAnimationIfNeededAsync();
                 }
                 catch (Exception ex)
                 {
                     Logger.Log($"SmartMessageProcessor: 设置PluginExecuting状态失败: {ex.Message}");
                 }
-                
+
                 // 修复：在 Plugin 执行前添加延迟，确保状态灯更新完成，防止 UI 竞态条件
                 var delayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
                 if (delayMs > 0)
@@ -1544,6 +1557,53 @@ namespace VPetLLM.Handlers.Core
                     await Task.Delay(delayMs);
                     Logger.Log($"SmartMessageProcessor: Plugin执行后延迟 {delayMs}ms 完成，确保UI处理完成");
                 }
+            }
+        }
+
+        /// <summary>
+        /// 停止宠物的思考动画（如果正在播放）
+        /// 用于 Plugin 执行前，避免 Plugin 执行时显示思考动画
+        /// </summary>
+        private async Task StopThinkAnimationIfNeededAsync()
+        {
+            try
+            {
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    // 检查宠物是否正在思考状态
+                    if (_plugin.MW?.Main?.DisplayType?.Name == "think")
+                    {
+                        Logger.Log("SmartMessageProcessor: 检测到思考动画，Plugin执行前停止");
+
+                        // 查找思考结束动画
+                        var thinkEndAnimations = _plugin.MW.Core.Graph.FindGraphs(
+                            "think",
+                            VPet_Simulator.Core.GraphInfo.AnimatType.C_End,
+                            _plugin.MW.Core.Save.Mode
+                        );
+
+                        if (thinkEndAnimations.Count > 0)
+                        {
+                            // 播放思考结束动画
+                            var selectedAnimation = thinkEndAnimations[VPet_Simulator.Core.Function.Rnd.Next(thinkEndAnimations.Count)];
+                            _plugin.MW.Main.Display(selectedAnimation, () =>
+                            {
+                                Logger.Log("SmartMessageProcessor: 思考结束动画播放完成（Plugin模式）");
+                            });
+                            Logger.Log($"SmartMessageProcessor: 播放思考结束动画（共 {thinkEndAnimations.Count} 个可选）");
+                        }
+                        else
+                        {
+                            // 没有思考结束动画，直接切换到默认状态
+                            _plugin.MW.Main.DisplayToNomal();
+                            Logger.Log("SmartMessageProcessor: 未找到思考结束动画，切换到默认状态");
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 停止思考动画失败: {ex.Message}");
             }
         }
 
