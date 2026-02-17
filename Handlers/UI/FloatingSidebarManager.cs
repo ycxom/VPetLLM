@@ -21,6 +21,10 @@ namespace VPetLLM.Handlers.UI
         private int _activeSessionCount = 0;
         private readonly object _sessionLock = new object();
 
+        // 动态位置监控 - 防止侧边栏显示到屏幕外部
+        private DispatcherTimer? _positionMonitorTimer;
+        private SidebarPosition _currentDisplayPosition = SidebarPosition.Right;
+
         public bool IsVisible => _sidebar?.Visibility == Visibility.Visible;
         public FloatingSidebar? Sidebar => _sidebar;
 
@@ -177,6 +181,10 @@ namespace VPetLLM.Handlers.UI
                 // 初始化并插入到 VPet UIGrid
                 _sidebar.Initialize(_vpetLLM);
 
+                // 记录当前显示位置并启动位置监控
+                _currentDisplayPosition = settings.Position;
+                StartPositionMonitoring();
+
                 // 订阅事件
                 _sidebar.ButtonClicked += OnButtonClicked;
                 _sidebar.SidebarClosed += OnSidebarClosed;
@@ -191,20 +199,28 @@ namespace VPetLLM.Handlers.UI
         }
 
         /// <summary>
-        /// 应用位置设置
+        /// 应用位置设置（从配置）
         /// </summary>
         private void ApplyPositionSettings(FloatingSidebarSettings settings)
+        {
+            ApplyPosition(settings.Position, settings);
+            _currentDisplayPosition = settings.Position;
+        }
+
+        /// <summary>
+        /// 应用位置（通用方法，供配置和动态调整共用）
+        /// </summary>
+        private void ApplyPosition(SidebarPosition position, FloatingSidebarSettings settings)
         {
             if (_sidebar is null) return;
 
             // 使用 VerticalAlignment.Top 配合 Margin 来定位，避免层级切换时的位置跳动
             // 因为 UIGrid 和 UIGrid_Back 都是 VerticalAlignment="Top" 的 Grid
-            switch (settings.Position)
+            switch (position)
             {
                 case SidebarPosition.Left:
                     _sidebar.HorizontalAlignment = HorizontalAlignment.Left;
                     _sidebar.VerticalAlignment = VerticalAlignment.Top;
-                    // 使用 Margin.Top 来实现垂直居中效果 (250 是 VPet 主界面高度 500 的一半)
                     _sidebar.Margin = new Thickness(10 + settings.CustomOffsetX, 200 + settings.CustomOffsetY, 0, 0);
                     _sidebar.SetOrientation(System.Windows.Controls.Orientation.Vertical);
                     break;
@@ -236,6 +252,133 @@ namespace VPetLLM.Handlers.UI
             }
         }
 
+        #region 动态位置监控 - 防止侧边栏显示到屏幕外部
+
+        /// <summary>
+        /// 启动位置监控
+        /// </summary>
+        private void StartPositionMonitoring()
+        {
+            StopPositionMonitoring();
+
+            _positionMonitorTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(200)
+            };
+            _positionMonitorTimer.Tick += PositionMonitor_Tick;
+            _positionMonitorTimer.Start();
+
+            // 同时订阅窗口 LocationChanged 事件，获得更即时的响应
+            try
+            {
+                if (_vpetLLM.MW is Window window)
+                {
+                    window.LocationChanged += Window_LocationChanged;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Could not subscribe to LocationChanged: {ex.Message}");
+            }
+
+            Logger.Log("Sidebar position monitoring started");
+        }
+
+        /// <summary>
+        /// 停止位置监控
+        /// </summary>
+        private void StopPositionMonitoring()
+        {
+            _positionMonitorTimer?.Stop();
+            _positionMonitorTimer = null;
+
+            try
+            {
+                if (_vpetLLM.MW is Window window)
+                {
+                    window.LocationChanged -= Window_LocationChanged;
+                }
+            }
+            catch { }
+        }
+
+        private void Window_LocationChanged(object? sender, EventArgs e)
+        {
+            CheckAndAdjustSidebarPosition();
+        }
+
+        private void PositionMonitor_Tick(object? sender, EventArgs e)
+        {
+            CheckAndAdjustSidebarPosition();
+        }
+
+        /// <summary>
+        /// 检查并动态调整侧边栏位置，防止显示到屏幕外部
+        /// 参考 VPet 提交 716108c3 的 MoveSideHideCheck 逻辑，
+        /// 使用 Controller.GetWindowsDistanceLeft/Right/Up/Down 检测屏幕边界
+        /// </summary>
+        private void CheckAndAdjustSidebarPosition()
+        {
+            if (_sidebar is null || _sidebar.Visibility != Visibility.Visible || _isDisposed) return;
+
+            try
+            {
+                var settings = GetFloatingSidebarSettings();
+                var controller = _vpetLLM.MW?.Core?.Controller;
+                if (controller is null) return;
+
+                var distLeft = controller.GetWindowsDistanceLeft();
+                var distRight = controller.GetWindowsDistanceRight();
+                var distUp = controller.GetWindowsDistanceUp();
+                var distDown = controller.GetWindowsDistanceDown();
+
+                var configPos = settings.Position;
+
+                // 自定义位置不做动态调整
+                if (configPos == SidebarPosition.Custom) return;
+
+                var targetPos = configPos;
+
+                // 当窗口边缘超出屏幕时（距离 < 0），将侧边栏移动到可见的一侧
+                switch (configPos)
+                {
+                    case SidebarPosition.Right:
+                        if (distRight < 0)
+                            targetPos = distLeft >= 0 ? SidebarPosition.Left : SidebarPosition.Top;
+                        break;
+                    case SidebarPosition.Left:
+                        if (distLeft < 0)
+                            targetPos = distRight >= 0 ? SidebarPosition.Right : SidebarPosition.Top;
+                        break;
+                    case SidebarPosition.Top:
+                        if (distUp < 0)
+                            targetPos = distDown >= 0 ? SidebarPosition.Bottom : SidebarPosition.Right;
+                        break;
+                    case SidebarPosition.Bottom:
+                        if (distDown < 0)
+                            targetPos = distUp >= 0 ? SidebarPosition.Top : SidebarPosition.Right;
+                        break;
+                }
+
+                // 仅当位置发生变化时才更新
+                if (targetPos != _currentDisplayPosition)
+                {
+                    var previousPos = _currentDisplayPosition;
+                    ApplyPosition(targetPos, settings);
+                    _currentDisplayPosition = targetPos;
+                    Logger.Log($"Sidebar dynamically moved: {previousPos} -> {targetPos} (configured: {configPos})");
+                }
+            }
+            catch (Exception ex)
+            {
+                // GetWindowsDistance 方法可能在某些版本不可用，记录错误并禁用监控
+                Logger.Log($"Position monitoring error (disabling): {ex.Message}");
+                StopPositionMonitoring();
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// 清理侧边栏资源
         /// </summary>
@@ -243,6 +386,8 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
+                StopPositionMonitoring();
+
                 if (_sidebar is not null)
                 {
                     _sidebar.ButtonClicked -= OnButtonClicked;
@@ -650,6 +795,7 @@ namespace VPetLLM.Handlers.UI
             {
                 if (disposing)
                 {
+                    StopPositionMonitoring();
                     _settingsCheckTimer?.Stop();
                     _settingsCheckTimer = null;
                     CleanupSidebar();
