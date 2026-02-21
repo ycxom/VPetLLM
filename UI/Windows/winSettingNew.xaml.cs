@@ -3909,6 +3909,15 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.IsChecked = node.EnableAdvanced;
             if (this.FindName("CheckBox_OpenAI_EnableStreaming") is CheckBox cbStream) cbStream.IsChecked = node.EnableStreaming;
             if (this.FindName("CheckBox_OpenAI_EnableVision") is CheckBox cbVision) cbVision.IsChecked = node.EnableVision;
+            if (this.FindName("ComboBox_OpenAI_ChannelMode") is ComboBox cbMode)
+            {
+                cbMode.SelectedIndex = node.Mode switch
+                {
+                    Setting.ChannelMode.ChatOnly => 1,
+                    Setting.ChannelMode.CompressionOnly => 2,
+                    _ => 0
+                };
+            }
             if (this.FindName("Slider_OpenAI_Temperature") is Slider slTemp)
             {
                 slTemp.Value = node.Temperature;
@@ -4035,10 +4044,29 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += OpenAINodeDetail_Click;
             if (this.FindName("CheckBox_OpenAI_EnableStreaming") is CheckBox cbStream) cbStream.Click += OpenAINodeDetail_Click;
             if (this.FindName("CheckBox_OpenAI_EnableVision") is CheckBox cbVision) cbVision.Click += OpenAINodeDetail_Click;
+            if (this.FindName("ComboBox_OpenAI_ChannelMode") is ComboBox cbChannelMode) cbChannelMode.SelectionChanged += OpenAINodeDetail_ModeChanged;
             if (this.FindName("Slider_OpenAI_Temperature") is Slider slTemp) slTemp.ValueChanged += OpenAINodeDetail_TemperatureChanged;
             if (this.FindName("TextBox_OpenAI_MaxTokens") is TextBox tbMax) tbMax.TextChanged += OpenAINodeDetail_TextChanged;
             if (this.FindName("TextBox_OpenAIApiKey_Plain") is TextBox tbPlain) tbPlain.TextChanged += OpenAINodeDetail_TextChanged;
 
+        }
+
+        private void OpenAINodeDetail_ModeChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedOpenAINode();
+            if (node is null) return;
+            if (sender is ComboBox cb)
+            {
+                node.Mode = cb.SelectedIndex switch
+                {
+                    1 => Setting.ChannelMode.ChatOnly,
+                    2 => Setting.ChannelMode.CompressionOnly,
+                    _ => Setting.ChannelMode.Unrestricted
+                };
+                RefreshOpenAINodesList();
+                SaveSettings();
+            }
         }
 
         private void Detail_TextBox_LostFocus(object sender, RoutedEventArgs e)
@@ -4097,6 +4125,15 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("CheckBox_GeminiNode_EnableAdvanced") is CheckBox cbAdv) cbAdv.IsChecked = node.EnableAdvanced;
             if (this.FindName("CheckBox_GeminiNode_EnableStreaming") is CheckBox cbStream) cbStream.IsChecked = node.EnableStreaming;
             if (this.FindName("CheckBox_GeminiNode_EnableVision") is CheckBox cbVision) cbVision.IsChecked = node.EnableVision;
+            if (this.FindName("ComboBox_Gemini_ChannelMode") is ComboBox cbMode)
+            {
+                cbMode.SelectedIndex = node.Mode switch
+                {
+                    Setting.ChannelMode.ChatOnly => 1,
+                    Setting.ChannelMode.CompressionOnly => 2,
+                    _ => 0
+                };
+            }
             if (this.FindName("Slider_GeminiNode_Temperature") is Slider slTemp)
             {
                 slTemp.Value = node.Temperature;
@@ -4220,10 +4257,29 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("CheckBox_GeminiNode_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += GeminiNodeDetail_Click;
             if (this.FindName("CheckBox_GeminiNode_EnableStreaming") is CheckBox cbStream) cbStream.Click += GeminiNodeDetail_Click;
             if (this.FindName("CheckBox_GeminiNode_EnableVision") is CheckBox cbVision) cbVision.Click += GeminiNodeDetail_Click;
+            if (this.FindName("ComboBox_Gemini_ChannelMode") is ComboBox cbChannelMode) cbChannelMode.SelectionChanged += GeminiNodeDetail_ModeChanged;
             if (this.FindName("Slider_GeminiNode_Temperature") is Slider slTemp) slTemp.ValueChanged += GeminiNodeDetail_TemperatureChanged;
             if (this.FindName("TextBox_GeminiNode_MaxTokens") is TextBox tbMax) tbMax.TextChanged += GeminiNodeDetail_TextChanged;
             if (this.FindName("TextBox_GeminiApiKey_Plain") is TextBox tbPlain) tbPlain.TextChanged += GeminiNodeDetail_TextChanged;
 
+        }
+
+        private void GeminiNodeDetail_ModeChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedGeminiNode();
+            if (node is null) return;
+            if (sender is ComboBox cb)
+            {
+                node.Mode = cb.SelectedIndex switch
+                {
+                    1 => Setting.ChannelMode.ChatOnly,
+                    2 => Setting.ChannelMode.CompressionOnly,
+                    _ => Setting.ChannelMode.Unrestricted
+                };
+                ScheduleGeminiListRefresh();
+                ScheduleAutoSave();
+            }
         }
 
         // 小眼睛：OpenAI API Key 显示/隐藏切换（供 XAML Click 使用）

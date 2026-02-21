@@ -373,6 +373,12 @@
             "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
             "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
             "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
+        },
+        "ChannelMode": {
+            "en": "Channel Mode:",
+            "zh-hans": "渠道模式:",
+            "zh-hant": "渠道模式:",
+            "jp": "チャネルモード:"
         }
     },
     "Gemini": {
@@ -507,6 +513,12 @@
             "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
             "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
             "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
+        },
+        "ChannelMode": {
+            "en": "Channel Mode:",
+            "zh-hans": "渠道模式:",
+            "zh-hant": "渠道模式:",
+            "jp": "チャネルモード:"
         }
     },
     "Free": {
@@ -569,6 +581,26 @@
             "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
             "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
             "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
+        }
+    },
+    "ChannelMode": {
+        "Unrestricted": {
+            "en": "Unrestricted",
+            "zh-hans": "无限制",
+            "zh-hant": "無限制",
+            "jp": "無制限"
+        },
+        "ChatOnly": {
+            "en": "Chat Only",
+            "zh-hans": "仅聊天",
+            "zh-hant": "僅聊天",
+            "jp": "チャットのみ"
+        },
+        "CompressionOnly": {
+            "en": "Compression Only",
+            "zh-hans": "仅聊天压缩",
+            "zh-hant": "僅聊天壓縮",
+            "jp": "圧縮のみ"
         }
     },
     "Advanced_Options": {

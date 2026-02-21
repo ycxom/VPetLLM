@@ -543,6 +543,15 @@
                                                     </ToolTip>
                                                 </CheckBox.ToolTip>
                                             </CheckBox>
+                                            <Label Content="{utils:Localize KeyPath=OpenAI.ChannelMode, Default=渠道模式:}"
+                                                   Style="{StaticResource SettingLabel}"/>
+                                            <ComboBox x:Name="ComboBox_OpenAI_ChannelMode"
+                                                      Margin="0,0,0,16"
+                                                      Style="{StaticResource ModernComboBox}">
+                                                <ComboBoxItem Content="{utils:Localize KeyPath=ChannelMode.Unrestricted, Default=无限制}" Tag="Unrestricted"/>
+                                                <ComboBoxItem Content="{utils:Localize KeyPath=ChannelMode.ChatOnly, Default=仅聊天}" Tag="ChatOnly"/>
+                                                <ComboBoxItem Content="{utils:Localize KeyPath=ChannelMode.CompressionOnly, Default=仅聊天压缩}" Tag="CompressionOnly"/>
+                                            </ComboBox>
                                             <CheckBox x:Name="CheckBox_OpenAI_EnableAdvanced"
                                                     Content="{utils:Localize KeyPath=OpenAI.EnableAdvanced}"
                                                     Margin="0,0,0,16"
@@ -751,6 +760,15 @@
                                                     </ToolTip>
                                                 </CheckBox.ToolTip>
                                             </CheckBox>
+                                            <Label Content="{utils:Localize KeyPath=Gemini.ChannelMode, Default=渠道模式:}"
+                                                   Style="{StaticResource SettingLabel}"/>
+                                            <ComboBox x:Name="ComboBox_Gemini_ChannelMode"
+                                                      Margin="0,0,0,16"
+                                                      Style="{StaticResource ModernComboBox}">
+                                                <ComboBoxItem Content="{utils:Localize KeyPath=ChannelMode.Unrestricted, Default=无限制}" Tag="Unrestricted"/>
+                                                <ComboBoxItem Content="{utils:Localize KeyPath=ChannelMode.ChatOnly, Default=仅聊天}" Tag="ChatOnly"/>
+                                                <ComboBoxItem Content="{utils:Localize KeyPath=ChannelMode.CompressionOnly, Default=仅聊天压缩}" Tag="CompressionOnly"/>
+                                            </ComboBox>
                                             <CheckBox x:Name="CheckBox_GeminiNode_EnableAdvanced"
                                                       Content="{utils:Localize KeyPath=Gemini.EnableAdvanced}"
                                                       Margin="0,0,0,16"

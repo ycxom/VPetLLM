@@ -781,6 +781,8 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
             public bool EnableVision { get; set; } = false;
+            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
+            public string? PluginModeId { get; set; }
 
             public OpenAISetting GetCurrentOpenAISetting()
             {
@@ -816,7 +818,7 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
 
-            public OpenAINodeSetting? GetCurrentOpenAISetting()
+            public OpenAINodeSetting? GetCurrentOpenAISetting(string? purpose = null)
             {
                 // 无节点时回退到兼容配置生成的默认节点（仅当启用时）
                 if (OpenAINodes.Count == 0)
@@ -847,6 +849,16 @@ namespace VPetLLM
                     return null;
                 }
 
+                // Mode 过滤：三级回退策略
+                if (!string.IsNullOrEmpty(purpose))
+                {
+                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurpose(n.Mode, n.PluginModeId, purpose)).ToList();
+                    if (filtered.Count == 0)
+                        filtered = enabledNodes.Where(n => n.Mode == ChannelMode.Unrestricted).ToList();
+                    if (filtered.Count > 0)
+                        enabledNodes = filtered;
+                }
+
                 if (EnableLoadBalancing)
                 {
                     // 轮换到下一个启用的节点
@@ -871,7 +883,7 @@ namespace VPetLLM
             /// </summary>
             /// <param name="triedIndices">已尝试过的节点在 OpenAINodes 列表中的索引</param>
             /// <returns>下一个未尝试的启用节点，如果没有则返回 null</returns>
-            public OpenAINodeSetting? GetNextUntriedNode(HashSet<int> triedIndices)
+            public OpenAINodeSetting? GetNextUntriedNode(HashSet<int> triedIndices, string? purpose = null)
             {
                 if (OpenAINodes.Count == 0)
                     return null;
@@ -881,6 +893,9 @@ namespace VPetLLM
                 {
                     if (OpenAINodes[i].Enabled && !triedIndices.Contains(i))
                     {
+                        if (!string.IsNullOrEmpty(purpose) &&
+                            !IsNodeMatchingPurpose(OpenAINodes[i].Mode, OpenAINodes[i].PluginModeId, purpose))
+                            continue;
                         return OpenAINodes[i];
                     }
                 }
@@ -916,6 +931,8 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "Gemini节点";
             public bool EnableVision { get; set; } = false;
+            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
+            public string? PluginModeId { get; set; }
         }
 
         public class GeminiSetting
@@ -933,7 +950,7 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
 
-            public GeminiNodeSetting? GetCurrentGeminiSetting()
+            public GeminiNodeSetting? GetCurrentGeminiSetting(string? purpose = null)
             {
                 // 无节点时回退到兼容配置生成的默认节点
                 if (GeminiNodes.Count == 0)
@@ -960,6 +977,16 @@ namespace VPetLLM
                     return null;
                 }
 
+                // Mode 过滤：三级回退策略
+                if (!string.IsNullOrEmpty(purpose))
+                {
+                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurpose(n.Mode, n.PluginModeId, purpose)).ToList();
+                    if (filtered.Count == 0)
+                        filtered = enabledNodes.Where(n => n.Mode == ChannelMode.Unrestricted).ToList();
+                    if (filtered.Count > 0)
+                        enabledNodes = filtered;
+                }
+
                 if (EnableLoadBalancing)
                 {
                     // 轮换到下一个启用的节点
@@ -984,7 +1011,7 @@ namespace VPetLLM
             /// </summary>
             /// <param name="triedIndices">已尝试过的节点在 GeminiNodes 列表中的索引</param>
             /// <returns>下一个未尝试的启用节点，如果没有则返回 null</returns>
-            public GeminiNodeSetting? GetNextUntriedNode(HashSet<int> triedIndices)
+            public GeminiNodeSetting? GetNextUntriedNode(HashSet<int> triedIndices, string? purpose = null)
             {
                 if (GeminiNodes.Count == 0)
                     return null;
@@ -994,6 +1021,9 @@ namespace VPetLLM
                 {
                     if (GeminiNodes[i].Enabled && !triedIndices.Contains(i))
                     {
+                        if (!string.IsNullOrEmpty(purpose) &&
+                            !IsNodeMatchingPurpose(GeminiNodes[i].Mode, GeminiNodes[i].PluginModeId, purpose))
+                            continue;
                         return GeminiNodes[i];
                     }
                 }
@@ -1048,6 +1078,26 @@ namespace VPetLLM
             MessageCount,  // 按消息数量触发
             TokenCount,    // 按Token数量触发
             Both           // 两者任一达到阈值即触发
+        }
+
+        public enum ChannelMode
+        {
+            Unrestricted = 0,      // 无限制（默认）
+            ChatOnly = 1,          // 仅聊天
+            CompressionOnly = 2,   // 仅聊天压缩
+            PluginDefined = 100    // 插件自定义（预留）
+        }
+
+        public static bool IsNodeMatchingPurpose(ChannelMode mode, string? pluginModeId, string purpose)
+        {
+            return mode switch
+            {
+                ChannelMode.Unrestricted => true,
+                ChannelMode.ChatOnly => purpose == "Chat",
+                ChannelMode.CompressionOnly => purpose == "Compression",
+                ChannelMode.PluginDefined => !string.IsNullOrEmpty(pluginModeId) && purpose == pluginModeId,
+                _ => true
+            };
         }
         public class ProxySetting
         {

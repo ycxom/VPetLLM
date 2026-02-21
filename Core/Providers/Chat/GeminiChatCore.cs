@@ -62,7 +62,7 @@ namespace VPetLLM.Core.Providers.Chat
                 ClearContext();
             }
 
-            var node = _geminiSetting.GetCurrentGeminiSetting();
+            var node = _geminiSetting.GetCurrentGeminiSetting("Chat");
             if (node is null)
             {
                 var noNodeError = "没有启用的 Gemini 节点，请在设置中启用至少一个节点";
@@ -254,7 +254,7 @@ namespace VPetLLM.Core.Providers.Chat
             }
             history = InjectRecordsIntoHistory(history);
 
-            var node = _geminiSetting.GetCurrentGeminiSetting();
+            var node = _geminiSetting.GetCurrentGeminiSetting("Chat");
             if (node is null)
             {
                 var noNodeError = "NoEnabledGeminiNodes".Translate();
@@ -408,7 +408,7 @@ namespace VPetLLM.Core.Providers.Chat
         {
             try
             {
-                var node = _geminiSetting.GetCurrentGeminiSetting();
+                var node = _geminiSetting.GetCurrentGeminiSetting("Compression");
                 if (node is null)
                 {
                     var noNodeError = "NoEnabledGeminiNodes".Translate();

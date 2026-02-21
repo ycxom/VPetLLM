@@ -21,8 +21,9 @@ namespace VPetLLM.Core
         /// 调用 LLM 处理消息
         /// </summary>
         /// <param name="message">要发送给 LLM 的消息</param>
+        /// <param name="purpose">用途标识（如 "Chat"、"Compression" 或插件自定义），预留供插件指定用途</param>
         /// <returns>LLM 的文本响应</returns>
-        public async Task<string> CallAsync(string message)
+        public async Task<string> CallAsync(string message, string? purpose = null)
         {
             var startTime = DateTime.UtcNow;
             string caller = "Unknown";

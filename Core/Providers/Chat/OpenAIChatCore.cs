@@ -84,8 +84,9 @@ namespace VPetLLM.Core.Providers.Chat
         /// <summary>
         /// 获取当前节点，使用集中式节点选择逻辑
         /// </summary>
+        /// <param name="purpose">用途标识（如 "Chat"、"Compression"），为 null 时不过滤</param>
         /// <returns>当前选中的节点，如果没有启用的节点则返回 null</returns>
-        private Setting.OpenAINodeSetting? GetCurrentNode()
+        private Setting.OpenAINodeSetting? GetCurrentNode(string? purpose = null)
         {
             // 若存在单次请求的缓存节点，则优先返回（不清空，保持请求一致性）
             if (_currentNodeContext is not null)
@@ -94,7 +95,7 @@ namespace VPetLLM.Core.Providers.Chat
             }
 
             // 使用集中式节点选择逻辑
-            var node = _openAISetting.GetCurrentOpenAISetting();
+            var node = _openAISetting.GetCurrentOpenAISetting(purpose);
             if (node is not null)
             {
                 // 缓存本次选中的节点，供同一请求中后续调用复用
@@ -132,9 +133,9 @@ namespace VPetLLM.Core.Providers.Chat
             return apiKeys[_random.Next(apiKeys.Count)];
         }
 
-        private (string? apiUrl, string apiKey, Setting.OpenAINodeSetting? node) GetCurrentEndpoint()
+        private (string? apiUrl, string apiKey, Setting.OpenAINodeSetting? node) GetCurrentEndpoint(string? purpose = null)
         {
-            var currentNode = GetCurrentNode();
+            var currentNode = GetCurrentNode(purpose);
             if (currentNode is null)
             {
                 return (null, string.Empty, null);
@@ -181,7 +182,7 @@ namespace VPetLLM.Core.Providers.Chat
             ClearNodeContext();
 
             // 获取当前节点和API Key
-            var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
+            var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint("Chat");
 
             // 检查是否有可用节点
             if (currentNode is null || apiUrl is null)
@@ -373,7 +374,7 @@ namespace VPetLLM.Core.Providers.Chat
             var tempUserMessage = CreateUserMessage(prompt);
 
             // 获取当前节点和API Key
-            var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
+            var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint("Chat");
 
             // 检查是否有可用节点
             if (currentNode is null || apiUrl is null)
@@ -571,7 +572,7 @@ namespace VPetLLM.Core.Providers.Chat
                 ClearNodeContext();
 
                 // 获取当前节点和API Key
-                var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint();
+                var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint("Compression");
 
                 // 检查是否有可用节点
                 if (currentNode is null || apiUrl is null)
