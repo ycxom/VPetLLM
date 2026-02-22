@@ -155,15 +155,18 @@ namespace VPetLLM.Core.Data.Managers
         private async Task CompressHistory()
         {
             var validHistory = _history.Where(m => !string.IsNullOrWhiteSpace(m.Content)).ToList();
-            var lastUserMessageIndex = validHistory.FindLastIndex(m => m.Role == "user");
 
-            if (lastUserMessageIndex == -1)
+            // 计算保留消息数
+            var retainCount = Math.Max(1, _settings.CompressionRetainCount);
+
+            // 保留最后 retainCount 条消息（确保不超过总消息数）
+            if (validHistory.Count <= retainCount)
             {
-                return;
+                return; // 消息不够，无需压缩
             }
 
-            var messagesToKeep = validHistory.Skip(lastUserMessageIndex).ToList();
-            var historyToCompress = validHistory.Take(lastUserMessageIndex)
+            var messagesToKeep = validHistory.Skip(validHistory.Count - retainCount).ToList();
+            var historyToCompress = validHistory.Take(validHistory.Count - retainCount)
                                                  .Where(m => m.Role == "user" || m.Role == "assistant")
                                                  .ToList();
 
@@ -174,6 +177,13 @@ namespace VPetLLM.Core.Data.Managers
 
             var historyText = string.Join("\n", historyToCompress.Select(m => m.Content));
             var systemPrompt = PromptHelper.Get("Context_Summary_Prefix", _settings.PromptLanguage);
+
+            // AI 动态保留模式：让 AI 判断应该额外保留多少条近期消息
+            if (_settings.EnableAIRetainCount)
+            {
+                systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RetainHint", _settings.PromptLanguage);
+            }
+
             var summary = await _chatCore.Summarize(systemPrompt, historyText);
 
             if (string.IsNullOrWhiteSpace(summary))

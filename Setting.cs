@@ -36,6 +36,8 @@ namespace VPetLLM
         public CompressionTriggerMode CompressionMode { get; set; } = CompressionTriggerMode.MessageCount;
         public int HistoryCompressionThreshold { get; set; } = 20;
         public int HistoryCompressionTokenThreshold { get; set; } = 4000;
+        public int CompressionRetainCount { get; set; } = 4;
+        public bool EnableAIRetainCount { get; set; } = false;
         public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         public bool ShowUninstallWarning { get; set; } = true;

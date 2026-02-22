@@ -398,6 +398,8 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_CompressionMode")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_CompressionRetainCount")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_EnableAIRetainCount")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
@@ -772,6 +774,8 @@ namespace VPetLLM.UI.Windows
 
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text = _plugin.Settings.HistoryCompressionThreshold.ToString();
             ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).Text = _plugin.Settings.HistoryCompressionTokenThreshold.ToString();
+            ((TextBox)this.FindName("TextBox_CompressionRetainCount")).Text = _plugin.Settings.CompressionRetainCount.ToString();
+            ((CheckBox)this.FindName("CheckBox_EnableAIRetainCount")).IsChecked = _plugin.Settings.EnableAIRetainCount;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).Text = _plugin.Settings.MaxLogCount.ToString();
             ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
@@ -1248,6 +1252,12 @@ namespace VPetLLM.UI.Windows
 
             if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).Text, out int historyCompressionTokenThreshold))
                 _plugin.Settings.HistoryCompressionTokenThreshold = historyCompressionTokenThreshold;
+
+            if (int.TryParse(((TextBox)this.FindName("TextBox_CompressionRetainCount")).Text, out int compressionRetainCount))
+                _plugin.Settings.CompressionRetainCount = compressionRetainCount;
+
+            if (this.FindName("CheckBox_EnableAIRetainCount") is CheckBox cbAIRetain)
+                _plugin.Settings.EnableAIRetainCount = cbAIRetain.IsChecked ?? false;
 
             _plugin.Settings.LogAutoScroll = logAutoScrollCheckBox.IsChecked ?? true;
             if (int.TryParse(maxLogCountTextBox.Text, out int maxLogCount))
@@ -2339,6 +2349,9 @@ namespace VPetLLM.UI.Windows
                     textBlockCurrentTokenCount.Text = "0";
                 }
             }
+
+            // 总结后保留对话消息数
+            if (FindName("TextBlock_CompressionRetainCount") is TextBlock textBlockCompressionRetainCount) textBlockCompressionRetainCount.Text = LanguageHelper.Get("Advanced_Options.CompressionRetainCount", langCode);
 
             // 记录器高级设置本地化
             if (FindName("TextBlock_RecordsAdvancedTitle") is TextBlock textBlockRecordsAdvancedTitle) textBlockRecordsAdvancedTitle.Text = LanguageHelper.Get("Advanced_Options.RecordsAdvancedTitle", langCode);

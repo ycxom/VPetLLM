@@ -2601,6 +2601,32 @@
                                             Foreground="{StaticResource SecondaryTextBrush}"
                                             FontSize="14"/>
                                 </StackPanel>
+
+                                <!-- 总结后保留对话消息数 -->
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="20,12,0,12">
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.CompressionRetainCount}"
+                                            VerticalAlignment="Center"
+                                            x:Name="TextBlock_CompressionRetainCount"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="140"/>
+                                    <TextBox x:Name="TextBox_CompressionRetainCount"
+                                            Width="70"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <CheckBox x:Name="CheckBox_EnableAIRetainCount"
+                                            Content="{utils:Localize KeyPath=Advanced_Options.EnableAIRetainCount, Default=AI 动态调优}"
+                                            VerticalAlignment="Center"
+                                            Margin="20,0,0,0"
+                                            Style="{StaticResource ModernCheckBox}">
+                                        <CheckBox.ToolTip>
+                                            <ToolTip>
+                                                <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableAIRetainCountTooltip, Default=启用后 AI 将在总结时自动判断应额外保留的近期消息数量}"/>
+                                            </ToolTip>
+                                        </CheckBox.ToolTip>
+                                    </CheckBox>
+                                </StackPanel>
                             </StackPanel>
 
                             <!-- 强化记忆高级设置 -->
