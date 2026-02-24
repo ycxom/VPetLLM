@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace VPetLLM.Core.Data.Managers
 {
     public class HistoryManager
@@ -184,11 +186,23 @@ namespace VPetLLM.Core.Data.Managers
                 systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RetainHint", _settings.PromptLanguage);
             }
 
+            // 压缩时写入记忆：指示 AI 将重要事件写入记忆库
+            if (_settings.EnableCompressionRecords && _chatCore?.RecordManager != null)
+            {
+                systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RecordHint", _settings.PromptLanguage);
+            }
+
             var summary = await _chatCore.Summarize(systemPrompt, historyText);
 
             if (string.IsNullOrWhiteSpace(summary))
             {
                 return;
+            }
+
+            // 从总结中提取并执行记忆命令，然后清理总结文本
+            if (_settings.EnableCompressionRecords && _chatCore?.RecordManager != null)
+            {
+                summary = ExtractAndExecuteRecordCommands(summary);
             }
 
             var newHistory = new List<Message>
@@ -206,6 +220,54 @@ namespace VPetLLM.Core.Data.Managers
             catch (Exception ex)
             {
                 Logger.Log($"压缩历史记录后更新数据库失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 从总结文本中提取 record 命令并执行，返回清理后的纯总结文本
+        /// </summary>
+        private string ExtractAndExecuteRecordCommands(string summary)
+        {
+            try
+            {
+                var recordRegex = new Regex(
+                    @"<\|\s*record\s*_begin\s*\|>(.*?)<\|\s*record\s*_end\s*\|>",
+                    RegexOptions.Singleline);
+
+                var matches = recordRegex.Matches(summary);
+                if (matches.Count == 0)
+                    return summary;
+
+                var textRegex = new Regex(@"text\s*\(\s*""([^""]*)""\s*\)");
+                var weightRegex = new Regex(@"weight\s*\(\s*(\d+)\s*\)");
+
+                foreach (Match match in matches)
+                {
+                    var commandValue = match.Groups[1].Value;
+                    var textMatch = textRegex.Match(commandValue);
+                    var weightMatch = weightRegex.Match(commandValue);
+
+                    if (textMatch.Success)
+                    {
+                        var content = textMatch.Groups[1].Value;
+                        var weight = weightMatch.Success ? int.Parse(weightMatch.Groups[1].Value) : 5;
+                        weight = Math.Clamp(weight, 1, 10);
+
+                        var recordId = _chatCore.RecordManager.CreateRecord(content, weight);
+                        Logger.Log($"压缩记忆提取: 已创建记录 #{recordId} - '{content}' (权重: {weight})");
+                    }
+                }
+
+                // 清理总结文本：移除所有 record 命令标签
+                var cleaned = recordRegex.Replace(summary, "").Trim();
+                // 清理多余空行
+                cleaned = Regex.Replace(cleaned, @"\n{3,}", "\n\n");
+                return cleaned;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"压缩记忆提取失败: {ex.Message}");
+                return summary;
             }
         }
 

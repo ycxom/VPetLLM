@@ -2627,6 +2627,21 @@
                                         </CheckBox.ToolTip>
                                     </CheckBox>
                                 </StackPanel>
+
+                                <!-- 压缩时写入记忆 -->
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="20,0,0,12">
+                                    <CheckBox x:Name="CheckBox_EnableCompressionRecords"
+                                            Content="{utils:Localize KeyPath=Advanced_Options.EnableCompressionRecords, Default=总结时写入记忆}"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource ModernCheckBox}">
+                                        <CheckBox.ToolTip>
+                                            <ToolTip>
+                                                <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableCompressionRecordsTooltip, Default=启用后 AI 在压缩上下文时会自动将重要事件写入记忆库}"/>
+                                            </ToolTip>
+                                        </CheckBox.ToolTip>
+                                    </CheckBox>
+                                </StackPanel>
                             </StackPanel>
 
                             <!-- 强化记忆高级设置 -->

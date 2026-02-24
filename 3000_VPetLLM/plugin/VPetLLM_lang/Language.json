@@ -772,6 +772,18 @@
             "zh-hant": "啟用後 AI 將在總結時自動判斷應額外保留的近期消息數量，以實現無縫聊天體驗",
             "jp": "有効にすると、AIが要約時にシームレスな会話の連続性のために追加で保持すべき最近のメッセージ数を自動的に判断します"
         },
+        "EnableCompressionRecords": {
+            "en": "Write to Memory on Summary",
+            "zh-hans": "总结时写入记忆",
+            "zh-hant": "總結時寫入記憶",
+            "jp": "要約時にメモリに書き込む"
+        },
+        "EnableCompressionRecordsTooltip": {
+            "en": "When enabled, AI will automatically extract important events and write them to the memory database during context compression",
+            "zh-hans": "启用后 AI 在压缩上下文时会自动将重要事件写入记忆库",
+            "zh-hant": "啟用後 AI 在壓縮上下文時會自動將重要事件寫入記憶庫",
+            "jp": "有効にすると、AIがコンテキスト圧縮時に重要なイベントを自動的にメモリデータベースに書き込みます"
+        },
         "RecordsAdvancedTitle": {
             "en": "Enhanced Memory Advanced Settings",
             "zh-hans": "强化记忆高级设置",

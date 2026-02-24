@@ -400,6 +400,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_CompressionRetainCount")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_EnableAIRetainCount")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableCompressionRecords")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
@@ -776,6 +777,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).Text = _plugin.Settings.HistoryCompressionTokenThreshold.ToString();
             ((TextBox)this.FindName("TextBox_CompressionRetainCount")).Text = _plugin.Settings.CompressionRetainCount.ToString();
             ((CheckBox)this.FindName("CheckBox_EnableAIRetainCount")).IsChecked = _plugin.Settings.EnableAIRetainCount;
+            ((CheckBox)this.FindName("CheckBox_EnableCompressionRecords")).IsChecked = _plugin.Settings.EnableCompressionRecords;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).Text = _plugin.Settings.MaxLogCount.ToString();
             ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
@@ -1258,6 +1260,9 @@ namespace VPetLLM.UI.Windows
 
             if (this.FindName("CheckBox_EnableAIRetainCount") is CheckBox cbAIRetain)
                 _plugin.Settings.EnableAIRetainCount = cbAIRetain.IsChecked ?? false;
+
+            if (this.FindName("CheckBox_EnableCompressionRecords") is CheckBox cbCompRecords)
+                _plugin.Settings.EnableCompressionRecords = cbCompRecords.IsChecked ?? false;
 
             _plugin.Settings.LogAutoScroll = logAutoScrollCheckBox.IsChecked ?? true;
             if (int.TryParse(maxLogCountTextBox.Text, out int maxLogCount))
