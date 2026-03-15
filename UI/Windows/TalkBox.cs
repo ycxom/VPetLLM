@@ -20,6 +20,9 @@ namespace VPetLLM.UI.Windows
         private StreamingState _streamingState = StreamingState.Idle;
         private readonly object _stateLock = new object();
 
+        // 回复级别串行化：确保多个AI回复按顺序处理，防止跨回复的消息乱序
+        private static readonly SemaphoreSlim _responseLock = new SemaphoreSlim(1, 1);
+
         /// <summary>
         /// 获取消息处理器（用于流式处理等待）
         /// </summary>
@@ -133,9 +136,16 @@ namespace VPetLLM.UI.Windows
                     {
                         Logger.Log($"HandleResponse: 检测到完整消息，使用统一流式处理器拆分处理");
 
-                        // 使用StreamingCommandProcessor处理完整消息
-                        // 这样可以统一流式和非流式的处理逻辑
-                        await ProcessCompleteMessageAsStreaming(response);
+                        // 等待前一个回复处理完成，保证回复间的命令顺序
+                        await _responseLock.WaitAsync();
+                        try
+                        {
+                            await ProcessCompleteMessageAsStreaming(response);
+                        }
+                        finally
+                        {
+                            _responseLock.Release();
+                        }
                     }
                     else
                     {
