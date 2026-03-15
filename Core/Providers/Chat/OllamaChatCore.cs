@@ -118,7 +118,6 @@ namespace VPetLLM.Core.Providers.Chat
                 using (var client = GetClient())
                 {
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
-                    client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
 
                     if (_ollamaSetting.EnableStreaming)
                     {
@@ -272,7 +271,6 @@ namespace VPetLLM.Core.Providers.Chat
                 using (var client = GetClient())
                 {
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
-                    client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
 
                     if (_ollamaSetting.EnableStreaming)
                     {
@@ -399,7 +397,6 @@ namespace VPetLLM.Core.Providers.Chat
                 using (var client = GetClient())
                 {
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
-                    client.Timeout = TimeSpan.FromSeconds(120); // 设置2分钟超时
                     var response = await client.PostAsync("/api/generate", content);
 
                     if (!response.IsSuccessStatusCode)
@@ -459,7 +456,6 @@ namespace VPetLLM.Core.Providers.Chat
                 using (var client = GetClient())
                 {
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
-                    client.Timeout = TimeSpan.FromSeconds(30); // 获取模型列表用较短超时
                     var response = client.GetAsync("/api/tags").Result;
 
                     if (!response.IsSuccessStatusCode)

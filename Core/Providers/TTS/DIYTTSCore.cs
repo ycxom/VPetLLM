@@ -38,7 +38,9 @@ namespace VPetLLM.Core.Providers.TTS
                 var baseUrl = _diyConfig.BaseUrl?.TrimEnd('/');
                 var requestMethod = _diyConfig.Method?.ToUpper() ?? "POST";
                 var contentType = _diyConfig.ContentType ?? "application/json";
-                const int timeout = 30000; // 默认30秒超时
+                var timeoutSeconds = Settings?.TTS?.RequestTimeoutSeconds ?? 30;
+                if (timeoutSeconds <= 0) timeoutSeconds = 30;
+                var timeoutMs = timeoutSeconds * 1000;
 
                 // 验证URL格式
                 if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
@@ -50,7 +52,7 @@ namespace VPetLLM.Core.Providers.TTS
                 HttpResponseMessage response;
 
                 // 设置超时时间
-                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout));
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
 
                 if (requestMethod == "POST")
                 {

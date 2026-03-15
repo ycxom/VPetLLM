@@ -112,6 +112,12 @@
             "zh-hant": "強化記憶（重要事情記錄器）",
             "jp": "強化メモリ（重要な記録）"
         },
+        "RequestTimeout": {
+            "en": "Request Timeout (seconds, 0=default)",
+            "zh-hans": "请求超时时间（秒，0=默认）",
+            "zh-hant": "請求超時時間（秒，0=默認）",
+            "jp": "リクエストタイムアウト（秒、0=デフォルト）"
+        },
         "ClearContext": {
             "en": "Clear Context",
             "zh-hans": "清除上下文",
@@ -1433,6 +1439,12 @@
             "zh-hans": "使用队列下载模式（适用于无法并发请求的接口）",
             "zh-hant": "使用隊列下載模式（適用於無法並發請求的接口）",
             "jp": "キューダウンロードモードを使用（同時リクエストをサポートしないAPIに適用）"
+        },
+        "RequestTimeout": {
+            "en": "Request Timeout (seconds, 0=default)",
+            "zh-hans": "请求超时时间（秒，0=默认）",
+            "zh-hant": "請求超時時間（秒，0=默認）",
+            "jp": "リクエストタイムアウト（秒、0=デフォルト）"
         },
         "Voice": {
             "en": "Voice",

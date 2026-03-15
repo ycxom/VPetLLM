@@ -742,6 +742,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked = _plugin.Settings.SeparateChatByProvider;
             ((CheckBox)this.FindName("CheckBox_EnableRecords")).IsChecked = _plugin.Settings.Records?.EnableRecords ?? true;
+            ((TextBox)this.FindName("TextBox_LLM_RequestTimeout")).Text = _plugin.Settings.LLMRequestTimeoutSeconds.ToString();
 
             // 加载记录器高级设置
             ((TextBox)this.FindName("TextBox_WeightDecayTurns")).Text = (_plugin.Settings.Records?.WeightDecayTurns ?? 1).ToString();
@@ -879,6 +880,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).IsChecked = _plugin.Settings.TTS.IsEnabled;
             ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked = _plugin.Settings.TTS.OnlyPlayAIResponse;
             ((CheckBox)this.FindName("CheckBox_TTS_UseQueueDownload")).IsChecked = _plugin.Settings.TTS.UseQueueDownload;
+            ((TextBox)this.FindName("TextBox_TTS_RequestTimeout")).Text = _plugin.Settings.TTS.RequestTimeoutSeconds.ToString();
             ((Slider)this.FindName("Slider_TTS_Volume")).Value = _plugin.Settings.TTS.Volume;
             ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = _plugin.Settings.TTS.Volume.ToString("F0") + "%";
             ((Slider)this.FindName("Slider_TTS_VolumeGain")).Value = _plugin.Settings.TTS.VolumeGain;
@@ -1211,6 +1213,10 @@ namespace VPetLLM.UI.Windows
             if (_plugin.Settings.Records is null) _plugin.Settings.Records = new Setting.RecordSettings();
             _plugin.Settings.Records.EnableRecords = enableRecordsCheckBox.IsChecked ?? true;
 
+            // 保存 LLM 请求超时
+            if (int.TryParse(((TextBox)this.FindName("TextBox_LLM_RequestTimeout")).Text, out int llmTimeout))
+                _plugin.Settings.LLMRequestTimeoutSeconds = Math.Max(0, llmTimeout);
+
             // 保存记录器高级设置
             var weightDecayTurnsTextBox = (TextBox)this.FindName("TextBox_WeightDecayTurns");
             var maxRecordsLimitTextBox = (TextBox)this.FindName("TextBox_MaxRecordsLimit");
@@ -1334,6 +1340,11 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.TTS.IsEnabled = ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).IsChecked ?? false;
             _plugin.Settings.TTS.OnlyPlayAIResponse = ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked ?? true;
             _plugin.Settings.TTS.UseQueueDownload = ((CheckBox)this.FindName("CheckBox_TTS_UseQueueDownload")).IsChecked ?? false;
+
+            // 保存 TTS 请求超时
+            if (int.TryParse(((TextBox)this.FindName("TextBox_TTS_RequestTimeout")).Text, out int ttsTimeout))
+                _plugin.Settings.TTS.RequestTimeoutSeconds = Math.Max(0, ttsTimeout);
+
             _plugin.Settings.TTS.Volume = ((Slider)this.FindName("Slider_TTS_Volume")).Value;
             _plugin.Settings.TTS.VolumeGain = ((Slider)this.FindName("Slider_TTS_VolumeGain")).Value;
             _plugin.Settings.TTS.Speed = ((Slider)this.FindName("Slider_TTS_Speed")).Value;

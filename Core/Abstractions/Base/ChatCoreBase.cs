@@ -385,7 +385,11 @@ namespace VPetLLM.Core.Abstractions.Base
         protected HttpClient GetClient()
         {
             var handler = CreateHttpClientHandler();
-            return new HttpClient(handler);
+            var client = new HttpClient(handler);
+            var timeoutSeconds = Settings?.LLMRequestTimeoutSeconds ?? 120;
+            if (timeoutSeconds <= 0) timeoutSeconds = 120;
+            client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+            return client;
         }
 
         // 统一将内部 Message 映射为 OpenAI 风格的 { role, content }，避免额外字段

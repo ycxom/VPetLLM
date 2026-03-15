@@ -61,6 +61,11 @@ namespace VPetLLM
         public MediaPlaybackSetting MediaPlayback { get; set; } = new MediaPlaybackSetting();
         public Configuration.FloatingSidebarSettings FloatingSidebar { get; set; } = new Configuration.FloatingSidebarSettings();
         public Configuration.ScreenshotSettings Screenshot { get; set; } = new Configuration.ScreenshotSettings();
+
+        /// <summary>
+        /// LLM 请求超时时间（秒），0 表示使用默认值（120秒）
+        /// </summary>
+        public int LLMRequestTimeoutSeconds { get; set; } = 120;
         
         private readonly string _path;
         private static ISettingStorage? _storage;
@@ -1135,6 +1140,11 @@ namespace VPetLLM
             public double Speed { get; set; } = 1.0;
             public double VolumeGain { get; set; } = 0.0; // 音量增益，单位dB，直接传递给mpv的--af=volume参数
             public bool UseQueueDownload { get; set; } = false; // 是否使用队列下载模式（适用于无法并发请求的接口）
+
+            /// <summary>
+            /// TTS 请求超时时间（秒），0 表示使用默认值（30秒）
+            /// </summary>
+            public int RequestTimeoutSeconds { get; set; } = 30;
 
             // URL TTS 设置
             public URLTTSSetting URL { get; set; } = new URLTTSSetting();

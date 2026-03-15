@@ -255,6 +255,20 @@
                                         Margin="0,0,0,16"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
+
+                                <Label Content="{utils:Localize KeyPath=LLM_Settings.RequestTimeout}"
+                                        Style="{StaticResource SettingLabel}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                    <TextBox x:Name="TextBox_LLM_RequestTimeout"
+                                            Width="80"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                    <TextBlock Text="s"
+                                            VerticalAlignment="Center"
+                                            Margin="6,0,0,0"
+                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                            FontSize="14"/>
+                                </StackPanel>
+
                                 <WrapPanel HorizontalAlignment="Right"
                                         Margin="0,0,0,16">
                                     <Button x:Name="Button_ClearContext"
@@ -1118,6 +1132,19 @@
                                             Margin="0,0,0,16"
                                             IsChecked="False"
                                             Style="{StaticResource ModernCheckBox}"/>
+
+                                            <Label Content="{utils:Localize KeyPath=TTS.RequestTimeout}"
+                                                    Style="{StaticResource SettingLabel}"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                                <TextBox x:Name="TextBox_TTS_RequestTimeout"
+                                                        Width="80"
+                                                        Style="{StaticResource ModernTextBox}"/>
+                                                <TextBlock Text="s"
+                                                        VerticalAlignment="Center"
+                                                        Margin="6,0,0,0"
+                                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                                        FontSize="14"/>
+                                            </StackPanel>
 
                                             <StackPanel Orientation="Horizontal"
                                             Margin="0,0,0,12">

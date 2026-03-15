@@ -29,8 +29,10 @@ namespace VPetLLM.Core.Providers.Chat
             var handler = CreateHttpClientHandler();
             _httpClient = new HttpClient(handler);
 
-            // 设置超时时间为30秒，避免长时间等待
-            _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            // 使用配置的超时时间
+            var timeoutSeconds = setting?.LLMRequestTimeoutSeconds ?? 30;
+            if (timeoutSeconds <= 0) timeoutSeconds = 30;
+            _httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
             // 设置API密钥
             _httpClient.DefaultRequestHeaders.Authorization =

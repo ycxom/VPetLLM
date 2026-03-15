@@ -115,9 +115,11 @@ namespace VPetLLM.Core.Abstractions.Base
                 handler.Proxy = null;
             }
 
+            var timeoutSeconds = Settings?.TTS?.RequestTimeoutSeconds ?? 30;
+            if (timeoutSeconds <= 0) timeoutSeconds = 30;
             return new HttpClient(handler)
             {
-                Timeout = TimeSpan.FromSeconds(30)
+                Timeout = TimeSpan.FromSeconds(timeoutSeconds)
             };
         }
     }
