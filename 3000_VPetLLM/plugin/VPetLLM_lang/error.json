@@ -268,5 +268,23 @@
         "zh-hant": "所有 Gemini 節點均請求失敗，請檢查網絡或節點配置",
         "en": "All Gemini nodes failed. Please check your network or node configuration.",
         "jp": "すべてのGeminiノードが失敗しました。ネットワークまたはノード設定を確認してください。"
+    },
+    "LMStudio.Error.Timeout": {
+        "zh-hans": "LM Studio请求超时，请检查：\n1. LM Studio服务是否正常运行\n2. 模型是否已加载\n3. 网络连接是否正常\n4. URL配置是否正确",
+        "zh-hant": "LM Studio請求超時，請檢查：\n1. LM Studio服務是否正常運行\n2. 模型是否已加載\n3. 網絡連接是否正常\n4. URL配置是否正確",
+        "en": "LM Studio request timed out. Please check:\n1. Is LM Studio service running properly\n2. Is the model loaded\n3. Is the network connection normal\n4. Is the URL configuration correct",
+        "jp": "LM Studioリクエストがタイムアウトしました。以下を確認してください：\n1. LM Studioサービスが正常に動作しているか\n2. モデルが読み込まれているか\n3. ネットワーク接続が正常か\n4. URL設定が正しいか"
+    },
+    "LMStudio.Error.ConnectionFailed": {
+        "zh-hans": "LM Studio连接失败，请检查：\n1. LM Studio服务是否启动\n2. LM Studio的API服务器是否启用\n3. URL配置是否正确\n4. 防火墙设置",
+        "zh-hant": "LM Studio連接失敗，請檢查：\n1. LM Studio服務是否啟動\n2. LM Studio的API服務器是否啟用\n3. URL配置是否正確\n4. 防火牆設置",
+        "en": "LM Studio connection failed. Please check:\n1. Is LM Studio service started\n2. Is LM Studio API server enabled\n3. Is the URL configuration correct\n4. Firewall settings",
+        "jp": "LM Studio接続に失敗しました。以下を確認してください：\n1. LM Studioサービスが起動しているか\n2. LM Studio APIサーバーが有効になっているか\n3. URL設定が正しいか\n4. ファイアウォール設定"
+    },
+    "LMStudio.Error.VisionNotEnabled": {
+        "zh-hans": "LM Studio未启用视觉能力，请在设置中启用 EnableVision",
+        "zh-hant": "LM Studio未啟用視覺能力，請在設置中啟用 EnableVision",
+        "en": "LM Studio vision capability not enabled. Please enable EnableVision in settings.",
+        "jp": "LM Studioのビジョン機能有効になっていません。設定でEnableVisionを有効にしてください。"
     }
 }

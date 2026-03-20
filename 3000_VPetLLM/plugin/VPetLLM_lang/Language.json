@@ -589,6 +589,80 @@
             "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
         }
     },
+    "LMStudio": {
+        "Header": {
+            "en": "LM Studio",
+            "zh-hans": "LM Studio",
+            "zh-hant": "LM Studio",
+            "jp": "LM Studio"
+        },
+        "URL": {
+            "en": "URL",
+            "zh-hans": "URL",
+            "zh-hant": "URL",
+            "jp": "URL"
+        },
+        "URLPlaceholder": {
+            "en": "http://localhost:1234",
+            "zh-hans": "http://localhost:1234",
+            "zh-hant": "http://localhost:1234",
+            "jp": "http://localhost:1234"
+        },
+        "Model": {
+            "en": "Model",
+            "zh-hans": "模型",
+            "zh-hant": "模型",
+            "jp": "モデル"
+        },
+        "ModelPlaceholder": {
+            "en": "Model name (optional, auto-detect if empty)",
+            "zh-hans": "模型名称（留空则自动检测）",
+            "zh-hant": "模型名稱（留空則自動檢測）",
+            "jp": "モデル名（空欄の場合は自動検出）"
+        },
+        "Refresh": {
+            "en": "Refresh",
+            "zh-hans": "刷新",
+            "zh-hant": "刷新",
+            "jp": "更新"
+        },
+        "EnableAdvanced": {
+            "en": "Enable Advanced Configuration",
+            "zh-hans": "启用高级配置",
+            "zh-hant": "啟用高級配置",
+            "jp": "詳細設定を有効にする"
+        },
+        "EnableStreaming": {
+            "en": "Enable Streaming",
+            "zh-hans": "启用流式传输",
+            "zh-hant": "啟用流式傳輸",
+            "jp": "ストリーミングを有効にする"
+        },
+        "Temperature": {
+            "en": "Temperature:",
+            "zh-hans": "温度:",
+            "zh-hant": "溫度:",
+            "jp": "温度:"
+        },
+        "MaxTokens": {
+            "en": "Max Tokens:",
+            "zh-hans": "最大Token:",
+            "zh-hant": "最大Token:",
+            "jp": "最大トークン:"
+        },
+        "EnableVision": {
+            "en": "Enable Vision",
+            "zh-hans": "启用视觉",
+            "zh-hant": "啟用視覺",
+            "jp": "ビジョンを有効にする"
+        },
+        "EnableVisionTooltip": {
+            "en": "Enable vision capability to process images and screenshots",
+            "zh-hans": "启用视觉能力以处理图片和截图",
+            "zh-hant": "啟用視覺能力以處理圖片和截圖",
+            "jp": "ビジョン機能を有効にして画像とスクリーンショットを処理"
+        }
+    },
     "ChannelMode": {
         "Unrestricted": {
             "en": "Unrestricted",

@@ -706,6 +706,10 @@ namespace VPetLLM.UI.Windows
             {
                 _plugin.Settings.Free = new Setting.FreeSetting();
             }
+            if (_plugin.Settings.LMStudio is null)
+            {
+                _plugin.Settings.LMStudio = new Setting.LMStudioSetting();
+            }
             if (_plugin.Settings.Ollama is null)
             {
                 _plugin.Settings.Ollama = new Setting.OllamaSetting();
@@ -810,6 +814,16 @@ namespace VPetLLM.UI.Windows
             ((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
             ((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
             ((TextBox)this.FindName("TextBox_Free_MaxTokens")).Text = _plugin.Settings.Free.MaxTokens.ToString();
+
+            // LM Studio 设置
+            ((TextBox)this.FindName("TextBox_LMStudioUrl")).Text = _plugin.Settings.LMStudio.Url;
+            ((ComboBox)this.FindName("ComboBox_LMStudioModel")).Text = _plugin.Settings.LMStudio.Model;
+            ((CheckBox)this.FindName("CheckBox_LMStudio_EnableStreaming")).IsChecked = _plugin.Settings.LMStudio.EnableStreaming;
+            ((CheckBox)this.FindName("CheckBox_LMStudio_EnableVision")).IsChecked = _plugin.Settings.LMStudio.EnableVision;
+            ((CheckBox)this.FindName("CheckBox_LMStudio_EnableAdvanced")).IsChecked = _plugin.Settings.LMStudio.EnableAdvanced;
+            ((Slider)this.FindName("Slider_LMStudio_Temperature")).Value = _plugin.Settings.LMStudio.Temperature;
+            ((TextBlock)this.FindName("TextBlock_LMStudio_TemperatureValue")).Text = _plugin.Settings.LMStudio.Temperature.ToString("F2");
+            ((TextBox)this.FindName("TextBox_LMStudio_MaxTokens")).Text = _plugin.Settings.LMStudio.MaxTokens.ToString();
 
             // 加载Free Chat配置的提供者信息
             LoadFreeProviderInfo();
@@ -1308,6 +1322,22 @@ namespace VPetLLM.UI.Windows
             if (freeMaxTokensTextBox is not null && int.TryParse(freeMaxTokensTextBox.Text, out int freeMaxTokens))
                 _plugin.Settings.Free.MaxTokens = freeMaxTokens;
 
+            // 保存 LM Studio 设置
+            if (this.FindName("TextBox_LMStudioUrl") is TextBox lmStudioUrlTextBox)
+                _plugin.Settings.LMStudio.Url = lmStudioUrlTextBox.Text;
+            if (this.FindName("ComboBox_LMStudioModel") is ComboBox lmStudioModelComboBox)
+                _plugin.Settings.LMStudio.Model = lmStudioModelComboBox.Text;
+            if (this.FindName("CheckBox_LMStudio_EnableStreaming") is CheckBox lmStudioEnableStreamingCheckBox)
+                _plugin.Settings.LMStudio.EnableStreaming = lmStudioEnableStreamingCheckBox.IsChecked ?? false;
+            if (this.FindName("CheckBox_LMStudio_EnableVision") is CheckBox lmStudioEnableVisionCheckBox)
+                _plugin.Settings.LMStudio.EnableVision = lmStudioEnableVisionCheckBox.IsChecked ?? false;
+            if (this.FindName("CheckBox_LMStudio_EnableAdvanced") is CheckBox lmStudioEnableAdvancedCheckBox)
+                _plugin.Settings.LMStudio.EnableAdvanced = lmStudioEnableAdvancedCheckBox.IsChecked ?? false;
+            if (this.FindName("Slider_LMStudio_Temperature") is Slider lmStudioTemperatureSlider)
+                _plugin.Settings.LMStudio.Temperature = lmStudioTemperatureSlider.Value;
+            if (this.FindName("TextBox_LMStudio_MaxTokens") is TextBox lmStudioMaxTokensTextBox && int.TryParse(lmStudioMaxTokensTextBox.Text, out int lmStudioMaxTokens))
+                _plugin.Settings.LMStudio.MaxTokens = lmStudioMaxTokens;
+
             _plugin.Settings.Tools = new List<Setting.ToolSetting>((IEnumerable<Setting.ToolSetting>)toolsDataGrid.ItemsSource);
 
             // Proxy settings
@@ -1510,6 +1540,7 @@ namespace VPetLLM.UI.Windows
                     Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Gemini => new GeminiChatCore(GetCurrentGeminiSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.LMStudio => new LMStudioChatCore(_plugin.Settings.LMStudio, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
 
@@ -1546,7 +1577,39 @@ namespace VPetLLM.UI.Windows
             }
             finally
             {
-                // 确保在UI线程上停止动画和重置按钮状态（使用异步避免潜在阻塞）
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    StopButtonLoadingAnimation(button);
+
+                    if (button is not null)
+                    {
+                        button.IsEnabled = true;
+                        button.UpdateLayout();
+                    }
+                }, System.Windows.Threading.DispatcherPriority.Background);
+            }
+        }
+
+        private async void Button_RefreshLMStudioModels_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            StartButtonLoadingAnimation(button);
+
+            try
+            {
+                var lmStudioCore = new LMStudioChatCore(_plugin.Settings.LMStudio, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+                var models = await Task.Run(() => lmStudioCore.RefreshModels());
+                ((ComboBox)this.FindName("ComboBox_LMStudioModel")).ItemsSource = models;
+                if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_LMStudioModel")).Text))
+                    ((ComboBox)this.FindName("ComboBox_LMStudioModel")).SelectedIndex = 0;
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"刷新LM Studio模型失败: {ex.Message}",
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
                 await Dispatcher.InvokeAsync(() =>
                 {
                     StopButtonLoadingAnimation(button);

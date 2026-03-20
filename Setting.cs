@@ -13,6 +13,7 @@ namespace VPetLLM
         public OpenAISetting OpenAI { get; set; } = new OpenAISetting();
         public GeminiSetting Gemini { get; set; } = new GeminiSetting();
         public FreeSetting Free { get; set; } = new FreeSetting();
+        public LMStudioSetting LMStudio { get; set; } = new LMStudioSetting();
         public string AiName { get; set; } = "虚拟宠物";
         public string UserName { get; set; } = "主人";
         public string Role { get; set; } = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回应我。";
@@ -1065,6 +1066,17 @@ namespace VPetLLM
             public bool EnableVision { get; set; } = false;
         }
 
+        public class LMStudioSetting
+        {
+            public string Url { get; set; } = "http://localhost:1234";
+            public string? Model { get; set; }
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
+            public bool EnableVision { get; set; } = false;
+        }
+
         public class ToolSetting
         {
             public string Name { get; set; } = "";
@@ -1078,7 +1090,8 @@ namespace VPetLLM
             Ollama,
             OpenAI,
             Gemini,
-            Free
+            Free,
+            LMStudio
         }
 
         public enum CompressionTriggerMode

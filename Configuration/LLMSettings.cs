@@ -31,6 +31,11 @@ namespace VPetLLM.Configuration
         public Setting.FreeSetting Free { get; set; } = new();
 
         /// <summary>
+        /// LM Studio 设置
+        /// </summary>
+        public Setting.LMStudioSetting LMStudio { get; set; } = new();
+
+        /// <summary>
         /// 是否保持上下文
         /// </summary>
         public bool KeepContext { get; set; } = true;
@@ -102,6 +107,13 @@ namespace VPetLLM.Configuration
 
                 case Setting.LLMType.Free:
                     // Free 模式不需要额外验证
+                    break;
+
+                case Setting.LLMType.LMStudio:
+                    if (string.IsNullOrWhiteSpace(LMStudio?.Url))
+                    {
+                        result.AddError("LM Studio URL is required");
+                    }
                     break;
             }
 

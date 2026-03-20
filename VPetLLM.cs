@@ -380,6 +380,10 @@ namespace VPetLLM
                         ChatCore = new FreeChatCore(Settings.Free, Settings, MW, ActionProcessor);
                         Logger.Log("Chat core set to Free.");
                         break;
+                    case SettingClass.LLMType.LMStudio:
+                        ChatCore = new LMStudioChatCore(Settings.LMStudio, Settings, MW, ActionProcessor);
+                        Logger.Log("Chat core set to LM Studio.");
+                        break;
                 }
                 
                 if (ChatCore != null)
