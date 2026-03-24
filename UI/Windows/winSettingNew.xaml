@@ -541,10 +541,22 @@
                                                 <Label Content="{utils:Localize KeyPath=OpenAI.ApiAddress, Suffix=:}"
                                                         Grid.Row="3" Grid.Column="0"
                                                         Style="{StaticResource SettingLabel}"/>
-                                                <TextBox x:Name="TextBox_OpenAIUrl"
-                                                        Grid.Row="3" Grid.Column="1"
-                                                        Margin="10,0,0,8"
-                                                        Style="{StaticResource ModernTextBox}"/>
+                                                <Grid Grid.Row="3" Grid.Column="1" Margin="10,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="TextBox_OpenAIUrl"
+                                                            Grid.Column="0"
+                                                            Style="{StaticResource ModernTextBox}"/>
+                                                    <ComboBox x:Name="ComboBox_OpenAIUrlPreset"
+                                                              Grid.Column="1"
+                                                              Width="120"
+                                                              Margin="8,0,0,0"
+                                                              SelectionChanged="ComboBox_OpenAIUrlPreset_SelectionChanged"
+                                                              ToolTip="{utils:Localize KeyPath=OpenAI.PresetTip, Default=选择预设端点}"
+                                                              Style="{StaticResource ModernComboBox}"/>
+                                                </Grid>
                                             </Grid>
 
                                             <CheckBox x:Name="CheckBox_OpenAI_EnableStreaming"

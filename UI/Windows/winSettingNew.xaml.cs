@@ -798,6 +798,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).Text = _plugin.Settings.OpenAI.MaxTokens.ToString();
             // 刷新OpenAI多节点列表，确保迁移后的节点显示且避免空引用
             RefreshOpenAINodesList();
+            _ = InitializeOpenAIUrlPresetsAsync();
             if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdv)
                 cbGemAdv.IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
             if (this.FindName("Slider_Gemini_Temperature") is Slider slGemTemp)
@@ -4017,6 +4018,48 @@ namespace VPetLLM.UI.Windows
             }
             if (this.FindName("TextBox_OpenAI_MaxTokens") is TextBox tbMax) tbMax.Text = node.MaxTokens.ToString();
             _isUpdatingNodeDetails = false;
+            SyncPresetSelectionByUrl(node.Url);
+        }
+
+        private void SyncPresetSelectionByUrl(string url)
+        {
+            var cbPreset = this.FindName("ComboBox_OpenAIUrlPreset") as ComboBox;
+            if (cbPreset == null || string.IsNullOrEmpty(url)) return;
+
+            var inputUrl = url.Trim().TrimEnd('/');
+            string bestMatchTag = null;
+
+            foreach (ComboBoxItem item in cbPreset.Items)
+            {
+                var tag = item.Tag?.ToString();
+                if (string.IsNullOrEmpty(tag) || !item.IsEnabled) continue;
+
+                var parts = tag.Split('|');
+                if (parts.Length < 2) continue;
+
+                var presetUrl = parts[1]?.Trim().TrimEnd('/');
+                if (string.Equals(inputUrl, presetUrl, StringComparison.OrdinalIgnoreCase))
+                {
+                    bestMatchTag = tag;
+                    break;
+                }
+            }
+
+            if (bestMatchTag != null)
+            {
+                foreach (ComboBoxItem item in cbPreset.Items)
+                {
+                    if (item.Tag?.ToString() == bestMatchTag)
+                    {
+                        cbPreset.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                cbPreset.SelectedIndex = 0;
+            }
         }
 
         private void OpenAINodeDetail_TextChanged(object sender, TextChangedEventArgs e)
@@ -4132,7 +4175,7 @@ namespace VPetLLM.UI.Windows
                 cbModel.DropDownClosed += OpenAIModel_DropDownClosed;
                 cbModel.KeyDown += OpenAIModel_KeyDown;
             }
-            if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl) { tbUrl.TextChanged += OpenAINodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; }
+            if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl) { tbUrl.TextChanged += OpenAINodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; tbUrl.TextChanged += TextBox_OpenAIUrl_TextChanged; }
             if (this.FindName("CheckBox_OpenAI_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += OpenAINodeDetail_Click;
             if (this.FindName("CheckBox_OpenAI_EnableStreaming") is CheckBox cbStream) cbStream.Click += OpenAINodeDetail_Click;
             if (this.FindName("CheckBox_OpenAI_EnableVision") is CheckBox cbVision) cbVision.Click += OpenAINodeDetail_Click;
@@ -4344,7 +4387,13 @@ namespace VPetLLM.UI.Windows
         {
             if (this.FindName("TextBox_GeminiNodeName") is TextBox tbName) tbName.TextChanged += GeminiNodeDetail_TextChanged;
             if (this.FindName("PasswordBox_GeminiApiKey") is PasswordBox pb) pb.PasswordChanged += GeminiNodeDetail_PasswordChanged;
-            if (this.FindName("ComboBox_GeminiNodeModel") is ComboBox cbModel) cbModel.SelectionChanged += GeminiNodeDetail_SelectionChanged;
+            if (this.FindName("ComboBox_GeminiNodeModel") is ComboBox cbModel)
+            {
+                cbModel.SelectionChanged += GeminiNodeDetail_SelectionChanged;
+                cbModel.LostFocus += GeminiNodeModel_LostFocus;
+                cbModel.DropDownClosed += GeminiNodeModel_DropDownClosed;
+                cbModel.KeyDown += GeminiNodeModel_KeyDown;
+            }
             if (this.FindName("TextBox_GeminiNodeUrl") is TextBox tbUrl) { tbUrl.TextChanged += GeminiNodeDetail_TextChanged; tbUrl.LostFocus += Detail_TextBox_LostFocus; }
             if (this.FindName("CheckBox_GeminiNode_EnableAdvanced") is CheckBox cbAdv) cbAdv.Click += GeminiNodeDetail_Click;
             if (this.FindName("CheckBox_GeminiNode_EnableStreaming") is CheckBox cbStream) cbStream.Click += GeminiNodeDetail_Click;
@@ -4393,6 +4442,8 @@ namespace VPetLLM.UI.Windows
                     else
                     {
                         pbx.Password = tbx.Text;
+                        if (GetSelectedOpenAINode() is Setting.OpenAINodeSetting node)
+                            node.ApiKey = tbx.Text;
                         tbx.Visibility = Visibility.Collapsed;
                         pbx.Visibility = Visibility.Visible;
                     }
@@ -4423,6 +4474,8 @@ namespace VPetLLM.UI.Windows
                     else
                     {
                         pbx.Password = tbx.Text;
+                        if (GetSelectedGeminiNode() is Setting.GeminiNodeSetting node)
+                            node.ApiKey = tbx.Text;
                         tbx.Visibility = Visibility.Collapsed;
                         pbx.Visibility = Visibility.Visible;
                     }
@@ -4514,6 +4567,33 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+        private void GeminiNodeModel_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedGeminiNode();
+            if (node is null) return;
+            if (sender is ComboBox cb)
+            {
+                node.Model = cb.Text;
+                ScheduleGeminiListRefresh();
+                SaveSettings();
+            }
+        }
+
+        private void GeminiNodeModel_DropDownClosed(object sender, EventArgs e)
+        {
+            GeminiNodeModel_LostFocus(sender, null);
+        }
+
+        private void GeminiNodeModel_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                GeminiNodeModel_LostFocus(sender, null);
+                e.Handled = true;
+            }
+        }
+
         private void ComboBox_ASR_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateASRProviderPanel();
@@ -4568,6 +4648,142 @@ namespace VPetLLM.UI.Windows
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ASR Provider] 切换提供商时出错: {ex.Message}");
+            }
+        }
+
+        private async Task InitializeOpenAIUrlPresetsAsync()
+        {
+            try
+            {
+                if (this.FindName("ComboBox_OpenAIUrlPreset") is not ComboBox cbPreset)
+                    return;
+
+                cbPreset.Items.Clear();
+                cbPreset.Items.Add(new ComboBoxItem { Content = "--", Tag = "" });
+
+                var presets = await ApiPresetManager.GetPresetsAsync();
+                if (presets?.Categories == null) return;
+
+                foreach (var category in presets.Categories)
+                {
+                    var headerItem = new ComboBoxItem
+                    {
+                        Content = $"=== {category.Name} ===",
+                        Tag = "",
+                        IsEnabled = false
+                    };
+                    cbPreset.Items.Add(headerItem);
+
+                    foreach (var preset in category.Presets)
+                    {
+                        cbPreset.Items.Add(new ComboBoxItem
+                        {
+                            Content = preset.Name,
+                            Tag = $"{category.Name}|{preset.Url}|{preset.DefaultModel}"
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"初始化OpenAI URL预设失败: {ex.Message}");
+            }
+        }
+
+        private void ComboBox_OpenAIUrlPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            var node = GetSelectedOpenAINode();
+            if (node is null) return;
+
+            if (sender is ComboBox cb && cb.SelectedItem is ComboBoxItem item)
+            {
+                var tag = item.Tag?.ToString();
+                if (string.IsNullOrEmpty(tag) || string.IsNullOrEmpty(item.Content?.ToString()) || item.Content.ToString() == "--")
+                    return;
+
+                var parts = tag.Split('|');
+                if (parts.Length >= 2)
+                {
+                    var newUrl = parts[1];
+                    if (node.Url != newUrl)
+                    {
+                        node.Url = newUrl;
+                        if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl)
+                            tbUrl.Text = newUrl;
+                    }
+                    if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
+                    {
+                        node.Model = parts[2];
+                        if (this.FindName("ComboBox_OpenAIModel") is ComboBox cbModel)
+                            cbModel.Text = parts[2];
+                    }
+                    RefreshOpenAINodesList();
+                    SaveSettings();
+                }
+            }
+        }
+
+        private void TextBox_OpenAIUrl_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            if (sender is not TextBox tbUrl) return;
+            var node = GetSelectedOpenAINode();
+            if (node is null) return;
+
+            var inputUrl = tbUrl.Text?.Trim().TrimEnd('/');
+            if (string.IsNullOrEmpty(inputUrl)) return;
+
+            var cbPreset = this.FindName("ComboBox_OpenAIUrlPreset") as ComboBox;
+            if (cbPreset == null) return;
+
+            string bestMatchTag = null;
+            foreach (ComboBoxItem item in cbPreset.Items)
+            {
+                var tag = item.Tag?.ToString();
+                if (string.IsNullOrEmpty(tag) || !item.IsEnabled) continue;
+
+                var parts = tag.Split('|');
+                if (parts.Length < 2) continue;
+
+                var presetUrl = parts[1]?.Trim().TrimEnd('/');
+                if (string.Equals(inputUrl, presetUrl, StringComparison.OrdinalIgnoreCase))
+                {
+                    bestMatchTag = tag;
+                    break;
+                }
+            }
+
+            if (bestMatchTag != null)
+            {
+                foreach (ComboBoxItem item in cbPreset.Items)
+                {
+                    if (item.Tag?.ToString() == bestMatchTag)
+                    {
+                        _isUpdatingNodeDetails = true;
+                        cbPreset.SelectedItem = item;
+                        _isUpdatingNodeDetails = false;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                var firstSelectableIndex = -1;
+                for (int i = 0; i < cbPreset.Items.Count; i++)
+                {
+                    if (cbPreset.Items[i] is ComboBoxItem item && item.IsEnabled && !string.IsNullOrEmpty(item.Tag?.ToString()))
+                    {
+                        firstSelectableIndex = i;
+                        break;
+                    }
+                }
+                if (firstSelectableIndex >= 0 && cbPreset.SelectedIndex != firstSelectableIndex)
+                {
+                    _isUpdatingNodeDetails = true;
+                    cbPreset.SelectedIndex = firstSelectableIndex;
+                    _isUpdatingNodeDetails = false;
+                }
             }
         }
 
