@@ -153,6 +153,138 @@
             "zh-hans": "已成功清空所有记忆记录。",
             "zh-hant": "已成功清空所有記憶記錄。",
             "jp": "すべてのメモリ記録が正常にクリアされました。"
+        },
+        "ChannelManagement": {
+            "en": "Channel Management",
+            "zh-hans": "渠道管理",
+            "zh-hant": "渠道管理",
+            "jp": "チャネル管理"
+        },
+        "ChannelManagementDesc": {
+            "en": "Support adding multiple channels. You can enter multiple API Keys (one per line) within a channel, and the program will automatically rotate them to distribute request frequency.",
+            "zh-hans": "支持添加多个渠道，渠道内可输入多行API Key，程序会自动轮换分散请求频率",
+            "zh-hant": "支持添加多個渠道，渠道內可輸入多行API Key，程序會自動輪換分散請求頻率",
+            "jp": "複数のチャネルの追加をサポートします。チャネル内に複数のAPIキー（1行に1つ）を入力でき、プログラムはリクエスト頻度を分散するために自動的にローテーションします。"
+        },
+        "AddChannel": {
+            "en": "Add Channel",
+            "zh-hans": "添加渠道",
+            "zh-hant": "添加渠道",
+            "jp": "チャネルを追加"
+        },
+        "RemoveSelectedChannel": {
+            "en": "Remove Selected Channel",
+            "zh-hans": "删除选中渠道",
+            "zh-hant": "刪除選中渠道",
+            "jp": "選択したチャネルを削除"
+        },
+        "ChannelName": {
+            "en": "Channel Name",
+            "zh-hans": "渠道名称",
+            "zh-hant": "渠道名稱",
+            "jp": "チャネル名"
+        },
+        "ChannelConfig": {
+            "en": "Channel Configuration",
+            "zh-hans": "渠道配置",
+            "zh-hant": "渠道配置",
+            "jp": "チャネル設定"
+        },
+        "EnableLoadBalancing": {
+            "en": "Enable Load Balancing (Auto-rotate API Keys)",
+            "zh-hans": "启用负载均衡（自动轮换API Key）",
+            "zh-hant": "啟用負載均衡（自動輪換API Key）",
+            "jp": "負荷分散を有効にする（APIキーを自動ローテーション）"
+        },
+        "ApiKeyTooltip": {
+            "en": "One API Key per line",
+            "zh-hans": "每行一个 API Key",
+            "zh-hant": "每行一個 API Key",
+            "jp": "1行に1つのAPIキー"
+        },
+        "ToggleApiKeyVisibility": {
+            "en": "Show/Hide",
+            "zh-hans": "显示/隐藏",
+            "zh-hant": "顯示/隱藏",
+            "jp": "表示/非表示"
+        },
+        "Enabled": {
+            "en": "Enabled",
+            "zh-hans": "启用",
+            "zh-hant": "啟用",
+            "jp": "有効"
+        },
+        "EnableVision": {
+            "en": "Enable Vision",
+            "zh-hans": "启用视觉",
+            "zh-hant": "啟用視覺",
+            "jp": "ビジョンを有効にする"
+        },
+        "EnableVisionTooltip": {
+            "en": "Enable vision capability for this channel to process images and screenshots",
+            "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
+            "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
+            "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
+        },
+        "ChannelMode": {
+            "en": "Channel Mode:",
+            "zh-hans": "渠道模式:",
+            "zh-hant": "渠道模式:",
+            "jp": "チャネルモード:"
+        },
+        "EnableAdvanced": {
+            "en": "Enable Advanced Configuration",
+            "zh-hans": "启用高级配置",
+            "zh-hant": "啟用高級配置",
+            "jp": "詳細設定を有効にする"
+        },
+        "EnableStreaming": {
+            "en": "Enable Streaming",
+            "zh-hans": "启用流式传输",
+            "zh-hant": "啟用流式傳輸",
+            "jp": "ストリーミングを有効にする"
+        },
+        "Temperature": {
+            "en": "Temperature",
+            "zh-hans": "温度",
+            "zh-hant": "溫度",
+            "jp": "温度"
+        },
+        "MaxTokens": {
+            "en": "Max Tokens",
+            "zh-hans": "最大Token",
+            "zh-hant": "最大Token",
+            "jp": "最大トークン"
+        },
+        "Model": {
+            "en": "Model",
+            "zh-hans": "模型",
+            "zh-hant": "模型",
+            "jp": "モデル"
+        },
+        "ApiAddress": {
+            "en": "API Address",
+            "zh-hans": "API 地址",
+            "zh-hant": "API 地址",
+            "jp": "APIアドレス"
+        },
+        "ApiKey": {
+            "en": "API Key",
+            "zh-hans": "API 密钥",
+            "zh-hant": "API 金鑰",
+            "jp": "APIキー"
+        },
+        "Refresh": {
+            "en": "Refresh",
+            "zh-hans": "刷新",
+            "zh-hant": "刷新",
+            "jp": "更新"
+        },
+        "PresetTip": {
+            "en": "Select a preset API endpoint",
+            "zh-hans": "选择预设的API端点",
+            "zh-hant": "選擇預設的API端點",
+            "jp": "プリセットAPIエンドポイントを選択"
         }
     },
     "Ollama": {
@@ -1586,6 +1718,32 @@
             "zh-hant": "測試TTS",
             "jp": "TTSテスト"
         },
+        "DIY": {
+            "Config": {
+                "en": "DIY TTS Configuration",
+                "zh-hans": "DIY TTS 配置",
+                "zh-hant": "DIY TTS 配置",
+                "jp": "DIY TTS設定"
+            },
+            "Description": {
+                "en": "Custom TTS API configuration, supports flexible request customization",
+                "zh-hans": "自定义TTS API 配置，支持灵活的请求定制",
+                "zh-hant": "自定義TTS API 配置，支持靈活的請求定制",
+                "jp": "カスタムTTS API設定。"
+            },
+            "TestSuccess": {
+                "en": "DIY TTS test successful! Audio is now playing.",
+                "zh-hans": "DIY TTS 测试成功！音频已播放。",
+                "zh-hant": "DIY TTS 測試成功！音頻已播放。",
+                "jp": "DIY TTSテスト成功！オーディオが再生されています。"
+            },
+            "TestFail": {
+                "en": "DIY TTS test failed. Please check your configuration and network connection.",
+                "zh-hans": "DIY TTS 测试失败，请检查配置和网络连接。",
+                "zh-hant": "DIY TTS 測試失敗，請檢查配置和網路連接。",
+                "jp": "DIY TTSテストに失敗しました。設定とネットワーク接続を確認してください。"
+            }
+        },
         "URL": {
             "Config": {
                 "en": "URL TTS Configuration",
@@ -1622,6 +1780,48 @@
                 "zh-hans": "URL TTS支持GET和POST请求方法，支持多种语音类型。",
                 "zh-hant": "URL TTS支援GET和POST請求方法，支援多種語音類型。",
                 "jp": "URL TTSはGETとPOSTリクエスト方法をサポートし、複数の音声タイプをサポートします。"
+            },
+            "RequestConfig": {
+                "en": "Request Configuration",
+                "zh-hans": "请求配置",
+                "zh-hant": "請求配置",
+                "jp": "リクエスト設定"
+            },
+            "ContentType": {
+                "en": "Content-Type",
+                "zh-hans": "Content-Type",
+                "zh-hant": "Content-Type",
+                "jp": "Content-Type"
+            },
+            "CustomHeaders": {
+                "en": "Custom Headers",
+                "zh-hans": "自定义请求头 (Headers)",
+                "zh-hant": "自定義請求頭 (Headers)",
+                "jp": "カスタムリクエストヘッダー"
+            },
+            "RequestBody": {
+                "en": "Request Body",
+                "zh-hans": "请求内容(Body)",
+                "zh-hant": "請求內容(Body)",
+                "jp": "リクエストボディ"
+            },
+            "RequestBodyTip": {
+                "en": "Use {text} as text placeholder",
+                "zh-hans": "使用 {text} 作为文本占位符",
+                "zh-hant": "使用 {text} 作為文本佔位符",
+                "jp": "{text} をテキストプレースホルダーとして使用"
+            },
+            "ResponseFormat": {
+                "en": "Response Audio Format",
+                "zh-hans": "响应音频格式",
+                "zh-hant": "響應音頻格式",
+                "jp": "応答オーディオ形式"
+            },
+            "TestButton": {
+                "en": "🔊 Test TTS",
+                "zh-hans": "🔊 测试 TTS",
+                "zh-hant": "🔊 測試 TTS",
+                "jp": "🔊 TTSテスト"
             }
         },
         "OpenAI": {
@@ -1830,6 +2030,126 @@
                 "zh-hans": "语速（默认：1.0）",
                 "zh-hant": "語速（默認：1.0）",
                 "jp": "速度（デフォルト：1.0）"
+            },
+            "ApiMode": {
+                "en": "API Mode",
+                "zh-hans": "API 模式",
+                "zh-hant": "API 模式",
+                "jp": "APIモード"
+            },
+            "WebUIMode": {
+                "en": "Integration Pack WebUI Mode",
+                "zh-hans": "整合包网页模式",
+                "zh-hant": "整合包網頁模式",
+                "jp": "統合パックWebUIモード"
+            },
+            "APIV2Mode": {
+                "en": "API v2",
+                "zh-hans": "API v2",
+                "zh-hant": "API v2",
+                "jp": "API v2"
+            },
+            "ApiModeTip": {
+                "en": "Integration pack WebUI mode uses /infer_single endpoint; API v2 mode uses official /tts endpoint",
+                "zh-hans": "整合包网页模式使用/infer_single 端点；API v2 模式使用官方 /tts 端点",
+                "zh-hant": "整合包網頁模式使用/infer_single 端點；API v2 模式使用官方 /tts 端點",
+                "jp": "統合パックWebUIモードは/infer_singleエンドポイントを使用；API v2モードは公式/ttsエンドポイントを使用"
+            },
+            "APIV2Settings": {
+                "en": "API v2 Settings",
+                "zh-hans": "API v2 设置",
+                "zh-hant": "API v2 設置",
+                "jp": "API v2 設定"
+            },
+            "RefAudioPath": {
+                "en": "Reference Audio Path (Required)",
+                "zh-hans": "参考音频路径(必需)",
+                "zh-hant": "參考音頻路徑(必需)",
+                "jp": "参照オーディオパス（必須）"
+            },
+            "RefAudioPathTip": {
+                "en": "Reference audio file path on server, used for voice cloning",
+                "zh-hans": "服务器上的参考音频文件路径，用于声音克隆",
+                "zh-hant": "服務器上的參考音頻文件路徑，用於聲音克隆",
+                "jp": "サーバー上の参照オーディオファイルパス。声音克隆に使用"
+            },
+            "PromptText": {
+                "en": "Prompt Text",
+                "zh-hans": "提示文本",
+                "zh-hant": "提示文本",
+                "jp": "プロンプトテキスト"
+            },
+            "PromptTextTip": {
+                "en": "Text content corresponding to the reference audio (optional)",
+                "zh-hans": "参考音频对应的文本内容（可选）",
+                "zh-hant": "參考音頻對應的文本內容（可選）",
+                "jp": "参照オーディオに対応するテキストコンテンツ（オプション）"
+            },
+            "PromptLanguage": {
+                "en": "Prompt Language",
+                "zh-hans": "提示语言",
+                "zh-hant": "提示語言",
+                "jp": "プロンプト言語"
+            },
+            "APIV2AdvancedSettings": {
+                "en": "API v2 Advanced Settings",
+                "zh-hans": "API v2 高级设置",
+                "zh-hant": "API v2 高級設置",
+                "jp": "API v2 詳細設定"
+            },
+            "StreamingMode": {
+                "en": "Streaming Mode",
+                "zh-hans": "流式模式",
+                "zh-hant": "流式模式",
+                "jp": "ストリーミングモード"
+            },
+            "StreamingModeTip": {
+                "en": "Streaming mode can speed up first response, but may affect audio quality",
+                "zh-hans": "流式模式可加快首次响应速度，但可能影响音质",
+                "zh-hant": "流式模式可加快首次響應速度，但可能影響音質",
+                "jp": "ストリーミングモードは最初の応答を高速化できますが、音質に影響する可能性があります"
+            },
+            "EnableSuperSampling": {
+                "en": "Enable Super Sampling",
+                "zh-hans": "启用超采样",
+                "zh-hant": "啟用超採樣",
+                "jp": "超サンプリングを有効にする"
+            },
+            "ModelWeightsSettings": {
+                "en": "Model Weights Settings",
+                "zh-hans": "模型权重设置",
+                "zh-hant": "模型權重設置",
+                "jp": "モデルウェイト設定"
+            },
+            "ModelWeightsPathTip": {
+                "en": "Specify model weights file path on server, leave empty to use server default model",
+                "zh-hans": "指定服务器上的模型权重文件路径，留空则使用服务器默认模型",
+                "zh-hant": "指定服務器上的模型權重文件路徑，留空則使用服務器默認模型",
+                "jp": "サーバー上のモデルウェイトファイルパスを指定。空の場合はサーバーのデフォルトモデルを使用"
+            },
+            "GPTModelPath": {
+                "en": "GPT Model Weights Path",
+                "zh-hans": "GPT 模型权重路径",
+                "zh-hant": "GPT 模型權重路徑",
+                "jp": "GPTモデルウェイトパス"
+            },
+            "GPTModelExample": {
+                "en": "Example: GPT_SoVITS/pretrained_models/xxx.ckpt",
+                "zh-hans": "例如: GPT_SoVITS/pretrained_models/xxx.ckpt",
+                "zh-hant": "例如: GPT_SoVITS/pretrained_models/xxx.ckpt",
+                "jp": "例: GPT_SoVITS/pretrained_models/xxx.ckpt"
+            },
+            "SoVITSModelPath": {
+                "en": "SoVITS Model Weights Path",
+                "zh-hans": "SoVITS 模型权重路径",
+                "zh-hant": "SoVITS 模型權重路徑",
+                "jp": "SoVITSモデルウェイトパス"
+            },
+            "SoVITSModelExample": {
+                "en": "Example: GPT_SoVITS/pretrained_models/xxx.pth",
+                "zh-hans": "例如: GPT_SoVITS/pretrained_models/xxx.pth",
+                "zh-hant": "例如: GPT_SoVITS/pretrained_models/xxx.pth",
+                "jp": "例: GPT_SoVITS/pretrained_models/xxx.pth"
             }
         },
         "FreeSettings": {
@@ -1931,10 +2251,18 @@
             "jp": "音声入力用のマイクデバイスを選択"
         },
         "RefreshDevices": {
-            "en": "Refresh Devices",
-            "zh-hans": "刷新设备",
-            "zh-hant": "刷新設備",
-            "jp": "デバイスを更新"
+            "Success": {
+                "en": "Device list refreshed",
+                "zh-hans": "设备列表已刷新",
+                "zh-hant": "設備列表已刷新",
+                "jp": "デバイスリストが更新されました"
+            },
+            "Fail": {
+                "en": "Failed to refresh device list",
+                "zh-hans": "刷新设备列表失败",
+                "zh-hant": "刷新設備列表失敗",
+                "jp": "デバイスリストの更新に失敗しました"
+            }
         },
         "AutoSend": {
             "en": "Auto-send after recognition",
@@ -2058,6 +2386,12 @@
                 "zh-hans": "Soniox 提供高精度的语音识别服务，支持多种语言",
                 "zh-hant": "Soniox 提供高精度的語音識別服務，支持多種語言",
                 "jp": "Soniox は複数の言語をサポートする高精度の音声認識サービスを提供します"
+            },
+            "RefreshModelsFail": {
+                "en": "Failed to get model list, please check API Key and network connection.",
+                "zh-hans": "获取模型列表失败，请检查API Key和网络连接。",
+                "zh-hant": "獲取模型列表失敗，請檢查API Key和網路連接。",
+                "jp": "モデルリストの取得に失敗しました。API Keyとネットワーク接続を確認してください。"
             }
         },
         "FreeSettings": {
@@ -2265,7 +2599,21 @@
     },
     "Success": {
         "en": "Success",
-        "zh-hans": "成功"
+        "zh-hans": "成功",
+        "zh-hant": "成功",
+        "jp": "成功"
+    },
+    "Warning": {
+        "en": "Warning",
+        "zh-hans": "警告",
+        "zh-hant": "警告",
+        "jp": "警告"
+    },
+    "Fail": {
+        "en": "Fail",
+        "zh-hans": "失败",
+        "zh-hant": "失敗",
+        "jp": "失敗"
     },
     "Settings": {
         "Plugin": {

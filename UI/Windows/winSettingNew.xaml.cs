@@ -348,12 +348,8 @@ namespace VPetLLM.UI.Windows
                     RefreshTTSPluginStatus(result.HasOtherEnabledTTSPlugin, result.EnabledPluginNames);
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             };
-            ((Slider)this.FindName("Slider_Ollama_Temperature")).ValueChanged += Control_ValueChanged;
-            // OpenAI多节点配置 - 温度设置事件处理已移至多节点管理界面
-            if (this.FindName("Slider_Gemini_Temperature") is Slider sliderGemTemp)
-                sliderGemTemp.ValueChanged += Control_ValueChanged;
-            ((Slider)this.FindName("Slider_Free_Temperature")).ValueChanged += Control_ValueChanged;
-            ((Slider)this.FindName("Slider_TTS_Volume")).ValueChanged += Control_ValueChanged;
+            // Ollama/Free/LMStudio/Gemini - 使用统一UI管理，这些Slider控件已不存在
+            // TTS相关的Slider
             ((Slider)this.FindName("Slider_TTS_VolumeGain")).ValueChanged += Control_ValueChanged;
             ((Slider)this.FindName("Slider_TTS_Speed")).ValueChanged += Control_ValueChanged;
 
@@ -365,14 +361,16 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_UserName")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Role")).TextChanged += Control_TextChanged;
-            ((TextBox)this.FindName("TextBox_OllamaUrl")).TextChanged += Control_TextChanged;
-            ((ComboBox)this.FindName("ComboBox_OllamaModel")).SelectionChanged += Control_SelectionChanged;
+            // Ollama/Free/LMStudio/OpenAI/Gemini - 使用统一UI管理，暂不处理单一配置
+            //((TextBox)this.FindName("TextBox_OllamaUrl")).TextChanged += Control_TextChanged;
+            //((ComboBox)this.FindName("ComboBox_OllamaModel")).SelectionChanged += Control_SelectionChanged;
             // OpenAI多节点配置 - 事件处理已移至多节点管理界面
-            if (this.FindName("TextBox_GeminiApiKey") is TextBox tbGeminiApiKey)
-                tbGeminiApiKey.TextChanged += Control_TextChanged;
+            //if (this.FindName("TextBox_GeminiApiKey") is TextBox tbGeminiApiKey)
+            //    tbGeminiApiKey.TextChanged += Control_TextChanged;
 
-            if (this.FindName("ComboBox_GeminiModel") is ComboBox comboGemModel)
-                comboGemModel.SelectionChanged += Control_SelectionChanged;
+            // Gemini/Free/LMStudio - 使用统一UI管理，暂不处理单一配置
+            //if (this.FindName("ComboBox_GeminiModel") is ComboBox comboGemModel)
+            //    comboGemModel.SelectionChanged += Control_SelectionChanged;
 
 
 
@@ -403,18 +401,19 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableCompressionRecords")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
-            ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
-            ((CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming")).Click += Control_Click;
-            ((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).TextChanged += Control_TextChanged;
+            // Ollama/Free/LMStudio - 使用统一UI管理，暂不处理单一配置
+            //((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).Click += Control_Click;
+            //((CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming")).Click += Control_Click;
+            //((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).TextChanged += Control_TextChanged;
             // OpenAI多节点配置 - 高级设置事件处理已移至多节点管理界面
-            if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdvBind)
-                cbGemAdvBind.Click += Control_Click;
-            ((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).Click += Control_Click;
-            ((CheckBox)this.FindName("CheckBox_Free_EnableVision")).Click += Control_Click;
-            ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).Click += Control_Click;
-            if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMaxBind)
-                tbGemMaxBind.TextChanged += Control_TextChanged;
-            ((TextBox)this.FindName("TextBox_Free_MaxTokens")).TextChanged += Control_TextChanged;
+            //if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdvBind)
+            //    cbGemAdvBind.Click += Control_Click;
+            //((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).Click += Control_Click;
+            //((CheckBox)this.FindName("CheckBox_Free_EnableVision")).Click += Control_Click;
+            //((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).Click += Control_Click;
+            //if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMaxBind)
+            //    tbGemMaxBind.TextChanged += Control_TextChanged;
+            //((TextBox)this.FindName("TextBox_Free_MaxTokens")).TextChanged += Control_TextChanged;
 
             // Proxy settings
             ((CheckBox)this.FindName("CheckBox_Proxy_IsEnabled")).Click += Control_Click;
@@ -714,8 +713,9 @@ namespace VPetLLM.UI.Windows
             {
                 _plugin.Settings.Ollama = new Setting.OllamaSetting();
             }
-            ((TextBox)this.FindName("TextBox_OllamaUrl")).Text = _plugin.Settings.Ollama.Url;
-            ((ComboBox)this.FindName("ComboBox_OllamaModel")).Text = _plugin.Settings.Ollama.Model;
+            // Ollama/Free/LMStudio - 使用统一UI管理，暂不处理单一配置
+            //((TextBox)this.FindName("TextBox_OllamaUrl")).Text = _plugin.Settings.Ollama.Url;
+            //((ComboBox)this.FindName("ComboBox_OllamaModel")).Text = _plugin.Settings.Ollama.Model;
             // OpenAI多节点配置 - 不再使用单一配置
             // 这些控件现在用于多节点管理界面
             //((TextBox)this.FindName("TextBox_OpenAIApiKey")).Text = "";
@@ -735,11 +735,11 @@ namespace VPetLLM.UI.Windows
             // 刷新Gemini多渠道列表
             RefreshGeminiNodesList();
 
-            // 兼容旧表单（保留显示）
-            if (this.FindName("TextBox_GeminiApiKey") is TextBox tbGeminiApiKey2)
-                tbGeminiApiKey2.Text = _plugin.Settings.Gemini.ApiKey;
-            if (this.FindName("ComboBox_GeminiModel") is ComboBox cbGeminiModel)
-                cbGeminiModel.Text = _plugin.Settings.Gemini.Model;
+            // 兼容旧表单（保留显示） - 已删除旧控件
+            //if (this.FindName("TextBox_GeminiApiKey") is TextBox tbGeminiApiKey2)
+            //    tbGeminiApiKey2.Text = _plugin.Settings.Gemini.ApiKey;
+            //if (this.FindName("ComboBox_GeminiModel") is ComboBox cbGeminiModel)
+            //    cbGeminiModel.Text = _plugin.Settings.Gemini.Model;
 
 
             ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked = _plugin.Settings.KeepContext;
@@ -786,45 +786,47 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).Text = _plugin.Settings.MaxLogCount.ToString();
             ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
-            ((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
-            ((CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming")).IsChecked = _plugin.Settings.Ollama.EnableStreaming;
-            ((CheckBox)this.FindName("CheckBox_Ollama_EnableVision")).IsChecked = _plugin.Settings.Ollama.EnableVision;
-            ((Slider)this.FindName("Slider_Ollama_Temperature")).Value = _plugin.Settings.Ollama.Temperature;
-            ((TextBlock)this.FindName("TextBlock_Ollama_TemperatureValue")).Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
-            ((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).Text = _plugin.Settings.Ollama.MaxTokens.ToString();
-            ((CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced")).IsChecked = _plugin.Settings.OpenAI.EnableAdvanced;
-            ((Slider)this.FindName("Slider_OpenAI_Temperature")).Value = _plugin.Settings.OpenAI.Temperature;
-            ((TextBlock)this.FindName("TextBlock_OpenAI_TemperatureValue")).Text = _plugin.Settings.OpenAI.Temperature.ToString("F2");
-            ((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).Text = _plugin.Settings.OpenAI.MaxTokens.ToString();
+            // Ollama/Free/LMStudio/OpenAI/Gemini - 使用统一UI管理，暂不处理单一配置
+            //((CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced")).IsChecked = _plugin.Settings.Ollama.EnableAdvanced;
+            //((CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming")).IsChecked = _plugin.Settings.Ollama.EnableStreaming;
+            //((CheckBox)this.FindName("CheckBox_Ollama_EnableVision")).IsChecked = _plugin.Settings.Ollama.EnableVision;
+            //((Slider)this.FindName("Slider_Ollama_Temperature")).Value = _plugin.Settings.Ollama.Temperature;
+            //((TextBlock)this.FindName("TextBlock_Ollama_TemperatureValue")).Text = _plugin.Settings.Ollama.Temperature.ToString("F2");
+            //((TextBox)this.FindName("TextBox_Ollama_MaxTokens")).Text = _plugin.Settings.Ollama.MaxTokens.ToString();
+            //((CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced")).IsChecked = _plugin.Settings.OpenAI.EnableAdvanced;
+            //((Slider)this.FindName("Slider_OpenAI_Temperature")).Value = _plugin.Settings.OpenAI.Temperature;
+            //((TextBlock)this.FindName("TextBlock_OpenAI_TemperatureValue")).Text = _plugin.Settings.OpenAI.Temperature.ToString("F2");
+            //((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).Text = _plugin.Settings.OpenAI.MaxTokens.ToString();
             // 刷新OpenAI多节点列表，确保迁移后的节点显示且避免空引用
             RefreshOpenAINodesList();
             _ = InitializeOpenAIUrlPresetsAsync();
-            if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdv)
-                cbGemAdv.IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
-            if (this.FindName("Slider_Gemini_Temperature") is Slider slGemTemp)
-            {
-                slGemTemp.Value = _plugin.Settings.Gemini.Temperature;
-                if (this.FindName("TextBlock_Gemini_TemperatureValue") is TextBlock tvGemTemp)
-                    tvGemTemp.Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
-            }
-            if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMax)
-                tbGemMax.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
-            ((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).IsChecked = _plugin.Settings.Free.EnableStreaming;
-            ((CheckBox)this.FindName("CheckBox_Free_EnableVision")).IsChecked = _plugin.Settings.Free.EnableVision;
-            ((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).IsChecked = _plugin.Settings.Free.EnableAdvanced;
-            ((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
-            ((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
-            ((TextBox)this.FindName("TextBox_Free_MaxTokens")).Text = _plugin.Settings.Free.MaxTokens.ToString();
+            // Gemini/Fre/LMStudio - 使用统一UI管理，暂不处理单一配置
+            //if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdv)
+            //    cbGemAdv.IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
+            //if (this.FindName("Slider_Gemini_Temperature") is Slider slGemTemp)
+            //{
+            //    slGemTemp.Value = _plugin.Settings.Gemini.Temperature;
+            //    if (this.FindName("TextBlock_Gemini_TemperatureValue") is TextBlock tvGemTemp)
+            //        tvGemTemp.Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
+            //}
+            //if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMax)
+            //    tbGemMax.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
+            //((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).IsChecked = _plugin.Settings.Free.EnableStreaming;
+            //((CheckBox)this.FindName("CheckBox_Free_EnableVision")).IsChecked = _plugin.Settings.Free.EnableVision;
+            //((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).IsChecked = _plugin.Settings.Free.EnableAdvanced;
+            //((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
+            //((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
+            //((TextBox)this.FindName("TextBox_Free_MaxTokens")).Text = _plugin.Settings.Free.MaxTokens.ToString();
 
-            // LM Studio 设置
-            ((TextBox)this.FindName("TextBox_LMStudioUrl")).Text = _plugin.Settings.LMStudio.Url;
-            ((ComboBox)this.FindName("ComboBox_LMStudioModel")).Text = _plugin.Settings.LMStudio.Model;
-            ((CheckBox)this.FindName("CheckBox_LMStudio_EnableStreaming")).IsChecked = _plugin.Settings.LMStudio.EnableStreaming;
-            ((CheckBox)this.FindName("CheckBox_LMStudio_EnableVision")).IsChecked = _plugin.Settings.LMStudio.EnableVision;
-            ((CheckBox)this.FindName("CheckBox_LMStudio_EnableAdvanced")).IsChecked = _plugin.Settings.LMStudio.EnableAdvanced;
-            ((Slider)this.FindName("Slider_LMStudio_Temperature")).Value = _plugin.Settings.LMStudio.Temperature;
-            ((TextBlock)this.FindName("TextBlock_LMStudio_TemperatureValue")).Text = _plugin.Settings.LMStudio.Temperature.ToString("F2");
-            ((TextBox)this.FindName("TextBox_LMStudio_MaxTokens")).Text = _plugin.Settings.LMStudio.MaxTokens.ToString();
+            // LM Studio 设置 - 使用统一UI管理，暂不处理单一配置
+            //((TextBox)this.FindName("TextBox_LMStudioUrl")).Text = _plugin.Settings.LMStudio.Url;
+            //((ComboBox)this.FindName("ComboBox_LMStudioModel")).Text = _plugin.Settings.LMStudio.Model;
+            //((CheckBox)this.FindName("CheckBox_LMStudio_EnableStreaming")).IsChecked = _plugin.Settings.LMStudio.EnableStreaming;
+            //((CheckBox)this.FindName("CheckBox_LMStudio_EnableVision")).IsChecked = _plugin.Settings.LMStudio.EnableVision;
+            //((CheckBox)this.FindName("CheckBox_LMStudio_EnableAdvanced")).IsChecked = _plugin.Settings.LMStudio.EnableAdvanced;
+            //((Slider)this.FindName("Slider_LMStudio_Temperature")).Value = _plugin.Settings.LMStudio.Temperature;
+            //((TextBlock)this.FindName("TextBlock_LMStudio_TemperatureValue")).Text = _plugin.Settings.LMStudio.Temperature.ToString("F2");
+            //((TextBox)this.FindName("TextBox_LMStudio_MaxTokens")).Text = _plugin.Settings.LMStudio.MaxTokens.ToString();
 
             // 加载Free Chat配置的提供者信息
             LoadFreeProviderInfo();
@@ -1156,13 +1158,14 @@ namespace VPetLLM.UI.Windows
             var userNameTextBox = (TextBox)this.FindName("TextBox_UserName");
             var followVPetNameCheckBox = (CheckBox)this.FindName("CheckBox_FollowVPetName");
             var roleTextBox = (TextBox)this.FindName("TextBox_Role");
-            var ollamaUrlTextBox = (TextBox)this.FindName("TextBox_OllamaUrl");
-            var ollamaModelComboBox = (ComboBox)this.FindName("ComboBox_OllamaModel");
-            var openAIApiKeyTextBox = (TextBox)this.FindName("TextBox_OpenAIApiKey");
-            var openAIModelComboBox = (ComboBox)this.FindName("ComboBox_OpenAIModel");
-            var openAIUrlTextBox = (TextBox)this.FindName("TextBox_OpenAIUrl");
-            var geminiApiKeyTextBox = (TextBox)this.FindName("TextBox_GeminiApiKey");
-            var geminiModelComboBox = (ComboBox)this.FindName("ComboBox_GeminiModel");
+            // Ollama/Free/LMStudio/OpenAI/Gemini - 使用统一UI管理，暂不处理单一配置
+            //var ollamaUrlTextBox = (TextBox)this.FindName("TextBox_OllamaUrl");
+            //var ollamaModelComboBox = (ComboBox)this.FindName("ComboBox_OllamaModel");
+            //var openAIApiKeyTextBox = (TextBox)this.FindName("TextBox_OpenAIApiKey");
+            //var openAIModelComboBox = (ComboBox)this.FindName("ComboBox_OpenAIModel");
+            //var openAIUrlTextBox = (TextBox)this.FindName("TextBox_OpenAIUrl");
+            //var geminiApiKeyTextBox = (TextBox)this.FindName("TextBox_GeminiApiKey");
+            //var geminiModelComboBox = (ComboBox)this.FindName("ComboBox_GeminiModel");
 
 
             var keepContextCheckBox = (CheckBox)this.FindName("CheckBox_KeepContext");
@@ -1179,20 +1182,21 @@ namespace VPetLLM.UI.Windows
             var enableLiveModeCheckBox = (CheckBox)this.FindName("CheckBox_EnableLiveMode");
             var logAutoScrollCheckBox = (CheckBox)this.FindName("CheckBox_LogAutoScroll");
             var maxLogCountTextBox = (TextBox)this.FindName("TextBox_MaxLogCount");
-            var ollamaEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced");
-            var ollamaEnableStreamingCheckBox = (CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming");
-            var ollamaTemperatureSlider = (Slider)this.FindName("Slider_Ollama_Temperature");
-            var ollamaMaxTokensTextBox = (TextBox)this.FindName("TextBox_Ollama_MaxTokens");
-            var openAIEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced");
-            var openAITemperatureSlider = (Slider)this.FindName("Slider_OpenAI_Temperature");
-            var openAIMaxTokensTextBox = (TextBox)this.FindName("TextBox_OpenAI_MaxTokens");
-            var geminiEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced");
-            var geminiTemperatureSlider = (Slider)this.FindName("Slider_Gemini_Temperature");
-            var geminiMaxTokensTextBox = (TextBox)this.FindName("TextBox_Gemini_MaxTokens");
-            var freeEnableStreamingCheckBox = (CheckBox)this.FindName("CheckBox_Free_EnableStreaming");
-            var freeEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Free_EnableAdvanced");
-            var freeTemperatureSlider = (Slider)this.FindName("Slider_Free_Temperature");
-            var freeMaxTokensTextBox = (TextBox)this.FindName("TextBox_Free_MaxTokens");
+            // Ollama/Free/LMStudio/OpenAI/Gemini - 使用统一UI管理，暂不处理单一配置
+            //var ollamaEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Ollama_EnableAdvanced");
+            //var ollamaEnableStreamingCheckBox = (CheckBox)this.FindName("CheckBox_Ollama_EnableStreaming");
+            //var ollamaTemperatureSlider = (Slider)this.FindName("Slider_Ollama_Temperature");
+            //var ollamaMaxTokensTextBox = (TextBox)this.FindName("TextBox_Ollama_MaxTokens");
+            //var openAIEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_OpenAI_EnableAdvanced");
+            //var openAITemperatureSlider = (Slider)this.FindName("Slider_OpenAI_Temperature");
+            //var openAIMaxTokensTextBox = (TextBox)this.FindName("TextBox_OpenAI_MaxTokens");
+            //var geminiEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Gemini_EnableAdvanced");
+            //var geminiTemperatureSlider = (Slider)this.FindName("Slider_Gemini_Temperature");
+            //var geminiMaxTokensTextBox = (TextBox)this.FindName("TextBox_Gemini_MaxTokens");
+            //var freeEnableStreamingCheckBox = (CheckBox)this.FindName("CheckBox_Free_EnableStreaming");
+            //var freeEnableAdvancedCheckBox = (CheckBox)this.FindName("CheckBox_Free_EnableAdvanced");
+            //var freeTemperatureSlider = (Slider)this.FindName("Slider_Free_Temperature");
+            //var freeMaxTokensTextBox = (TextBox)this.FindName("TextBox_Free_MaxTokens");
             var toolsDataGrid = (DataGrid)this.FindName("DataGrid_Tools");
 
             var oldProvider = _plugin.Settings.Provider;
@@ -1211,15 +1215,16 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.AiName = aiNameTextBox.Text;
             _plugin.Settings.UserName = userNameTextBox.Text;
             _plugin.Settings.Role = roleTextBox.Text;
-            _plugin.Settings.Ollama.Url = ollamaUrlTextBox.Text;
-            _plugin.Settings.Ollama.Model = ollamaModelComboBox.Text;
+            // Ollama/Free/LMStudio/OpenAI/Gemini - 使用统一UI管理，暂不处理单一配置
+            //_plugin.Settings.Ollama.Url = ollamaUrlTextBox.Text;
+            //_plugin.Settings.Ollama.Model = ollamaModelComboBox.Text;
             // OpenAI多节点配置 - 不再使用单一配置
             // 这些控件现在用于多节点管理界面
             // OpenAI配置通过多节点列表管理
-            if (geminiApiKeyTextBox is not null)
-                _plugin.Settings.Gemini.ApiKey = geminiApiKeyTextBox.Text;
-            if (geminiModelComboBox is not null)
-                _plugin.Settings.Gemini.Model = geminiModelComboBox.Text;
+            //if (geminiApiKeyTextBox is not null)
+            //    _plugin.Settings.Gemini.ApiKey = geminiApiKeyTextBox.Text;
+            //if (geminiModelComboBox is not null)
+            //    _plugin.Settings.Gemini.Model = geminiModelComboBox.Text;
 
 
             _plugin.Settings.KeepContext = keepContextCheckBox.IsChecked ?? true;
@@ -1288,21 +1293,22 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.LogAutoScroll = logAutoScrollCheckBox.IsChecked ?? true;
             if (int.TryParse(maxLogCountTextBox.Text, out int maxLogCount))
                 _plugin.Settings.MaxLogCount = maxLogCount;
-            _plugin.Settings.Ollama.EnableAdvanced = ollamaEnableAdvancedCheckBox.IsChecked ?? false;
-            _plugin.Settings.Ollama.EnableStreaming = ollamaEnableStreamingCheckBox.IsChecked ?? true;
-            if (this.FindName("CheckBox_Ollama_EnableVision") is CheckBox cbOllamaVision)
-                _plugin.Settings.Ollama.EnableVision = cbOllamaVision.IsChecked ?? false;
-            _plugin.Settings.Ollama.Temperature = ollamaTemperatureSlider.Value;
-            if (int.TryParse(ollamaMaxTokensTextBox.Text, out int ollamaMaxTokens))
-                _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
+            // Ollama/Free/LMStudio/OpenAI/Gemini - 使用统一UI管理，暂不处理单一配置
+            //_plugin.Settings.Ollama.EnableAdvanced = ollamaEnableAdvancedCheckBox.IsChecked ?? false;
+            //_plugin.Settings.Ollama.EnableStreaming = ollamaEnableStreamingCheckBox.IsChecked ?? true;
+            //if (this.FindName("CheckBox_Ollama_EnableVision") is CheckBox cbOllamaVision)
+            //    _plugin.Settings.Ollama.EnableVision = cbOllamaVision.IsChecked ?? false;
+            //_plugin.Settings.Ollama.Temperature = ollamaTemperatureSlider.Value;
+            //if (int.TryParse(ollamaMaxTokensTextBox.Text, out int ollamaMaxTokens))
+            //    _plugin.Settings.Ollama.MaxTokens = ollamaMaxTokens;
             // OpenAI多节点配置 - 高级设置通过多节点管理界面处理
             // 温度和最大令牌数现在由各个节点独立配置
-            if (geminiEnableAdvancedCheckBox is not null)
-                _plugin.Settings.Gemini.EnableAdvanced = geminiEnableAdvancedCheckBox.IsChecked ?? false;
-            if (geminiTemperatureSlider is not null)
-                _plugin.Settings.Gemini.Temperature = geminiTemperatureSlider.Value;
-            if (geminiMaxTokensTextBox is not null && int.TryParse(geminiMaxTokensTextBox.Text, out int geminiMaxTokens))
-                _plugin.Settings.Gemini.MaxTokens = geminiMaxTokens;
+            //if (geminiEnableAdvancedCheckBox is not null)
+            //    _plugin.Settings.Gemini.EnableAdvanced = geminiEnableAdvancedCheckBox.IsChecked ?? false;
+            //if (geminiTemperatureSlider is not null)
+            //    _plugin.Settings.Gemini.Temperature = geminiTemperatureSlider.Value;
+            //if (geminiMaxTokensTextBox is not null && int.TryParse(geminiMaxTokensTextBox.Text, out int geminiMaxTokens))
+            //    _plugin.Settings.Gemini.MaxTokens = geminiMaxTokens;
 
             // 保存 Gemini 负载均衡开关
             if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLB2)
@@ -1311,33 +1317,33 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLB2)
                 _plugin.Settings.OpenAI.EnableLoadBalancing = cbOpenLB2.IsChecked ?? false;
 
-            // 保存 Free 设置
-            if (freeEnableStreamingCheckBox is not null)
-                _plugin.Settings.Free.EnableStreaming = freeEnableStreamingCheckBox.IsChecked ?? false;
-            if (this.FindName("CheckBox_Free_EnableVision") is CheckBox cbFreeVision)
-                _plugin.Settings.Free.EnableVision = cbFreeVision.IsChecked ?? false;
-            if (freeEnableAdvancedCheckBox is not null)
-                _plugin.Settings.Free.EnableAdvanced = freeEnableAdvancedCheckBox.IsChecked ?? false;
-            if (freeTemperatureSlider is not null)
-                _plugin.Settings.Free.Temperature = freeTemperatureSlider.Value;
-            if (freeMaxTokensTextBox is not null && int.TryParse(freeMaxTokensTextBox.Text, out int freeMaxTokens))
-                _plugin.Settings.Free.MaxTokens = freeMaxTokens;
+            // 保存 Free/LMStudio 设置 - 使用统一UI管理，暂不处理单一配置
+            //if (freeEnableStreamingCheckBox is not null)
+            //    _plugin.Settings.Free.EnableStreaming = freeEnableStreamingCheckBox.IsChecked ?? false;
+            //if (this.FindName("CheckBox_Free_EnableVision") is CheckBox cbFreeVision)
+            //    _plugin.Settings.Free.EnableVision = cbFreeVision.IsChecked ?? false;
+            //if (freeEnableAdvancedCheckBox is not null)
+            //    _plugin.Settings.Free.EnableAdvanced = freeEnableAdvancedCheckBox.IsChecked ?? false;
+            //if (freeTemperatureSlider is not null)
+            //    _plugin.Settings.Free.Temperature = freeTemperatureSlider.Value;
+            //if (freeMaxTokensTextBox is not null && int.TryParse(freeMaxTokensTextBox.Text, out int freeMaxTokens))
+            //    _plugin.Settings.Free.MaxTokens = freeMaxTokens;
 
-            // 保存 LM Studio 设置
-            if (this.FindName("TextBox_LMStudioUrl") is TextBox lmStudioUrlTextBox)
-                _plugin.Settings.LMStudio.Url = lmStudioUrlTextBox.Text;
-            if (this.FindName("ComboBox_LMStudioModel") is ComboBox lmStudioModelComboBox)
-                _plugin.Settings.LMStudio.Model = lmStudioModelComboBox.Text;
-            if (this.FindName("CheckBox_LMStudio_EnableStreaming") is CheckBox lmStudioEnableStreamingCheckBox)
-                _plugin.Settings.LMStudio.EnableStreaming = lmStudioEnableStreamingCheckBox.IsChecked ?? false;
-            if (this.FindName("CheckBox_LMStudio_EnableVision") is CheckBox lmStudioEnableVisionCheckBox)
-                _plugin.Settings.LMStudio.EnableVision = lmStudioEnableVisionCheckBox.IsChecked ?? false;
-            if (this.FindName("CheckBox_LMStudio_EnableAdvanced") is CheckBox lmStudioEnableAdvancedCheckBox)
-                _plugin.Settings.LMStudio.EnableAdvanced = lmStudioEnableAdvancedCheckBox.IsChecked ?? false;
-            if (this.FindName("Slider_LMStudio_Temperature") is Slider lmStudioTemperatureSlider)
-                _plugin.Settings.LMStudio.Temperature = lmStudioTemperatureSlider.Value;
-            if (this.FindName("TextBox_LMStudio_MaxTokens") is TextBox lmStudioMaxTokensTextBox && int.TryParse(lmStudioMaxTokensTextBox.Text, out int lmStudioMaxTokens))
-                _plugin.Settings.LMStudio.MaxTokens = lmStudioMaxTokens;
+            // 保存 LM Studio 设置 - 使用统一UI管理，暂不处理单一配置
+            //if (this.FindName("TextBox_LMStudioUrl") is TextBox lmStudioUrlTextBox)
+            //    _plugin.Settings.LMStudio.Url = lmStudioUrlTextBox.Text;
+            //if (this.FindName("ComboBox_LMStudioModel") is ComboBox lmStudioModelComboBox)
+            //    _plugin.Settings.LMStudio.Model = lmStudioModelComboBox.Text;
+            //if (this.FindName("CheckBox_LMStudio_EnableStreaming") is CheckBox lmStudioEnableStreamingCheckBox)
+            //    _plugin.Settings.LMStudio.EnableStreaming = lmStudioEnableStreamingCheckBox.IsChecked ?? false;
+            //if (this.FindName("CheckBox_LMStudio_EnableVision") is CheckBox lmStudioEnableVisionCheckBox)
+            //    _plugin.Settings.LMStudio.EnableVision = lmStudioEnableVisionCheckBox.IsChecked ?? false;
+            //if (this.FindName("CheckBox_LMStudio_EnableAdvanced") is CheckBox lmStudioEnableAdvancedCheckBox)
+            //    _plugin.Settings.LMStudio.EnableAdvanced = lmStudioEnableAdvancedCheckBox.IsChecked ?? false;
+            //if (this.FindName("Slider_LMStudio_Temperature") is Slider lmStudioTemperatureSlider)
+            //    _plugin.Settings.LMStudio.Temperature = lmStudioTemperatureSlider.Value;
+            //if (this.FindName("TextBox_LMStudio_MaxTokens") is TextBox lmStudioMaxTokensTextBox && int.TryParse(lmStudioMaxTokensTextBox.Text, out int lmStudioMaxTokens))
+            //    _plugin.Settings.LMStudio.MaxTokens = lmStudioMaxTokens;
 
             _plugin.Settings.Tools = new List<Setting.ToolSetting>((IEnumerable<Setting.ToolSetting>)toolsDataGrid.ItemsSource);
 
@@ -2333,6 +2339,32 @@ namespace VPetLLM.UI.Windows
             if (FindName("Button_EditContext") is Button buttonEditContext) buttonEditContext.Content = LanguageHelper.Get("LLM_Settings.EditContext", langCode);
             if (FindName("Button_ClearRecords") is Button buttonClearRecords) buttonClearRecords.Content = LanguageHelper.Get("LLM_Settings.ClearRecords", langCode);
             if (FindName("Button_EditRecords") is Button buttonEditRecords) buttonEditRecords.Content = LanguageHelper.Get("LLM_Settings.EditRecords", langCode);
+
+            // 更新右侧渠道管理部分
+            if (FindName("Label_ChannelManagement") is Label labelChannelManagement) labelChannelManagement.Content = LanguageHelper.Get("LLM_Settings.ChannelManagement", langCode);
+            if (FindName("TextBlock_ChannelManagementDesc") is TextBlock textBlockChannelManagementDesc) textBlockChannelManagementDesc.Text = LanguageHelper.Get("LLM_Settings.ChannelManagementDesc", langCode);
+            if (FindName("CheckBox_EnableLoadBalancing") is CheckBox checkBoxEnableLoadBalancing) checkBoxEnableLoadBalancing.Content = LanguageHelper.Get("LLM_Settings.EnableLoadBalancing", langCode);
+            if (FindName("Button_AddChannel") is Button buttonAddChannel) buttonAddChannel.Content = LanguageHelper.Get("LLM_Settings.AddChannel", langCode);
+            if (FindName("Button_RemoveChannel") is Button buttonRemoveChannel) buttonRemoveChannel.Content = LanguageHelper.Get("LLM_Settings.RemoveSelectedChannel", langCode);
+            if (FindName("GridViewColumn_Enabled") is GridViewColumn gridViewColumnEnabled) gridViewColumnEnabled.Header = LanguageHelper.Get("LLM_Settings.Enabled", langCode);
+            if (FindName("GridViewColumn_ChannelName") is GridViewColumn gridViewColumnChannelName) gridViewColumnChannelName.Header = LanguageHelper.Get("LLM_Settings.ChannelName", langCode);
+            if (FindName("GridViewColumn_Model") is GridViewColumn gridViewColumnModel) gridViewColumnModel.Header = LanguageHelper.Get("LLM_Settings.Model", langCode);
+            if (FindName("GridViewColumn_ApiAddress") is GridViewColumn gridViewColumnApiAddress) gridViewColumnApiAddress.Header = LanguageHelper.Get("LLM_Settings.ApiAddress", langCode);
+            if (FindName("Label_ChannelConfig") is Label labelChannelConfig) labelChannelConfig.Content = LanguageHelper.Get("LLM_Settings.ChannelConfig", langCode);
+            if (FindName("Label_ChannelName") is Label labelChannelName) labelChannelName.Content = LanguageHelper.Get("LLM_Settings.ChannelName", langCode) + ":";
+            if (FindName("Label_ApiKey") is Label labelApiKey) labelApiKey.Content = LanguageHelper.Get("LLM_Settings.ApiKey", langCode) + ":";
+            if (FindName("Label_ApiAddress") is Label labelApiAddress) labelApiAddress.Content = LanguageHelper.Get("LLM_Settings.ApiAddress", langCode) + ":";
+            if (FindName("Label_Model") is Label labelModel) labelModel.Content = LanguageHelper.Get("LLM_Settings.Model", langCode) + ":";
+            if (FindName("Button_RefreshModels") is Button buttonRefreshModels) buttonRefreshModels.Content = LanguageHelper.Get("LLM_Settings.Refresh", langCode);
+            if (FindName("CheckBox_EnableStreaming") is CheckBox checkBoxEnableStreaming) checkBoxEnableStreaming.Content = LanguageHelper.Get("LLM_Settings.EnableStreaming", langCode);
+            if (FindName("CheckBox_EnableVision") is CheckBox checkBoxEnableVision) checkBoxEnableVision.Content = LanguageHelper.Get("LLM_Settings.EnableVision", langCode);
+            if (FindName("Label_ChannelMode") is Label labelChannelMode) labelChannelMode.Content = LanguageHelper.Get("LLM_Settings.ChannelMode", langCode);
+            if (FindName("ComboBoxItem_ChannelMode_Unrestricted") is ComboBoxItem comboBoxItemChannelModeUnrestricted) comboBoxItemChannelModeUnrestricted.Content = LanguageHelper.Get("ChannelMode.Unrestricted", langCode);
+            if (FindName("ComboBoxItem_ChannelMode_ChatOnly") is ComboBoxItem comboBoxItemChannelModeChatOnly) comboBoxItemChannelModeChatOnly.Content = LanguageHelper.Get("ChannelMode.ChatOnly", langCode);
+            if (FindName("ComboBoxItem_ChannelMode_CompressionOnly") is ComboBoxItem comboBoxItemChannelModeCompressionOnly) comboBoxItemChannelModeCompressionOnly.Content = LanguageHelper.Get("ChannelMode.CompressionOnly", langCode);
+            if (FindName("CheckBox_EnableAdvanced") is CheckBox checkBoxEnableAdvanced) checkBoxEnableAdvanced.Content = LanguageHelper.Get("LLM_Settings.EnableAdvanced", langCode);
+            if (FindName("TextBlock_Temperature") is TextBlock textBlockTemperature) textBlockTemperature.Text = LanguageHelper.Get("LLM_Settings.Temperature", langCode);
+            if (FindName("TextBlock_MaxTokens") is TextBlock textBlockMaxTokens) textBlockMaxTokens.Text = LanguageHelper.Get("LLM_Settings.MaxTokens", langCode);
 
             if (FindName("CheckBox_EnableAction") is CheckBox checkBoxEnableAction)
             {
@@ -3610,22 +3642,24 @@ namespace VPetLLM.UI.Windows
                 if (_ttsService is not null)
                 {
                     var success = await _ttsService.TestTTSAsync();
+                    var langCode = _plugin.Settings.Language;
                     if (success)
                     {
-                        MessageBox.Show("DIY TTS 测试成功！音频已播放。",
-                            "测试成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show(LanguageHelper.Get("TTS.DIY.TestSuccess", langCode) ?? "DIY TTS 测试成功！音频已播放。",
+                            LanguageHelper.Get("Success", langCode) ?? "成功", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
-                        MessageBox.Show("DIY TTS 测试失败，请检查配置和网络连接。",
-                            "测试失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show(LanguageHelper.Get("TTS.DIY.TestFail", langCode) ?? "DIY TTS 测试失败，请检查配置和网络连接。",
+                            LanguageHelper.Get("Fail", langCode) ?? "失败", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"测试失败：{ex.Message}",
-                    "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                var langCode = _plugin.Settings.Language;
+                MessageBox.Show($"{LanguageHelper.Get("Error", langCode) ?? "错误"}: {ex.Message}",
+                    LanguageHelper.Get("Error", langCode) ?? "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -3901,6 +3935,804 @@ namespace VPetLLM.UI.Windows
                 _plugin.Settings.OpenAI.OpenAINodes.Remove(node);
                 RefreshOpenAINodesList();
                 MarkUnsavedChanges();
+            }
+        }
+
+        private void ComboBox_ChannelType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.SelectedItem is ComboBoxItem item)
+            {
+                var channelType = item.Tag?.ToString();
+                LoadChannelNodes(channelType);
+                UpdateChannelSpecificUI(channelType);
+            }
+        }
+
+        private void LoadChannelNodes(string? channelType)
+        {
+            var listView = this.FindName("ListView_Channels") as ListView;
+            if (listView == null) return;
+
+            // 先清除 ItemsSource，防止 ItemsControl 与源不一致
+            listView.ItemsSource = null;
+
+            switch (channelType)
+            {
+                case "OpenAI":
+                    listView.ItemsSource = _plugin.Settings.OpenAI.OpenAINodes;
+                    break;
+                case "Gemini":
+                    listView.ItemsSource = _plugin.Settings.Gemini.GeminiNodes;
+                    break;
+                case "Ollama":
+                case "LMStudio":
+                    listView.ItemsSource = null;
+                    break;
+            }
+            listView.UpdateLayout();
+        }
+
+        private void UpdateChannelSpecificUI(string? channelType)
+        {
+            var cbModel = this.FindName("ComboBox_Model") as ComboBox;
+            var cbEnableStreaming = this.FindName("CheckBox_EnableStreaming") as CheckBox;
+            var cbEnableVision = this.FindName("CheckBox_EnableVision") as CheckBox;
+            var labelChannelMode = this.FindName("Label_ChannelMode") as Label;
+            var cbChannelMode = this.FindName("ComboBox_ChannelMode") as ComboBox;
+            var cbEnableAdvanced = this.FindName("CheckBox_EnableAdvanced") as CheckBox;
+            var stackPanelAdvanced = this.FindName("StackPanel_Advanced") as StackPanel;
+            var labelApiKey = this.FindName("Label_ApiKey") as Label;
+            var gridApiKey = this.FindName("Grid_ApiKey") as Grid;
+            var labelApiAddress = this.FindName("Label_ApiAddress") as Label;
+            var gridApiAddress = this.FindName("Grid_ApiAddress") as Grid;
+            var cbUrlPreset = this.FindName("ComboBox_UrlPreset") as ComboBox;
+            var buttonRefreshModels = this.FindName("Button_RefreshModels") as Button;
+
+            if (cbModel != null)
+            {
+                cbModel.ItemsSource = null;
+                switch (channelType)
+                {
+                    case "OpenAI":
+                        cbModel.ItemsSource = new[] { "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo", "gpt-3.5-turbo-16k" };
+                        break;
+                    case "Gemini":
+                        cbModel.ItemsSource = new[] { "gemini-pro", "gemini-1.5-pro", "gemini-pro-vision" };
+                        break;
+                    case "Ollama":
+                        cbModel.ItemsSource = new[] { "llama2", "mistral", "codellama" };
+                        break;
+                    case "LMStudio":
+                        cbModel.ItemsSource = new[] { "default" };
+                        break;
+                }
+            }
+
+            // 根据渠道类型显示或隐藏控件
+            switch (channelType)
+            {
+                case "OpenAI":
+                    if (labelApiKey != null) labelApiKey.Visibility = Visibility.Visible;
+                    if (gridApiKey != null) gridApiKey.Visibility = Visibility.Visible;
+                    if (labelApiAddress != null) labelApiAddress.Visibility = Visibility.Visible;
+                    if (gridApiAddress != null) gridApiAddress.Visibility = Visibility.Visible;
+                    if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Visible;
+                    if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
+                    if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
+                    if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
+                    if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
+                    if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
+                    if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
+                    break;
+                case "Gemini":
+                    if (labelApiKey != null) labelApiKey.Visibility = Visibility.Visible;
+                    if (gridApiKey != null) gridApiKey.Visibility = Visibility.Visible;
+                    if (labelApiAddress != null) labelApiAddress.Visibility = Visibility.Visible;
+                    if (gridApiAddress != null) gridApiAddress.Visibility = Visibility.Visible;
+                    if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
+                    if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
+                    if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Collapsed;
+                    if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Collapsed;
+                    if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
+                    if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
+                    if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Collapsed;
+                    break;
+                case "Ollama":
+                case "LMStudio":
+                    if (labelApiKey != null) labelApiKey.Visibility = Visibility.Collapsed;
+                    if (gridApiKey != null) gridApiKey.Visibility = Visibility.Collapsed;
+                    if (labelApiAddress != null) labelApiAddress.Visibility = Visibility.Visible;
+                    if (gridApiAddress != null) gridApiAddress.Visibility = Visibility.Visible;
+                    if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
+                    if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
+                    if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Collapsed;
+                    if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Collapsed;
+                    if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
+                    if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
+                    if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
+                    break;
+            }
+        }
+
+        private void Button_AddChannel_Click(object sender, RoutedEventArgs e)
+        {
+            var cbChannelType = this.FindName("ComboBox_ChannelType") as ComboBox;
+            var channelType = (cbChannelType?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "OpenAI";
+            var listView = this.FindName("ListView_Channels") as ListView;
+
+            _isUpdatingNodeDetails = true;
+            try
+            {
+                switch (channelType)
+                {
+                    case "OpenAI":
+                        var openaiNode = new Setting.OpenAINodeSetting
+                        {
+                            Name = $"OpenAI渠道{_plugin.Settings.OpenAI.OpenAINodes.Count + 1}",
+                            ApiKey = "",
+                            Model = "gpt-3.5-turbo",
+                            Url = "https://api.openai.com/v1",
+                            Enabled = true,
+                            EnableAdvanced = false,
+                            Temperature = 0.7,
+                            MaxTokens = 2048
+                        };
+                        _plugin.Settings.OpenAI.OpenAINodes.Add(openaiNode);
+                        LoadChannelNodes(channelType);
+                        if (listView != null)
+                        {
+                            listView.SelectedItem = openaiNode;
+                        }
+                        break;
+                    case "Gemini":
+                        var geminiNode = new Setting.GeminiNodeSetting
+                        {
+                            Name = $"Gemini渠道{_plugin.Settings.Gemini.GeminiNodes.Count + 1}",
+                            ApiKey = "",
+                            Model = "gemini-pro",
+                            Url = "https://generativelanguage.googleapis.com/v1beta",
+                            Enabled = true,
+                            EnableAdvanced = false,
+                            Temperature = 0.7,
+                            MaxTokens = 2048
+                        };
+                        _plugin.Settings.Gemini.GeminiNodes.Add(geminiNode);
+                        LoadChannelNodes(channelType);
+                        if (listView != null)
+                        {
+                            listView.SelectedItem = geminiNode;
+                        }
+                        break;
+                    case "Ollama":
+                    case "LMStudio":
+                        break;
+                }
+            }
+            finally
+            {
+                _isUpdatingNodeDetails = false;
+            }
+
+            MarkUnsavedChanges();
+        }
+
+        private void Button_RemoveChannel_Click(object sender, RoutedEventArgs e)
+        {
+            var listView = this.FindName("ListView_Channels") as ListView;
+            var cbChannelType = this.FindName("ComboBox_ChannelType") as ComboBox;
+            var channelType = (cbChannelType?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+
+            if (listView?.SelectedItem == null || channelType == null) return;
+
+            switch (channelType)
+            {
+                case "OpenAI":
+                    if (listView.SelectedItem is Setting.OpenAINodeSetting openaiNode)
+                    {
+                        _plugin.Settings.OpenAI.OpenAINodes.Remove(openaiNode);
+                    }
+                    break;
+                case "Gemini":
+                    if (listView.SelectedItem is Setting.GeminiNodeSetting geminiNode)
+                    {
+                        _plugin.Settings.Gemini.GeminiNodes.Remove(geminiNode);
+                    }
+                    break;
+            }
+
+            LoadChannelNodes(channelType);
+            MarkUnsavedChanges();
+        }
+
+        private void ListView_Channels_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _isUpdatingNodeDetails = true;
+            string? lastUrl = null;
+            try
+            {
+                var listView = sender as ListView;
+                var cbChannelType = this.FindName("ComboBox_ChannelType") as ComboBox;
+                var channelType = (cbChannelType?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+
+                if (listView?.SelectedItem == null || channelType == null) return;
+
+                object selectedNode = listView.SelectedItem;
+
+                var tbChannelName = this.FindName("TextBox_ChannelName") as TextBox;
+                var pwbApiKey = this.FindName("PasswordBox_OpenAIApiKey") as PasswordBox;
+                var tbxApiKeyPlain = this.FindName("TextBox_OpenAIApiKey_Plain") as TextBox;
+                var tbApiUrl = this.FindName("TextBox_ApiUrl") as TextBox;
+                var cbModel = this.FindName("ComboBox_Model") as ComboBox;
+                var cbEnableStreaming = this.FindName("CheckBox_EnableStreaming") as CheckBox;
+                var cbEnableVision = this.FindName("CheckBox_EnableVision") as CheckBox;
+                var cbEnableAdvanced = this.FindName("CheckBox_EnableAdvanced") as CheckBox;
+                var sliderTemperature = this.FindName("Slider_Temperature") as Slider;
+                var tbMaxTokens = this.FindName("TextBox_MaxTokens") as TextBox;
+                var cbChannelMode = this.FindName("ComboBox_ChannelMode") as ComboBox;
+                var textBlockTemperatureValue = this.FindName("TextBlock_TemperatureValue") as TextBlock;
+
+                switch (channelType)
+                {
+                    case "OpenAI":
+                        if (selectedNode is Setting.OpenAINodeSetting openaiNode)
+                        {
+                            if (tbChannelName != null) tbChannelName.Text = openaiNode.Name;
+                            if (pwbApiKey != null) pwbApiKey.Password = openaiNode.ApiKey ?? string.Empty;
+                            if (tbxApiKeyPlain != null) tbxApiKeyPlain.Text = openaiNode.ApiKey ?? string.Empty;
+                            if (tbApiUrl != null)
+                            {
+                                lastUrl = tbApiUrl.Text;
+                                tbApiUrl.Text = openaiNode.Url;
+                            }
+                            if (cbModel != null) cbModel.Text = openaiNode.Model;
+                            if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = openaiNode.EnableStreaming;
+                            if (cbEnableVision != null) cbEnableVision.IsChecked = openaiNode.EnableVision;
+                            if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = openaiNode.EnableAdvanced;
+                            if (sliderTemperature != null) sliderTemperature.Value = openaiNode.Temperature;
+                            if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = openaiNode.Temperature.ToString("F2");
+                            if (tbMaxTokens != null) tbMaxTokens.Text = openaiNode.MaxTokens.ToString();
+                            if (cbChannelMode != null)
+                            {
+                                foreach (ComboBoxItem item in cbChannelMode.Items)
+                                {
+                                    if (item.Tag?.ToString() == openaiNode.Mode.ToString())
+                                    {
+                                        cbChannelMode.SelectedItem = item;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    case "Gemini":
+                        if (selectedNode is Setting.GeminiNodeSetting geminiNode)
+                        {
+                            if (tbChannelName != null) tbChannelName.Text = geminiNode.Name;
+                            if (pwbApiKey != null) pwbApiKey.Password = geminiNode.ApiKey ?? string.Empty;
+                            if (tbxApiKeyPlain != null) tbxApiKeyPlain.Text = geminiNode.ApiKey ?? string.Empty;
+                            if (tbApiUrl != null)
+                            {
+                                lastUrl = tbApiUrl.Text;
+                                tbApiUrl.Text = geminiNode.Url;
+                            }
+                            if (cbModel != null) cbModel.Text = geminiNode.Model;
+                            if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = geminiNode.EnableStreaming;
+                            if (cbEnableVision != null) cbEnableVision.IsChecked = geminiNode.EnableVision;
+                            if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = geminiNode.EnableAdvanced;
+                            if (sliderTemperature != null) sliderTemperature.Value = geminiNode.Temperature;
+                            if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = geminiNode.Temperature.ToString("F2");
+                            if (tbMaxTokens != null) tbMaxTokens.Text = geminiNode.MaxTokens.ToString();
+                        }
+                        break;
+                }
+            }
+            finally
+            {
+                _isUpdatingNodeDetails = false;
+
+                // 切换渠道后，根据新的 API URL 自动匹配并设置 ComboBox_UrlPreset
+                if (!string.IsNullOrEmpty(lastUrl))
+                {
+                    var tbApiUrl = this.FindName("TextBox_ApiUrl") as TextBox;
+                    var cbUrlPreset = this.FindName("ComboBox_UrlPreset") as ComboBox;
+                    if (tbApiUrl != null && cbUrlPreset != null)
+                    {
+                        bool foundMatch = false;
+                        foreach (var item in cbUrlPreset.Items)
+                        {
+                            if (item is ComboBoxItem comboItem && comboItem.Tag != null)
+                            {
+                                string tag = comboItem.Tag.ToString();
+                                if (!string.IsNullOrEmpty(tag) && tag.Contains('|'))
+                                {
+                                    var parts = tag.Split('|');
+                                    if (parts.Length >= 2)
+                                    {
+                                        string presetUrl = parts[1];
+                                        if (tbApiUrl.Text.StartsWith(presetUrl, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            cbUrlPreset.SelectedItem = comboItem;
+                                            foundMatch = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 如果没找到匹配项，设置为 "--"
+                        if (!foundMatch)
+                        {
+                            foreach (var item in cbUrlPreset.Items)
+                            {
+                                if (item is ComboBoxItem comboItem && comboItem.Content?.ToString() == "--")
+                                {
+                                    cbUrlPreset.SelectedItem = comboItem;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void Button_Toggle_ApiKey_Click(object sender, RoutedEventArgs e)
+        {
+            var pwbApiKey = this.FindName("PasswordBox_OpenAIApiKey") as PasswordBox;
+            var tbxApiKey = this.FindName("TextBox_OpenAIApiKey_Plain") as TextBox;
+            if (pwbApiKey == null || tbxApiKey == null) return;
+
+            if (pwbApiKey.Visibility == Visibility.Visible)
+            {
+                tbxApiKey.Text = pwbApiKey.Password;
+                pwbApiKey.Visibility = Visibility.Collapsed;
+                tbxApiKey.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                pwbApiKey.Password = tbxApiKey.Text;
+                pwbApiKey.Visibility = Visibility.Visible;
+                tbxApiKey.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void Button_RefreshModels_Click(object sender, RoutedEventArgs e)
+        {
+            var cbChannelType = this.FindName("ComboBox_ChannelType") as ComboBox;
+            var channelType = (cbChannelType?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+            var cbModel = this.FindName("ComboBox_Model") as ComboBox;
+            var tbApiUrl = this.FindName("TextBox_ApiUrl") as TextBox;
+            var pwbApiKey = this.FindName("PasswordBox_OpenAIApiKey") as PasswordBox;
+            var tbxApiKeyPlain = this.FindName("TextBox_OpenAIApiKey_Plain") as TextBox;
+
+            if (cbModel == null) return;
+
+            string? apiKey = pwbApiKey?.Password;
+            if (pwbApiKey?.Visibility != Visibility.Visible && tbxApiKeyPlain != null)
+            {
+                apiKey = tbxApiKeyPlain.Text;
+            }
+
+            string apiUrl = tbApiUrl?.Text ?? "";
+            string currentModel = cbModel?.Text ?? "";
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    List<string>? models = null;
+
+                    switch (channelType)
+                    {
+                        case "OpenAI":
+                            if (!string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(apiUrl))
+                            {
+                                models = await GetOpenAIModelsAsync(apiUrl, apiKey);
+                            }
+                            break;
+                        case "Gemini":
+                            if (!string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(apiUrl))
+                            {
+                                models = await GetGeminiModelsAsync(apiUrl, apiKey);
+                            }
+                            break;
+                    }
+
+                    if (models != null && models.Count > 0)
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            if (cbModel != null)
+                            {
+                                cbModel.ItemsSource = models;
+                                cbModel.Text = currentModel;
+                            }
+                        });
+                    }
+                }
+                catch
+                {
+                }
+            });
+        }
+
+        private async Task<List<string>> GetOpenAIModelsAsync(string apiUrl, string apiKey)
+        {
+            var models = new List<string>();
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+
+                var response = await client.GetAsync($"{apiUrl.TrimEnd('/')}/models");
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("data", out var data))
+                    {
+                        foreach (var item in data.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("id", out var id))
+                            {
+                                models.Add(id.GetString() ?? "");
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return models;
+        }
+
+        private async Task<List<string>> GetGeminiModelsAsync(string apiUrl, string apiKey)
+        {
+            var models = new List<string>();
+            try
+            {
+                using var client = new HttpClient();
+                var response = await client.GetAsync($"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("models", out var modelList))
+                    {
+                        foreach (var item in modelList.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("name", out var name))
+                            {
+                                string nameStr = name.GetString() ?? "";
+                                if (nameStr.Contains("gemini"))
+                                {
+                                    nameStr = nameStr.Replace("models/", "");
+                                    models.Add(nameStr);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return models;
+        }
+
+        private void SaveCurrentNodeChanges()
+        {
+            if (_isUpdatingNodeDetails) return;
+
+            var cbChannelType = this.FindName("ComboBox_ChannelType") as ComboBox;
+            var channelType = (cbChannelType?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+            var listView = this.FindName("ListView_Channels") as ListView;
+            
+            if (listView?.SelectedItem == null || channelType == null) return;
+
+            object selectedNode = listView.SelectedItem;
+
+            var tbChannelName = this.FindName("TextBox_ChannelName") as TextBox;
+            var pwbApiKey = this.FindName("PasswordBox_OpenAIApiKey") as PasswordBox;
+            var tbxApiKeyPlain = this.FindName("TextBox_OpenAIApiKey_Plain") as TextBox;
+            var tbApiUrl = this.FindName("TextBox_ApiUrl") as TextBox;
+            var cbModel = this.FindName("ComboBox_Model") as ComboBox;
+            var cbEnableStreaming = this.FindName("CheckBox_EnableStreaming") as CheckBox;
+            var cbEnableVision = this.FindName("CheckBox_EnableVision") as CheckBox;
+            var cbEnableAdvanced = this.FindName("CheckBox_EnableAdvanced") as CheckBox;
+            var sliderTemperature = this.FindName("Slider_Temperature") as Slider;
+            var tbMaxTokens = this.FindName("TextBox_MaxTokens") as TextBox;
+            var cbChannelMode = this.FindName("ComboBox_ChannelMode") as ComboBox;
+
+            switch (channelType)
+            {
+                case "OpenAI":
+                    if (selectedNode is Setting.OpenAINodeSetting openaiNode)
+                    {
+                        if (tbChannelName != null) openaiNode.Name = tbChannelName.Text;
+                        if (pwbApiKey != null && pwbApiKey.Visibility == Visibility.Visible)
+                            openaiNode.ApiKey = pwbApiKey.Password;
+                        else if (tbxApiKeyPlain != null)
+                            openaiNode.ApiKey = tbxApiKeyPlain.Text;
+                        if (tbApiUrl != null) openaiNode.Url = tbApiUrl.Text;
+                        if (cbModel != null) openaiNode.Model = cbModel.Text;
+                        if (cbEnableStreaming != null) openaiNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
+                        if (cbEnableVision != null) openaiNode.EnableVision = cbEnableVision.IsChecked ?? false;
+                        if (cbEnableAdvanced != null) openaiNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
+                        if (sliderTemperature != null) openaiNode.Temperature = sliderTemperature.Value;
+                        if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
+                            openaiNode.MaxTokens = maxTokens;
+                        if (cbChannelMode != null && cbChannelMode.SelectedItem is ComboBoxItem modeItem)
+                            openaiNode.Mode = Enum.Parse<Setting.ChannelMode>(modeItem.Tag?.ToString() ?? "Unrestricted");
+                    }
+                    break;
+                case "Gemini":
+                    if (selectedNode is Setting.GeminiNodeSetting geminiNode)
+                    {
+                        if (tbChannelName != null) geminiNode.Name = tbChannelName.Text;
+                        if (pwbApiKey != null && pwbApiKey.Visibility == Visibility.Visible)
+                            geminiNode.ApiKey = pwbApiKey.Password;
+                        else if (tbxApiKeyPlain != null)
+                            geminiNode.ApiKey = tbxApiKeyPlain.Text;
+                        if (tbApiUrl != null) geminiNode.Url = tbApiUrl.Text;
+                        if (cbModel != null) geminiNode.Model = cbModel.Text;
+                        if (cbEnableStreaming != null) geminiNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
+                        if (cbEnableVision != null) geminiNode.EnableVision = cbEnableVision.IsChecked ?? false;
+                        if (cbEnableAdvanced != null) geminiNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
+                        if (sliderTemperature != null) geminiNode.Temperature = sliderTemperature.Value;
+                        if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
+                            geminiNode.MaxTokens = maxTokens;
+                    }
+                    break;
+            }
+
+            // 保存并恢复滚动位置以防止刷新时回到顶部
+            if (listView != null)
+            {
+                var scrollViewer = FindVisualChild<ScrollViewer>(listView);
+                double scrollOffset = 0;
+                if (scrollViewer != null)
+                {
+                    scrollOffset = scrollViewer.VerticalOffset;
+                }
+
+                listView.Items.Refresh();
+
+                if (scrollViewer != null)
+                {
+                    scrollViewer.ScrollToVerticalOffset(scrollOffset);
+                }
+            }
+
+            MarkUnsavedChanges();
+        }
+
+        private T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(parent, i);
+                if (child != null && child is T)
+                {
+                    return (T)child;
+                }
+                else
+                {
+                    T? childOfChild = FindVisualChild<T>(child);
+                    if (childOfChild != null)
+                    {
+                        return childOfChild;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private void TextBox_ChannelName_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void PasswordBox_OpenAIApiKey_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void TextBox_OpenAIApiKey_Plain_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void TextBox_ApiUrl_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+
+            // 根据 API 地址自动匹配并设置 ComboBox_UrlPreset
+            if (sender is TextBox tbUrl && !string.IsNullOrEmpty(tbUrl.Text))
+            {
+                var cbUrlPreset = this.FindName("ComboBox_UrlPreset") as ComboBox;
+                if (cbUrlPreset != null)
+                {
+                    bool foundMatch = false;
+                    foreach (var item in cbUrlPreset.Items)
+                    {
+                        if (item is ComboBoxItem comboItem && comboItem.Tag != null)
+                        {
+                            string tag = comboItem.Tag.ToString();
+                            if (!string.IsNullOrEmpty(tag) && tag.Contains('|'))
+                            {
+                                var parts = tag.Split('|');
+                                if (parts.Length >= 2)
+                                {
+                                    string presetUrl = parts[1];
+                                    // 简单匹配：检查当前 URL 是否以预设 URL 开头（不区分大小写）
+                                    if (tbUrl.Text.StartsWith(presetUrl, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        _isUpdatingNodeDetails = true;
+                                        cbUrlPreset.SelectedItem = comboItem;
+                                        _isUpdatingNodeDetails = false;
+                                        foundMatch = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 如果没找到匹配项，设置为 "--"
+                    if (!foundMatch)
+                    {
+                        _isUpdatingNodeDetails = true;
+                        foreach (var item in cbUrlPreset.Items)
+                        {
+                            if (item is ComboBoxItem comboItem && comboItem.Content?.ToString() == "--")
+                            {
+                                cbUrlPreset.SelectedItem = comboItem;
+                                break;
+                            }
+                        }
+                        _isUpdatingNodeDetails = false;
+                    }
+                }
+            }
+
+            SaveCurrentNodeChanges();
+        }
+
+        private void ComboBox_Model_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void ComboBox_Model_LostFocus(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void CheckBox_EnableStreaming_Checked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void CheckBox_EnableStreaming_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void CheckBox_EnableVision_Checked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void CheckBox_EnableVision_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void CheckBox_EnableAdvanced_Checked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void CheckBox_EnableAdvanced_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void Slider_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            var textBlock = this.FindName("TextBlock_TemperatureValue") as TextBlock;
+            if (textBlock != null)
+                textBlock.Text = e.NewValue.ToString("F2");
+            SaveCurrentNodeChanges();
+        }
+
+        private void TextBox_MaxTokens_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void ComboBox_ChannelMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+        }
+
+        private void ComboBox_UrlPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            
+            var cbChannelType = this.FindName("ComboBox_ChannelType") as ComboBox;
+            var channelType = (cbChannelType?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+            var listView = this.FindName("ListView_Channels") as ListView;
+            
+            if (listView?.SelectedItem == null || channelType == null) return;
+
+            object selectedNode = listView.SelectedItem;
+
+            if (sender is ComboBox cb && cb.SelectedItem is ComboBoxItem item)
+            {
+                var tag = item.Tag?.ToString();
+                if (string.IsNullOrEmpty(tag) || string.IsNullOrEmpty(item.Content?.ToString()) || item.Content.ToString() == "--")
+                    return;
+
+                var parts = tag.Split('|');
+                if (parts.Length >= 2)
+                {
+                    var newUrl = parts[1];
+                    
+                    _isUpdatingNodeDetails = true;
+                    try
+                    {
+                        switch (channelType)
+                        {
+                            case "OpenAI":
+                                if (selectedNode is Setting.OpenAINodeSetting openaiNode)
+                                {
+                                    if (openaiNode.Url != newUrl)
+                                    {
+                                        openaiNode.Url = newUrl;
+                                        if (this.FindName("TextBox_ApiUrl") is TextBox tbUrl)
+                                            tbUrl.Text = newUrl;
+                                    }
+                                    if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
+                                    {
+                                        openaiNode.Model = parts[2];
+                                        if (this.FindName("ComboBox_Model") is ComboBox cbModel)
+                                            cbModel.Text = parts[2];
+                                    }
+                                }
+                                break;
+                            case "Gemini":
+                                if (selectedNode is Setting.GeminiNodeSetting geminiNode)
+                                {
+                                    if (geminiNode.Url != newUrl)
+                                    {
+                                        geminiNode.Url = newUrl;
+                                        if (this.FindName("TextBox_ApiUrl") is TextBox tbUrl)
+                                            tbUrl.Text = newUrl;
+                                    }
+                                    if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
+                                    {
+                                        geminiNode.Model = parts[2];
+                                        if (this.FindName("ComboBox_Model") is ComboBox cbModel)
+                                            cbModel.Text = parts[2];
+                                    }
+                                }
+                                break;
+                        }
+                        
+                        SaveCurrentNodeChanges();
+                    }
+                    finally
+                    {
+                        _isUpdatingNodeDetails = false;
+                    }
+                }
             }
         }
 
@@ -4655,38 +5487,69 @@ namespace VPetLLM.UI.Windows
         {
             try
             {
-                if (this.FindName("ComboBox_OpenAIUrlPreset") is not ComboBox cbPreset)
-                    return;
-
-                cbPreset.Items.Clear();
-                cbPreset.Items.Add(new ComboBoxItem { Content = "--", Tag = "" });
-
-                var presets = await ApiPresetManager.GetPresetsAsync();
-                if (presets?.Categories == null) return;
-
-                foreach (var category in presets.Categories)
+                // 初始化原来的 ComboBox_OpenAIUrlPreset
+                if (this.FindName("ComboBox_OpenAIUrlPreset") is ComboBox cbPresetOld)
                 {
-                    var headerItem = new ComboBoxItem
-                    {
-                        Content = $"=== {category.Name} ===",
-                        Tag = "",
-                        IsEnabled = false
-                    };
-                    cbPreset.Items.Add(headerItem);
+                    cbPresetOld.Items.Clear();
+                    cbPresetOld.Items.Add(new ComboBoxItem { Content = "--", Tag = "" });
 
-                    foreach (var preset in category.Presets)
+                    var presets = await ApiPresetManager.GetPresetsAsync();
+                    if (presets?.Categories == null) return;
+
+                    foreach (var category in presets.Categories)
                     {
-                        cbPreset.Items.Add(new ComboBoxItem
+                        var headerItem = new ComboBoxItem
                         {
-                            Content = preset.Name,
-                            Tag = $"{category.Name}|{preset.Url}|{preset.DefaultModel}"
-                        });
+                            Content = $"=== {category.Name} ===",
+                            Tag = "",
+                            IsEnabled = false
+                        };
+                        cbPresetOld.Items.Add(headerItem);
+
+                        foreach (var preset in category.Presets)
+                        {
+                            cbPresetOld.Items.Add(new ComboBoxItem
+                            {
+                                Content = preset.Name,
+                                Tag = $"{category.Name}|{preset.Url}|{preset.DefaultModel}"
+                            });
+                        }
+                    }
+                }
+
+                // 初始化新的 ComboBox_UrlPreset
+                if (this.FindName("ComboBox_UrlPreset") is ComboBox cbPresetNew)
+                {
+                    cbPresetNew.Items.Clear();
+                    cbPresetNew.Items.Add(new ComboBoxItem { Content = "--", Tag = "" });
+
+                    var presets = await ApiPresetManager.GetPresetsAsync();
+                    if (presets?.Categories == null) return;
+
+                    foreach (var category in presets.Categories)
+                    {
+                        var headerItem = new ComboBoxItem
+                        {
+                            Content = $"=== {category.Name} ===",
+                            Tag = "",
+                            IsEnabled = false
+                        };
+                        cbPresetNew.Items.Add(headerItem);
+
+                        foreach (var preset in category.Presets)
+                        {
+                            cbPresetNew.Items.Add(new ComboBoxItem
+                            {
+                                Content = preset.Name,
+                                Tag = $"{category.Name}|{preset.Url}|{preset.DefaultModel}"
+                            });
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"初始化OpenAI URL预设失败: {ex.Message}");
+                Logger.Log($"初始化URL预设失败: {ex.Message}");
             }
         }
 
@@ -4892,7 +5755,9 @@ namespace VPetLLM.UI.Windows
 
                 if (_sonioxModels.Count == 0)
                 {
-                    MessageBox.Show("未能获取模型列表，请检查 API Key 和网络连接", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    var langCode = _plugin.Settings.Language;
+                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("ASR.Soniox.RefreshModelsFail", langCode, "获取模型列表失败，请检查API Key和网络连接"),
+                        LanguageHelper.Get("Warning", langCode) ?? "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
@@ -5216,12 +6081,16 @@ namespace VPetLLM.UI.Windows
             try
             {
                 LoadRecordingDevices();
-                MessageBox.Show("设备列表已刷新", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                var langCode = _plugin.Settings.Language;
+                MessageBox.Show(LanguageHelper.Get("ASR.RefreshDevices.Success", langCode) ?? "设备列表已刷新",
+                    LanguageHelper.Get("Success", langCode) ?? "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 Logger.Log($"Error refreshing devices: {ex.Message}");
-                MessageBox.Show($"刷新设备列表失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                var langCode = _plugin.Settings.Language;
+                MessageBox.Show($"{LanguageHelper.Get("ASR.RefreshDevices.Fail", langCode) ?? "刷新设备列表失败"}: {ex.Message}",
+                    LanguageHelper.Get("Error", langCode) ?? "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
