@@ -58,6 +58,30 @@
             "zh-hant": "LLM 供應商",
             "jp": "LLMプロバイダー"
         },
+        "EnableFallback": {
+            "en": "Enable Fallback",
+            "zh-hans": "启用降级",
+            "zh-hant": "啟用降級",
+            "jp": "フォールバックを有効にする"
+        },
+        "EnableFallbackTooltip": {
+            "en": "When enabled, automatically switch to backup providers when the primary provider fails",
+            "zh-hans": "启用后，当前提供商出错时自动切换到备选提供商",
+            "zh-hant": "啟用後，當前提供商出錯時自動切換到備選提供商",
+            "jp": "有効にすると、プライマリプロバイダーが失敗した場合にバックアッププロバイダーに自動切り替え"
+        },
+        "FallbackPriority": {
+            "en": "Fallback Priority",
+            "zh-hans": "降级优先级",
+            "zh-hant": "降級優先級",
+            "jp": "フォールバック優先度"
+        },
+        "FallbackPriorityTip": {
+            "en": "Drag to reorder. Only enabled providers will be used",
+            "zh-hans": "拖动排序，仅启用状态的渠道会被使用",
+            "zh-hant": "拖動排序，僅啟用狀態的渠道會被使用",
+            "jp": "ドラッグして並べ替え、有効なチャネルのみ使用されます"
+        },
         "AiName": {
             "en": "AI Name",
             "zh-hans": "AI名称",

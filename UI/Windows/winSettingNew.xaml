@@ -196,6 +196,93 @@
                                     </ComboBox.ItemContainerStyle>
                                 </ComboBox>
 
+                                <CheckBox x:Name="CheckBox_EnableFallback"
+                                        Content="{utils:Localize KeyPath=LLM_Settings.EnableFallback}"
+                                        ToolTip="{utils:Localize KeyPath=LLM_Settings.EnableFallbackTooltip}"
+                                        Margin="0,0,0,8"
+                                        Style="{StaticResource ModernCheckBox}"
+                                        Checked="CheckBox_EnableFallback_Checked"
+                                        Unchecked="CheckBox_EnableFallback_Unchecked"/>
+
+                                <StackPanel x:Name="Panel_FallbackPriority" Visibility="Collapsed" Margin="0,0,0,16">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <Label Content="{utils:Localize KeyPath=LLM_Settings.FallbackPriority}"
+                                                x:Name="Label_FallbackPriority"
+                                                Style="{StaticResource SettingLabel}"
+                                                Padding="0,0,0,0"/>
+                                        <TextBlock Text="{utils:Localize KeyPath=LLM_Settings.FallbackPriorityTip}"
+                                                Foreground="{StaticResource SecondaryTextBrush}"
+                                                FontSize="11"
+                                                VerticalAlignment="Center"
+                                                Margin="8,0,0,0"/>
+                                    </StackPanel>
+                                    <ListBox x:Name="ListBox_FallbackProviders"
+                                            AllowDrop="True"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            SelectionMode="Single"
+                                            PreviewMouseLeftButtonDown="ListBox_FallbackProviders_PreviewMouseLeftButtonDown"
+                                            PreviewMouseMove="ListBox_FallbackProviders_PreviewMouseMove"
+                                            Drop="ListBox_FallbackProviders_Drop"
+                                            DragOver="ListBox_FallbackProviders_DragOver"
+                                            DragEnter="ListBox_FallbackProviders_DragEnter"
+                                            ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{StaticResource SecondaryBackgroundBrush}"
+                                                        BorderBrush="{StaticResource BorderBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="4"
+                                                        Padding="8,6"
+                                                        Margin="0,2">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="☰"
+                                                                Foreground="{StaticResource SecondaryTextBrush}"
+                                                                FontSize="14"
+                                                                VerticalAlignment="Center"
+                                                                Margin="0,0,8,0"
+                                                                Cursor="SizeAll"/>
+                                                        <CheckBox Grid.Column="1"
+                                                                IsChecked="{Binding IsEnabled}"
+                                                                Margin="0,0,8,0"
+                                                                VerticalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                                            <Border Background="{Binding ProviderColor}"
+                                                                    CornerRadius="3"
+                                                                    Width="16"
+                                                                    Height="16"
+                                                                    Margin="0,0,6,0"
+                                                                    VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding ProviderIcon}"
+                                                                        FontSize="8"
+                                                                        Foreground="White"
+                                                                        HorizontalAlignment="Center"
+                                                                        VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <TextBlock Text="{Binding ProviderName}"
+                                                                    VerticalAlignment="Center"
+                                                                    Foreground="{StaticResource PrimaryTextBrush}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="0"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="Background" Value="Transparent"/>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                    </ListBox>
+                                </StackPanel>
+
                                 <Label Content="{utils:Localize KeyPath=LLM_Settings.AiName}"
                                         VerticalAlignment="Top"
                                         Margin="0,0,0,0"

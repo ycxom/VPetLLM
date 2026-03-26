@@ -67,7 +67,17 @@ namespace VPetLLM
         /// LLM 请求超时时间（秒），0 表示使用默认值（120秒）
         /// </summary>
         public int LLMRequestTimeoutSeconds { get; set; } = 120;
-        
+
+        /// <summary>
+        /// 是否启用降级功能
+        /// </summary>
+        public bool EnableFallback { get; set; } = false;
+
+        /// <summary>
+        /// 降级提供商配置列表
+        /// </summary>
+        public List<ProviderFallbackConfig> FallbackProviders { get; set; } = new();
+
         private readonly string _path;
         private static ISettingStorage? _storage;
         private readonly string? _instanceId;
@@ -1075,6 +1085,13 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
+        }
+
+        public class ProviderFallbackConfig
+        {
+            public string ProviderType { get; set; } = "";
+            public bool IsEnabled { get; set; } = false;
+            public int Priority { get; set; } = 0;
         }
 
         public class ToolSetting

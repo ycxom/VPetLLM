@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using System.Collections.ObjectModel;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Windows;
@@ -44,8 +45,70 @@ namespace VPetLLM.UI.Windows
         public string SettingActionText { get; set; }
     }
 
+    public class ProviderFallbackItem : System.ComponentModel.INotifyPropertyChanged
+    {
+        private bool _isEnabled;
+        private int _priority;
+        private string _providerName;
+        private string _providerIcon;
+        private string _providerColor;
+        private Action<bool> _onEnabledChanged;
+
+        public ProviderFallbackItem() { }
+
+        public ProviderFallbackItem(Action<bool> onEnabledChanged)
+        {
+            _onEnabledChanged = onEnabledChanged;
+        }
+
+        public string ProviderName
+        {
+            get => _providerName;
+            set { _providerName = value; OnPropertyChanged(nameof(ProviderName)); }
+        }
+
+        public string ProviderType { get; set; }
+
+        public string ProviderIcon
+        {
+            get => _providerIcon;
+            set { _providerIcon = value; OnPropertyChanged(nameof(ProviderIcon)); }
+        }
+
+        public string ProviderColor
+        {
+            get => _providerColor;
+            set { _providerColor = value; OnPropertyChanged(nameof(ProviderColor)); }
+        }
+
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                _isEnabled = value;
+                OnPropertyChanged(nameof(IsEnabled));
+                _onEnabledChanged?.Invoke(value);
+            }
+        }
+
+        public int Priority
+        {
+            get => _priority;
+            set { _priority = value; OnPropertyChanged(nameof(Priority)); }
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
+        }
+    }
+
     public partial class winSettingNew : Window
     {
+        private ObservableCollection<ProviderFallbackItem> _fallbackProviders;
+
         /// <summary>
         /// 动态窗口标题支持
         /// 根据VPetLLM是否为默认插件显示不同的标题
@@ -687,6 +750,12 @@ namespace VPetLLM.UI.Windows
         {
             ((ComboBox)this.FindName("ComboBox_Provider")).ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectedItem = _plugin.Settings.Provider;
+            ((CheckBox)this.FindName("CheckBox_EnableFallback")).IsChecked = _plugin.Settings.EnableFallback;
+            if (_plugin.Settings.EnableFallback == true && Panel_FallbackPriority != null)
+            {
+                Panel_FallbackPriority.Visibility = Visibility.Visible;
+                LoadFallbackProviders();
+            }
             var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
             languageComboBox.ItemsSource = LanguageHelper.LanguageDisplayMap.Values;
             languageComboBox.SelectedItem = LanguageHelper.LanguageDisplayMap.FirstOrDefault(x => x.Key == _plugin.Settings.Language).Value;
@@ -1152,6 +1221,7 @@ namespace VPetLLM.UI.Windows
         {
             if (!_isReadyToSave) return;
             var providerComboBox = (ComboBox)this.FindName("ComboBox_Provider");
+            if (providerComboBox == null) return;
             var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
             var promptlanguageComboBox = (ComboBox)this.FindName("ComboBox_PromptLanguage");
             var aiNameTextBox = (TextBox)this.FindName("TextBox_AiName");
@@ -1522,6 +1592,7 @@ namespace VPetLLM.UI.Windows
                     Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Gemini => new GeminiChatCore(GetCurrentGeminiSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.LMStudio => new LMStudioChatCore(_plugin.Settings.LMStudio, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
 
@@ -1562,7 +1633,296 @@ namespace VPetLLM.UI.Windows
                 _hasUnsavedChanges = false;
             }
         }
-        private void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
+        private async void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_plugin?.Settings == null) return;
+            if (CheckBox_EnableFallback?.IsChecked == true)
+            {
+                await Task.Delay(100);
+                LoadFallbackProviders();
+                SaveFallbackSettings();
+            }
+        }
+
+        private void CheckBox_EnableFallback_Checked(object sender, RoutedEventArgs e)
+        {
+            if (Panel_FallbackPriority == null) return;
+            Panel_FallbackPriority.Visibility = Visibility.Visible;
+            LoadFallbackProviders();
+            SaveFallbackSettings();
+        }
+
+        private void CheckBox_EnableFallback_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (Panel_FallbackPriority == null) return;
+            Panel_FallbackPriority.Visibility = Visibility.Collapsed;
+            SaveFallbackSettings();
+        }
+
+        private void LoadFallbackProviders()
+        {
+            if (ListBox_FallbackProviders == null) return;
+
+            var currentProvider = _plugin?.Settings?.Provider.ToString() ?? "Ollama";
+
+            Action<bool> onEnabledChanged = _ => { Dispatcher.InvokeAsync(() => SaveFallbackSettings()); };
+
+            var allProviders = new List<ProviderFallbackItem>
+            {
+                new ProviderFallbackItem(onEnabledChanged) { ProviderType = "OpenAI", ProviderName = "OpenAI", ProviderIcon = "AI", ProviderColor = "#10A37F", IsEnabled = false, Priority = 0 },
+                new ProviderFallbackItem(onEnabledChanged) { ProviderType = "Gemini", ProviderName = "Gemini", ProviderIcon = "G", ProviderColor = "#4285F4", IsEnabled = false, Priority = 1 },
+                new ProviderFallbackItem(onEnabledChanged) { ProviderType = "Ollama", ProviderName = "Ollama", ProviderIcon = "O", ProviderColor = "#FF6B35", IsEnabled = false, Priority = 2 },
+                new ProviderFallbackItem(onEnabledChanged) { ProviderType = "LMStudio", ProviderName = "LM Studio", ProviderIcon = "LM", ProviderColor = "#FF6B35", IsEnabled = false, Priority = 3 },
+                new ProviderFallbackItem(onEnabledChanged) { ProviderType = "Free", ProviderName = "Free", ProviderIcon = "F", ProviderColor = "#28A745", IsEnabled = false, Priority = 4 }
+            };
+
+            var filteredItems = allProviders.Where(x => x.ProviderType != currentProvider).ToList();
+
+            try
+            {
+                var fallbackConfig = _plugin?.Settings?.FallbackProviders;
+                if (fallbackConfig != null && fallbackConfig.Count > 0)
+                {
+                    foreach (var provider in filteredItems)
+                    {
+                        var config = fallbackConfig.FirstOrDefault(p => p.ProviderType == provider.ProviderType);
+                        if (config != null)
+                        {
+                            provider.IsEnabled = config.IsEnabled;
+                            provider.Priority = config.Priority;
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            filteredItems = filteredItems.OrderBy(x => x.Priority).ToList();
+            for (int i = 0; i < filteredItems.Count; i++)
+            {
+                filteredItems[i].Priority = i;
+            }
+
+            _fallbackProviders = new ObservableCollection<ProviderFallbackItem>(filteredItems);
+            ListBox_FallbackProviders.ItemsSource = null;
+            ListBox_FallbackProviders.ItemsSource = _fallbackProviders;
+        }
+
+        private void SaveFallbackSettings()
+        {
+            try
+            {
+                if (_plugin?.Settings == null) return;
+
+                if (_plugin.Settings.FallbackProviders == null)
+                {
+                    _plugin.Settings.FallbackProviders = new List<Setting.ProviderFallbackConfig>();
+                }
+                else
+                {
+                    _plugin.Settings.FallbackProviders.Clear();
+                }
+
+                if (ListBox_FallbackProviders?.ItemsSource is IEnumerable<ProviderFallbackItem> items)
+                {
+                    int priority = 0;
+                    foreach (var item in items)
+                    {
+                        _plugin.Settings.FallbackProviders.Add(new Setting.ProviderFallbackConfig
+                        {
+                            ProviderType = item.ProviderType,
+                            IsEnabled = item.IsEnabled,
+                            Priority = priority++
+                        });
+                    }
+                }
+
+                _plugin.Settings.EnableFallback = CheckBox_EnableFallback?.IsChecked == true;
+                MarkUnsavedChanges();
+            }
+            catch { }
+        }
+
+        private Point _dragStartPoint;
+        private bool _isDragging;
+
+        private void ListBox_FallbackProviders_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragStartPoint = e.GetPosition(null);
+            _isDragging = false;
+        }
+
+        private void ListBox_FallbackProviders_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed) return;
+
+            Point currentPosition = e.GetPosition(null);
+            Vector diff = _dragStartPoint - currentPosition;
+
+            if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+            {
+                if (_isDragging) return;
+
+                _isDragging = true;
+                ListBox listBox = sender as ListBox;
+                if (listBox == null) return;
+
+                ListBoxItem listBoxItem = FindAncestor<ListBoxItem>((DependencyObject)e.OriginalSource);
+                if (listBoxItem == null) return;
+
+                int index = listBox.ItemContainerGenerator.IndexFromContainer(listBoxItem);
+                if (index < 0) return;
+
+                object data = new object[] { index, listBoxItem.DataContext };
+                DragDrop.DoDragDrop(listBoxItem, data, DragDropEffects.Move);
+            }
+        }
+
+        private void ListBox_FallbackProviders_Drop(object sender, DragEventArgs e)
+        {
+            if (!_isDragging) return;
+            _isDragging = false;
+
+            ListBox listBox = sender as ListBox;
+            if (listBox == null) return;
+
+            ResetAllItemBorders(listBox);
+
+            if (listBox.ItemsSource is not ObservableCollection<ProviderFallbackItem> items) return;
+
+            int dropIndex = GetDropIndex(listBox, e.GetPosition(listBox));
+
+            object[] data = e.Data.GetData(typeof(object[])) as object[];
+            if (data == null || data.Length < 2) return;
+
+            int dragIndex = (int)data[0];
+            ProviderFallbackItem dragItem = data[1] as ProviderFallbackItem;
+            if (dragItem == null) return;
+
+            items.RemoveAt(dragIndex);
+            if (dropIndex > items.Count) dropIndex = items.Count;
+            items.Insert(dropIndex, dragItem);
+
+            for (int i = 0; i < items.Count; i++)
+            {
+                items[i].Priority = i;
+            }
+
+            listBox.SelectedItem = dragItem;
+
+            SaveFallbackSettings();
+        }
+
+        private void ResetAllItemBorders(ListBox listBox)
+        {
+            for (int i = 0; i < listBox.Items.Count; i++)
+            {
+                ListBoxItem item = listBox.ItemContainerGenerator.ContainerFromIndex(i) as ListBoxItem;
+                if (item != null)
+                {
+                    var border = FindChild<Border>(item);
+                    if (border != null)
+                    {
+                        border.BorderBrush = (SolidColorBrush)FindResource("BorderBrush");
+                        border.BorderThickness = new Thickness(1);
+                    }
+                }
+            }
+        }
+
+        private int GetDropIndex(ListBox listBox, Point point)
+        {
+            int index = 0;
+            for (int i = 0; i < listBox.Items.Count; i++)
+            {
+                ListBoxItem item = listBox.ItemContainerGenerator.ContainerFromIndex(i) as ListBoxItem;
+                if (item != null)
+                {
+                    Point itemTop = item.TranslatePoint(new Point(0, 0), listBox);
+                    Point itemBottom = item.TranslatePoint(new Point(item.ActualWidth, item.ActualHeight), listBox);
+
+                    double midY = itemTop.Y + item.ActualHeight / 2;
+
+                    if (point.Y < midY)
+                    {
+                        return i;
+                    }
+                    index = i + 1;
+                }
+            }
+            return index;
+        }
+
+        private void ListBox_FallbackProviders_DragEnter(object sender, DragEventArgs e)
+        {
+            ListBox listBox = sender as ListBox;
+            if (listBox == null) return;
+            ResetAllItemBorders(listBox);
+        }
+
+        private void ListBox_FallbackProviders_DragOver(object sender, DragEventArgs e)
+        {
+            if (!_isDragging) return;
+
+            ListBox listBox = sender as ListBox;
+            if (listBox == null) return;
+
+            int dropIndex = GetDropIndex(listBox, e.GetPosition(listBox));
+
+            for (int i = 0; i < listBox.Items.Count; i++)
+            {
+                ListBoxItem item = listBox.ItemContainerGenerator.ContainerFromIndex(i) as ListBoxItem;
+                if (item != null)
+                {
+                    if (i == dropIndex)
+                    {
+                        var border = FindChild<Border>(item);
+                        if (border != null)
+                        {
+                            border.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 120, 212));
+                            border.BorderThickness = new Thickness(2);
+                        }
+                    }
+                    else
+                    {
+                        var border = FindChild<Border>(item);
+                        if (border != null)
+                        {
+                            border.BorderBrush = (SolidColorBrush)FindResource("BorderBrush");
+                            border.BorderThickness = new Thickness(1);
+                        }
+                    }
+                }
+            }
+
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+        }
+
+        private static T FindChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T result)
+                    return result;
+                var descendant = FindChild<T>(child);
+                if (descendant != null)
+                    return descendant;
+            }
+            return null;
+        }
+
+        private static T FindAncestor<T>(DependencyObject current) where T : DependencyObject
+        {
+            while (current != null)
+            {
+                if (current is T ancestor)
+                    return ancestor;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return null;
+        }
 
         private async void Button_RefreshOllamaModels_Click(object sender, RoutedEventArgs e)
         {
@@ -4308,8 +4668,11 @@ namespace VPetLLM.UI.Windows
             var tbApiUrl = this.FindName("TextBox_ApiUrl") as TextBox;
             var pwbApiKey = this.FindName("PasswordBox_OpenAIApiKey") as PasswordBox;
             var tbxApiKeyPlain = this.FindName("TextBox_OpenAIApiKey_Plain") as TextBox;
+            var btnRefresh = sender as Button;
 
-            if (cbModel == null) return;
+            if (cbModel == null || btnRefresh == null) return;
+
+            StartButtonLoadingAnimation(btnRefresh);
 
             string? apiKey = pwbApiKey?.Password;
             if (pwbApiKey?.Visibility != Visibility.Visible && tbxApiKeyPlain != null)
@@ -4342,20 +4705,23 @@ namespace VPetLLM.UI.Windows
                             break;
                     }
 
-                    if (models != null && models.Count > 0)
+                    Dispatcher.Invoke(() =>
                     {
-                        Dispatcher.Invoke(() =>
+                        StopButtonLoadingAnimation(btnRefresh);
+
+                        if (models != null && models.Count > 0)
                         {
                             if (cbModel != null)
                             {
                                 cbModel.ItemsSource = models;
                                 cbModel.Text = currentModel;
                             }
-                        });
-                    }
+                        }
+                    });
                 }
                 catch
                 {
+                    Dispatcher.Invoke(() => StopButtonLoadingAnimation(btnRefresh));
                 }
             });
         }
