@@ -514,6 +514,12 @@
                     <ComboBoxItem x:Name="ComboBoxItem_ChannelMode_ChatOnly" Content="{utils:Localize KeyPath=ChannelMode.ChatOnly, Default=仅聊天}" Tag="ChatOnly"/>
                     <ComboBoxItem x:Name="ComboBoxItem_ChannelMode_CompressionOnly" Content="{utils:Localize KeyPath=ChannelMode.CompressionOnly, Default=仅聊天压缩}" Tag="CompressionOnly"/>
                 </ComboBox>
+                <Label x:Name="Label_ChannelProxyMode" Content="{utils:Localize KeyPath=LLM_Settings.ChannelProxyMode, Default=代理模式:}" Style="{StaticResource SettingLabel}"/>
+                <ComboBox x:Name="ComboBox_ChannelProxyMode" Margin="0,0,0,16" Style="{StaticResource ModernComboBox}" SelectionChanged="ComboBox_ChannelProxyMode_SelectionChanged">
+                    <ComboBoxItem x:Name="ComboBoxItem_ChannelProxyMode_FollowDefault" Content="{utils:Localize KeyPath=ChannelProxyMode.FollowDefault, Default=跟随默认}" Tag="FollowDefault"/>
+                    <ComboBoxItem x:Name="ComboBoxItem_ChannelProxyMode_Direct" Content="{utils:Localize KeyPath=ChannelProxyMode.Direct, Default=直连}" Tag="Direct"/>
+                    <ComboBoxItem x:Name="ComboBoxItem_ChannelProxyMode_ForceProxy" Content="{utils:Localize KeyPath=ChannelProxyMode.ForceProxy, Default=强制代理}" Tag="ForceProxy"/>
+                </ComboBox>
                 <CheckBox x:Name="CheckBox_EnableAdvanced" Content="{utils:Localize KeyPath=LLM_Settings.EnableAdvanced}" Margin="0,0,0,16" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableAdvanced_Checked" Unchecked="CheckBox_EnableAdvanced_Unchecked"/>
                 <StackPanel x:Name="StackPanel_Advanced" Margin="20,0,0,0" IsEnabled="{Binding ElementName=CheckBox_EnableAdvanced, Path=IsChecked}">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">

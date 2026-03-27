@@ -45,6 +45,16 @@ namespace VPetLLM.Core.Providers.Chat
             _setting = setting;
         }
 
+        protected override Setting.ChannelProxyMode GetChannelProxyMode()
+        {
+            var node = _geminiSetting.GetCurrentGeminiSetting();
+            if (node != null)
+            {
+                return node.ProxyMode;
+            }
+            return Setting.ChannelProxyMode.FollowDefault;
+        }
+
         public override Task<string> Chat(string prompt)
         {
             return Chat(prompt, false);

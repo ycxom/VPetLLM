@@ -112,6 +112,16 @@ namespace VPetLLM.Core.Providers.Chat
             _currentNodeContext = null;
         }
 
+        protected override Setting.ChannelProxyMode GetChannelProxyMode()
+        {
+            var node = GetCurrentNode();
+            if (node != null)
+            {
+                return node.ProxyMode;
+            }
+            return Setting.ChannelProxyMode.FollowDefault;
+        }
+
         private string GetCurrentApiKey(Setting.OpenAINodeSetting? node)
         {
             if (string.IsNullOrWhiteSpace(node?.ApiKey))

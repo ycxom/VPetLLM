@@ -256,6 +256,12 @@
             "zh-hant": "渠道模式:",
             "jp": "チャネルモード:"
         },
+        "ChannelProxyMode": {
+            "en": "Proxy Mode:",
+            "zh-hans": "代理模式:",
+            "zh-hant": "代理模式:",
+            "jp": "プロキシモード:"
+        },
         "EnableAdvanced": {
             "en": "Enable Advanced Configuration",
             "zh-hans": "启用高级配置",
@@ -593,6 +599,26 @@
             "zh-hans": "仅聊天压缩",
             "zh-hant": "僅聊天壓縮",
             "jp": "圧縮のみ"
+        }
+    },
+    "ChannelProxyMode": {
+        "FollowDefault": {
+            "en": "Follow Default",
+            "zh-hans": "跟随默认",
+            "zh-hant": "跟隨默認",
+            "jp": "デフォルトに従う"
+        },
+        "Direct": {
+            "en": "Direct",
+            "zh-hans": "直连",
+            "zh-hant": "直連",
+            "jp": "直接接続"
+        },
+        "ForceProxy": {
+            "en": "Force Proxy",
+            "zh-hans": "强制代理",
+            "zh-hant": "強制代理",
+            "jp": "強制プロキシ"
         }
     },
     "Advanced_Options": {

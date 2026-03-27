@@ -1,5 +1,6 @@
 using Newtonsoft.Json.Linq;
 using System.Collections.ObjectModel;
+using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Windows;
@@ -4339,6 +4340,8 @@ namespace VPetLLM.UI.Windows
             var cbEnableVision = this.FindName("CheckBox_EnableVision") as CheckBox;
             var labelChannelMode = this.FindName("Label_ChannelMode") as Label;
             var cbChannelMode = this.FindName("ComboBox_ChannelMode") as ComboBox;
+            var labelChannelProxyMode = this.FindName("Label_ChannelProxyMode") as Label;
+            var cbChannelProxyMode = this.FindName("ComboBox_ChannelProxyMode") as ComboBox;
             var cbEnableAdvanced = this.FindName("CheckBox_EnableAdvanced") as CheckBox;
             var stackPanelAdvanced = this.FindName("StackPanel_Advanced") as StackPanel;
             var labelApiKey = this.FindName("Label_ApiKey") as Label;
@@ -4381,6 +4384,8 @@ namespace VPetLLM.UI.Windows
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
                     if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
                     if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
+                    if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Visible;
+                    if (cbChannelProxyMode != null) cbChannelProxyMode.Visibility = Visibility.Visible;
                     if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
                     if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
                     if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
@@ -4393,11 +4398,13 @@ namespace VPetLLM.UI.Windows
                     if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
                     if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
-                    if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Collapsed;
-                    if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Collapsed;
+                    if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
+                    if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
+                    if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Visible;
+                    if (cbChannelProxyMode != null) cbChannelProxyMode.Visibility = Visibility.Visible;
                     if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
                     if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
-                    if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Collapsed;
+                    if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
                     break;
                 case "Ollama":
                 case "LMStudio":
@@ -4408,8 +4415,10 @@ namespace VPetLLM.UI.Windows
                     if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
                     if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
-                    if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Collapsed;
-                    if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Collapsed;
+                    if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
+                    if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
+                    if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Collapsed;
+                    if (cbChannelProxyMode != null) cbChannelProxyMode.Visibility = Visibility.Collapsed;
                     if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
                     if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
                     if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
@@ -4532,6 +4541,7 @@ namespace VPetLLM.UI.Windows
                 var sliderTemperature = this.FindName("Slider_Temperature") as Slider;
                 var tbMaxTokens = this.FindName("TextBox_MaxTokens") as TextBox;
                 var cbChannelMode = this.FindName("ComboBox_ChannelMode") as ComboBox;
+                var cbChannelProxyMode = this.FindName("ComboBox_ChannelProxyMode") as ComboBox;
                 var textBlockTemperatureValue = this.FindName("TextBlock_TemperatureValue") as TextBlock;
 
                 switch (channelType)
@@ -4565,6 +4575,17 @@ namespace VPetLLM.UI.Windows
                                     }
                                 }
                             }
+                            if (cbChannelProxyMode != null)
+                            {
+                                foreach (ComboBoxItem item in cbChannelProxyMode.Items)
+                                {
+                                    if (item.Tag?.ToString() == openaiNode.ProxyMode.ToString())
+                                    {
+                                        cbChannelProxyMode.SelectedItem = item;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                         break;
                     case "Gemini":
@@ -4585,6 +4606,28 @@ namespace VPetLLM.UI.Windows
                             if (sliderTemperature != null) sliderTemperature.Value = geminiNode.Temperature;
                             if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = geminiNode.Temperature.ToString("F2");
                             if (tbMaxTokens != null) tbMaxTokens.Text = geminiNode.MaxTokens.ToString();
+                            if (cbChannelMode != null)
+                            {
+                                foreach (ComboBoxItem item in cbChannelMode.Items)
+                                {
+                                    if (item.Tag?.ToString() == geminiNode.Mode.ToString())
+                                    {
+                                        cbChannelMode.SelectedItem = item;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (cbChannelProxyMode != null)
+                            {
+                                foreach (ComboBoxItem item in cbChannelProxyMode.Items)
+                                {
+                                    if (item.Tag?.ToString() == geminiNode.ProxyMode.ToString())
+                                    {
+                                        cbChannelProxyMode.SelectedItem = item;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                         break;
                 }
@@ -4669,6 +4712,7 @@ namespace VPetLLM.UI.Windows
             var pwbApiKey = this.FindName("PasswordBox_OpenAIApiKey") as PasswordBox;
             var tbxApiKeyPlain = this.FindName("TextBox_OpenAIApiKey_Plain") as TextBox;
             var btnRefresh = sender as Button;
+            var listView = this.FindName("ListView_Channels") as ListView;
 
             if (cbModel == null || btnRefresh == null) return;
 
@@ -4682,6 +4726,22 @@ namespace VPetLLM.UI.Windows
 
             string apiUrl = tbApiUrl?.Text ?? "";
             string currentModel = cbModel?.Text ?? "";
+            var proxyMode = Setting.ChannelProxyMode.FollowDefault;
+
+            if (listView?.SelectedItem != null)
+            {
+                switch (channelType)
+                {
+                    case "OpenAI":
+                        if (listView.SelectedItem is Setting.OpenAINodeSetting openaiNode)
+                            proxyMode = openaiNode.ProxyMode;
+                        break;
+                    case "Gemini":
+                        if (listView.SelectedItem is Setting.GeminiNodeSetting geminiNode)
+                            proxyMode = geminiNode.ProxyMode;
+                        break;
+                }
+            }
 
             Task.Run(async () =>
             {
@@ -4694,13 +4754,13 @@ namespace VPetLLM.UI.Windows
                         case "OpenAI":
                             if (!string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(apiUrl))
                             {
-                                models = await GetOpenAIModelsAsync(apiUrl, apiKey);
+                                models = await GetOpenAIModelsAsync(apiUrl, apiKey, proxyMode);
                             }
                             break;
                         case "Gemini":
                             if (!string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(apiUrl))
                             {
-                                models = await GetGeminiModelsAsync(apiUrl, apiKey);
+                                models = await GetGeminiModelsAsync(apiUrl, apiKey, proxyMode);
                             }
                             break;
                     }
@@ -4726,12 +4786,37 @@ namespace VPetLLM.UI.Windows
             });
         }
 
-        private async Task<List<string>> GetOpenAIModelsAsync(string apiUrl, string apiKey)
+        private async Task<List<string>> GetOpenAIModelsAsync(string apiUrl, string apiKey, Setting.ChannelProxyMode proxyMode)
         {
             var models = new List<string>();
             try
             {
-                using var client = new HttpClient();
+                var handler = new HttpClientHandler();
+                if (proxyMode == Setting.ChannelProxyMode.Direct)
+                {
+                    // 直连，不使用代理
+                }
+                else if (proxyMode == Setting.ChannelProxyMode.ForceProxy && _plugin?.Settings?.Proxy != null)
+                {
+                    var protocol = _plugin.Settings.Proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                    var proxyUri = $"{protocol}://{_plugin.Settings.Proxy.Address}";
+                    handler.Proxy = new WebProxy(new Uri(proxyUri));
+                }
+                else if (proxyMode == Setting.ChannelProxyMode.FollowDefault && _plugin?.Settings?.Proxy?.IsEnabled == true)
+                {
+                    if (_plugin.Settings.Proxy.FollowSystemProxy)
+                    {
+                        handler.Proxy = WebRequest.GetSystemWebProxy();
+                    }
+                    else
+                    {
+                        var protocol = _plugin.Settings.Proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                        var proxyUri = $"{protocol}://{_plugin.Settings.Proxy.Address}";
+                        handler.Proxy = new WebProxy(new Uri(proxyUri));
+                    }
+                }
+
+                using var client = new HttpClient(handler);
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
 
                 var response = await client.GetAsync($"{apiUrl.TrimEnd('/')}/models");
@@ -4757,12 +4842,37 @@ namespace VPetLLM.UI.Windows
             return models;
         }
 
-        private async Task<List<string>> GetGeminiModelsAsync(string apiUrl, string apiKey)
+        private async Task<List<string>> GetGeminiModelsAsync(string apiUrl, string apiKey, Setting.ChannelProxyMode proxyMode)
         {
             var models = new List<string>();
             try
             {
-                using var client = new HttpClient();
+                var handler = new HttpClientHandler();
+                if (proxyMode == Setting.ChannelProxyMode.Direct)
+                {
+                    // 直连，不使用代理
+                }
+                else if (proxyMode == Setting.ChannelProxyMode.ForceProxy && _plugin?.Settings?.Proxy != null)
+                {
+                    var protocol = _plugin.Settings.Proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                    var proxyUri = $"{protocol}://{_plugin.Settings.Proxy.Address}";
+                    handler.Proxy = new WebProxy(new Uri(proxyUri));
+                }
+                else if (proxyMode == Setting.ChannelProxyMode.FollowDefault && _plugin?.Settings?.Proxy?.IsEnabled == true)
+                {
+                    if (_plugin.Settings.Proxy.FollowSystemProxy)
+                    {
+                        handler.Proxy = WebRequest.GetSystemWebProxy();
+                    }
+                    else
+                    {
+                        var protocol = _plugin.Settings.Proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                        var proxyUri = $"{protocol}://{_plugin.Settings.Proxy.Address}";
+                        handler.Proxy = new WebProxy(new Uri(proxyUri));
+                    }
+                }
+
+                using var client = new HttpClient(handler);
                 var response = await client.GetAsync($"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}");
                 if (response.IsSuccessStatusCode)
                 {
@@ -4814,6 +4924,7 @@ namespace VPetLLM.UI.Windows
             var sliderTemperature = this.FindName("Slider_Temperature") as Slider;
             var tbMaxTokens = this.FindName("TextBox_MaxTokens") as TextBox;
             var cbChannelMode = this.FindName("ComboBox_ChannelMode") as ComboBox;
+            var cbChannelProxyMode = this.FindName("ComboBox_ChannelProxyMode") as ComboBox;
 
             switch (channelType)
             {
@@ -4835,6 +4946,8 @@ namespace VPetLLM.UI.Windows
                             openaiNode.MaxTokens = maxTokens;
                         if (cbChannelMode != null && cbChannelMode.SelectedItem is ComboBoxItem modeItem)
                             openaiNode.Mode = Enum.Parse<Setting.ChannelMode>(modeItem.Tag?.ToString() ?? "Unrestricted");
+                        if (cbChannelProxyMode != null && cbChannelProxyMode.SelectedItem is ComboBoxItem proxyModeItem)
+                            openaiNode.ProxyMode = Enum.Parse<Setting.ChannelProxyMode>(proxyModeItem.Tag?.ToString() ?? "FollowDefault");
                     }
                     break;
                 case "Gemini":
@@ -4853,6 +4966,10 @@ namespace VPetLLM.UI.Windows
                         if (sliderTemperature != null) geminiNode.Temperature = sliderTemperature.Value;
                         if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
                             geminiNode.MaxTokens = maxTokens;
+                        if (cbChannelMode != null && cbChannelMode.SelectedItem is ComboBoxItem modeItem)
+                            geminiNode.Mode = Enum.Parse<Setting.ChannelMode>(modeItem.Tag?.ToString() ?? "Unrestricted");
+                        if (cbChannelProxyMode != null && cbChannelProxyMode.SelectedItem is ComboBoxItem proxyModeItem)
+                            geminiNode.ProxyMode = Enum.Parse<Setting.ChannelProxyMode>(proxyModeItem.Tag?.ToString() ?? "FollowDefault");
                     }
                     break;
             }
@@ -5025,6 +5142,12 @@ namespace VPetLLM.UI.Windows
 
         private void ComboBox_ChannelMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            SaveCurrentNodeChanges();
+        }
+
+        private void ComboBox_ChannelProxyMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
             SaveCurrentNodeChanges();
         }
 

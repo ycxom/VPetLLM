@@ -802,6 +802,7 @@ namespace VPetLLM
             public bool EnableVision { get; set; } = false;
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
             public string? PluginModeId { get; set; }
+            public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
 
             public OpenAISetting GetCurrentOpenAISetting()
             {
@@ -815,7 +816,8 @@ namespace VPetLLM
                     EnableAdvanced = this.EnableAdvanced,
                     EnableStreaming = this.EnableStreaming,
                     Enabled = this.Enabled,
-                    Name = this.Name
+                    Name = this.Name,
+                    OpenAINodes = new List<OpenAINodeSetting> { this }
                 };
             }
         }
@@ -952,6 +954,7 @@ namespace VPetLLM
             public bool EnableVision { get; set; } = false;
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
             public string? PluginModeId { get; set; }
+            public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
         }
 
         public class GeminiSetting
@@ -1124,6 +1127,16 @@ namespace VPetLLM
             ChatOnly = 1,          // 仅聊天
             CompressionOnly = 2,   // 仅聊天压缩
             PluginDefined = 100    // 插件自定义（预留）
+        }
+
+        /// <summary>
+        /// 渠道代理模式
+        /// </summary>
+        public enum ChannelProxyMode
+        {
+            FollowDefault = 0,    // 跟随默认设置
+            Direct = 1,           // 直连（不使用代理）
+            ForceProxy = 2        // 强制代理（前提：全局代理已启用）
         }
 
         public static bool IsNodeMatchingPurpose(ChannelMode mode, string? pluginModeId, string purpose)

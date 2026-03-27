@@ -274,8 +274,46 @@ namespace VPetLLM.Core.Abstractions.Base
             SystemMessageProvider.RemovePlugin(plugin);
         }
 
+        protected virtual Setting.ChannelProxyMode GetChannelProxyMode()
+        {
+            return Setting.ChannelProxyMode.FollowDefault;
+        }
+
         public IWebProxy GetProxy(string? requestType = null)
         {
+            var channelProxyMode = GetChannelProxyMode();
+
+            // 如果强制代理但全局代理未启用，则返回null（无法强制）
+            if (channelProxyMode == Setting.ChannelProxyMode.ForceProxy && (Settings?.Proxy is null || !Settings.Proxy.IsEnabled))
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForceProxy but global proxy not enabled, returning null proxy");
+                return null;
+            }
+
+            // 如果直连，完全不使用代理
+            if (channelProxyMode == Setting.ChannelProxyMode.Direct)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProxyDebug] Direct mode, returning null proxy");
+                return null;
+            }
+
+            // 如果强制代理，跳过全局检查，直接使用代理
+            if (channelProxyMode == Setting.ChannelProxyMode.ForceProxy)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProxyDebug] ForceProxy mode, using proxy");
+                if (Settings?.Proxy != null && Settings.Proxy.FollowSystemProxy)
+                {
+                    return WebRequest.GetSystemWebProxy();
+                }
+                else if (Settings?.Proxy != null)
+                {
+                    var protocol = Settings.Proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                    var proxyUri = $"{protocol}://{Settings.Proxy.Address}";
+                    return new WebProxy(new Uri(proxyUri));
+                }
+            }
+
+            // FollowDefault 或默认行为：使用全局代理设置
             // 如果Settings或Proxy为null，直接返回null
             if (Settings?.Proxy is null)
             {
