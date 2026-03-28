@@ -623,7 +623,7 @@ namespace VPetLLM.UI.Windows
             }
 
             // 立即保存重要配置
-            ScheduleAutoSave();
+            ScheduleSecretSave();
         }
 
         private void Control_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -681,12 +681,12 @@ namespace VPetLLM.UI.Windows
                 }
                 else
                 {
-                    ScheduleAutoSave();
+                    ScheduleSecretSave();
                 }
             }
             else
             {
-                ScheduleAutoSave();
+                ScheduleSecretSave();
             }
         }
 
@@ -711,7 +711,7 @@ namespace VPetLLM.UI.Windows
                 else
                 {
                     // 其他字段延迟保存
-                    ScheduleAutoSave();
+                    ScheduleSecretSave();
                 }
             }
         }
@@ -722,12 +722,12 @@ namespace VPetLLM.UI.Windows
                 return;
 
             // 立即保存重要配置
-            ScheduleAutoSave();
+            ScheduleSecretSave();
         }
 
         private void Control_PasswordChanged(object sender, RoutedEventArgs e)
         {
-            ScheduleAutoSave();
+            ScheduleSecretSave();
         }
 
         /// <summary>
@@ -3842,7 +3842,7 @@ namespace VPetLLM.UI.Windows
             }
 
             // 调用原有的保存逻辑
-            ScheduleAutoSave();
+            ScheduleSecretSave();
         }
 
         // DIY TTS 配置加载
@@ -4306,6 +4306,65 @@ namespace VPetLLM.UI.Windows
                 var channelType = item.Tag?.ToString();
                 LoadChannelNodes(channelType);
                 UpdateChannelSpecificUI(channelType);
+
+                // 确保模型被正确设置 - 使用专门的函数
+                var listView = this.FindName("ListView_Channels") as ListView;
+                if (listView?.SelectedItem != null && channelType != null)
+                {
+                    SafeSetModelComboBox(channelType, listView.SelectedItem);
+                }
+            }
+        }
+
+        // 专门、唯一的函数用于安全设置模型 ComboBox，避免所有竞争条件
+        private void SafeSetModelComboBox(string channelType, object selectedNode)
+        {
+            var cbModel = this.FindName("ComboBox_Model") as ComboBox;
+            if (cbModel == null) return;
+
+            _isUpdatingNodeDetails = true;
+            
+            // 最极端的保护：临时移除事件处理器，完全避免任何触发！
+            cbModel.SelectionChanged -= ComboBox_Model_SelectionChanged;
+            cbModel.LostFocus -= ComboBox_Model_LostFocus;
+            
+            try
+            {
+                string? targetModel = null;
+                
+                if (channelType == "OpenAI" && selectedNode is Setting.OpenAINodeSetting openaiNode)
+                {
+                    var channelId = $"OpenAI.{openaiNode.Url?.GetHashCode() ?? 0}_{openaiNode.ApiKey?.GetHashCode() ?? 0}";
+                    var cachedModels = GetCachedModels(channelType, channelId, openaiNode.Url);
+                    var modelsList = cachedModels != null && cachedModels.Count > 0 
+                        ? cachedModels 
+                        : new List<string> { "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo", "gpt-3.5-turbo-16k" };
+                    targetModel = openaiNode.Model;
+                    cbModel.ItemsSource = modelsList;
+                }
+                else if (channelType == "Gemini" && selectedNode is Setting.GeminiNodeSetting geminiNode)
+                {
+                    var channelId = $"Gemini.{geminiNode.Url?.GetHashCode() ?? 0}_{geminiNode.ApiKey?.GetHashCode() ?? 0}";
+                    var cachedModels = GetCachedModels(channelType, channelId, geminiNode.Url);
+                    var modelsList = cachedModels != null && cachedModels.Count > 0 
+                        ? cachedModels 
+                        : new List<string> { "gemini-pro", "gemini-1.5-pro", "gemini-pro-vision" };
+                    targetModel = geminiNode.Model;
+                    cbModel.ItemsSource = modelsList;
+                }
+                
+                // 关键修复：始终强制设置 Text，确保即使目标模型不在列表中也不会被重置
+                if (!string.IsNullOrEmpty(targetModel))
+                {
+                    cbModel.Text = targetModel;
+                }
+            }
+            finally
+            {
+                _isUpdatingNodeDetails = false;
+                // 恢复事件处理器
+                cbModel.SelectionChanged += ComboBox_Model_SelectionChanged;
+                cbModel.LostFocus += ComboBox_Model_LostFocus;
             }
         }
 
@@ -4331,6 +4390,12 @@ namespace VPetLLM.UI.Windows
                     break;
             }
             listView.UpdateLayout();
+
+            // 自动选中第一个节点
+            if (listView.Items.Count > 0 && listView.SelectedIndex < 0)
+            {
+                listView.SelectedIndex = 0;
+            }
         }
 
         private void UpdateChannelSpecificUI(string? channelType)
@@ -4350,26 +4415,8 @@ namespace VPetLLM.UI.Windows
             var gridApiAddress = this.FindName("Grid_ApiAddress") as Grid;
             var cbUrlPreset = this.FindName("ComboBox_UrlPreset") as ComboBox;
             var buttonRefreshModels = this.FindName("Button_RefreshModels") as Button;
-
-            if (cbModel != null)
-            {
-                cbModel.ItemsSource = null;
-                switch (channelType)
-                {
-                    case "OpenAI":
-                        cbModel.ItemsSource = new[] { "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo", "gpt-3.5-turbo-16k" };
-                        break;
-                    case "Gemini":
-                        cbModel.ItemsSource = new[] { "gemini-pro", "gemini-1.5-pro", "gemini-pro-vision" };
-                        break;
-                    case "Ollama":
-                        cbModel.ItemsSource = new[] { "llama2", "mistral", "codellama" };
-                        break;
-                    case "LMStudio":
-                        cbModel.ItemsSource = new[] { "default" };
-                        break;
-                }
-            }
+            // 模型列表完全由 ListView_Channels_SelectionChanged 处理
+            // 避免在 UpdateChannelSpecificUI 和 ListView_Channels_SelectionChanged 之间发生冲突
 
             // 根据渠道类型显示或隐藏控件
             switch (channelType)
@@ -4501,12 +4548,14 @@ namespace VPetLLM.UI.Windows
                 case "OpenAI":
                     if (listView.SelectedItem is Setting.OpenAINodeSetting openaiNode)
                     {
+                        ClearChannelCache(channelType, openaiNode.GetHashCode().ToString());
                         _plugin.Settings.OpenAI.OpenAINodes.Remove(openaiNode);
                     }
                     break;
                 case "Gemini":
                     if (listView.SelectedItem is Setting.GeminiNodeSetting geminiNode)
                     {
+                        ClearChannelCache(channelType, geminiNode.GetHashCode().ToString());
                         _plugin.Settings.Gemini.GeminiNodes.Remove(geminiNode);
                     }
                     break;
@@ -4534,7 +4583,6 @@ namespace VPetLLM.UI.Windows
                 var pwbApiKey = this.FindName("PasswordBox_OpenAIApiKey") as PasswordBox;
                 var tbxApiKeyPlain = this.FindName("TextBox_OpenAIApiKey_Plain") as TextBox;
                 var tbApiUrl = this.FindName("TextBox_ApiUrl") as TextBox;
-                var cbModel = this.FindName("ComboBox_Model") as ComboBox;
                 var cbEnableStreaming = this.FindName("CheckBox_EnableStreaming") as CheckBox;
                 var cbEnableVision = this.FindName("CheckBox_EnableVision") as CheckBox;
                 var cbEnableAdvanced = this.FindName("CheckBox_EnableAdvanced") as CheckBox;
@@ -4557,7 +4605,7 @@ namespace VPetLLM.UI.Windows
                                 lastUrl = tbApiUrl.Text;
                                 tbApiUrl.Text = openaiNode.Url;
                             }
-                            if (cbModel != null) cbModel.Text = openaiNode.Model;
+                            
                             if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = openaiNode.EnableStreaming;
                             if (cbEnableVision != null) cbEnableVision.IsChecked = openaiNode.EnableVision;
                             if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = openaiNode.EnableAdvanced;
@@ -4599,7 +4647,7 @@ namespace VPetLLM.UI.Windows
                                 lastUrl = tbApiUrl.Text;
                                 tbApiUrl.Text = geminiNode.Url;
                             }
-                            if (cbModel != null) cbModel.Text = geminiNode.Model;
+                            
                             if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = geminiNode.EnableStreaming;
                             if (cbEnableVision != null) cbEnableVision.IsChecked = geminiNode.EnableVision;
                             if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = geminiNode.EnableAdvanced;
@@ -4635,6 +4683,15 @@ namespace VPetLLM.UI.Windows
             finally
             {
                 _isUpdatingNodeDetails = false;
+
+                // 模型设置完全由 SafeSetModelComboBox 统一处理，确保没有竞争条件
+                var listViewFinal = sender as ListView;
+                var cbChannelTypeFinal = this.FindName("ComboBox_ChannelType") as ComboBox;
+                var channelTypeFinal = (cbChannelTypeFinal?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+                if (listViewFinal?.SelectedItem != null && channelTypeFinal != null)
+                {
+                    SafeSetModelComboBox(channelTypeFinal, listViewFinal.SelectedItem);
+                }
 
                 // 切换渠道后，根据新的 API URL 自动匹配并设置 ComboBox_UrlPreset
                 if (!string.IsNullOrEmpty(lastUrl))
@@ -4727,6 +4784,7 @@ namespace VPetLLM.UI.Windows
             string apiUrl = tbApiUrl?.Text ?? "";
             string currentModel = cbModel?.Text ?? "";
             var proxyMode = Setting.ChannelProxyMode.FollowDefault;
+            string? channelId = null;
 
             if (listView?.SelectedItem != null)
             {
@@ -4734,11 +4792,17 @@ namespace VPetLLM.UI.Windows
                 {
                     case "OpenAI":
                         if (listView.SelectedItem is Setting.OpenAINodeSetting openaiNode)
+                        {
                             proxyMode = openaiNode.ProxyMode;
+                            channelId = $"OpenAI.{openaiNode.Url?.GetHashCode() ?? 0}_{openaiNode.ApiKey?.GetHashCode() ?? 0}";
+                        }
                         break;
                     case "Gemini":
                         if (listView.SelectedItem is Setting.GeminiNodeSetting geminiNode)
+                        {
                             proxyMode = geminiNode.ProxyMode;
+                            channelId = $"Gemini.{geminiNode.Url?.GetHashCode() ?? 0}_{geminiNode.ApiKey?.GetHashCode() ?? 0}";
+                        }
                         break;
                 }
             }
@@ -4748,7 +4812,9 @@ namespace VPetLLM.UI.Windows
                 try
                 {
                     List<string>? models = null;
+                    string cacheKey = GenerateCacheKey(apiUrl);
 
+                    // T0: 始终从云端获取最新列表
                     switch (channelType)
                     {
                         case "OpenAI":
@@ -4765,6 +4831,26 @@ namespace VPetLLM.UI.Windows
                             break;
                     }
 
+                    // 更新T1缓存
+                    if (models != null && models.Count > 0)
+                    {
+                        SaveModelsToCache(channelType, channelId, apiUrl, models);
+                    }
+                    else
+                    {
+                        // T0获取失败，尝试T1缓存
+                        var cachedModels = GetCachedModels(channelType, channelId, apiUrl);
+                        if (cachedModels != null && cachedModels.Count > 0)
+                        {
+                            models = cachedModels;
+                        }
+                        else
+                        {
+                            // T1也不存在，使用T2硬编码列表
+                            models = GetHardcodedModels(channelType);
+                        }
+                    }
+
                     Dispatcher.Invoke(() =>
                     {
                         StopButtonLoadingAnimation(btnRefresh);
@@ -4773,8 +4859,16 @@ namespace VPetLLM.UI.Windows
                         {
                             if (cbModel != null)
                             {
-                                cbModel.ItemsSource = models;
-                                cbModel.Text = currentModel;
+                                _isUpdatingNodeDetails = true;
+                                try
+                                {
+                                    cbModel.ItemsSource = models;
+                                    cbModel.Text = currentModel;
+                                }
+                                finally
+                                {
+                                    _isUpdatingNodeDetails = false;
+                                }
                             }
                         }
                     });
@@ -4784,6 +4878,167 @@ namespace VPetLLM.UI.Windows
                     Dispatcher.Invoke(() => StopButtonLoadingAnimation(btnRefresh));
                 }
             });
+        }
+
+        private List<string> GetHardcodedModels(string? channelType)
+        {
+            // T2: 硬编码列表作为最终备选
+            return channelType switch
+            {
+                "OpenAI" => new List<string>
+                {
+                    "gpt-3.5-turbo",
+                    "gpt-3.5-turbo-16k",
+                    "gpt-4",
+                    "gpt-4-turbo-preview",
+                    "gpt-4-32k",
+                    "gpt-4o",
+                    "gpt-4o-mini"
+                },
+                "Gemini" => new List<string>
+                {
+                    "gemini-1.5-pro",
+                    "gemini-1.5-flash",
+                    "gemini-1.0-pro",
+                    "gemini-pro"
+                },
+                _ => new List<string>()
+            };
+        }
+
+        private string GenerateCacheKey(string apiUrl)
+        {
+            try
+            {
+                var uri = new Uri(apiUrl);
+                return $"{uri.Host}_{uri.Port}";
+            }
+            catch
+            {
+                return apiUrl.GetHashCode().ToString();
+            }
+        }
+
+        private string? GetChannelId(ListView? listView, string? channelType)
+        {
+            if (listView?.SelectedItem == null || string.IsNullOrEmpty(channelType))
+                return null;
+
+            return channelType switch
+            {
+                "OpenAI" when listView.SelectedItem is Setting.OpenAINodeSetting openaiNode =>
+                    $"OpenAI.{openaiNode.Url?.GetHashCode() ?? 0}_{openaiNode.ApiKey?.GetHashCode() ?? 0}",
+                "Gemini" when listView.SelectedItem is Setting.GeminiNodeSetting geminiNode =>
+                    $"Gemini.{geminiNode.Url?.GetHashCode() ?? 0}_{geminiNode.ApiKey?.GetHashCode() ?? 0}",
+                _ => null
+            };
+        }
+
+        private List<string>? GetCachedModels(string? channelType, string? channelId, string apiUrl)
+        {
+            if (_plugin?.Settings?.ModelCache == null || string.IsNullOrEmpty(channelId))
+                return null;
+
+            // 检查渠道是否已有缓存关联
+            if (_plugin.Settings.ModelCache.ChannelCacheLinks.TryGetValue(channelId, out var existingCacheKey))
+            {
+                // 验证缓存是否存在且匹配URL
+                if (_plugin.Settings.ModelCache.Cache.TryGetValue(existingCacheKey, out var entry))
+                {
+                    var currentKey = GenerateCacheKey(apiUrl);
+                    if (entry.CacheKey == currentKey)
+                    {
+                        return entry.Models;
+                    }
+                    else
+                    {
+                        // URL已变更，取消关联但保留缓存（可能被其他渠道使用）
+                        entry.LinkedChannels.Remove(channelId);
+                        _plugin.Settings.ModelCache.ChannelCacheLinks.Remove(channelId);
+                    }
+                }
+            }
+
+            // 尝试查找是否有相同URL的缓存可关联
+            var cacheKey = GenerateCacheKey(apiUrl);
+            foreach (var kvp in _plugin.Settings.ModelCache.Cache)
+            {
+                if (kvp.Value.CacheKey == cacheKey)
+                {
+                    // 找到匹配的缓存，关联当前渠道
+                    _plugin.Settings.ModelCache.ChannelCacheLinks[channelId] = kvp.Key;
+                    if (!kvp.Value.LinkedChannels.Contains(channelId))
+                    {
+                        kvp.Value.LinkedChannels.Add(channelId);
+                    }
+                    return kvp.Value.Models;
+                }
+            }
+
+            return null;
+        }
+
+        private void SaveModelsToCache(string? channelType, string? channelId, string apiUrl, List<string> models)
+        {
+            if (_plugin?.Settings?.ModelCache == null || string.IsNullOrEmpty(channelId))
+                return;
+
+            var cacheKey = GenerateCacheKey(apiUrl);
+            var newEntry = new Setting.ModelCacheEntry
+            {
+                CacheKey = cacheKey,
+                Models = models,
+                LinkedChannels = new List<string> { channelId },
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
+            };
+
+            // 检查是否已有该URL的缓存
+            foreach (var kvp in _plugin.Settings.ModelCache.Cache)
+            {
+                if (kvp.Value.CacheKey == cacheKey)
+                {
+                    // 已存在，更新模型列表并关联
+                    kvp.Value.Models = models;
+                    kvp.Value.UpdatedAt = DateTime.Now;
+                    if (!kvp.Value.LinkedChannels.Contains(channelId))
+                    {
+                        kvp.Value.LinkedChannels.Add(channelId);
+                    }
+                    _plugin.Settings.ModelCache.ChannelCacheLinks[channelId] = kvp.Key;
+                    MarkUnsavedChanges();
+                    return;
+                }
+            }
+
+            // 新建缓存
+            _plugin.Settings.ModelCache.Cache[cacheKey] = newEntry;
+            _plugin.Settings.ModelCache.ChannelCacheLinks[channelId] = cacheKey;
+            MarkUnsavedChanges();
+        }
+
+        public void ClearChannelCache(string channelType, string channelId)
+        {
+            if (_plugin?.Settings?.ModelCache == null)
+                return;
+
+            var linkKey = $"{channelType}.{channelId}";
+
+            // 移除渠道关联
+            if (_plugin.Settings.ModelCache.ChannelCacheLinks.TryGetValue(linkKey, out var cacheKey))
+            {
+                if (_plugin.Settings.ModelCache.Cache.TryGetValue(cacheKey, out var entry))
+                {
+                    entry.LinkedChannels.Remove(linkKey);
+                    // 如果没有渠道关联了，删除缓存
+                    if (entry.LinkedChannels.Count == 0)
+                    {
+                        _plugin.Settings.ModelCache.Cache.Remove(cacheKey);
+                    }
+                }
+                _plugin.Settings.ModelCache.ChannelCacheLinks.Remove(linkKey);
+                MarkUnsavedChanges();
+            }
         }
 
         private async Task<List<string>> GetOpenAIModelsAsync(string apiUrl, string apiKey, Setting.ChannelProxyMode proxyMode)
@@ -4937,7 +5192,8 @@ namespace VPetLLM.UI.Windows
                         else if (tbxApiKeyPlain != null)
                             openaiNode.ApiKey = tbxApiKeyPlain.Text;
                         if (tbApiUrl != null) openaiNode.Url = tbApiUrl.Text;
-                        if (cbModel != null) openaiNode.Model = cbModel.Text;
+                        if (cbModel != null && !string.IsNullOrEmpty(cbModel.Text))
+                            openaiNode.Model = cbModel.Text;
                         if (cbEnableStreaming != null) openaiNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
                         if (cbEnableVision != null) openaiNode.EnableVision = cbEnableVision.IsChecked ?? false;
                         if (cbEnableAdvanced != null) openaiNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
@@ -4992,7 +5248,7 @@ namespace VPetLLM.UI.Windows
                 }
             }
 
-            MarkUnsavedChanges();
+            // 注意：不再在这里自动调度保存，由调用方决定使用 ScheduleAutoSave() 还是 ScheduleSecretSave()
         }
 
         private T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
@@ -5019,16 +5275,19 @@ namespace VPetLLM.UI.Windows
         private void TextBox_ChannelName_TextChanged(object sender, TextChangedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void PasswordBox_OpenAIApiKey_PasswordChanged(object sender, RoutedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void TextBox_OpenAIApiKey_Plain_TextChanged(object sender, TextChangedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void TextBox_ApiUrl_TextChanged(object sender, TextChangedEventArgs e)
@@ -5085,46 +5344,61 @@ namespace VPetLLM.UI.Windows
             }
 
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void ComboBox_Model_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            SaveCurrentNodeChanges();
+            if (!_isUpdatingNodeDetails)
+            {
+                SaveCurrentNodeChanges();
+                ScheduleSecretSave();
+            }
         }
 
         private void ComboBox_Model_LostFocus(object sender, RoutedEventArgs e)
         {
-            SaveCurrentNodeChanges();
+            if (!_isUpdatingNodeDetails)
+            {
+                SaveCurrentNodeChanges();
+                ScheduleSecretSave();
+            }
         }
 
         private void CheckBox_EnableStreaming_Checked(object sender, RoutedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void CheckBox_EnableStreaming_Unchecked(object sender, RoutedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void CheckBox_EnableVision_Checked(object sender, RoutedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void CheckBox_EnableVision_Unchecked(object sender, RoutedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void CheckBox_EnableAdvanced_Checked(object sender, RoutedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void CheckBox_EnableAdvanced_Unchecked(object sender, RoutedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void Slider_Temperature_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -5133,22 +5407,26 @@ namespace VPetLLM.UI.Windows
             if (textBlock != null)
                 textBlock.Text = e.NewValue.ToString("F2");
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void TextBox_MaxTokens_TextChanged(object sender, TextChangedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void ComboBox_ChannelMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void ComboBox_ChannelProxyMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_isUpdatingNodeDetails) return;
             SaveCurrentNodeChanges();
+            ScheduleSecretSave();
         }
 
         private void ComboBox_UrlPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -5182,13 +5460,15 @@ namespace VPetLLM.UI.Windows
                             case "OpenAI":
                                 if (selectedNode is Setting.OpenAINodeSetting openaiNode)
                                 {
-                                    if (openaiNode.Url != newUrl)
+                                    bool urlChanged = openaiNode.Url != newUrl;
+                                    if (urlChanged)
                                     {
                                         openaiNode.Url = newUrl;
                                         if (this.FindName("TextBox_ApiUrl") is TextBox tbUrl)
                                             tbUrl.Text = newUrl;
                                     }
-                                    if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
+                                    // 关键修复：只有当 URL 真正改变时，才设置预设的 DefaultModel
+                                    if (urlChanged && parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
                                     {
                                         openaiNode.Model = parts[2];
                                         if (this.FindName("ComboBox_Model") is ComboBox cbModel)
@@ -5199,13 +5479,15 @@ namespace VPetLLM.UI.Windows
                             case "Gemini":
                                 if (selectedNode is Setting.GeminiNodeSetting geminiNode)
                                 {
-                                    if (geminiNode.Url != newUrl)
+                                    bool urlChanged = geminiNode.Url != newUrl;
+                                    if (urlChanged)
                                     {
                                         geminiNode.Url = newUrl;
                                         if (this.FindName("TextBox_ApiUrl") is TextBox tbUrl)
                                             tbUrl.Text = newUrl;
                                     }
-                                    if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
+                                    // 关键修复：只有当 URL 真正改变时，才设置预设的 DefaultModel
+                                    if (urlChanged && parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
                                     {
                                         geminiNode.Model = parts[2];
                                         if (this.FindName("ComboBox_Model") is ComboBox cbModel)
@@ -5215,7 +5497,8 @@ namespace VPetLLM.UI.Windows
                                 break;
                         }
                         
-                        SaveCurrentNodeChanges();
+                        // 调度异步保存，避免 UI 阻塞
+                        ScheduleSecretSave();
                     }
                     finally
                     {
@@ -5438,7 +5721,7 @@ namespace VPetLLM.UI.Windows
             {
                 node.Model = cb.Text;
                 RefreshOpenAINodesList();
-                SaveSettings();
+                ScheduleSecretSave();
             }
         }
 
@@ -5453,19 +5736,19 @@ namespace VPetLLM.UI.Windows
                 {
                     node.EnableAdvanced = cb.IsChecked ?? false;
                     RefreshOpenAINodesList();
-                    SaveSettings();
+                    ScheduleSecretSave();
                 }
                 else if (cb.Name == "CheckBox_OpenAI_EnableStreaming")
                 {
                     node.EnableStreaming = cb.IsChecked ?? false;
                     RefreshOpenAINodesList();
-                    SaveSettings();
+                    ScheduleSecretSave();
                 }
                 else if (cb.Name == "CheckBox_OpenAI_EnableVision")
                 {
                     node.EnableVision = cb.IsChecked ?? false;
                     RefreshOpenAINodesList();
-                    SaveSettings();
+                    ScheduleSecretSave();
                 }
             }
         }
@@ -5480,7 +5763,7 @@ namespace VPetLLM.UI.Windows
                 node.Temperature = sl.Value;
                 if (this.FindName("TextBlock_OpenAI_TemperatureValue") is TextBlock tv) tv.Text = sl.Value.ToString("F2");
                 RefreshOpenAINodesList();
-                SaveSettings();
+                ScheduleSecretSave();
             }
         }
 
@@ -5521,13 +5804,13 @@ namespace VPetLLM.UI.Windows
                     _ => Setting.ChannelMode.Unrestricted
                 };
                 RefreshOpenAINodesList();
-                SaveSettings();
+                ScheduleSecretSave();
             }
         }
 
         private void Detail_TextBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            ScheduleAutoSave();
+            ScheduleSecretSave();
         }
 
         // 负载均衡复选框点击：写回设置并立即保存，使随机/轮询立刻生效
@@ -5657,7 +5940,7 @@ namespace VPetLLM.UI.Windows
                 {
                     node.Model = cb.Text;
                     ScheduleGeminiListRefresh();
-                    ScheduleAutoSave();
+                    ScheduleSecretSave();
                 }), System.Windows.Threading.DispatcherPriority.Background);
             }
         }
@@ -5673,19 +5956,19 @@ namespace VPetLLM.UI.Windows
                 {
                     node.EnableAdvanced = cb.IsChecked ?? false;
                     ScheduleGeminiListRefresh();
-                    ScheduleAutoSave();
+                    ScheduleSecretSave();
                 }
                 else if (cb.Name == "CheckBox_GeminiNode_EnableStreaming")
                 {
                     node.EnableStreaming = cb.IsChecked ?? false;
                     ScheduleGeminiListRefresh();
-                    ScheduleAutoSave();
+                    ScheduleSecretSave();
                 }
                 else if (cb.Name == "CheckBox_GeminiNode_EnableVision")
                 {
                     node.EnableVision = cb.IsChecked ?? false;
                     ScheduleGeminiListRefresh();
-                    ScheduleAutoSave();
+                    ScheduleSecretSave();
                 }
             }
         }
@@ -5700,7 +5983,7 @@ namespace VPetLLM.UI.Windows
                 node.Temperature = sl.Value;
                 if (this.FindName("TextBlock_GeminiNode_TemperatureValue") is TextBlock tv) tv.Text = sl.Value.ToString("F2");
                 ScheduleGeminiListRefresh();
-                ScheduleAutoSave();
+                ScheduleSecretSave();
             }
         }
 
@@ -5740,7 +6023,7 @@ namespace VPetLLM.UI.Windows
                     _ => Setting.ChannelMode.Unrestricted
                 };
                 ScheduleGeminiListRefresh();
-                ScheduleAutoSave();
+                ScheduleSecretSave();
             }
         }
 
@@ -5870,7 +6153,7 @@ namespace VPetLLM.UI.Windows
             {
                 node.Model = cb.Text;
                 RefreshOpenAINodesList();
-                SaveSettings();
+                ScheduleSecretSave();
             }
         }
 
@@ -5897,7 +6180,7 @@ namespace VPetLLM.UI.Windows
             {
                 node.Model = cb.Text;
                 ScheduleGeminiListRefresh();
-                SaveSettings();
+                ScheduleSecretSave();
             }
         }
 
@@ -6058,20 +6341,22 @@ namespace VPetLLM.UI.Windows
                 if (parts.Length >= 2)
                 {
                     var newUrl = parts[1];
-                    if (node.Url != newUrl)
+                    bool urlChanged = node.Url != newUrl;
+                    if (urlChanged)
                     {
                         node.Url = newUrl;
                         if (this.FindName("TextBox_OpenAIUrl") is TextBox tbUrl)
                             tbUrl.Text = newUrl;
                     }
-                    if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
+                    // 关键修复：只有当 URL 真正改变时，才设置预设的 DefaultModel
+                    if (urlChanged && parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
                     {
                         node.Model = parts[2];
                         if (this.FindName("ComboBox_OpenAIModel") is ComboBox cbModel)
                             cbModel.Text = parts[2];
                     }
                     RefreshOpenAINodesList();
-                    SaveSettings();
+                    ScheduleSecretSave();
                 }
             }
         }

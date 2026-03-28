@@ -8,7 +8,7 @@ namespace VPetLLM.Infrastructure.Configuration;
 /// </summary>
 public class SchemaManager
 {
-    private const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
 
     /// <summary>
     /// Create the initial database schema
@@ -254,6 +254,10 @@ public class SchemaManager
             
             case 5:
                 ApplyMigrationV5(connection);
+                break;
+            
+            case 6:
+                ApplyMigrationV6(connection);
                 break;
             
             default:
@@ -659,6 +663,44 @@ public class SchemaManager
         {
             Logger.Log($"Warning: Migration to version 5 encountered errors: {ex.Message}");
             // Continue anyway - this is not critical
+        }
+    }
+
+    /// <summary>
+    /// Apply migration to version 6: Create model_cache table for caching model lists
+    /// </summary>
+    private void ApplyMigrationV6(SqliteConnection connection)
+    {
+        Logger.Log("Applying migration to version 6: Creating model_cache table");
+
+        // Create model_cache table
+        using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = @"
+                CREATE TABLE IF NOT EXISTS model_cache (
+                    cache_key TEXT PRIMARY KEY,
+                    models_json TEXT NOT NULL,
+                    linked_channels_json TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+            ";
+            cmd.ExecuteNonQuery();
+            Logger.Log("Created model_cache table");
+        }
+
+        // Create channel_cache_links table
+        using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = @"
+                CREATE TABLE IF NOT EXISTS channel_cache_links (
+                    channel_id TEXT PRIMARY KEY,
+                    cache_key TEXT NOT NULL,
+                    FOREIGN KEY (cache_key) REFERENCES model_cache(cache_key) ON DELETE CASCADE
+                );
+            ";
+            cmd.ExecuteNonQuery();
+            Logger.Log("Created channel_cache_links table");
         }
     }
 }

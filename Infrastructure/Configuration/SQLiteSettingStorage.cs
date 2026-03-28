@@ -188,7 +188,7 @@ public class SQLiteSettingStorage : ISettingStorage
 
             // Check schema version
             var currentVersion = _schemaManager.GetSchemaVersion(_connection);
-            var targetVersion = 5; // CurrentSchemaVersion
+            var targetVersion = SchemaManager.CurrentSchemaVersion;
             
             if (currentVersion == 0)
             {

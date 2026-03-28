@@ -45,6 +45,7 @@ namespace VPetLLM
         public bool ShowUninstallWarning { get; set; } = true;
         public TTSSetting TTS { get; set; } = new TTSSetting();
         public ProxySetting Proxy { get; set; } = new ProxySetting();
+        public ModelCacheSetting ModelCache { get; set; } = new ModelCacheSetting();
         public PluginStoreSetting PluginStore { get; set; } = new PluginStoreSetting();
         public TouchFeedbackSettings TouchFeedback { get; set; } = new TouchFeedbackSettings();
         public bool EnableBuyFeedback { get; set; } = true;
@@ -261,6 +262,7 @@ namespace VPetLLM
                         
                         // Load provider nodes from provider_nodes table
                         LoadProviderNodes(sqliteStorage);
+                        LoadModelCache(sqliteStorage);
                     }
                     else
                     {
@@ -463,6 +465,10 @@ namespace VPetLLM
             {
                 Proxy = new ProxySetting();
             }
+            if (ModelCache is null)
+            {
+                ModelCache = new ModelCacheSetting();
+            }
             if (PluginStore is null)
             {
                 PluginStore = new PluginStoreSetting();
@@ -615,11 +621,12 @@ namespace VPetLLM
                 {
                     _storage.Save(this);
                     Logger.Log("Settings saved successfully to storage");
-                    
+
                     // Save provider nodes to provider_nodes table
                     if (_storage is SQLiteSettingStorage sqliteStorage)
                     {
                         SaveProviderNodes(sqliteStorage);
+                        SaveModelCache(sqliteStorage);
                     }
                 }
                 else
@@ -634,6 +641,150 @@ namespace VPetLLM
             {
                 Logger.Log($"Failed to save settings: {ex.Message}");
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Save model cache to model_cache table
+        /// </summary>
+        private void SaveModelCache(SQLiteSettingStorage sqliteStorage)
+        {
+            try
+            {
+                var connection = sqliteStorage.GetConnection();
+                if (connection == null)
+                {
+                    Logger.Log("Cannot save model cache: database connection is null");
+                    return;
+                }
+
+                // Use SQL directly since we don't have a service for this
+                using var transaction = connection.BeginTransaction();
+
+                // First clear all existing cache entries
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM model_cache";
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Save each cache entry
+                if (ModelCache?.Cache != null)
+                {
+                    foreach (var kvp in ModelCache.Cache)
+                    {
+                        var entry = kvp.Value;
+                        var modelsJson = JsonConvert.SerializeObject(entry.Models);
+                        var linkedChannelsJson = JsonConvert.SerializeObject(entry.LinkedChannels);
+
+                        using (var cmd = connection.CreateCommand())
+                        {
+                            cmd.CommandText = @"
+                                INSERT OR REPLACE INTO model_cache (cache_key, models_json, linked_channels_json, created_at, updated_at)
+                                VALUES (@cacheKey, @modelsJson, @linkedChannelsJson, @createdAt, @updatedAt)";
+                            cmd.Parameters.AddWithValue("@cacheKey", kvp.Key);
+                            cmd.Parameters.AddWithValue("@modelsJson", modelsJson);
+                            cmd.Parameters.AddWithValue("@linkedChannelsJson", linkedChannelsJson);
+                            cmd.Parameters.AddWithValue("@createdAt", entry.CreatedAt.ToString("o"));
+                            cmd.Parameters.AddWithValue("@updatedAt", entry.UpdatedAt.ToString("o"));
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                    Logger.Log($"Saved {ModelCache.Cache.Count} model cache entries");
+                }
+
+                // Save channel-cache links
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM channel_cache_links";
+                    cmd.ExecuteNonQuery();
+                }
+
+                if (ModelCache?.ChannelCacheLinks != null)
+                {
+                    foreach (var kvp in ModelCache.ChannelCacheLinks)
+                    {
+                        using (var cmd = connection.CreateCommand())
+                        {
+                            cmd.CommandText = @"
+                                INSERT OR REPLACE INTO channel_cache_links (channel_id, cache_key)
+                                VALUES (@channelId, @cacheKey)";
+                            cmd.Parameters.AddWithValue("@channelId", kvp.Key);
+                            cmd.Parameters.AddWithValue("@cacheKey", kvp.Value);
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                    Logger.Log($"Saved {ModelCache.ChannelCacheLinks.Count} channel-cache links");
+                }
+
+                transaction.Commit();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to save model cache: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Load model cache from database
+        /// </summary>
+        private void LoadModelCache(SQLiteSettingStorage sqliteStorage)
+        {
+            try
+            {
+                var connection = sqliteStorage.GetConnection();
+                if (connection == null)
+                {
+                    Logger.Log("Cannot load model cache: database connection is null");
+                    return;
+                }
+
+                ModelCache = new ModelCacheSetting();
+
+                // Load cache entries
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT cache_key, models_json, linked_channels_json, created_at, updated_at FROM model_cache";
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var cacheKey = reader.GetString(0);
+                        var modelsJson = reader.GetString(1);
+                        var linkedChannelsJson = reader.GetString(2);
+                        var createdAt = DateTime.Parse(reader.GetString(3));
+                        var updatedAt = DateTime.Parse(reader.GetString(4));
+
+                        var entry = new ModelCacheEntry
+                        {
+                            CacheKey = cacheKey,
+                            Models = JsonConvert.DeserializeObject<List<string>>(modelsJson) ?? new List<string>(),
+                            LinkedChannels = JsonConvert.DeserializeObject<List<string>>(linkedChannelsJson) ?? new List<string>(),
+                            CreatedAt = createdAt,
+                            UpdatedAt = updatedAt
+                        };
+                        ModelCache.Cache[cacheKey] = entry;
+                    }
+                }
+                Logger.Log($"Loaded {ModelCache.Cache.Count} model cache entries");
+
+                // Load channel-cache links
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT channel_id, cache_key FROM channel_cache_links";
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var channelId = reader.GetString(0);
+                        var cacheKey = reader.GetString(1);
+                        ModelCache.ChannelCacheLinks[channelId] = cacheKey;
+                    }
+                }
+                Logger.Log($"Loaded {ModelCache.ChannelCacheLinks.Count} channel-cache links");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to load model cache: {ex.Message}");
+                ModelCache = new ModelCacheSetting();
             }
         }
 
@@ -791,7 +942,7 @@ namespace VPetLLM
         public class OpenAINodeSetting
         {
             public string? ApiKey { get; set; }
-            public string? Model { get; set; }
+            public string Model { get; set; } = "gpt-4";
             public string Url { get; set; } = "https://api.openai.com/v1";
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
@@ -1435,6 +1586,53 @@ namespace VPetLLM
             /// mpv.exe 路径（留空则使用插件目录下的 mpv.exe）
             /// </summary>
             public string MpvPath { get; set; } = "";
+        }
+
+        /// <summary>
+        /// 模型缓存设置 - 用于缓存从API获取的模型列表
+        /// </summary>
+        public class ModelCacheSetting
+        {
+            /// <summary>
+            /// 模型缓存表 - Key为缓存的唯一标识(通常是URL host的hash)
+            /// </summary>
+            public Dictionary<string, ModelCacheEntry> Cache { get; set; } = new Dictionary<string, ModelCacheEntry>();
+
+            /// <summary>
+            /// 渠道与缓存的关联表 - Key为"渠道类型.NodeId"，Value为缓存Key
+            /// </summary>
+            public Dictionary<string, string> ChannelCacheLinks { get; set; } = new Dictionary<string, string>();
+        }
+
+        /// <summary>
+        /// 模型缓存条目
+        /// </summary>
+        public class ModelCacheEntry
+        {
+            /// <summary>
+            /// 缓存唯一标识(基于URL host生成)
+            /// </summary>
+            public string CacheKey { get; set; } = "";
+
+            /// <summary>
+            /// 缓存的模型列表
+            /// </summary>
+            public List<string> Models { get; set; } = new List<string>();
+
+            /// <summary>
+            /// 关联的渠道列表("渠道类型.NodeId")
+            /// </summary>
+            public List<string> LinkedChannels { get; set; } = new List<string>();
+
+            /// <summary>
+            /// 缓存创建时间
+            /// </summary>
+            public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+            /// <summary>
+            /// 最后更新时间
+            /// </summary>
+            public DateTime UpdatedAt { get; set; } = DateTime.Now;
         }
 
     }
