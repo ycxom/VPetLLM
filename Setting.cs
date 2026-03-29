@@ -937,6 +937,7 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
+            public bool EnableLoadBalancing { get; set; } = true;
         }
 
         public class OpenAINodeSetting
@@ -1228,6 +1229,7 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
+            public bool EnableLoadBalancing { get; set; } = true;
         }
 
         public class LMStudioSetting
@@ -1239,6 +1241,7 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
+            public bool EnableLoadBalancing { get; set; } = true;
         }
 
         public class ProviderFallbackConfig

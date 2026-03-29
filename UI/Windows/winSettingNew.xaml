@@ -414,7 +414,9 @@
                     Content="{utils:Localize KeyPath=LLM_Settings.EnableLoadBalancing}"
                     Margin="0,0,0,16"
                     IsChecked="True"
-                    Style="{StaticResource ModernCheckBox}"/>
+                    Style="{StaticResource ModernCheckBox}"
+                    Checked="CheckBox_EnableLoadBalancing_Checked"
+                    Unchecked="CheckBox_EnableLoadBalancing_Unchecked"/>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                 <Button x:Name="Button_AddChannel"
                         Content="{utils:Localize KeyPath=LLM_Settings.AddChannel}"

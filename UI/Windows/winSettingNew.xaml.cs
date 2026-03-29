@@ -4415,6 +4415,7 @@ namespace VPetLLM.UI.Windows
             var gridApiAddress = this.FindName("Grid_ApiAddress") as Grid;
             var cbUrlPreset = this.FindName("ComboBox_UrlPreset") as ComboBox;
             var buttonRefreshModels = this.FindName("Button_RefreshModels") as Button;
+            var cbEnableLoadBalancing = this.FindName("CheckBox_EnableLoadBalancing") as CheckBox;
             // 模型列表完全由 ListView_Channels_SelectionChanged 处理
             // 避免在 UpdateChannelSpecificUI 和 ListView_Channels_SelectionChanged 之间发生冲突
 
@@ -4436,6 +4437,11 @@ namespace VPetLLM.UI.Windows
                     if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
                     if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
                     if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
+                    if (cbEnableLoadBalancing != null)
+                    {
+                        cbEnableLoadBalancing.Visibility = Visibility.Visible;
+                        cbEnableLoadBalancing.IsChecked = _plugin.Settings.OpenAI.EnableLoadBalancing;
+                    }
                     break;
                 case "Gemini":
                     if (labelApiKey != null) labelApiKey.Visibility = Visibility.Visible;
@@ -4452,8 +4458,33 @@ namespace VPetLLM.UI.Windows
                     if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
                     if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
                     if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
+                    if (cbEnableLoadBalancing != null)
+                    {
+                        cbEnableLoadBalancing.Visibility = Visibility.Visible;
+                        cbEnableLoadBalancing.IsChecked = _plugin.Settings.Gemini.EnableLoadBalancing;
+                    }
                     break;
                 case "Ollama":
+                    if (labelApiKey != null) labelApiKey.Visibility = Visibility.Collapsed;
+                    if (gridApiKey != null) gridApiKey.Visibility = Visibility.Collapsed;
+                    if (labelApiAddress != null) labelApiAddress.Visibility = Visibility.Visible;
+                    if (gridApiAddress != null) gridApiAddress.Visibility = Visibility.Visible;
+                    if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
+                    if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
+                    if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
+                    if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
+                    if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Collapsed;
+                    if (cbChannelProxyMode != null) cbChannelProxyMode.Visibility = Visibility.Collapsed;
+                    if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
+                    if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
+                    if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
+                    if (cbEnableLoadBalancing != null)
+                    {
+                        cbEnableLoadBalancing.Visibility = Visibility.Visible;
+                        cbEnableLoadBalancing.IsChecked = _plugin.Settings.Ollama.EnableLoadBalancing;
+                    }
+                    break;
                 case "LMStudio":
                     if (labelApiKey != null) labelApiKey.Visibility = Visibility.Collapsed;
                     if (gridApiKey != null) gridApiKey.Visibility = Visibility.Collapsed;
@@ -4469,6 +4500,11 @@ namespace VPetLLM.UI.Windows
                     if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
                     if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
                     if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
+                    if (cbEnableLoadBalancing != null)
+                    {
+                        cbEnableLoadBalancing.Visibility = Visibility.Visible;
+                        cbEnableLoadBalancing.IsChecked = _plugin.Settings.LMStudio.EnableLoadBalancing;
+                    }
                     break;
             }
         }
@@ -5180,10 +5216,15 @@ namespace VPetLLM.UI.Windows
             var tbMaxTokens = this.FindName("TextBox_MaxTokens") as TextBox;
             var cbChannelMode = this.FindName("ComboBox_ChannelMode") as ComboBox;
             var cbChannelProxyMode = this.FindName("ComboBox_ChannelProxyMode") as ComboBox;
+            var cbEnableLoadBalancing = this.FindName("CheckBox_EnableLoadBalancing") as CheckBox;
 
             switch (channelType)
             {
                 case "OpenAI":
+                    if (cbEnableLoadBalancing != null)
+                    {
+                        _plugin.Settings.OpenAI.EnableLoadBalancing = cbEnableLoadBalancing.IsChecked ?? true;
+                    }
                     if (selectedNode is Setting.OpenAINodeSetting openaiNode)
                     {
                         if (tbChannelName != null) openaiNode.Name = tbChannelName.Text;
@@ -5207,6 +5248,10 @@ namespace VPetLLM.UI.Windows
                     }
                     break;
                 case "Gemini":
+                    if (cbEnableLoadBalancing != null)
+                    {
+                        _plugin.Settings.Gemini.EnableLoadBalancing = cbEnableLoadBalancing.IsChecked ?? true;
+                    }
                     if (selectedNode is Setting.GeminiNodeSetting geminiNode)
                     {
                         if (tbChannelName != null) geminiNode.Name = tbChannelName.Text;
@@ -5226,6 +5271,18 @@ namespace VPetLLM.UI.Windows
                             geminiNode.Mode = Enum.Parse<Setting.ChannelMode>(modeItem.Tag?.ToString() ?? "Unrestricted");
                         if (cbChannelProxyMode != null && cbChannelProxyMode.SelectedItem is ComboBoxItem proxyModeItem)
                             geminiNode.ProxyMode = Enum.Parse<Setting.ChannelProxyMode>(proxyModeItem.Tag?.ToString() ?? "FollowDefault");
+                    }
+                    break;
+                case "Ollama":
+                    if (cbEnableLoadBalancing != null)
+                    {
+                        _plugin.Settings.Ollama.EnableLoadBalancing = cbEnableLoadBalancing.IsChecked ?? true;
+                    }
+                    break;
+                case "LMStudio":
+                    if (cbEnableLoadBalancing != null)
+                    {
+                        _plugin.Settings.LMStudio.EnableLoadBalancing = cbEnableLoadBalancing.IsChecked ?? true;
                     }
                     break;
             }
@@ -5396,6 +5453,18 @@ namespace VPetLLM.UI.Windows
         }
 
         private void CheckBox_EnableAdvanced_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+            ScheduleSecretSave();
+        }
+
+        private void CheckBox_EnableLoadBalancing_Checked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+            ScheduleSecretSave();
+        }
+
+        private void CheckBox_EnableLoadBalancing_Unchecked(object sender, RoutedEventArgs e)
         {
             SaveCurrentNodeChanges();
             ScheduleSecretSave();
