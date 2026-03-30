@@ -4736,40 +4736,48 @@ namespace VPetLLM.UI.Windows
                     var cbUrlPreset = this.FindName("ComboBox_UrlPreset") as ComboBox;
                     if (tbApiUrl != null && cbUrlPreset != null)
                     {
-                        bool foundMatch = false;
-                        foreach (var item in cbUrlPreset.Items)
+                        _isUpdatingNodeDetails = true;
+                        try
                         {
-                            if (item is ComboBoxItem comboItem && comboItem.Tag != null)
+                            bool foundMatch = false;
+                            foreach (var item in cbUrlPreset.Items)
                             {
-                                string tag = comboItem.Tag.ToString();
-                                if (!string.IsNullOrEmpty(tag) && tag.Contains('|'))
+                                if (item is ComboBoxItem comboItem && comboItem.Tag != null)
                                 {
-                                    var parts = tag.Split('|');
-                                    if (parts.Length >= 2)
+                                    string tag = comboItem.Tag.ToString();
+                                    if (!string.IsNullOrEmpty(tag) && tag.Contains('|'))
                                     {
-                                        string presetUrl = parts[1];
-                                        if (tbApiUrl.Text.StartsWith(presetUrl, StringComparison.OrdinalIgnoreCase))
+                                        var parts = tag.Split('|');
+                                        if (parts.Length >= 2)
                                         {
-                                            cbUrlPreset.SelectedItem = comboItem;
-                                            foundMatch = true;
-                                            break;
+                                            string presetUrl = parts[1];
+                                            if (tbApiUrl.Text.StartsWith(presetUrl, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                cbUrlPreset.SelectedItem = comboItem;
+                                                foundMatch = true;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        // 如果没找到匹配项，设置为 "--"
-                        if (!foundMatch)
-                        {
-                            foreach (var item in cbUrlPreset.Items)
+                            // 如果没找到匹配项，设置为 "--"
+                            if (!foundMatch)
                             {
-                                if (item is ComboBoxItem comboItem && comboItem.Content?.ToString() == "--")
+                                foreach (var item in cbUrlPreset.Items)
                                 {
-                                    cbUrlPreset.SelectedItem = comboItem;
-                                    break;
+                                    if (item is ComboBoxItem comboItem && comboItem.Content?.ToString() == "--")
+                                    {
+                                        cbUrlPreset.SelectedItem = comboItem;
+                                        break;
+                                    }
                                 }
                             }
+                        }
+                        finally
+                        {
+                            _isUpdatingNodeDetails = false;
                         }
                     }
                 }
