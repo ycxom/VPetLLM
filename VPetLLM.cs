@@ -173,10 +173,8 @@ namespace VPetLLM
             Instance = this;
 
             // 初始化日志
-            Logger.Log("VPetLLM plugin constructor started (refactored version).");
 
             // **优先初始化 SQLite，避免后续数据库操作失败**
-            Logger.Log("Initializing SQLite native library...");
             if (!SQLiteHelper.Initialize())
             {
                 Logger.Log($"WARNING: SQLite initialization failed: {SQLiteHelper.GetErrorMessage()}");
@@ -185,16 +183,10 @@ namespace VPetLLM
                 Logger.Log("2. e_sqlite3.dll exists in runtimes folder");
                 Logger.Log("3. System architecture matches (x64/x86)");
             }
-            else
-            {
-                Logger.Log("SQLite native library initialized successfully");
-            }
 
             // 加载设置 - 传递 PrefixSave 作为 instanceId
             var instanceId = mainwin?.PrefixSave ?? "";
-            Logger.Log($"Initializing settings with instanceId: '{instanceId}'");
             Settings = new Setting(ExtensionValue.BaseDirectory, instanceId);
-            Logger.Log("Settings loaded.");
 
             // 初始化语言和提示词
             InitializeLanguageAndPrompts();
@@ -487,13 +479,10 @@ namespace VPetLLM
         {
             try
             {
-                // 初始化语音输入服务
                 var asrConfig = new Infrastructure.Configuration.Configurations.ASRConfiguration();
                 _voiceInputService = new Infrastructure.Services.ApplicationServices.VoiceInputService(this, asrConfig, _logger, _eventBus);
                 _voiceInputService.TranscriptionCompleted += OnVoiceInputTranscriptionCompleted;
-                Logger.Log("VoiceInputService initialized");
 
-                // 初始化截图服务
                 _screenshotService = new Services.ScreenshotService(this, Settings);
                 _screenshotService.ScreenshotCaptured += OnScreenshotCaptured;
                 _screenshotService.OCRCompleted += OnOCRCompleted;
@@ -502,21 +491,13 @@ namespace VPetLLM
                 {
                     screenshotService.PreprocessingCompleted += OnPreprocessingCompleted;
                 }
-                Logger.Log("ScreenshotService initialized");
 
-                // 初始化购买服务
                 var purchaseConfig = new Infrastructure.Services.ApplicationServices.PurchaseConfiguration();
                 _purchaseService = new Infrastructure.Services.ApplicationServices.PurchaseService(this, purchaseConfig, _logger, _eventBus);
-                Logger.Log("PurchaseService initialized");
 
-                // 初始化媒体播放服务
                 InitializeMediaPlaybackService();
 
-                // 初始化处理生命周期管理器
                 _processingLifecycleManager = new Services.ProcessingLifecycleManager(this);
-                Logger.Log("ProcessingLifecycleManager initialized");
-
-                _logger.LogInformation("Application services initialized");
             }
             catch (Exception ex)
             {
@@ -528,17 +509,14 @@ namespace VPetLLM
         {
             try
             {
-                // 确定 mpv.exe 路径
                 var mpvPath = Settings.MediaPlayback?.MpvPath;
                 if (string.IsNullOrWhiteSpace(mpvPath))
                 {
-                    // 默认使用插件目录下的 mpv/mpv.exe（与 TTS 一致）
                     var dllPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                     var mpvDir = Path.Combine(dllPath ?? "", "mpv");
                     mpvPath = Path.Combine(mpvDir, "mpv.exe");
                 }
 
-                // 始终创建 MediaPlaybackService（即使 mpv.exe 不存在，执行时会报错）
                 var mediaConfig = new Infrastructure.Services.ApplicationServices.MediaPlaybackConfiguration
                 {
                     MpvExePath = mpvPath,
@@ -546,15 +524,6 @@ namespace VPetLLM
                 };
                 _mediaPlaybackService = new Infrastructure.Services.ApplicationServices.MediaPlaybackService(mediaConfig, _logger, _eventBus);
                 ActionProcessor?.SetMediaPlaybackService(_mediaPlaybackService as Services.IMediaPlaybackService);
-
-                if (File.Exists(mpvPath))
-                {
-                    Logger.Log($"MediaPlaybackService initialized with mpv path: {mpvPath}");
-                }
-                else
-                {
-                    Logger.Log($"MediaPlaybackService initialized, but mpv.exe not found at {mpvPath}. Playback will fail until mpv.exe is available.");
-                }
             }
             catch (Exception ex)
             {
@@ -886,9 +855,7 @@ namespace VPetLLM
         {
             try
             {
-                Logger.Log("开始初始化AnimationCoordinator...");
                 AnimationHelper.Initialize(MW);
-                Logger.Log("AnimationCoordinator初始化成功");
             }
             catch (Exception ex)
             {
@@ -903,16 +870,12 @@ namespace VPetLLM
         {
             try
             {
-                Logger.Log("开始初始化FloatingSidebar...");
                 _floatingSidebarManager = new FloatingSidebarManager(this);
 
-                // 如果设置中启用了悬浮侧边栏，则显示它
                 if (Settings.FloatingSidebar.IsEnabled)
                 {
                     _floatingSidebarManager.Show();
                 }
-
-                Logger.Log("FloatingSidebar初始化成功");
             }
             catch (Exception ex)
             {
@@ -927,23 +890,16 @@ namespace VPetLLM
         {
             try
             {
-                Logger.Log("开始初始化TouchInteractionHandler...");
-
-                // 检查必要的组件是否已准备好
                 if (MW?.Main is null)
                 {
-                    Logger.Log("错误：MW.Main为null，无法初始化TouchInteractionHandler");
                     return;
                 }
 
-                Logger.Log("MW.Main已准备好，创建TouchInteractionHandler...");
                 TouchInteractionHandler = new TouchInteractionHandler(this);
-                Logger.Log("TouchInteractionHandler初始化成功");
             }
             catch (Exception ex)
             {
                 Logger.Log($"初始化TouchInteractionHandler时发生错误: {ex.Message}");
-                Logger.Log($"错误堆栈: {ex.StackTrace}");
                 TouchInteractionHandler = null;
             }
         }

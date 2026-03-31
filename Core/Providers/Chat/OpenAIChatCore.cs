@@ -212,7 +212,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            SystemLogger.Log($"OpenAI ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+
 
             // 构建多模态消息内容
             var base64Image = Convert.ToBase64String(imageData);
@@ -271,7 +271,6 @@ namespace VPetLLM.Core.Providers.Chat
 
                     if (currentNode.EnableStreaming)
                     {
-                        SystemLogger.Log("OpenAI ChatWithImage: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
                         {
                             Content = content
@@ -288,7 +287,6 @@ namespace VPetLLM.Core.Providers.Chat
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new StreamingCommandProcessor((cmd) =>
                         {
-                            SystemLogger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
                         }, VPetLLM.Instance);
 
@@ -324,7 +322,6 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                     else
                     {
-                        SystemLogger.Log("OpenAI ChatWithImage: 使用非流式传输模式");
                         var response = await client.PostAsync(apiUrl, content);
 
                         if (!response.IsSuccessStatusCode)
@@ -451,7 +448,6 @@ namespace VPetLLM.Core.Providers.Chat
                     if (currentNode.EnableStreaming)
                     {
                         // 流式传输模式
-                        SystemLogger.Log("OpenAI: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
                         {
                             Content = content
@@ -469,7 +465,6 @@ namespace VPetLLM.Core.Providers.Chat
                         var streamProcessor = new StreamingCommandProcessor((cmd) =>
                         {
                             // 当检测到完整命令时，立即处理（流式模式下逐个命令处理）
-                            SystemLogger.Log($"OpenAI流式: 检测到完整命令: {cmd}");
                             ResponseHandler?.Invoke(cmd);
                         }, VPetLLM.Instance);
 
@@ -518,13 +513,11 @@ namespace VPetLLM.Core.Providers.Chat
                         // 刷新批处理器，确保所有待处理命令都被处理
                         streamProcessor.FlushBatch();
 
-                        SystemLogger.Log("OpenAI流式: 流式传输完成，总消息长度 {0},总Token用量：{1}".Translate(message.Length, TotalUsage));
                         // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
                     else
                     {
                         // 非流式传输模式
-                        SystemLogger.Log("OpenAI: 使用非流式传输模式");
                         var response = await client.PostAsync(apiUrl, content);
 
                         if (!response.IsSuccessStatusCode)
@@ -538,7 +531,6 @@ namespace VPetLLM.Core.Providers.Chat
                         var responseObject = JObject.Parse(responseString);
                         message = responseObject["choices"][0]["message"]["content"].ToString();
                         var tokenUsage = responseObject["usage"]["total_tokens"].ToString();
-                        SystemLogger.Log("OpenAI非流式: 收到完整消息，长度 {0}，Token用量：{1}".Translate(message.Length, tokenUsage));
                         // 非流式模式下，一次性处理完整消息
                         ResponseHandler?.Invoke(message);
                     }

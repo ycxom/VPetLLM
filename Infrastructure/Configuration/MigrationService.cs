@@ -72,14 +72,12 @@ public class MigrationService
             // Save to SQLite
             _destination.Save(tempSettings);
             result.SettingsMigrated = jsonObject.Count;
-            Logger.Log($"Saved {result.SettingsMigrated} settings to database");
 
             // Create backup of JSON file
             try
             {
                 var backupPath = _jsonPath + ".backup";
                 File.Copy(_jsonPath, backupPath, overwrite: true);
-                Logger.Log($"Created backup of JSON file: {backupPath}");
             }
             catch (Exception ex)
             {

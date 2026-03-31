@@ -739,7 +739,7 @@ namespace VPetLLM.UI.Windows
             {
                 var touchFeedbackControl = new TouchFeedbackSettingsControl(_plugin);
                 TouchFeedbackSettingsContainer.Content = touchFeedbackControl;
-                Logger.Log("TouchFeedbackSettingsControl initialized successfully.");
+
             }
             catch (Exception ex)
             {
@@ -7586,7 +7586,6 @@ namespace VPetLLM.UI.Windows
                 {
                     var preprocessingService = new Services.PreprocessingMultimodal(_plugin.Settings, _plugin);
                     availableNodes = preprocessingService.GetAvailableVisionNodes();
-                    Logger.Log($"RefreshVisionNodesList: Found {availableNodes.Count} available vision nodes");
                 }
                 catch (Exception ex)
                 {
@@ -7595,11 +7594,6 @@ namespace VPetLLM.UI.Windows
                 }
 
                 var selectedNodes = _plugin.Settings.Screenshot.MultimodalProvider?.SelectedNodes ?? new System.Collections.Generic.List<Configuration.VisionNodeIdentifier>();
-                Logger.Log($"RefreshVisionNodesList: Saved selection has {selectedNodes.Count} nodes");
-                foreach (var node in selectedNodes)
-                {
-                    Logger.Log($"RefreshVisionNodesList: Saved node - {node.UniqueId}");
-                }
 
                 // 清除并重建集合
                 _visionNodes.Clear();
@@ -7617,7 +7611,6 @@ namespace VPetLLM.UI.Windows
                     foreach (var node in availableNodes)
                     {
                         var isSelected = selectedNodes.Any(n => n.UniqueId == node.UniqueId);
-                        Logger.Log($"RefreshVisionNodesList: Node {node.UniqueId} - IsSelected = {isSelected}");
                         var wrapper = new Configuration.SelectableVisionNode
                         {
                             Node = node,
@@ -7628,8 +7621,6 @@ namespace VPetLLM.UI.Windows
 
                     visionNodesControl.ItemsSource = _visionNodes;
                 }
-
-                Logger.Log($"RefreshVisionNodesList: Completed with {_visionNodes.Count} nodes in collection");
             }
             catch (Exception ex)
             {
@@ -7650,7 +7641,6 @@ namespace VPetLLM.UI.Windows
                 // 确保窗口已完全加载
                 if (!_isReadyToSave)
                 {
-                    Logger.Log("LoadMultimodalProviderSettings: Window not ready, deferring load");
                     return;
                 }
 
@@ -7660,30 +7650,22 @@ namespace VPetLLM.UI.Windows
                 if (_plugin.Settings.Screenshot.MultimodalProvider is null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
-                    Logger.Log("LoadMultimodalProviderSettings: Created new MultimodalProviderConfig");
                 }
 
                 // 确保SelectedNodes列表被正确初始化
                 if (_plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes is null)
                 {
                     _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes = new List<Configuration.VisionNodeIdentifier>();
-                    Logger.Log("LoadMultimodalProviderSettings: Created new SelectedNodes list");
                 }
 
                 // 记录当前保存的配置
                 var savedProviderType = _plugin.Settings.Screenshot.MultimodalProvider.ProviderType;
                 var savedNodes = _plugin.Settings.Screenshot.MultimodalProvider.SelectedNodes;
-                Logger.Log($"LoadMultimodalProviderSettings: Saved ProviderType = {savedProviderType}, SelectedNodes count = {savedNodes.Count}");
-                foreach (var node in savedNodes)
-                {
-                    Logger.Log($"LoadMultimodalProviderSettings: Saved node - {node.UniqueId}");
-                }
 
                 // 加载提供商类型
                 if (comboBoxProvider is not null)
                 {
                     var providerType = _plugin.Settings.Screenshot.MultimodalProvider?.ProviderType.ToString() ?? "Free";
-                    Logger.Log($"LoadMultimodalProviderSettings: Setting ComboBox to {providerType}");
                     foreach (ComboBoxItem item in comboBoxProvider.Items)
                     {
                         if (item.Tag?.ToString() == providerType)
@@ -7701,8 +7683,6 @@ namespace VPetLLM.UI.Windows
                 // 加载并设置视觉节点
                 RefreshVisionNodesList();
                 UpdateMultimodalProviderPanel();
-
-                Logger.Log("Multimodal provider settings loaded successfully");
             }
             catch (Exception ex)
             {

@@ -112,8 +112,6 @@ namespace VPetLLMPlugin.UI.Windows
 
                 ButtonContainer.Children.Add(button);
                 _buttons[sidebarButton.ButtonId] = sidebarButton;
-
-                Logger.Log($"Added button: {sidebarButton.ButtonId}");
             }
             catch (Exception ex)
             {
@@ -149,7 +147,6 @@ namespace VPetLLMPlugin.UI.Windows
                 }
 
                 _buttons.Remove(buttonId);
-                Logger.Log($"Removed button: {buttonId}");
             }
             catch (Exception ex)
             {

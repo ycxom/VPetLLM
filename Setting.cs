@@ -110,7 +110,6 @@ namespace VPetLLM
                 _storage = new SQLiteSettingStorage(path, instanceId);
                 if (_storage.Initialize(instanceId))
                 {
-                    Logger.Log($"SQLite storage initialized successfully: {_storage.GetStorageLocation()}");
                     
                     // If JSON file exists, perform migration
                     if (needsMigration)
@@ -258,15 +257,10 @@ namespace VPetLLM
                     if (!string.IsNullOrWhiteSpace(json))
                     {
                         JsonConvert.PopulateObject(json, this);
-                        Logger.Log("Settings loaded successfully from SQLite storage");
                         
                         // Load provider nodes from provider_nodes table
                         LoadProviderNodes(sqliteStorage);
                         LoadModelCache(sqliteStorage);
-                    }
-                    else
-                    {
-                        Logger.Log("No settings found in SQLite, using defaults");
                     }
                 }
                 else
@@ -309,11 +303,6 @@ namespace VPetLLM
                 if (openAINodeConfigs.Count > 0)
                 {
                     OpenAI.OpenAINodes = openAINodeConfigs;
-                    Logger.Log($"Loaded {openAINodeConfigs.Count} OpenAI nodes from provider_nodes table");
-                }
-                else
-                {
-                    Logger.Log("No OpenAI nodes found in provider_nodes table, using nodes from settings");
                 }
 
                 // Load Gemini nodes
@@ -321,11 +310,6 @@ namespace VPetLLM
                 if (geminiNodeConfigs.Count > 0)
                 {
                     Gemini.GeminiNodes = geminiNodeConfigs;
-                    Logger.Log($"Loaded {geminiNodeConfigs.Count} Gemini nodes from provider_nodes table");
-                }
-                else
-                {
-                    Logger.Log("No Gemini nodes found in provider_nodes table, using nodes from settings");
                 }
 
                 // Load plugin/tool data
@@ -765,7 +749,6 @@ namespace VPetLLM
                         ModelCache.Cache[cacheKey] = entry;
                     }
                 }
-                Logger.Log($"Loaded {ModelCache.Cache.Count} model cache entries");
 
                 // Load channel-cache links
                 using (var cmd = connection.CreateCommand())
@@ -779,7 +762,6 @@ namespace VPetLLM
                         ModelCache.ChannelCacheLinks[channelId] = cacheKey;
                     }
                 }
-                Logger.Log($"Loaded {ModelCache.ChannelCacheLinks.Count} channel-cache links");
             }
             catch (Exception ex)
             {

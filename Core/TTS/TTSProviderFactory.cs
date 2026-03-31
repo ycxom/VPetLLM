@@ -26,8 +26,6 @@ public class TTSProviderFactory
         _unifiedTTSDispatcher = unifiedTTSDispatcher;
         _mpvPlayer = mpvPlayer;
         _vpetTTSIntegration = vpetTTSIntegration;
-        
-        Logger.Log($"TTSProviderFactory: 初始化完成，VPetTTS集成管理器可用: {_vpetTTSIntegration is not null}");
     }
 
     /// <summary>
@@ -36,26 +34,18 @@ public class TTSProviderFactory
     /// </summary>
     public ITTSProvider GetActiveProvider()
     {
-        Logger.Log("TTSProviderFactory: 检测活动提供者...");
-
-        // 首先尝试 VPetTTS
         var vpetTTSProvider = new VPetTTSProvider(_vpetAPI, _unifiedTTSDispatcher, _vpetTTSIntegration);
         if (vpetTTSProvider.IsAvailable())
         {
-            Logger.Log("TTSProviderFactory: 使用 VPetTTS 提供者");
             return vpetTTSProvider;
         }
 
-        // 其次尝试 EdgeTTS
         var edgeTTSProvider = new EdgeTTSProvider(_vpetAPI);
         if (edgeTTSProvider.IsAvailable())
         {
-            Logger.Log("TTSProviderFactory: 使用 EdgeTTS 提供者");
             return edgeTTSProvider;
         }
 
-        // 回退到内置 TTS
-        Logger.Log("TTSProviderFactory: 使用内置 TTS 提供者");
         return new BuiltinTTSProvider(_vpetAPI, _mpvPlayer);
     }
 
@@ -64,31 +54,26 @@ public class TTSProviderFactory
     /// </summary>
     public List<ITTSProvider> GetAllAvailableProviders()
     {
-        Logger.Log("TTSProviderFactory: 获取所有可用提供者...");
         var providers = new List<ITTSProvider>();
 
         var vpetTTS = new VPetTTSProvider(_vpetAPI, _unifiedTTSDispatcher, _vpetTTSIntegration);
         if (vpetTTS.IsAvailable())
         {
             providers.Add(vpetTTS);
-            Logger.Log("TTSProviderFactory: VPetTTS 可用");
         }
 
         var edgeTTS = new EdgeTTSProvider(_vpetAPI);
         if (edgeTTS.IsAvailable())
         {
             providers.Add(edgeTTS);
-            Logger.Log("TTSProviderFactory: EdgeTTS 可用");
         }
 
         var builtinTTS = new BuiltinTTSProvider(_vpetAPI, _mpvPlayer);
         if (builtinTTS.IsAvailable())
         {
             providers.Add(builtinTTS);
-            Logger.Log("TTSProviderFactory: BuiltinTTS 可用");
         }
 
-        Logger.Log($"TTSProviderFactory: 找到 {providers.Count} 个可用提供者");
         return providers;
     }
 
@@ -97,8 +82,6 @@ public class TTSProviderFactory
     /// </summary>
     public ITTSProvider? GetProviderByName(string providerName)
     {
-        Logger.Log($"TTSProviderFactory: 按名称获取提供者: {providerName}");
-
         ITTSProvider? provider = providerName?.ToLower() switch
         {
             "vpettts" => new VPetTTSProvider(_vpetAPI, _unifiedTTSDispatcher, _vpetTTSIntegration),
@@ -106,15 +89,6 @@ public class TTSProviderFactory
             "builtintts" => new BuiltinTTSProvider(_vpetAPI, _mpvPlayer),
             _ => null
         };
-
-        if (provider is null)
-        {
-            Logger.Log($"TTSProviderFactory: 未找到提供者: {providerName}");
-        }
-        else
-        {
-            Logger.Log($"TTSProviderFactory: 找到提供者: {provider.ProviderName}");
-        }
 
         return provider;
     }

@@ -16,78 +16,38 @@ namespace VPetLLM.Utils.Plugin
         public static void LoadPlugins(IChatCore chatCore)
         {
             var pluginDir = PluginPath;
-            VPetLLMUtils.Logger.Log($"LoadPlugins: PluginPath property returns: {pluginDir}");
 
             if (!Directory.Exists(pluginDir))
             {
-                VPetLLMUtils.Logger.Log($"LoadPlugins: Directory does not exist, creating: {pluginDir}");
                 Directory.CreateDirectory(pluginDir);
                 return;
             }
 
-            VPetLLMUtils.Logger.Log($"LoadPlugins: Directory exists, checking contents");
-
-            // 详细检查目录内容
-            try
-            {
-                var allFiles = Directory.GetFiles(pluginDir);
-                VPetLLMUtils.Logger.Log($"LoadPlugins: Total files in directory: {allFiles.Length}");
-                foreach (var file in allFiles)
-                {
-                    VPetLLMUtils.Logger.Log($"LoadPlugins: Found file: {Path.GetFileName(file)}");
-                }
-
-                var allDirectories = Directory.GetDirectories(pluginDir);
-                VPetLLMUtils.Logger.Log($"LoadPlugins: Total subdirectories: {allDirectories.Length}");
-                foreach (var dir in allDirectories)
-                {
-                    VPetLLMUtils.Logger.Log($"LoadPlugins: Found directory: {Path.GetFileName(dir)}");
-                }
-            }
-            catch (Exception ex)
-            {
-                VPetLLMUtils.Logger.Log($"LoadPlugins: Error listing directory contents: {ex.Message}");
-            }
-
-            VPetLLMUtils.Logger.Log($"LoadPlugins: Starting plugin load process. Plugin directory: {pluginDir}");
             UnloadAllPlugins(chatCore);
-            VPetLLMUtils.Logger.Log($"LoadPlugins: After UnloadAllPlugins - FailedPlugins.Count: {FailedPlugins.Count}");
 
             var configFile = Path.Combine(pluginDir, "plugins.json");
             var pluginStates = new Dictionary<string, bool>();
             if (File.Exists(configFile))
             {
                 pluginStates = JsonConvert.DeserializeObject<Dictionary<string, bool>>(File.ReadAllText(configFile));
-                VPetLLMUtils.Logger.Log($"LoadPlugins: Loaded plugin states from config file, {pluginStates.Count} entries");
-            }
-            else
-            {
-                VPetLLMUtils.Logger.Log($"LoadPlugins: No plugins.json config file found");
             }
 
-            VPetLLMUtils.Logger.Log($"LoadPlugins: Searching for DLL files with pattern '*.dll' in: {pluginDir}");
             var dllFiles = Directory.GetFiles(pluginDir, "*.dll");
-            VPetLLMUtils.Logger.Log($"LoadPlugins: Directory.GetFiles returned {dllFiles.Length} DLL files");
 
             if (dllFiles.Length == 0)
             {
-                VPetLLMUtils.Logger.Log($"LoadPlugins: No DLL files found. Checking for case-sensitive issues...");
-                // 尝试不同的搜索模式
                 var allDllFiles = Directory.GetFiles(pluginDir, "*", SearchOption.TopDirectoryOnly)
                     .Where(f => f.ToLowerInvariant().EndsWith(".dll"))
                     .ToArray();
-                VPetLLMUtils.Logger.Log($"LoadPlugins: Case-insensitive search found {allDllFiles.Length} .dll files");
 
                 if (allDllFiles.Length > 0)
                 {
-                    VPetLLMUtils.Logger.Log($"LoadPlugins: Using case-insensitive results");
                     dllFiles = allDllFiles;
                 }
             }
 
             foreach (var file in dllFiles)
             {
-                VPetLLMUtils.Logger.Log($"LoadPlugins: Processing file: {Path.GetFileName(file)} (Full path: {file})");
                 try
                 {
                     var context = new AssemblyLoadContext($"{Path.GetFileNameWithoutExtension(file)}_{Guid.NewGuid()}", isCollectible: true);
@@ -107,29 +67,21 @@ namespace VPetLLM.Utils.Plugin
 
                     var assembly = context.LoadFromAssemblyPath(shadowCopiedFile);
                     _pluginContexts[file] = context;
-                    VPetLLMUtils.Logger.Log($"LoadPlugins: Successfully loaded assembly from {Path.GetFileName(file)}");
 
                     var types = assembly.GetTypes();
-                    VPetLLMUtils.Logger.Log($"LoadPlugins: Assembly contains {types.Length} types");
 
                     bool foundCompatiblePlugin = false;
                     foreach (var type in types)
                     {
-                        // Check for new-style plugins (IVPetLLMPlugin)
                         if (typeof(IVPetLLMPlugin).IsAssignableFrom(type) && !type.IsInterface)
                         {
-                            VPetLLMUtils.Logger.Log($"LoadPlugins: Found IVPetLLMPlugin implementation: {type.FullName}");
                             var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
                             plugin.FilePath = file;
 
-                            // 检查是否已存在同名插件
                             var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
                             if (existingPlugin is not null)
                             {
-                                VPetLLMUtils.Logger.Log($"Warning: Plugin with name '{plugin.Name}' already exists. Skipping duplicate from {file}");
-                                VPetLLMUtils.Logger.Log($"Existing plugin from: {existingPlugin.FilePath}");
-                                VPetLLMUtils.Logger.Log($"Duplicate plugin from: {file}");
-                                continue; // 跳过重复的插件
+                                continue;
                             }
 
                             if (plugin is IPluginWithData pluginWithData)
@@ -145,20 +97,16 @@ namespace VPetLLM.Utils.Plugin
                                 plugin.Initialize(VPetLLM.Instance);
                                 if (chatCore is not null)
                                 {
-                                    // Convert new-style plugin to legacy interface for chatCore
                                     var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(plugin);
                                     chatCore.AddPlugin(legacyPlugin);
                                 }
                             }
-                            VPetLLMUtils.Logger.Log($"Loaded plugin: {plugin.Name}, Enabled: {plugin.Enabled}");
                             foundCompatiblePlugin = true;
                         }
                     }
 
-                    // 如果没有找到兼容的插件类型，将其标记为失败（可能是旧版本插件）
                     if (!foundCompatiblePlugin)
                     {
-                        VPetLLMUtils.Logger.Log($"LoadPlugins: No compatible plugin types found in {Path.GetFileName(file)} - likely an outdated plugin");
                         FailedPlugins.Add(new FailedPlugin
                         {
                             Name = Path.GetFileNameWithoutExtension(file),
@@ -166,12 +114,10 @@ namespace VPetLLM.Utils.Plugin
                             Error = new InvalidOperationException("插件使用旧版接口，需要更新"),
                             Description = "此插件使用旧版接口编译，与当前版本不兼容。请更新插件。"
                         });
-                        VPetLLMUtils.Logger.Log($"LoadPlugins: Added outdated plugin to FailedPlugins: {Path.GetFileNameWithoutExtension(file)}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    VPetLLMUtils.Logger.Log($"Failed to load plugin {file}: {ex.Message}");
                     FailedPlugins.Add(new FailedPlugin
                     {
                         Name = Path.GetFileNameWithoutExtension(file),
@@ -179,30 +125,24 @@ namespace VPetLLM.Utils.Plugin
                         Error = ex,
                         Description = ex.Message
                     });
-                    VPetLLMUtils.Logger.Log($"LoadPlugins: Added failed plugin '{Path.GetFileNameWithoutExtension(file)}'. Total failed plugins: {FailedPlugins.Count}");
                 }
             }
-
-            VPetLLMUtils.Logger.Log($"LoadPlugins: Completed. Loaded plugins: {Plugins.Count}, Failed plugins: {FailedPlugins.Count}");
         }
 
         public static void SavePluginStates()
         {
             var configFile = Path.Combine(PluginPath, "plugins.json");
 
-            // 使用安全的方式创建字典，避免重复键的问题
             var pluginStates = new Dictionary<string, bool>();
             foreach (var plugin in Plugins)
             {
                 if (!string.IsNullOrEmpty(plugin.Name))
                 {
-                    // 如果存在重复名称，使用最后一个插件的状�?
                     pluginStates[plugin.Name] = plugin.Enabled;
                 }
             }
 
             File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
-            VPetLLMUtils.Logger.Log($"Saved plugin states for {pluginStates.Count} plugins");
         }
 
         public static async Task<bool> UnloadAndTryDeletePlugin(IVPetLLMPlugin plugin, IChatCore chatCore)
@@ -961,7 +901,6 @@ namespace VPetLLM.Utils.Plugin
         {
             if (!File.Exists(filePath))
             {
-                VPetLLMUtils.Logger.Log($"GetFileSha256: File does not exist: {filePath}");
                 return null;
             }
 
@@ -976,24 +915,19 @@ namespace VPetLLM.Utils.Plugin
                         {
                             var hash = sha256.ComputeHash(stream);
                             var result = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                            VPetLLMUtils.Logger.Log($"GetFileSha256: Successfully calculated hash for {Path.GetFileName(filePath)}: {result}");
                             return result;
                         }
                     }
                 }
-                catch (IOException ex) when (attempt < 2)
+                catch (IOException) when (attempt < 2)
                 {
-                    VPetLLMUtils.Logger.Log($"GetFileSha256: Attempt {attempt + 1} failed for {filePath}: {ex.Message}. Retrying...");
                     Thread.Sleep(200);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    VPetLLMUtils.Logger.Log($"GetFileSha256: Error calculating hash for {filePath}: {ex.Message}");
                     return null;
                 }
             }
-
-            VPetLLMUtils.Logger.Log($"GetFileSha256: Failed to calculate hash after 3 attempts for {filePath}");
             return null;
         }
     }

@@ -126,7 +126,6 @@ public class ProviderNodeService
                 var result = cmd.ExecuteScalar();
                 var nodeId = Convert.ToInt32(result);
 
-                Logger.Log($"Added new node for provider '{providerType}' with ID {nodeId}");
                 return nodeId;
             }
             catch (Exception ex)
@@ -175,11 +174,9 @@ public class ProviderNodeService
                 var rowsAffected = cmd.ExecuteNonQuery();
                 if (rowsAffected > 0)
                 {
-                    Logger.Log($"Updated node ID {id}");
                     return true;
                 }
 
-                Logger.Log($"Node ID {id} not found");
                 return false;
             }
             catch (Exception ex)
@@ -244,11 +241,9 @@ public class ProviderNodeService
                 var rowsAffected = cmd.ExecuteNonQuery();
                 if (rowsAffected > 0)
                 {
-                    Logger.Log($"{(enabled ? "Enabled" : "Disabled")} node ID {id}");
                     return true;
                 }
 
-                Logger.Log($"Node ID {id} not found");
                 return false;
             }
             catch (Exception ex)
@@ -277,11 +272,9 @@ public class ProviderNodeService
                 var rowsAffected = cmd.ExecuteNonQuery();
                 if (rowsAffected > 0)
                 {
-                    Logger.Log($"Deleted node ID {id}");
                     return true;
                 }
 
-                Logger.Log($"Node ID {id} not found");
                 return false;
             }
             catch (Exception ex)

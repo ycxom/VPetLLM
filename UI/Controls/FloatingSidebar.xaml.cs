@@ -499,7 +499,6 @@ namespace VPetLLMPlugin.UI.Controls
 
                 ButtonContainer.Children.Add(button);
                 _buttons[sidebarButton.ButtonId] = sidebarButton;
-                Logger.Log($"Added button: {sidebarButton.ButtonId}");
             }
             catch (Exception ex)
             {
@@ -529,7 +528,6 @@ namespace VPetLLMPlugin.UI.Controls
                 }
 
                 _buttons.Remove(buttonId);
-                Logger.Log($"Removed button: {buttonId}");
             }
             catch (Exception ex)
             {
@@ -690,7 +688,6 @@ namespace VPetLLMPlugin.UI.Controls
                     }
                 }
 
-                Logger.Log($"Sidebar orientation set to: {orientation}");
             }
             catch (Exception ex)
             {

@@ -84,8 +84,6 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                Logger.Log("Settings window closed, refreshing sidebar configuration");
-
                 var settings = GetFloatingSidebarSettings();
                 ApplyConfiguration(settings);
 
@@ -453,7 +451,6 @@ namespace VPetLLM.Handlers.UI
                     _sidebar.AddButton(button);
                 }
 
-                Logger.Log($"Refreshed sidebar buttons: {string.Join(", ", buttonsToAdd.Select(b => b.ButtonId))}");
             }
             catch (Exception ex)
             {
@@ -471,7 +468,6 @@ namespace VPetLLM.Handlers.UI
                 if (_sidebar is not null && !_isDisposed)
                 {
                     _sidebar.UpdateStatusLight(status);
-                    Logger.Log($"VPetLLM status updated to: {status}");
                 }
             }
             catch (Exception ex)
@@ -671,7 +667,6 @@ namespace VPetLLM.Handlers.UI
                     _sidebar.BringToFront();
                 }
 
-                Logger.Log("Applied sidebar configuration");
             }
             catch (Exception ex)
             {
@@ -743,8 +738,6 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
-                Logger.Log($"Sidebar button clicked: {e.ButtonId}");
-
                 var allButtons = SidebarButton.GetDefaultButtons();
                 var button = allButtons.FirstOrDefault(b => b.ButtonId == e.ButtonId);
 

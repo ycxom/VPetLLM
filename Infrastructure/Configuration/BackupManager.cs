@@ -27,13 +27,11 @@ public class BackupManager
             if (!Directory.Exists(_backupDirectory))
             {
                 Directory.CreateDirectory(_backupDirectory);
-                Logger.Log($"Created backup directory: {_backupDirectory}");
             }
 
             // Check if database file exists
             if (!File.Exists(_databasePath))
             {
-                Logger.Log($"Database file not found, skipping backup: {_databasePath}");
                 return string.Empty;
             }
 
@@ -44,7 +42,6 @@ public class BackupManager
 
             // Copy database file to backup location
             File.Copy(_databasePath, backupPath, overwrite: true);
-            Logger.Log($"Database backup created: {backupPath}");
 
             // Rotate old backups
             RotateBackups();
@@ -70,7 +67,6 @@ public class BackupManager
             // Validate backup file exists
             if (!File.Exists(backupPath))
             {
-                Logger.Log($"Backup file not found: {backupPath}");
                 return false;
             }
 
@@ -79,12 +75,10 @@ public class BackupManager
             {
                 var emergencyBackup = _databasePath + ".emergency";
                 File.Copy(_databasePath, emergencyBackup, overwrite: true);
-                Logger.Log($"Created emergency backup before restoration: {emergencyBackup}");
             }
 
             // Copy backup file to database location
             File.Copy(backupPath, _databasePath, overwrite: true);
-            Logger.Log($"Database restored from backup: {backupPath}");
 
             return true;
         }
@@ -118,7 +112,6 @@ public class BackupManager
             {
                 var oldestBackup = backupFiles[0];
                 oldestBackup.Delete();
-                Logger.Log($"Deleted old backup: {oldestBackup.Name}");
                 backupFiles.RemoveAt(0);
             }
         }

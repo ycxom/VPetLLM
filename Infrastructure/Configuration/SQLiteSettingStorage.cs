@@ -122,8 +122,6 @@ public class SQLiteSettingStorage : ISettingStorage
                 jObject.Remove("EnableStreaming");
                 jObject.Remove("Enabled");
                 jObject.Remove("Name");
-                
-                Logger.Log("Excluded OpenAINodes and legacy properties from settings table (managed in provider_nodes)");
             }
             else if (providerType == "Gemini")
             {
@@ -137,8 +135,6 @@ public class SQLiteSettingStorage : ISettingStorage
                 jObject.Remove("MaxTokens");
                 jObject.Remove("EnableAdvanced");
                 jObject.Remove("EnableStreaming");
-                
-                Logger.Log("Excluded GeminiNodes and legacy properties from settings table (managed in provider_nodes)");
             }
 
             return jObject.ToString(Formatting.None);
@@ -183,8 +179,6 @@ public class SQLiteSettingStorage : ISettingStorage
             // Open connection
             _connection = new SqliteConnection(connectionString);
             _connection.Open();
-
-            Logger.Log($"SQLite database connection opened: {_databasePath}");
 
             // Check schema version
             var currentVersion = _schemaManager.GetSchemaVersion(_connection);
@@ -254,8 +248,6 @@ public class SQLiteSettingStorage : ISettingStorage
                     throw new StorageException("Database connection is not initialized");
                 }
 
-                Logger.Log($"Loading settings from database as JSON for instance: '{_instanceId ?? "default"}'");
-
                 // Build a JSON object from both shared and instance-specific tables
                 var jsonBuilder = new System.Text.StringBuilder();
                 jsonBuilder.Append("{");
@@ -264,12 +256,10 @@ public class SQLiteSettingStorage : ISettingStorage
                 var isFirst = true;
 
                 // 1. Load shared settings from 'settings' table
-                Logger.Log("Loading shared settings from 'settings' table...");
                 loadedCount += LoadFromTable("settings", jsonBuilder, ref isFirst);
 
                 // 2. Load instance-specific settings from instance table
                 var instanceTableName = GetInstanceTableName();
-                Logger.Log($"Loading instance-specific settings from '{instanceTableName}' table...");
                 
                 // Check if instance table exists, create if not
                 EnsureInstanceTableExists(instanceTableName);
@@ -280,14 +270,10 @@ public class SQLiteSettingStorage : ISettingStorage
 
                 if (loadedCount == 0)
                 {
-                    Logger.Log("No settings found in database");
                     return null;
                 }
-
-                Logger.Log($"Loaded {loadedCount} settings from database (shared + instance-specific)");
                 
                 var json = jsonBuilder.ToString();
-                Logger.Log($"Reconstructed JSON length: {json.Length} characters");
                 
                 return json;
             }
@@ -426,7 +412,6 @@ public class SQLiteSettingStorage : ISettingStorage
                 )
             ";
             cmd.ExecuteNonQuery();
-            Logger.Log($"Ensured table '{tableName}' exists");
         }
         catch (Exception ex)
         {
@@ -544,7 +529,6 @@ public class SQLiteSettingStorage : ISettingStorage
                             else if (key == "Tools")
                             {
                                 // Skip Tools list - managed in plugin_data table
-                                Logger.Log("Excluded Tools list from settings table (managed in plugin_data)");
                                 continue;
                             }
                             else
@@ -574,7 +558,6 @@ public class SQLiteSettingStorage : ISettingStorage
                     }
 
                     transaction.Commit();
-                    Logger.Log($"Saved {savedCount} settings to database (shared: {sharedCount}, instance: {instanceCount})");
                 }
                 catch (Exception ex)
                 {

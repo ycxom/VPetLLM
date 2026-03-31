@@ -24,15 +24,11 @@ public class VPetTTSProvider : ITTSProvider
         _vpetAPI = vpetAPI ?? throw new ArgumentNullException(nameof(vpetAPI));
         _unifiedTTSDispatcher = unifiedTTSDispatcher;
         _vpetTTSIntegration = vpetTTSIntegration;
-        Logger.Log($"VPetTTSProvider: 初始化完成，统一 TTS 调度器可用: {_unifiedTTSDispatcher is not null}, VPetTTS集成管理器可用: {_vpetTTSIntegration is not null}");
     }
 
     public bool IsAvailable()
     {
-        // 检查 VPetTTS 插件是否已加载并可用
-        var available = _unifiedTTSDispatcher is not null;
-        Logger.Log($"VPetTTSProvider: IsAvailable = {available}");
-        return available;
+        return _unifiedTTSDispatcher is not null;
     }
 
     public async Task<TTSAudioResult> GenerateAudioAsync(
@@ -42,40 +38,26 @@ public class VPetTTSProvider : ITTSProvider
     {
         try
         {
-            Logger.Log($"VPetTTSProvider: 生成音频，文本长度: {text.Length}");
-
-            // 优先使用集成管理器（支持独占会话和预加载）
             if (_vpetTTSIntegration is not null && _vpetTTSIntegration.IsInExclusiveSession())
             {
-                Logger.Log("VPetTTSProvider: 使用集成管理器提交 TTS 请求");
-
-                // 提交 TTS 请求（集成管理器会自动处理预加载）
                 var requestId = await _vpetTTSIntegration.SubmitTTSRequestAsync(text);
-                Logger.Log($"VPetTTSProvider: TTS 请求已提交，请求 ID: {requestId}");
-
-                // 估算时长
                 var estimatedDuration = EstimateDuration(text, options.Speed);
 
                 return new TTSAudioResult
                 {
                     Success = true,
-                    AudioFilePath = null, // VPetTTS 内部处理播放
+                    AudioFilePath = null,
                     DurationMs = estimatedDuration,
                     ErrorMessage = null,
-                    RequestId = requestId // 保存请求 ID 用于后续等待
+                    RequestId = requestId
                 };
             }
 
-            // 回退到统一 TTS 调度器
             if (_unifiedTTSDispatcher is null)
             {
                 throw new InvalidOperationException("统一 TTS 调度器不可用");
             }
 
-            Logger.Log("VPetTTSProvider: 使用统一 TTS 调度器");
-
-            // VPetTTS 特定的音频生成逻辑
-            // 使用统一 TTS 调度器处理请求
             var request = new ModelsTTSRequest
             {
                 RequestId = Guid.NewGuid().ToString(),
@@ -92,15 +74,6 @@ public class VPetTTSProvider : ITTSProvider
 
             var response = await _unifiedTTSDispatcher.ProcessRequestAsync(request);
 
-            if (!response.Success)
-            {
-                Logger.Log($"VPetTTSProvider: 音频生成失败: {response.ErrorMessage}");
-            }
-            else
-            {
-                Logger.Log($"VPetTTSProvider: 音频生成成功，时长: {response.AudioDurationMs}ms");
-            }
-
             return new TTSAudioResult
             {
                 Success = response.Success,
@@ -111,7 +84,6 @@ public class VPetTTSProvider : ITTSProvider
         }
         catch (Exception ex)
         {
-            Logger.Log($"VPetTTSProvider: 音频生成异常: {ex.Message}");
             return new TTSAudioResult
             {
                 Success = false,
@@ -128,34 +100,19 @@ public class VPetTTSProvider : ITTSProvider
     {
         try
         {
-            // 如果有请求 ID 且集成管理器可用，等待请求完成
             if (!string.IsNullOrEmpty(audioResult.RequestId) && _vpetTTSIntegration is not null)
             {
-                Logger.Log($"VPetTTSProvider: 等待请求完成，请求 ID: {audioResult.RequestId}");
-                var completed = await _vpetTTSIntegration.WaitForRequestCompleteAsync(audioResult.RequestId, 60);
-                
-                if (completed)
-                {
-                    Logger.Log("VPetTTSProvider: 请求完成");
-                }
-                else
-                {
-                    Logger.Log("VPetTTSProvider: 请求等待超时");
-                }
+                await _vpetTTSIntegration.WaitForRequestCompleteAsync(audioResult.RequestId, 60);
                 return;
             }
 
-            // 回退到估算时长等待
             if (audioResult.DurationMs > 0)
             {
-                Logger.Log($"VPetTTSProvider: 等待播放完成（估算时长）: {audioResult.DurationMs}ms");
                 await Task.Delay(audioResult.DurationMs, cancellationToken);
-                Logger.Log("VPetTTSProvider: 播放等待完成");
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Logger.Log($"VPetTTSProvider: 播放等待失败: {ex.Message}");
             throw;
         }
     }
@@ -169,21 +126,15 @@ public class VPetTTSProvider : ITTSProvider
 
         try
         {
-            // VPetTTS 特定的时长估算
-            // 基于中文 TTS 特性（204 字符/分钟）
             var charactersPerMinute = 204 * speed;
             var charactersPerSecond = charactersPerMinute / 60.0;
             var estimatedSeconds = text.Length / charactersPerSecond;
-            var estimatedMs = (int)(estimatedSeconds * 1000 * 1.15); // 15% 缓冲
-            var result = Math.Max(2000, estimatedMs); // 最小 2 秒
-
-            Logger.Log($"VPetTTSProvider: 估算时长: {result}ms (文本长度: {text.Length}, 速度: {speed})");
-            return result;
+            var estimatedMs = (int)(estimatedSeconds * 1000 * 1.15);
+            return Math.Max(2000, estimatedMs);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Logger.Log($"VPetTTSProvider: 估算时长失败: {ex.Message}");
-            return 5000; // 默认 5 秒
+            return 5000;
         }
     }
 }

@@ -104,18 +104,15 @@ namespace VPetLLM.Utils.Data
                 var cloudMd5 = versionInfo["vpetllm"]?["VPetLLM_API_presets"]?.ToString();
                 if (string.IsNullOrEmpty(cloudMd5))
                 {
-                    Logger.Log("ApiPresetManager: 版本信息中未找到 api_presets 的MD5，强制更新");
                     return true;
                 }
 
                 var localMd5 = LoadLocalVersionHash();
                 if (localMd5 != cloudMd5)
                 {
-                    Logger.Log($"ApiPresetManager: 检测到新版本 (云端:{cloudMd5}, 本地:{localMd5})");
                     return true;
                 }
 
-                Logger.Log("ApiPresetManager: 已是最新版本");
                 return false;
             }
             catch (Exception ex)
@@ -166,7 +163,6 @@ namespace VPetLLM.Utils.Data
                 {
                     var md5 = CalculateMD5(json);
                     SaveLocalVersionHash(md5);
-                    Logger.Log($"ApiPresetManager: 预设下载成功，MD5: {md5}");
                 }
 
                 return data;

@@ -38,29 +38,22 @@ namespace VPetLLM.Utils.Data
         {
             try
             {
-                Logger.Log("FreeConfigManager: 开始初始化配置...");
-
-                // 下载版本信息
                 var versionInfo = await DownloadVersionInfoAsync();
                 if (versionInfo is null)
                 {
-                    Logger.Log("FreeConfigManager: 无法获取版本信息，使用本地配置");
                     return File.Exists(GetConfigPath(ASR_CONFIG_NAME)) &&
                            File.Exists(GetConfigPath(CHAT_CONFIG_NAME)) &&
                            File.Exists(GetConfigPath(TTS_CONFIG_NAME));
                 }
 
-                // 检查并更新各个配置文件
                 bool asrOk = await CheckAndUpdateConfigAsync(ASR_CONFIG_NAME, versionInfo);
                 bool chatOk = await CheckAndUpdateConfigAsync(CHAT_CONFIG_NAME, versionInfo);
                 bool ttsOk = await CheckAndUpdateConfigAsync(TTS_CONFIG_NAME, versionInfo);
 
-                Logger.Log($"FreeConfigManager: 配置初始化完成 - ASR:{asrOk}, Chat:{chatOk}, TTS:{ttsOk}");
                 return asrOk && chatOk && ttsOk;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.Log($"FreeConfigManager: 初始化配置异常: {ex.Message}");
                 return false;
             }
         }
@@ -78,9 +71,8 @@ namespace VPetLLM.Utils.Data
                 var response = await client.GetStringAsync(url);
                 return JObject.Parse(response);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.Log($"FreeConfigManager: 下载版本信息失败: {ex.Message}");
                 return null;
             }
         }
@@ -92,57 +84,42 @@ namespace VPetLLM.Utils.Data
         {
             try
             {
-                // 从版本信息中获取期望的MD5
                 var expectedMd5 = versionInfo["vpetllm"]?[configName.Replace(".json", "")]?.ToString();
                 if (string.IsNullOrEmpty(expectedMd5))
                 {
-                    Logger.Log($"FreeConfigManager: 版本信息中未找到 {configName} 的MD5");
                     return false;
                 }
 
-                var configPath = GetConfigPath(configName);
                 var encryptedPath = Path.Combine(ConfigDirectory, expectedMd5);
 
-                // 检查加密文件是否存在
                 if (File.Exists(encryptedPath))
                 {
-                    Logger.Log($"FreeConfigManager:配置已是最新 (MD5: {expectedMd5})");
-                    // Logger.Log($"FreeConfigManager: {configName} 配置已是最新 (MD5: {expectedMd5})");
                     return true;
                 }
 
-                // 需要下载新配置
-                Logger.Log($"FreeConfigManager: 下载新配置 {configName}...");
                 var configContent = await DownloadConfigAsync(configName);
                 if (string.IsNullOrEmpty(configContent))
                 {
                     return false;
                 }
 
-                // 计算下载内容的MD5
                 var actualMd5 = CalculateMD5(configContent);
                 if (actualMd5 != expectedMd5)
                 {
-                    Logger.Log($"FreeConfigManager: MD5校验失败 - 期望:{expectedMd5}, 实际:{actualMd5}");
                     return false;
                 }
 
-                // 加密并保存
                 var encryptedContent = EncryptConfig(configContent);
                 File.WriteAllText(encryptedPath, encryptedContent);
 
-                Logger.Log($"FreeConfigManager: 配置更新成功，已保存为: {expectedMd5}");
-
-                // 清理旧的加密文件（同类型配置）
                 var configType = configName.Contains("ASR") ? "ASR" :
                                 configName.Contains("Chat") ? "Chat" : "TTS";
                 CleanOldEncryptedFiles(expectedMd5, configType);
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.Log($"FreeConfigManager: 更新配置 {configName} 失败: {ex.Message}");
                 return false;
             }
         }
@@ -159,9 +136,8 @@ namespace VPetLLM.Utils.Data
                 var url = $"{CONFIG_BASE_URL}/{configName}";
                 return await client.GetStringAsync(url);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.Log($"FreeConfigManager: 下载配置 {configName} 失败: {ex.Message}");
                 return null;
             }
         }
@@ -202,9 +178,8 @@ namespace VPetLLM.Utils.Data
 
                 return Encoding.UTF8.GetString(contentBytes);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.Log($"FreeConfigManager: 解密配置失败: {ex.Message}");
                 return null;
             }
         }
@@ -230,10 +205,8 @@ namespace VPetLLM.Utils.Data
                 foreach (var file in files)
                 {
                     var fileName = Path.GetFileName(file);
-                    // 如果文件名是32位MD5格式且不是当前版本
                     if (fileName.Length == 32 && fileName != currentMd5 && !fileName.Contains("."))
                     {
-                        // 尝试解密并检查是否是同类型配置
                         try
                         {
                             var encryptedContent = File.ReadAllText(file);
@@ -243,7 +216,6 @@ namespace VPetLLM.Utils.Data
                                 var json = JObject.Parse(decryptedContent);
                                 var model = json["Model"]?.ToString();
 
-                                // 根据Model判断配置类型，只删除同类型的旧配置
                                 bool isSameType = false;
                                 if (configType == "ASR" && model == "LBGAME") isSameType = true;
                                 else if (configType == "Chat" && model == "bymbymbym") isSameType = true;
@@ -252,22 +224,18 @@ namespace VPetLLM.Utils.Data
                                 if (isSameType)
                                 {
                                     File.Delete(file);
-                                    Logger.Log($"FreeConfigManager: 清理旧{configType}配置文件: {fileName}");
                                 }
                             }
                         }
                         catch
                         {
-                            // 无法解密或解析的文件，可能是损坏的，也删除
                             File.Delete(file);
-                            Logger.Log($"FreeConfigManager: 清理无效配置文件: {fileName}");
                         }
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.Log($"FreeConfigManager: 清理旧文件失败: {ex.Message}");
             }
         }
 
@@ -286,29 +254,24 @@ namespace VPetLLM.Utils.Data
         {
             try
             {
-                // 首先尝试找到对应的加密文件
                 var encryptedFile = FindEncryptedConfigFile(configName);
                 if (string.IsNullOrEmpty(encryptedFile))
                 {
-                    Logger.Log($"FreeConfigManager: 未找到 {configName} 的配置文件");
                     return null;
                 }
 
-                // 读取并解密
                 var encryptedContent = File.ReadAllText(encryptedFile);
                 var decryptedContent = DecryptConfig(encryptedContent);
 
                 if (string.IsNullOrEmpty(decryptedContent))
                 {
-                    Logger.Log($"FreeConfigManager: 解密配置 {configName} 失败");
                     return null;
                 }
 
                 return JObject.Parse(decryptedContent);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.Log($"FreeConfigManager: 读取配置 {configName} 失败: {ex.Message}");
                 return null;
             }
         }
@@ -320,18 +283,14 @@ namespace VPetLLM.Utils.Data
         {
             try
             {
-                // 获取配置名称（不含.json）
                 var configKey = configName.Replace(".json", "");
 
-                // 遍历目录中的所有32位MD5文件
                 var files = Directory.GetFiles(ConfigDirectory);
                 foreach (var file in files)
                 {
                     var fileName = Path.GetFileName(file);
-                    // 检查是否是32位MD5格式（无扩展名）
                     if (fileName.Length == 32 && !fileName.Contains("."))
                     {
-                        // 尝试解密并验证
                         try
                         {
                             var encryptedContent = File.ReadAllText(file);
@@ -339,16 +298,13 @@ namespace VPetLLM.Utils.Data
                             if (!string.IsNullOrEmpty(decryptedContent))
                             {
                                 var json = JObject.Parse(decryptedContent);
-                                // 检查是否包含预期的字段来判断配置类型
                                 if (json["API_KEY"] is not null && json["API_URL"] is not null && json["Model"] is not null)
                                 {
-                                    // 通过Model字段判断配置类型
                                     var model = json["Model"]?.ToString();
                                     if ((configKey == "Free_ASR_Config" && model == "LBGAME") ||
                                         (configKey == "Free_Chat_Config" && model == "bymbymbym") ||
                                         (configKey == "Free_TTS_Config" && model == "vpetllm"))
                                     {
-                                        // Logger.Log($"FreeConfigManager: 找到 {configName} 的加密文件: {fileName}");
                                         return file;
                                     }
                                 }
@@ -356,16 +312,14 @@ namespace VPetLLM.Utils.Data
                         }
                         catch
                         {
-                            // 忽略解密失败的文件
                         }
                     }
                 }
 
                 return null;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.Log($"FreeConfigManager: 查找加密文件失败: {ex.Message}");
                 return null;
             }
         }

@@ -170,21 +170,11 @@ namespace VPetLLM.Utils.Plugin
 
                     if (isValidBatch && isNotExpired)
                     {
-                        Logger.Log($"TTSPluginDetector: 缓存命中 - {pluginName}, 批次: {batchId}");
                         return cached.Result;
                     }
-                    else
-                    {
-                        Logger.Log($"TTSPluginDetector: 缓存过期或批次不匹配 - {pluginName}, 当前批次: {batchId}, 缓存批次: {cached.BatchId}");
-                    }
-                }
-                else
-                {
-                    Logger.Log($"TTSPluginDetector: 缓存未命中 - {pluginName}");
                 }
 
                 // 缓存未命中或已过期，重新检测
-                Logger.Log($"TTSPluginDetector: 重新检测插件 - {pluginName}");
                 var result = DetectSpecificPlugin(mainWindow, pluginName);
 
                 // 更新缓存
@@ -194,8 +184,6 @@ namespace VPetLLM.Utils.Plugin
                     CacheTime = DateTime.Now,
                     BatchId = batchId
                 };
-
-                Logger.Log($"TTSPluginDetector: 缓存已更新 - {pluginName}, 批次: {batchId}");
                 return result;
             }
         }
@@ -222,10 +210,7 @@ namespace VPetLLM.Utils.Plugin
                     _cache.Remove(key);
                 }
 
-                if (keysToRemove.Count > 0)
-                {
-                    Logger.Log($"TTSPluginDetector: 已清除批次 {batchId} 的 {keysToRemove.Count} 个缓存项");
-                }
+
             }
         }
 
@@ -236,9 +221,7 @@ namespace VPetLLM.Utils.Plugin
         {
             lock (_cacheLock)
             {
-                var count = _cache.Count;
                 _cache.Clear();
-                Logger.Log($"TTSPluginDetector: 已清除所有缓存，共 {count} 个项目");
             }
         }
 
@@ -249,7 +232,6 @@ namespace VPetLLM.Utils.Plugin
         public static void SetCacheTimeout(int timeoutMs)
         {
             _cacheTimeoutMs = Math.Max(1000, timeoutMs); // 最小1秒
-            Logger.Log($"TTSPluginDetector: 缓存超时时间已设置为 {_cacheTimeoutMs}ms");
         }
 
         /// <summary>
@@ -288,7 +270,6 @@ namespace VPetLLM.Utils.Plugin
             {
                 if (mainWindow?.Plugins is null)
                 {
-                    Logger.Log("TTSPluginDetector: 插件列表为空");
                     return result;
                 }
 
@@ -314,10 +295,7 @@ namespace VPetLLM.Utils.Plugin
                     }
                 }
 
-                if (result.HasOtherEnabledTTSPlugin)
-                {
-                    Logger.Log($"TTSPluginDetector: 检测到其他已启用的 TTS 插件: {result.EnabledPluginNames}");
-                }
+
             }
             catch (Exception ex)
             {
@@ -354,7 +332,6 @@ namespace VPetLLM.Utils.Plugin
                         if (string.Equals(currentPluginName, pluginName, StringComparison.OrdinalIgnoreCase))
                         {
                             result.PluginExists = true;
-                            Logger.Log($"TTSPluginDetector: 找到 {pluginName} 插件");
 
                             // 检查插件是否启用
                             result.PluginEnabled = CheckPluginEnabled(plugin);
@@ -362,7 +339,6 @@ namespace VPetLLM.Utils.Plugin
                             // 尝试获取版本信息
                             result.PluginVersion = GetPluginVersion(plugin);
 
-                            Logger.Log($"TTSPluginDetector: 插件状态 - 存在: {result.PluginExists}, 启用: {result.PluginEnabled}, 版本: {result.PluginVersion}");
                             break;
                         }
                     }
@@ -372,10 +348,7 @@ namespace VPetLLM.Utils.Plugin
                     }
                 }
 
-                if (!result.PluginExists)
-                {
-                    Logger.Log($"TTSPluginDetector: 未找到 {pluginName} 插件");
-                }
+
             }
             catch (Exception ex)
             {
@@ -400,7 +373,6 @@ namespace VPetLLM.Utils.Plugin
                 if (setProperty is not null)
                 {
                     setObject = setProperty.GetValue(plugin);
-                    Logger.Log("TTSPluginDetector: 通过属性获取到 Set 对象");
                 }
 
                 // 如果属性不存在，尝试获取 Set 字段（VPetTTS 使用的是字段）
@@ -410,7 +382,6 @@ namespace VPetLLM.Utils.Plugin
                     if (setField is not null)
                     {
                         setObject = setField.GetValue(plugin);
-                        Logger.Log("TTSPluginDetector: 通过字段获取到 Set 对象");
                     }
                 }
 
@@ -423,14 +394,12 @@ namespace VPetLLM.Utils.Plugin
                         var enableValue = enableProperty.GetValue(setObject);
                         if (enableValue is bool enabled)
                         {
-                            Logger.Log($"TTSPluginDetector: 成功获取 Enable 属性值: {enabled}");
                             return enabled;
                         }
                     }
                 }
 
                 // 如果无法获取 Enable 属性，假设插件未启用（保守策略）
-                Logger.Log("TTSPluginDetector: 无法获取 Enable 属性，假设插件未启用");
                 return false;
             }
             catch (Exception ex)
