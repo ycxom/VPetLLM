@@ -60,9 +60,6 @@ namespace VPetLLM.Core.Providers.Chat
             return Chat(prompt, false);
         }
 
-        /// <summary>
-        /// 发送带图像的多模态消息
-        /// </summary>
         public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
         {
             OnConversationTurn();
@@ -81,7 +78,6 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            // 检查视觉能力是否启用
             if (!node.EnableVision)
             {
                 var visionError = "当前节点未启用视觉能力，请在设置中启用 EnableVision";
@@ -92,17 +88,166 @@ namespace VPetLLM.Core.Providers.Chat
 
             Logger.Log($"Gemini ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
 
-            // 构建历史消息
             List<Message> history = GetCoreHistory();
 
-            // 构建请求内容
+            if (node.UseOpenAIAuth)
+            {
+                return await ChatWithImageOpenAI(prompt, imageData, history, node);
+            }
+            else
+            {
+                return await ChatWithImageGemini(prompt, imageData, history, node);
+            }
+        }
+
+        private async Task<string> ChatWithImageOpenAI(string prompt, byte[] imageData, List<Message> history, Setting.GeminiNodeSetting node)
+        {
+            var base64Image = Convert.ToBase64String(imageData);
+            var userContent = new object[]
+            {
+                new { type = "text", text = prompt },
+                new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Image}" } }
+            };
+
+            var requestMessages = new List<object>();
+            foreach (var msg in history)
+            {
+                requestMessages.Add(new { role = msg.Role, content = msg.DisplayContent });
+            }
+            requestMessages.Add(new { role = "user", content = userContent });
+
+            object data;
+            if (node.EnableAdvanced)
+            {
+                data = new
+                {
+                    model = node.Model,
+                    messages = requestMessages,
+                    temperature = node.Temperature,
+                    max_tokens = node.MaxTokens,
+                    stream = node.EnableStreaming
+                };
+            }
+            else
+            {
+                data = new
+                {
+                    model = node.Model,
+                    messages = requestMessages,
+                    max_tokens = 4096,
+                    stream = node.EnableStreaming
+                };
+            }
+
+            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+
+            var apiUrl = BuildOpenAIEndpoint(node.Url);
+
+            string message;
+            try
+            {
+                using (var client = GetClient())
+                {
+                    AddAuthHeaders(client, node);
+
+                    if (node.EnableStreaming)
+                    {
+                        Logger.Log("Gemini (OpenAI兼容): 使用流式传输模式");
+                        var request = new HttpRequestMessage(HttpMethod.Post, apiUrl) { Content = content };
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new Handlers.Core.StreamingCommandProcessor((cmd) =>
+                        {
+                            Logger.Log($"Gemini流式: 检测到完整命令: {cmd}");
+                            ResponseHandler?.Invoke(cmd);
+                        });
+
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) is not null)
+                            {
+                                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                                    continue;
+
+                                var jsonData = line.Substring(6).Trim();
+                                if (jsonData == "[DONE]")
+                                    break;
+
+                                try
+                                {
+                                    var chunk = JObject.Parse(jsonData);
+                                    var delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        streamProcessor.AddChunk(delta);
+                                        StreamingChunkHandler?.Invoke(delta);
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        message = fullMessage.ToString();
+                    }
+                    else
+                    {
+                        Logger.Log("Gemini (OpenAI兼容): 使用非流式传输模式");
+                        var response = await client.PostAsync(apiUrl, content);
+
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var responseObject = JObject.Parse(responseString);
+                        message = responseObject["choices"][0]["message"]["content"].ToString();
+                        ResponseHandler?.Invoke(message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
+                Logger.Log($"Gemini ChatWithImage 异常: {ex.Message}");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+
+            if (Settings.KeepContext)
+            {
+                var userMessage = CreateUserMessage($"[图像] {prompt}");
+                if (userMessage is not null)
+                {
+                    userMessage.ImageData = imageData;
+                    await HistoryManager.AddMessage(userMessage);
+                }
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                SaveHistory();
+            }
+            return "";
+        }
+
+        private async Task<string> ChatWithImageGemini(string prompt, byte[] imageData, List<Message> history, Setting.GeminiNodeSetting node)
+        {
             var contents = new List<object>();
             foreach (var msg in history.Where(m => m.Role != "system"))
             {
                 contents.Add(new { role = msg.Role == "assistant" ? "model" : msg.Role, parts = new[] { new { text = msg.DisplayContent } } });
             }
 
-            // 添加带图像的用户消息
             var base64Image = Convert.ToBase64String(imageData);
             contents.Add(new
             {
@@ -130,31 +275,14 @@ namespace VPetLLM.Core.Providers.Chat
 
             var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
 
-            var baseUrl = node.Url.TrimEnd('/');
-            if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
-            {
-                baseUrl += "/v1beta";
-            }
-            var modelName = node.Model;
-            var apiEndpoint = node.EnableStreaming
-                ? $"{baseUrl}/models/{modelName}:streamGenerateContent?alt=sse"
-                : $"{baseUrl}/models/{modelName}:generateContent";
+            var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model, node.EnableStreaming);
 
             string message;
             try
             {
                 using (var client = GetClient())
                 {
-                    if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
-                    {
-                        client.DefaultRequestHeaders.Remove("User-Agent");
-                    }
-                    client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                    var rotatedKey = GetCurrentApiKeyFromNode(node.ApiKey);
-                    if (!string.IsNullOrEmpty(rotatedKey))
-                    {
-                        client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey);
-                    }
+                    AddAuthHeaders(client, node);
 
                     if (node.EnableStreaming)
                     {
@@ -229,13 +357,11 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            // 保存历史记录（包含图像数据用于上下文编辑器显示）
             if (Settings.KeepContext)
             {
                 var userMessage = CreateUserMessage($"[图像] {prompt}");
                 if (userMessage is not null)
                 {
-                    // 保存图像数据到消息对象（用于上下文编辑器显示）
                     userMessage.ImageData = imageData;
                     await HistoryManager.AddMessage(userMessage);
                 }
@@ -254,7 +380,6 @@ namespace VPetLLM.Core.Providers.Chat
                 ClearContext();
             }
 
-            // 使用 CreateUserMessage 自动设置时间戳和状态信息
             var tempUserMessage = CreateUserMessage(prompt);
 
             List<Message> history = GetCoreHistory();
@@ -277,12 +402,154 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            // 调试模式：当角色设定包含 VPetLLM_DeBug 时，记录当前调用的节点信息
             if (Settings?.Role?.Contains("VPetLLM_DeBug") == true)
             {
-                Logger.Log($"[DEBUG] Gemini 当前调用节点: {node.Name}, URL: {node.Url}, Model: {node.Model}");
+                Logger.Log($"[DEBUG] Gemini 当前调用节点: {node.Name}, URL: {node.Url}, Model: {node.Model}, UseOpenAIAuth: {node.UseOpenAIAuth}");
             }
 
+            if (node.UseOpenAIAuth)
+            {
+                return await ChatOpenAI(prompt, history, node, tempUserMessage);
+            }
+            else
+            {
+                return await ChatGemini(prompt, history, node, tempUserMessage);
+            }
+        }
+
+        private async Task<string> ChatOpenAI(string prompt, List<Message> history, Setting.GeminiNodeSetting node, Message? tempUserMessage)
+        {
+            object data;
+            if (node.EnableAdvanced)
+            {
+                data = new
+                {
+                    model = node.Model,
+                    messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
+                    temperature = node.Temperature,
+                    max_tokens = node.MaxTokens,
+                    stream = node.EnableStreaming
+                };
+            }
+            else
+            {
+                data = new
+                {
+                    model = node.Model,
+                    messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
+                    stream = node.EnableStreaming
+                };
+            }
+            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+
+            var apiUrl = BuildOpenAIEndpoint(node.Url);
+
+            string message;
+            try
+            {
+                using (var client = GetClient())
+                {
+                    AddAuthHeaders(client, node);
+
+                    if (node.EnableStreaming)
+                    {
+                        Logger.Log("Gemini (OpenAI兼容): 使用流式传输模式");
+                        var request = new HttpRequestMessage(HttpMethod.Post, apiUrl) { Content = content };
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+
+                        var fullMessage = new StringBuilder();
+                        var streamProcessor = new StreamingCommandProcessor((cmd) =>
+                        {
+                            ResponseHandler?.Invoke(cmd);
+                        }, VPetLLM.Instance);
+
+                        bool useBatch = Settings?.EnableStreamingBatch ?? true;
+                        int batchWindow = Settings?.StreamingBatchWindowMs ?? 100;
+                        streamProcessor.SetBatchingConfig(useBatch, batchWindow);
+
+                        var TotalUsage = 0;
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new System.IO.StreamReader(stream))
+                        {
+                            string line;
+                            while ((line = await reader.ReadLineAsync()) is not null)
+                            {
+                                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                                    continue;
+
+                                var jsonData = line.Substring(6).Trim();
+                                if (jsonData == "[DONE]")
+                                    break;
+
+                                try
+                                {
+                                    var chunk = JObject.Parse(jsonData);
+                                    var delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    if (!string.IsNullOrEmpty(delta))
+                                    {
+                                        fullMessage.Append(delta);
+                                        streamProcessor.AddChunk(delta);
+                                        StreamingChunkHandler?.Invoke(delta);
+                                        var usage = chunk["usage"]?["total_tokens"]?.ToObject<int>() ?? 0;
+                                        TotalUsage += usage;
+                                    }
+                                }
+                                catch
+                                {
+                                }
+                            }
+                        }
+                        message = fullMessage.ToString();
+                        streamProcessor.FlushBatch();
+                    }
+                    else
+                    {
+                        Logger.Log("Gemini (OpenAI兼容): 使用非流式传输模式");
+                        var response = await client.PostAsync(apiUrl, content);
+
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            ResponseHandler?.Invoke(errorMessage);
+                            return "";
+                        }
+
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var responseObject = JObject.Parse(responseString);
+                        message = responseObject["choices"][0]["message"]["content"].ToString();
+                        ResponseHandler?.Invoke(message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
+                Logger.Log($"Gemini Chat 异常: {ex.Message}");
+                ResponseHandler?.Invoke(errorMessage);
+                return "";
+            }
+
+            if (Settings.KeepContext)
+            {
+                if (tempUserMessage is not null)
+                {
+                    await HistoryManager.AddMessage(tempUserMessage);
+                }
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                SaveHistory();
+            }
+            return "";
+        }
+
+        private async Task<string> ChatGemini(string prompt, List<Message> history, Setting.GeminiNodeSetting node, Message? tempUserMessage)
+        {
             var requestData = new
             {
                 contents = history.Where(m => m.Role != "system")
@@ -300,31 +567,14 @@ namespace VPetLLM.Core.Providers.Chat
 
             var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
 
-            var baseUrl = node.Url.TrimEnd('/');
-            if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
-            {
-                baseUrl += "/v1beta";
-            }
-            var modelName = node.Model;
-            var apiEndpoint = node.EnableStreaming
-                ? $"{baseUrl}/models/{modelName}:streamGenerateContent?alt=sse"
-                : $"{baseUrl}/models/{modelName}:generateContent";
+            var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model, node.EnableStreaming);
 
             string message;
             try
             {
                 using (var client = GetClient())
                 {
-                    if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
-                    {
-                        client.DefaultRequestHeaders.Remove("User-Agent");
-                    }
-                    client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                    var rotatedKey = GetCurrentApiKeyFromNode(node.ApiKey);
-                    if (!string.IsNullOrEmpty(rotatedKey))
-                    {
-                        client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey);
-                    }
+                    AddAuthHeaders(client, node);
 
                     if (node.EnableStreaming)
                     {
@@ -413,7 +663,6 @@ namespace VPetLLM.Core.Providers.Chat
             return "";
         }
 
-
         public override async Task<string> Summarize(string systemPrompt, string userContent)
         {
             try
@@ -430,46 +679,13 @@ namespace VPetLLM.Core.Providers.Chat
                     return ErrorMessageHelper.IsDebugMode(Settings) ? noNodeError : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
                 }
 
-                var requestData = new
+                if (node.UseOpenAIAuth)
                 {
-                    system_instruction = new { parts = new[] { new { text = systemPrompt } } },
-                    contents = new[] { new { parts = new[] { new { text = userContent } } } }
-                };
-
-                var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
-
-                var baseUrl = node.Url.TrimEnd('/');
-                if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
-                {
-                    baseUrl += "/v1beta";
+                    return await SummarizeOpenAI(systemPrompt, userContent, node);
                 }
-                var modelName = node.Model;
-                var apiEndpoint = $"{baseUrl}/models/{modelName}:generateContent";
-
-                using (var client = GetClient())
+                else
                 {
-                    if (client.DefaultRequestHeaders.TryGetValues("User-Agent", out _))
-                    {
-                        client.DefaultRequestHeaders.Remove("User-Agent");
-                    }
-                    client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                    var rotatedKey2 = GetCurrentApiKeyFromNode(node.ApiKey);
-                    if (!string.IsNullOrEmpty(rotatedKey2))
-                    {
-                        client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey2);
-                    }
-                    var response = await client.PostAsync(apiEndpoint, content);
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
-                        Logger.Log($"Gemini Summarize 错误: {errorMessage}");
-                        return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
-                    }
-
-                    var responseString = await response.Content.ReadAsStringAsync();
-                    var responseObject = JObject.Parse(responseString);
-                    return responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
+                    return await SummarizeGemini(systemPrompt, userContent, node);
                 }
             }
             catch (Exception ex)
@@ -478,6 +694,86 @@ namespace VPetLLM.Core.Providers.Chat
                 return ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Gemini Summarize 异常: {ex.Message}\n{ex.StackTrace}"
                     : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试。");
+            }
+        }
+
+        private async Task<string> SummarizeOpenAI(string systemPrompt, string userContent, Setting.GeminiNodeSetting node)
+        {
+            var messages = new[]
+            {
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userContent }
+            };
+
+            object data;
+            if (node.EnableAdvanced)
+            {
+                data = new
+                {
+                    model = node.Model,
+                    messages = messages,
+                    temperature = node.Temperature,
+                    max_tokens = node.MaxTokens
+                };
+            }
+            else
+            {
+                data = new
+                {
+                    model = node.Model,
+                    messages = messages
+                };
+            }
+
+            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+
+            var apiUrl = BuildOpenAIEndpoint(node.Url);
+
+            using (var client = GetClient())
+            {
+                AddAuthHeaders(client, node);
+                var response = await client.PostAsync(apiUrl, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                    Logger.Log($"Gemini Summarize 错误: {errorMessage}");
+                    return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试");
+                }
+
+                var responseString = await response.Content.ReadAsStringAsync();
+                var responseObject = JObject.Parse(responseString);
+                return responseObject["choices"][0]["message"]["content"].ToString();
+            }
+        }
+
+        private async Task<string> SummarizeGemini(string systemPrompt, string userContent, Setting.GeminiNodeSetting node)
+        {
+            var requestData = new
+            {
+                system_instruction = new { parts = new[] { new { text = systemPrompt } } },
+                contents = new[] { new { parts = new[] { new { text = userContent } } } }
+            };
+
+            var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
+
+            var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model, false);
+
+            using (var client = GetClient())
+            {
+                AddAuthHeaders(client, node);
+                var response = await client.PostAsync(apiEndpoint, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                    Logger.Log($"Gemini Summarize 错误: {errorMessage}");
+                    return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
+                }
+
+                var responseString = await response.Content.ReadAsStringAsync();
+                var responseObject = JObject.Parse(responseString);
+                return responseObject["candidates"][0]["content"]["parts"][0]["text"].ToString();
             }
         }
 
@@ -508,18 +804,25 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 string requestUrl;
-                if (node.Url.Contains("/models"))
+                if (node.UseOpenAIAuth)
                 {
-                    requestUrl = node.Url;
+                    requestUrl = BuildOpenAIModelsEndpoint(node.Url);
                 }
                 else
                 {
-                    var baseUrl = node.Url.TrimEnd('/');
-                    if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
+                    if (node.Url.Contains("/models"))
                     {
-                        baseUrl += "/v1beta";
+                        requestUrl = node.Url;
                     }
-                    requestUrl = baseUrl.EndsWith("/") ? $"{baseUrl}models/" : $"{baseUrl}/models/";
+                    else
+                    {
+                        var baseUrl = node.Url.TrimEnd('/');
+                        if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
+                        {
+                            baseUrl += "/v1beta";
+                        }
+                        requestUrl = baseUrl.EndsWith("/") ? $"{baseUrl}models/" : $"{baseUrl}/models/";
+                    }
                 }
 
                 using (var client = GetClient())
@@ -529,11 +832,7 @@ namespace VPetLLM.Core.Providers.Chat
                         client.DefaultRequestHeaders.Remove("User-Agent");
                     }
                     client.DefaultRequestHeaders.Add("User-Agent", "Lolisi_VPet_LLMAPI");
-                    var rotatedKey3 = GetCurrentApiKeyFromNode(node.ApiKey);
-                    if (!string.IsNullOrEmpty(rotatedKey3))
-                    {
-                        client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey3);
-                    }
+                    AddAuthHeaders(client, node);
 
                     var response = client.GetAsync(requestUrl).Result;
 
@@ -548,11 +847,39 @@ namespace VPetLLM.Core.Providers.Chat
                     try
                     {
                         var jsonToken = JToken.Parse(responseString);
-                        if (jsonToken is JObject responseObject && responseObject["models"] is JArray modelsArray)
+                        if (jsonToken is JObject responseObject)
                         {
-                            foreach (var model in modelsArray)
+                            JArray? modelsArray = null;
+
+                            if (node.UseOpenAIAuth)
                             {
-                                models.Add(model["name"].ToString().Replace("models/", ""));
+                                if (responseObject["data"] is JArray openaiModelsArray)
+                                {
+                                    modelsArray = openaiModelsArray;
+                                }
+                            }
+                            else
+                            {
+                                if (responseObject["models"] is JArray googleModelsArray)
+                                {
+                                    modelsArray = googleModelsArray;
+                                }
+                                else if (responseObject["data"] is JArray openaiModelsArray)
+                                {
+                                    modelsArray = openaiModelsArray;
+                                }
+                            }
+
+                            if (modelsArray != null)
+                            {
+                                foreach (var model in modelsArray)
+                                {
+                                    var modelName = model["id"]?.ToString() ?? model["name"]?.ToString();
+                                    if (!string.IsNullOrEmpty(modelName))
+                                    {
+                                        models.Add(modelName.Replace("models/", ""));
+                                    }
+                                }
                             }
                         }
                         else if (jsonToken is JArray responseArray)
@@ -587,6 +914,68 @@ namespace VPetLLM.Core.Providers.Chat
         public new List<string> GetModels()
         {
             return new List<string>();
+        }
+
+        private string BuildOpenAIEndpoint(string url)
+        {
+            string apiUrl = url;
+            if (!apiUrl.Contains("/chat/completions"))
+            {
+                var baseUrl = apiUrl.TrimEnd('/');
+                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
+                {
+                    baseUrl += "/v1";
+                }
+                apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
+            }
+            return apiUrl;
+        }
+
+        private string BuildOpenAIModelsEndpoint(string url)
+        {
+            string modelsUrl = url;
+            if (modelsUrl.Contains("/chat/completions"))
+            {
+                modelsUrl = modelsUrl.Replace("/chat/completions", "/models");
+            }
+            else
+            {
+                var baseUrl = modelsUrl.TrimEnd('/');
+                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
+                {
+                    baseUrl += "/v1";
+                }
+                modelsUrl = baseUrl.TrimEnd('/') + "/models";
+            }
+            return modelsUrl;
+        }
+
+        private string BuildGeminiEndpoint(string url, string modelName, bool enableStreaming)
+        {
+            var baseUrl = url.TrimEnd('/');
+            if (!baseUrl.Contains("/v1") && !baseUrl.Contains("/v1beta"))
+            {
+                baseUrl += "/v1beta";
+            }
+            return enableStreaming
+                ? $"{baseUrl}/models/{modelName}:streamGenerateContent?alt=sse"
+                : $"{baseUrl}/models/{modelName}:generateContent";
+        }
+
+        private void AddAuthHeaders(HttpClient client, Setting.GeminiNodeSetting node)
+        {
+            var rotatedKey = GetCurrentApiKeyFromNode(node.ApiKey);
+            if (!string.IsNullOrEmpty(rotatedKey))
+            {
+                if (node.UseOpenAIAuth)
+                {
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {rotatedKey}");
+                }
+                else
+                {
+                    client.DefaultRequestHeaders.Add("x-goog-api-key", rotatedKey);
+                }
+            }
         }
     }
 }

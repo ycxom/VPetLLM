@@ -1089,6 +1089,7 @@ namespace VPetLLM
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
             public string? PluginModeId { get; set; }
             public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
+            public bool UseOpenAIAuth { get; set; } = false;
         }
 
         public class GeminiSetting

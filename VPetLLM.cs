@@ -481,7 +481,6 @@ namespace VPetLLM
             {
                 var asrConfig = new Infrastructure.Configuration.Configurations.ASRConfiguration();
                 _voiceInputService = new Infrastructure.Services.ApplicationServices.VoiceInputService(this, asrConfig, _logger, _eventBus);
-                _voiceInputService.TranscriptionCompleted += OnVoiceInputTranscriptionCompleted;
 
                 _screenshotService = new Services.ScreenshotService(this, Settings);
                 _screenshotService.ScreenshotCaptured += OnScreenshotCaptured;
@@ -1173,24 +1172,6 @@ namespace VPetLLM
         {
             _logger.LogInformation($"Purchase batch processed: {evt.TotalCount} items");
             await Task.CompletedTask;
-        }
-
-        private void OnVoiceInputTranscriptionCompleted(object? sender, string transcription)
-        {
-            if (!string.IsNullOrWhiteSpace(transcription))
-            {
-                Application.Current.Dispatcher.InvokeAsync(async () =>
-                {
-                    try
-                    {
-                        await SendChat(transcription);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"Error sending voice input: {ex.Message}");
-                    }
-                });
-            }
         }
 
         private void OnScreenshotCaptured(object? sender, Services.ScreenshotCapturedEventArgs e)
