@@ -2994,8 +2994,14 @@
                                           TextWrapping="Wrap"
                                           Style="{StaticResource DescriptionText}"
                                           Margin="0,0,0,12"/>
-                                <TextBlock Text="{utils:Localize KeyPath=About.Version, Default=版本信息}"
-                                          Style="{StaticResource DescriptionText}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{utils:Localize KeyPath=About.Version, Default=版本:}"
+                                              Style="{StaticResource DescriptionText}"/>
+                                    <TextBlock x:Name="TextBlock_About_Version"
+                                              Text="N/A"
+                                              Style="{StaticResource DescriptionText}"
+                                              Margin="4,0,0,0"/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 

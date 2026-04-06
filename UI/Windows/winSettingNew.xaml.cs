@@ -299,6 +299,7 @@ namespace VPetLLM.UI.Windows
         // Gemini 列表刷新去抖计时器（避免每次键入都刷新列表导致重绘卡顿）
         private DispatcherTimer? _geminiRefreshTimer;
         private bool _hasUnsavedChanges = false;
+        private bool _aboutTabLoaded = false;
         private readonly object _saveLock = new object();
         // 合并异步保存标记，防止重复排队
         private bool _isSaveScheduled = false;
@@ -413,7 +414,18 @@ namespace VPetLLM.UI.Windows
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
                 // 加载 About 页面的 Free 提供者信息
-                LoadAboutTabInfo();
+                // 注意：About Tab 在首次选中时才加载，因为 TabItem 内容延迟加载
+                if (FindName("Tab_About") is TabItem aboutTab)
+                {
+                    aboutTab.AddHandler(System.Windows.Controls.Primitives.Selector.SelectedEvent, new RoutedEventHandler((s, e) =>
+                    {
+                        if (!_aboutTabLoaded)
+                        {
+                            _aboutTabLoaded = true;
+                            LoadAboutTabInfo();
+                        }
+                    }));
+                }
             };
             // Ollama/Free/LMStudio/Gemini - 使用统一UI管理，这些Slider控件已不存在
             // TTS相关的Slider
@@ -7872,6 +7884,9 @@ namespace VPetLLM.UI.Windows
             {
                 var language = _plugin.Settings.Language;
 
+                // 加载版本信息
+                LoadVersionInfo();
+
                 await Task.Run(async () =>
                 {
                     await FreeConfigManager.InitializeConfigsAsync();
@@ -7917,6 +7932,66 @@ namespace VPetLLM.UI.Windows
             catch (Exception ex)
             {
                 Logger.Log($"Error loading About tab info: {ex.Message}");
+            }
+        }
+
+        private void LoadVersionInfo()
+        {
+            try
+            {
+                string infoFile = null;
+
+                // 从 DLL 所在目录的上级目录查找 (VPet-Simulator 插件结构)
+                // DLL 在 3000_VPetLLM/plugin/ 目录下，info.lps 在 3000_VPetLLM/ 目录下
+                var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                if (!string.IsNullOrEmpty(assemblyLocation))
+                {
+                    var dllDir = Path.GetDirectoryName(assemblyLocation);
+                    if (!string.IsNullOrEmpty(dllDir))
+                    {
+                        // DLL 在 plugin 子目录下，需要向上两级找到 3000_VPetLLM 目录
+                        var pluginDir = Directory.GetParent(dllDir);
+                        if (pluginDir != null)
+                        {
+                            infoFile = Path.Combine(pluginDir.FullName, "info.lps");
+                        }
+                    }
+                }
+
+                if (infoFile != null && File.Exists(infoFile))
+                {
+                    var lines = File.ReadAllLines(infoFile);
+                    foreach (var line in lines)
+                    {
+                        // info.lps 格式: vupmod#VPetLLM:|author#ycxom:|gamever#11064:|ver#21164:|
+                        // 需要用 | 分隔后查找 ver# 开头的字段
+                        if (line.Contains("ver#"))
+                        {
+                            var parts = line.Split('|');
+                            foreach (var part in parts)
+                            {
+                                if (part.StartsWith("ver#"))
+                                {
+                                    var version = part.Substring(4).TrimEnd(':');
+                                    if (version.Length >= 4 && int.TryParse(version, out _))
+                                    {
+                                        version = $"{version[0]}.{version.Substring(1, 2)}.{version.Substring(3)}";
+                                    }
+                                    if (FindName("TextBlock_About_Version") is TextBlock versionBlock)
+                                    {
+                                        versionBlock.Text = version;
+                                    }
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"About: 加载版本信息失败: {ex.Message}");
             }
         }
 

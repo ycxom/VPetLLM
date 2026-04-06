@@ -3391,10 +3391,10 @@
             "jp": "VPetLLMはVPet-Simulator用に設計されたプラグインで、複数のLLM、ASR、TTSプロバイダーをサポートしています。"
         },
         "Version": {
-            "en": "Version Info",
-            "zh-hans": "版本信息",
-            "zh-hant": "版本資訊",
-            "jp": "バージョン情報"
+            "en": "Version:",
+            "zh-hans": "版本:",
+            "zh-hant": "版本:",
+            "jp": "バージョン:"
         },
         "FreeProviders": {
             "en": "Free Provider Information",
