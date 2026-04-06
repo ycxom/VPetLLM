@@ -3370,5 +3370,115 @@
                 "jp": "Freeチャネルの分析に失敗しました"
             }
         }
+    },
+    "About": {
+        "Tab": {
+            "en": "About",
+            "zh-hans": "关于",
+            "zh-hant": "關於",
+            "jp": "について"
+        },
+        "Title": {
+            "en": "About VPetLLM",
+            "zh-hans": "关于 VPetLLM",
+            "zh-hant": "關於 VPetLLM",
+            "jp": "VPetLLMについて"
+        },
+        "Description": {
+            "en": "VPetLLM is a plugin designed for VPet-Simulator, supporting multiple LLM, ASR, TTS providers.",
+            "zh-hans": "VPetLLM 是一个为 VPet-Simulator 设计的插件，支持多种 LLM、ASR、TTS 提供商。",
+            "zh-hant": "VPetLLM 是一個為 VPet-Simulator 設計的插件，支持多種 LLM、ASR、TTS 供應商。",
+            "jp": "VPetLLMはVPet-Simulator用に設計されたプラグインで、複数のLLM、ASR、TTSプロバイダーをサポートしています。"
+        },
+        "Version": {
+            "en": "Version Info",
+            "zh-hans": "版本信息",
+            "zh-hant": "版本資訊",
+            "jp": "バージョン情報"
+        },
+        "FreeProviders": {
+            "en": "Free Provider Information",
+            "zh-hans": "Free 提供者说明",
+            "zh-hant": "Free 提供者說明",
+            "jp": "Freeプロバイダー情報"
+        },
+        "FreeChat": {
+            "en": "Free Chat",
+            "zh-hans": "Free Chat",
+            "zh-hant": "Free Chat",
+            "jp": "Free Chat"
+        },
+        "FreeChatDesc": {
+            "en": "Free LLM service based on LBGame API, supporting multi-turn conversations.",
+            "zh-hans": "基于 LBGame API 提供的免费 LLM 服务，支持多轮对话。",
+            "zh-hant": "基於 LBGame API 提供的免費 LLM 服務，支持多輪對話。",
+            "jp": "LBGame APIに基づく無料LLMサービス、マルチターン会話をサポート。"
+        },
+        "FreeTTS": {
+            "en": "Free TTS",
+            "zh-hans": "Free TTS",
+            "zh-hant": "Free TTS",
+            "jp": "Free TTS"
+        },
+        "FreeTTSDesc": {
+            "en": "Free TTS service based on VPetLLM API, supporting multiple voice styles.",
+            "zh-hans": "基于 VPetLLM API 提供的免费 TTS 服务，支持多种语音风格。",
+            "zh-hant": "基於 VPetLLM API 提供的免費 TTS 服務，支持多種語音風格。",
+            "jp": "VPetLLM APIに基づく無料TTSサービス、複数の音声スタイルをサポート。"
+        },
+        "FreeASR": {
+            "en": "Free ASR",
+            "zh-hans": "Free ASR",
+            "zh-hant": "Free ASR",
+            "jp": "Free ASR"
+        },
+        "FreeASRDesc": {
+            "en": "Free speech recognition service based on LBGame API, supporting Chinese voice input.",
+            "zh-hans": "基于 LBGame API 提供的免费语音识别服务，支持中文语音输入。",
+            "zh-hant": "基於 LBGame API 提供的免費語音識別服務，支持中文語音輸入。",
+            "jp": "LBGame APIに基づく無料音声認識サービス、中国語音声入力をサポート。"
+        },
+        "FreeNotice": {
+            "en": "Free services are provided by third-party APIs and may have usage limits. Please use them reasonably.",
+            "zh-hans": "Free 服务由第三方 API 提供，可能存在使用限制，请合理使用。",
+            "zh-hant": "Free 服務由第三方 API 提供，可能存在使用限制，請合理使用。",
+            "jp": "FreeサービスはサードパーティAPIによって提供されており、使用制限がある場合があります。合理的にご利用ください。"
+        },
+        "OpenSource": {
+            "en": "Open Source",
+            "zh-hans": "开源地址",
+            "zh-hant": "開源地址",
+            "jp": "オープンソース"
+        },
+        "OpenSourceDesc": {
+            "en": "This project is developed based on VPet-Simulator. Thanks to the original author LorisYounger for the open source contribution.",
+            "zh-hans": "本项目基于 VPet-Simulator 开发，感谢原作者 LorisYounger 的开源贡献。",
+            "zh-hant": "本項目基於 VPet-Simulator 開發，感謝原作者 LorisYounger 的開源貢獻。",
+            "jp": "このプロジェクトはVPet-Simulatorに基づいて開発されています。原作者LorisYoungerのオープンソース貢献に感謝します。"
+        },
+        "Acknowledgements": {
+            "en": "Acknowledgements",
+            "zh-hans": "鸣谢",
+            "zh-hant": "鳴謝",
+            "jp": "謝辞"
+        },
+        "ThanksList": {
+            "en": "Thanks to the following projects and services for their support:",
+            "zh-hans": "感谢以下项目和服务的支持：",
+            "zh-hant": "感謝以下項目和服務的支持：",
+            "jp": "以下のプロジェクトとサービスのサポートに感謝します："
+        },
+        "License": {
+            "en": "License",
+            "zh-hans": "许可证",
+            "zh-hant": "許可證",
+            "jp": "ライセンス"
+        },
+        "LicenseDesc": {
+            "en": "This project follows relevant open source licenses and is for learning and research purposes only.",
+            "zh-hans": "本项目遵循相关开源协议，仅供学习和研究使用。",
+            "zh-hant": "本項目遵循相關開源協議，僅供學習和研究使用。",
+            "jp": "このプロジェクトは関連するオープンソースライセンスに従い、学習および研究目的のみです。"
+        }
     }
 }

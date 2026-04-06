@@ -411,6 +411,9 @@ namespace VPetLLM.UI.Windows
                     var result = TTSPluginDetector.DetectAllOtherTTSPlugins(_plugin.MW);
                     RefreshTTSPluginStatus(result.HasOtherEnabledTTSPlugin, result.EnabledPluginNames);
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+
+                // 加载 About 页面的 Free 提供者信息
+                LoadAboutTabInfo();
             };
             // Ollama/Free/LMStudio/Gemini - 使用统一UI管理，这些Slider控件已不存在
             // TTS相关的Slider
@@ -7834,13 +7837,87 @@ namespace VPetLLM.UI.Windows
             var errorText = new TextBlock
             {
                 Text = message,
-                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x57, 0x22)), // #FF5722
+                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x57, 0x22)),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 2, 0, 2),
                 FontSize = 12
             };
 
             errorPanel.Children.Add(errorText);
+        }
+
+        #endregion
+
+        #region About Tab
+
+        private void OpenGitHubLink(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://github.com/ycxom/VPetLLM",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to open GitHub link: {ex.Message}");
+            }
+        }
+
+        private async void LoadAboutTabInfo()
+        {
+            try
+            {
+                var language = _plugin.Settings.Language;
+
+                await Task.Run(async () =>
+                {
+                    await FreeConfigManager.InitializeConfigsAsync();
+
+                    var chatConfig = FreeConfigManager.GetChatConfig();
+                    var ttsConfig = FreeConfigManager.GetTTSConfig();
+                    var asrConfig = FreeConfigManager.GetASRConfig();
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (chatConfig != null)
+                        {
+                            var chatDesc = FreeConfigManager.GetDescription(chatConfig, language);
+                            var chatProvider = FreeConfigManager.GetProviderInfo(chatConfig, language);
+                            if (FindName("TextBlock_About_FreeChatDesc") is TextBlock chatDescBlock && !string.IsNullOrEmpty(chatDesc))
+                                chatDescBlock.Text = chatDesc;
+                            if (FindName("TextBlock_About_FreeChatProvider") is TextBlock chatProvBlock && !string.IsNullOrEmpty(chatProvider))
+                                chatProvBlock.Text = chatProvider;
+                        }
+
+                        if (ttsConfig != null)
+                        {
+                            var ttsDesc = FreeConfigManager.GetDescription(ttsConfig, language);
+                            var ttsProvider = FreeConfigManager.GetProviderInfo(ttsConfig, language);
+                            if (FindName("TextBlock_About_FreeTTSDesc") is TextBlock ttsDescBlock && !string.IsNullOrEmpty(ttsDesc))
+                                ttsDescBlock.Text = ttsDesc;
+                            if (FindName("TextBlock_About_FreeTTSProvider") is TextBlock ttsProvBlock && !string.IsNullOrEmpty(ttsProvider))
+                                ttsProvBlock.Text = ttsProvider;
+                        }
+
+                        if (asrConfig != null)
+                        {
+                            var asrDesc = FreeConfigManager.GetDescription(asrConfig, language);
+                            var asrProvider = FreeConfigManager.GetProviderInfo(asrConfig, language);
+                            if (FindName("TextBlock_About_FreeASRDesc") is TextBlock asrDescBlock && !string.IsNullOrEmpty(asrDesc))
+                                asrDescBlock.Text = asrDesc;
+                            if (FindName("TextBlock_About_FreeASRProvider") is TextBlock asrProvBlock && !string.IsNullOrEmpty(asrProvider))
+                                asrProvBlock.Text = asrProvider;
+                        }
+                    });
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error loading About tab info: {ex.Message}");
+            }
         }
 
         #endregion

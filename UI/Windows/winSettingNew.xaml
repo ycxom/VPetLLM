@@ -2973,6 +2973,190 @@
                     </Grid>
                 </Border>
             </TabItem>
+            <TabItem Header="{utils:Localize KeyPath=About.Tab, Default=关于}"
+                    x:Name="Tab_About"
+                    Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="{utils:Localize KeyPath=About.Title, Default=关于 VPetLLM}"
+                                  Style="{StaticResource SectionHeader}"
+                                  FontSize="20"
+                                  Margin="0,0,0,16"/>
+
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
+                               BorderBrush="{StaticResource BorderBrush}"
+                               BorderThickness="1"
+                               CornerRadius="8"
+                               Padding="16"
+                               Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="{utils:Localize KeyPath=About.Description, Default=VPetLLM 是一个为 VPet-Simulator 设计的插件，支持多种 LLM、ASR、TTS 提供商。}"
+                                          TextWrapping="Wrap"
+                                          Style="{StaticResource DescriptionText}"
+                                          Margin="0,0,0,12"/>
+                                <TextBlock Text="{utils:Localize KeyPath=About.Version, Default=版本信息}"
+                                          Style="{StaticResource DescriptionText}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="{utils:Localize KeyPath=About.FreeProviders, Default=Free 提供者说明}"
+                                  Style="{StaticResource SectionHeader}"
+                                  Margin="0,8,0,12"/>
+
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
+                               BorderBrush="{StaticResource BorderBrush}"
+                               BorderThickness="1"
+                               CornerRadius="8"
+                               Padding="16"
+                               Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="{utils:Localize KeyPath=About.FreeChat, Default=Free Chat}"
+                                          FontWeight="SemiBold"
+                                          Foreground="{StaticResource PrimaryTextBrush}"
+                                          Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TextBlock_About_FreeChatDesc"
+                                          Text="{utils:Localize KeyPath=About.FreeChatDesc, Default=基于 LBGame API 提供的免费 LLM 服务，支持多轮对话。}"
+                                          TextWrapping="Wrap"
+                                          Style="{StaticResource DescriptionText}"
+                                          Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TextBlock_About_FreeChatProvider"
+                                          TextWrapping="Wrap"
+                                          Style="{StaticResource DescriptionText}"
+                                          Foreground="#0078D4"
+                                          Margin="0,0,0,12"/>
+
+                                <TextBlock Text="{utils:Localize KeyPath=About.FreeTTS, Default=Free TTS}"
+                                          FontWeight="SemiBold"
+                                          Foreground="{StaticResource PrimaryTextBrush}"
+                                          Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TextBlock_About_FreeTTSDesc"
+                                          Text="{utils:Localize KeyPath=About.FreeTTSDesc, Default=基于 VPetLLM API 提供的免费 TTS 服务，支持多种语音风格。}"
+                                          TextWrapping="Wrap"
+                                          Style="{StaticResource DescriptionText}"
+                                          Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TextBlock_About_FreeTTSProvider"
+                                          TextWrapping="Wrap"
+                                          Style="{StaticResource DescriptionText}"
+                                          Foreground="#0078D4"
+                                          Margin="0,0,0,12"/>
+
+                                <TextBlock Text="{utils:Localize KeyPath=About.FreeASR, Default=Free ASR}"
+                                          FontWeight="SemiBold"
+                                          Foreground="{StaticResource PrimaryTextBrush}"
+                                          Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TextBlock_About_FreeASRDesc"
+                                          Text="{utils:Localize KeyPath=About.FreeASRDesc, Default=基于 LBGame API 提供的免费语音识别服务，支持中文语音输入。}"
+                                          TextWrapping="Wrap"
+                                          Style="{StaticResource DescriptionText}"
+                                          Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TextBlock_About_FreeASRProvider"
+                                          TextWrapping="Wrap"
+                                          Style="{StaticResource DescriptionText}"
+                                          Foreground="#0078D4"/>
+
+                                <Border Background="#FFF3E0"
+                                       BorderBrush="#FFB74D"
+                                       BorderThickness="1"
+                                       CornerRadius="4"
+                                       Padding="12"
+                                       Margin="0,16,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="⚠️"
+                                                  FontSize="14"
+                                                  Margin="0,0,8,0"
+                                                  VerticalAlignment="Center"/>
+                                        <TextBlock Text="{utils:Localize KeyPath=About.FreeNotice, Default=Free 服务由第三方 API 提供，可能存在使用限制，请合理使用。}"
+                                                  TextWrapping="Wrap"
+                                                  Foreground="#E65100"
+                                                  VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="{utils:Localize KeyPath=About.OpenSource, Default=开源地址}"
+                                  Style="{StaticResource SectionHeader}"
+                                  Margin="0,8,0,12"/>
+
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
+                               BorderBrush="{StaticResource BorderBrush}"
+                               BorderThickness="1"
+                               CornerRadius="8"
+                               Padding="16"
+                               Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="{utils:Localize KeyPath=About.OpenSourceDesc, Default=本项目基于 VPet-Simulator 开发，感谢原作者 LorisYounger 的开源贡献。}"
+                                          TextWrapping="Wrap"
+                                          Style="{StaticResource DescriptionText}"
+                                          Margin="0,0,0,12"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="GitHub: "
+                                              Foreground="{StaticResource SecondaryTextBrush}"/>
+                                    <TextBlock Text="https://github.com/ycxom/VPetLLM"
+                                              Foreground="#0078D4"
+                                              Cursor="Hand"
+                                              TextDecorations="Underline"
+                                              MouseLeftButtonDown="OpenGitHubLink"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="{utils:Localize KeyPath=About.Acknowledgements, Default=鸣谢}"
+                                  Style="{StaticResource SectionHeader}"
+                                  Margin="0,8,0,12"/>
+
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
+                               BorderBrush="{StaticResource BorderBrush}"
+                               BorderThickness="1"
+                               CornerRadius="8"
+                               Padding="16"
+                               Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="{utils:Localize KeyPath=About.ThanksList, Default=感谢以下项目和服务的支持：}"
+                                          TextWrapping="Wrap"
+                                          Style="{StaticResource DescriptionText}"
+                                          Margin="0,0,0,12"/>
+
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource DescriptionText}" Margin="0,0,0,4">
+                                    <Run Text="• "/><Run FontWeight="SemiBold" Text="VPet-Simulator"/><Run Text=" - 虚拟桌宠模拟器"/>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource DescriptionText}" Margin="0,0,0,4">
+                                    <Run Text="• "/><Run FontWeight="SemiBold" Text="LBGame API"/><Run Text=" - 提供 Free Chat/ASR 服务"/>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource DescriptionText}" Margin="0,0,0,4">
+                                    <Run Text="• "/><Run FontWeight="SemiBold" Text="OpenAI"/><Run Text=" - GPT API 参考"/>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource DescriptionText}" Margin="0,0,0,4">
+                                    <Run Text="• "/><Run FontWeight="SemiBold" Text="Google Gemini"/><Run Text=" - Gemini API 参考"/>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource DescriptionText}" Margin="0,0,0,4">
+                                    <Run Text="• "/><Run FontWeight="SemiBold" Text="Ollama"/><Run Text=" - 本地 LLM 运行时"/>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource DescriptionText}" Margin="0,0,0,4">
+                                    <Run Text="• "/><Run FontWeight="SemiBold" Text="mpv"/><Run Text=" - 音频播放器"/>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource DescriptionText}">
+                                    <Run Text="• "/><Run FontWeight="SemiBold" Text="所有贡献者和用户"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="{utils:Localize KeyPath=About.License, Default=许可证}"
+                                  Style="{StaticResource SectionHeader}"
+                                  Margin="0,8,0,12"/>
+
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
+                               BorderBrush="{StaticResource BorderBrush}"
+                               BorderThickness="1"
+                               CornerRadius="8"
+                               Padding="16">
+                            <TextBlock Text="{utils:Localize KeyPath=About.LicenseDesc, Default=本项目遵循相关开源协议，仅供学习和研究使用。}"
+                                      TextWrapping="Wrap"
+                                      Style="{StaticResource DescriptionText}"/>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>

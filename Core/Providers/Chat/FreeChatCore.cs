@@ -111,6 +111,17 @@ namespace VPetLLM.Core.Providers.Chat
                     return "";
                 }
 
+                // 检查 MaxTokens 限制，超过 10000 自动启用上下文压缩模式
+                const int MAX_TOKENS_LIMIT = 10000;
+                if (_freeSetting.MaxTokens > MAX_TOKENS_LIMIT)
+                {
+                    if (!Settings.EnableHistoryCompression)
+                    {
+                        Logger.Log($"Free Chat: MaxTokens ({_freeSetting.MaxTokens}) 超过限制 ({MAX_TOKENS_LIMIT})，自动启用上下文压缩模式");
+                        Settings.EnableHistoryCompression = true;
+                    }
+                }
+
                 if (!Settings.KeepContext)
                 {
                     ClearContext();
@@ -293,6 +304,17 @@ namespace VPetLLM.Core.Providers.Chat
                     Logger.Log(errorMessage);
                     ResponseHandler?.Invoke(errorMessage);
                     return "";
+                }
+
+                // 检查 MaxTokens 限制，超过 10000 自动启用上下文压缩模式
+                const int MAX_TOKENS_LIMIT = 10000;
+                if (_freeSetting.MaxTokens > MAX_TOKENS_LIMIT)
+                {
+                    if (!Settings.EnableHistoryCompression)
+                    {
+                        Logger.Log($"Free Chat: MaxTokens ({_freeSetting.MaxTokens}) 超过限制 ({MAX_TOKENS_LIMIT})，自动启用上下文压缩模式");
+                        Settings.EnableHistoryCompression = true;
+                    }
                 }
 
                 if (!Settings.KeepContext)
