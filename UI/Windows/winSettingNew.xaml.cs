@@ -1604,11 +1604,11 @@ namespace VPetLLM.UI.Windows
                 // 创建新的ChatCore实例
                 IChatCore newChatCore = newProvider switch
                 {
-                    Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama.GetCurrentOllamaSetting() ?? new Setting.OllamaNodeSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Gemini => new GeminiChatCore(GetCurrentGeminiSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
-                    Setting.LLMType.LMStudio => new LMStudioChatCore(_plugin.Settings.LMStudio, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.LMStudio => new LMStudioChatCore(_plugin.Settings.LMStudio.GetCurrentLMStudioSetting() ?? new Setting.LMStudioNodeSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
 
@@ -1630,11 +1630,11 @@ namespace VPetLLM.UI.Windows
 
                 IChatCore updatedChatCore = newProvider switch
                 {
-                    Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.Ollama => new OllamaChatCore(_plugin.Settings.Ollama.GetCurrentOllamaSetting() ?? new Setting.OllamaNodeSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.OpenAI => new OpenAIChatCore(_plugin.Settings.OpenAI, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Gemini => new GeminiChatCore(GetCurrentGeminiSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     Setting.LLMType.Free => new FreeChatCore(_plugin.Settings.Free, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
-                    Setting.LLMType.LMStudio => new LMStudioChatCore(_plugin.Settings.LMStudio, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
+                    Setting.LLMType.LMStudio => new LMStudioChatCore(_plugin.Settings.LMStudio.GetCurrentLMStudioSetting() ?? new Setting.LMStudioNodeSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor),
                     _ => throw new NotImplementedException()
                 };
 
@@ -1947,7 +1947,7 @@ namespace VPetLLM.UI.Windows
 
             try
             {
-                var ollamaCore = new OllamaChatCore(_plugin.Settings.Ollama, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+                var ollamaCore = new OllamaChatCore(_plugin.Settings.Ollama.GetCurrentOllamaSetting() ?? new Setting.OllamaNodeSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = await Task.Run(() => ollamaCore.RefreshModels());
                 ((ComboBox)this.FindName("ComboBox_OllamaModel")).ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_OllamaModel")).Text))
@@ -1980,7 +1980,7 @@ namespace VPetLLM.UI.Windows
 
             try
             {
-                var lmStudioCore = new LMStudioChatCore(_plugin.Settings.LMStudio, _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
+                var lmStudioCore = new LMStudioChatCore(_plugin.Settings.LMStudio.GetCurrentLMStudioSetting() ?? new Setting.LMStudioNodeSetting(), _plugin.Settings, _plugin.MW, _plugin.ActionProcessor);
                 var models = await Task.Run(() => lmStudioCore.RefreshModels());
                 ((ComboBox)this.FindName("ComboBox_LMStudioModel")).ItemsSource = models;
                 if (models.Count > 0 && string.IsNullOrEmpty(((ComboBox)this.FindName("ComboBox_LMStudioModel")).Text))
@@ -4367,6 +4367,26 @@ namespace VPetLLM.UI.Windows
                     targetModel = geminiNode.Model;
                     cbModel.ItemsSource = modelsList;
                 }
+                else if (channelType == "Ollama" && selectedNode is Setting.OllamaNodeSetting ollamaNode)
+                {
+                    var channelId = $"Ollama.{ollamaNode.Url?.GetHashCode() ?? 0}";
+                    var cachedModels = GetCachedModels(channelType, channelId, ollamaNode.Url);
+                    var modelsList = cachedModels != null && cachedModels.Count > 0
+                        ? cachedModels
+                        : new List<string> { "点击右侧刷新按钮获取模型列表" };
+                    targetModel = ollamaNode.Model;
+                    cbModel.ItemsSource = modelsList;
+                }
+                else if (channelType == "LMStudio" && selectedNode is Setting.LMStudioNodeSetting lmStudioNode)
+                {
+                    var channelId = $"LMStudio.{lmStudioNode.Url?.GetHashCode() ?? 0}";
+                    var cachedModels = GetCachedModels(channelType, channelId, lmStudioNode.Url);
+                    var modelsList = cachedModels != null && cachedModels.Count > 0
+                        ? cachedModels
+                        : new List<string> { "点击右侧刷新按钮获取模型列表" };
+                    targetModel = lmStudioNode.Model;
+                    cbModel.ItemsSource = modelsList;
+                }
                 
                 // 关键修复：始终强制设置 Text，确保即使目标模型不在列表中也不会被重置
                 if (!string.IsNullOrEmpty(targetModel))
@@ -4400,8 +4420,10 @@ namespace VPetLLM.UI.Windows
                     listView.ItemsSource = _plugin.Settings.Gemini.GeminiNodes;
                     break;
                 case "Ollama":
+                    listView.ItemsSource = _plugin.Settings.Ollama.OllamaNodes;
+                    break;
                 case "LMStudio":
-                    listView.ItemsSource = null;
+                    listView.ItemsSource = _plugin.Settings.LMStudio.LMStudioNodes;
                     break;
             }
             listView.UpdateLayout();
@@ -4574,7 +4596,40 @@ namespace VPetLLM.UI.Windows
                         }
                         break;
                     case "Ollama":
+                        var ollamaNode = new Setting.OllamaNodeSetting
+                        {
+                            Name = $"Ollama渠道{_plugin.Settings.Ollama.OllamaNodes.Count + 1}",
+                            Model = "",
+                            Url = "http://localhost:11434",
+                            Enabled = true,
+                            EnableAdvanced = false,
+                            Temperature = 0.7,
+                            MaxTokens = 2048
+                        };
+                        _plugin.Settings.Ollama.OllamaNodes.Add(ollamaNode);
+                        LoadChannelNodes(channelType);
+                        if (listView != null)
+                        {
+                            listView.SelectedItem = ollamaNode;
+                        }
+                        break;
                     case "LMStudio":
+                        var lmStudioNode = new Setting.LMStudioNodeSetting
+                        {
+                            Name = $"LM Studio渠道{_plugin.Settings.LMStudio.LMStudioNodes.Count + 1}",
+                            Model = "",
+                            Url = "http://localhost:1234",
+                            Enabled = true,
+                            EnableAdvanced = false,
+                            Temperature = 0.7,
+                            MaxTokens = 2048
+                        };
+                        _plugin.Settings.LMStudio.LMStudioNodes.Add(lmStudioNode);
+                        LoadChannelNodes(channelType);
+                        if (listView != null)
+                        {
+                            listView.SelectedItem = lmStudioNode;
+                        }
                         break;
                 }
             }
@@ -4608,6 +4663,20 @@ namespace VPetLLM.UI.Windows
                     {
                         ClearChannelCache(channelType, geminiNode.GetHashCode().ToString());
                         _plugin.Settings.Gemini.GeminiNodes.Remove(geminiNode);
+                    }
+                    break;
+                case "Ollama":
+                    if (listView.SelectedItem is Setting.OllamaNodeSetting ollamaNode)
+                    {
+                        ClearChannelCache(channelType, ollamaNode.GetHashCode().ToString());
+                        _plugin.Settings.Ollama.OllamaNodes.Remove(ollamaNode);
+                    }
+                    break;
+                case "LMStudio":
+                    if (listView.SelectedItem is Setting.LMStudioNodeSetting lmStudioNode)
+                    {
+                        ClearChannelCache(channelType, lmStudioNode.GetHashCode().ToString());
+                        _plugin.Settings.LMStudio.LMStudioNodes.Remove(lmStudioNode);
                     }
                     break;
             }
@@ -4729,6 +4798,62 @@ namespace VPetLLM.UI.Windows
                             }
                         }
                         break;
+                    case "Ollama":
+                        if (selectedNode is Setting.OllamaNodeSetting ollamaNode)
+                        {
+                            if (tbChannelName != null) tbChannelName.Text = ollamaNode.Name;
+                            if (tbApiUrl != null)
+                            {
+                                lastUrl = tbApiUrl.Text;
+                                tbApiUrl.Text = ollamaNode.Url;
+                            }
+                            if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = ollamaNode.EnableStreaming;
+                            if (cbEnableVision != null) cbEnableVision.IsChecked = ollamaNode.EnableVision;
+                            if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = ollamaNode.EnableAdvanced;
+                            if (sliderTemperature != null) sliderTemperature.Value = ollamaNode.Temperature;
+                            if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = ollamaNode.Temperature.ToString("F2");
+                            if (tbMaxTokens != null) tbMaxTokens.Text = ollamaNode.MaxTokens.ToString();
+                            if (cbChannelMode != null)
+                            {
+                                foreach (ComboBoxItem item in cbChannelMode.Items)
+                                {
+                                    if (item.Tag?.ToString() == ollamaNode.Mode.ToString())
+                                    {
+                                        cbChannelMode.SelectedItem = item;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    case "LMStudio":
+                        if (selectedNode is Setting.LMStudioNodeSetting lmStudioNode)
+                        {
+                            if (tbChannelName != null) tbChannelName.Text = lmStudioNode.Name;
+                            if (tbApiUrl != null)
+                            {
+                                lastUrl = tbApiUrl.Text;
+                                tbApiUrl.Text = lmStudioNode.Url;
+                            }
+                            if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = lmStudioNode.EnableStreaming;
+                            if (cbEnableVision != null) cbEnableVision.IsChecked = lmStudioNode.EnableVision;
+                            if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = lmStudioNode.EnableAdvanced;
+                            if (sliderTemperature != null) sliderTemperature.Value = lmStudioNode.Temperature;
+                            if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = lmStudioNode.Temperature.ToString("F2");
+                            if (tbMaxTokens != null) tbMaxTokens.Text = lmStudioNode.MaxTokens.ToString();
+                            if (cbChannelMode != null)
+                            {
+                                foreach (ComboBoxItem item in cbChannelMode.Items)
+                                {
+                                    if (item.Tag?.ToString() == lmStudioNode.Mode.ToString())
+                                    {
+                                        cbChannelMode.SelectedItem = item;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        break;
                 }
             }
             finally
@@ -4821,6 +4946,9 @@ namespace VPetLLM.UI.Windows
 
         private void Button_RefreshModels_Click(object sender, RoutedEventArgs e)
         {
+            // 先保存当前输入到节点对象
+            SaveCurrentNodeChanges();
+
             var cbChannelType = this.FindName("ComboBox_ChannelType") as ComboBox;
             var channelType = (cbChannelType?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
             var cbModel = this.FindName("ComboBox_Model") as ComboBox;
@@ -4854,6 +4982,7 @@ namespace VPetLLM.UI.Windows
                         {
                             proxyMode = openaiNode.ProxyMode;
                             channelId = $"OpenAI.{openaiNode.Url?.GetHashCode() ?? 0}_{openaiNode.ApiKey?.GetHashCode() ?? 0}";
+                            apiUrl = openaiNode.Url ?? "";
                         }
                         break;
                     case "Gemini":
@@ -4861,6 +4990,21 @@ namespace VPetLLM.UI.Windows
                         {
                             proxyMode = geminiNode.ProxyMode;
                             channelId = $"Gemini.{geminiNode.Url?.GetHashCode() ?? 0}_{geminiNode.ApiKey?.GetHashCode() ?? 0}";
+                            apiUrl = geminiNode.Url ?? "";
+                        }
+                        break;
+                    case "Ollama":
+                        if (listView.SelectedItem is Setting.OllamaNodeSetting ollamaNode)
+                        {
+                            channelId = $"Ollama.{ollamaNode.Url?.GetHashCode() ?? 0}";
+                            apiUrl = ollamaNode.Url ?? "";
+                        }
+                        break;
+                    case "LMStudio":
+                        if (listView.SelectedItem is Setting.LMStudioNodeSetting lmStudioNode)
+                        {
+                            channelId = $"LMStudio.{lmStudioNode.Url?.GetHashCode() ?? 0}";
+                            apiUrl = lmStudioNode.Url ?? "";
                         }
                         break;
                 }
@@ -4872,6 +5016,8 @@ namespace VPetLLM.UI.Windows
                 {
                     List<string>? models = null;
                     string cacheKey = GenerateCacheKey(apiUrl);
+
+                    Logger.Log($"刷新模型列表: channelType={channelType}, apiUrl={apiUrl}, channelId={channelId}");
 
                     // T0: 始终从云端获取最新列表
                     switch (channelType)
@@ -4886,6 +5032,28 @@ namespace VPetLLM.UI.Windows
                             if (!string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(apiUrl))
                             {
                                 models = await GetGeminiModelsAsync(apiUrl, apiKey, proxyMode);
+                            }
+                            break;
+                        case "Ollama":
+                            if (!string.IsNullOrEmpty(apiUrl))
+                            {
+                                models = await GetOllamaModelsAsync(apiUrl);
+                                Logger.Log($"Ollama模型列表获取完成: {models?.Count ?? 0}个模型");
+                            }
+                            else
+                            {
+                                Logger.Log($"Ollama模型列表获取失败: apiUrl为空");
+                            }
+                            break;
+                        case "LMStudio":
+                            if (!string.IsNullOrEmpty(apiUrl))
+                            {
+                                models = await GetLMStudioModelsAsync(apiUrl);
+                                Logger.Log($"LMStudio模型列表获取完成: {models?.Count ?? 0}个模型");
+                            }
+                            else
+                            {
+                                Logger.Log($"LMStudio模型列表获取失败: apiUrl为空");
                             }
                             break;
                     }
@@ -4914,6 +5082,8 @@ namespace VPetLLM.UI.Windows
                     {
                         StopButtonLoadingAnimation(btnRefresh);
 
+                        Logger.Log($"刷新模型列表UI更新: models={(models != null ? models.Count : 0)}个, currentModel={currentModel}");
+
                         if (models != null && models.Count > 0)
                         {
                             if (cbModel != null)
@@ -4923,6 +5093,74 @@ namespace VPetLLM.UI.Windows
                                 {
                                     cbModel.ItemsSource = models;
                                     cbModel.Text = currentModel;
+                                    
+                                    if (listView?.SelectedItem != null)
+                                    {
+                                        switch (channelType)
+                                        {
+                                            case "OpenAI":
+                                                if (listView.SelectedItem is Setting.OpenAINodeSetting openaiNode)
+                                                {
+                                                    if (!string.IsNullOrEmpty(currentModel) && models.Contains(currentModel))
+                                                    {
+                                                        openaiNode.Model = currentModel;
+                                                    }
+                                                    else if (models.Count > 0)
+                                                    {
+                                                        openaiNode.Model = models[0];
+                                                        cbModel.Text = models[0];
+                                                    }
+                                                }
+                                                break;
+                                            case "Gemini":
+                                                if (listView.SelectedItem is Setting.GeminiNodeSetting geminiNode)
+                                                {
+                                                    if (!string.IsNullOrEmpty(currentModel) && models.Contains(currentModel))
+                                                    {
+                                                        geminiNode.Model = currentModel;
+                                                    }
+                                                    else if (models.Count > 0)
+                                                    {
+                                                        geminiNode.Model = models[0];
+                                                        cbModel.Text = models[0];
+                                                    }
+                                                }
+                                                break;
+                                            case "Ollama":
+                                                if (listView.SelectedItem is Setting.OllamaNodeSetting ollamaNode)
+                                                {
+                                                    if (!string.IsNullOrEmpty(currentModel) && models.Contains(currentModel))
+                                                    {
+                                                        ollamaNode.Model = currentModel;
+                                                    }
+                                                    else if (models.Count > 0)
+                                                    {
+                                                        ollamaNode.Model = models[0];
+                                                        cbModel.Text = models[0];
+                                                    }
+                                                }
+                                                break;
+                                            case "LMStudio":
+                                                if (listView.SelectedItem is Setting.LMStudioNodeSetting lmStudioNode)
+                                                {
+                                                    if (!string.IsNullOrEmpty(currentModel) && models.Contains(currentModel))
+                                                    {
+                                                        lmStudioNode.Model = currentModel;
+                                                    }
+                                                    else if (models.Count > 0)
+                                                    {
+                                                        lmStudioNode.Model = models[0];
+                                                        cbModel.Text = models[0];
+                                                    }
+                                                }
+                                                break;
+                                        }
+                                        
+                                        if (listView != null)
+                                        {
+                                            listView.Items.Refresh();
+                                        }
+                                    }
                                 }
                                 finally
                                 {
@@ -4932,8 +5170,9 @@ namespace VPetLLM.UI.Windows
                         }
                     });
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Logger.Log($"刷新{channelType}模型列表失败: {ex}");
                     Dispatcher.Invoke(() => StopButtonLoadingAnimation(btnRefresh));
                 }
             });
@@ -4989,6 +5228,10 @@ namespace VPetLLM.UI.Windows
                     $"OpenAI.{openaiNode.Url?.GetHashCode() ?? 0}_{openaiNode.ApiKey?.GetHashCode() ?? 0}",
                 "Gemini" when listView.SelectedItem is Setting.GeminiNodeSetting geminiNode =>
                     $"Gemini.{geminiNode.Url?.GetHashCode() ?? 0}_{geminiNode.ApiKey?.GetHashCode() ?? 0}",
+                "Ollama" when listView.SelectedItem is Setting.OllamaNodeSetting ollamaNode =>
+                    $"Ollama.{ollamaNode.Url?.GetHashCode() ?? 0}",
+                "LMStudio" when listView.SelectedItem is Setting.LMStudioNodeSetting lmStudioNode =>
+                    $"LMStudio.{lmStudioNode.Url?.GetHashCode() ?? 0}",
                 _ => null
             };
         }
@@ -5150,8 +5393,9 @@ namespace VPetLLM.UI.Windows
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.Log($"异常: {ex}");
             }
             return models;
         }
@@ -5209,8 +5453,135 @@ namespace VPetLLM.UI.Windows
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.Log($"异常: {ex}");
+            }
+            return models;
+        }
+
+        private async Task<List<string>> GetOllamaModelsAsync(string apiUrl)
+        {
+            var models = new List<string>();
+            try
+            {
+                var handler = new HttpClientHandler();
+                if (_plugin?.Settings?.Proxy?.IsEnabled == true)
+                {
+                    if (_plugin.Settings.Proxy.FollowSystemProxy)
+                    {
+                        handler.Proxy = WebRequest.GetSystemWebProxy();
+                    }
+                    else
+                    {
+                        var protocol = _plugin.Settings.Proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                        var proxyUri = $"{protocol}://{_plugin.Settings.Proxy.Address}";
+                        handler.Proxy = new WebProxy(new Uri(proxyUri));
+                    }
+                }
+
+                using var client = new HttpClient(handler);
+                client.Timeout = TimeSpan.FromSeconds(10);
+                var baseUrl = apiUrl.TrimEnd('/');
+                var requestUrl = $"{baseUrl}/api/tags";
+                Logger.Log($"GetOllamaModelsAsync: 请求URL={requestUrl}");
+                var response = await client.GetAsync(requestUrl);
+                Logger.Log($"GetOllamaModelsAsync: 响应状态码={response.StatusCode}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    Logger.Log($"GetOllamaModelsAsync: 响应内容长度={json.Length}");
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("models", out var modelList))
+                    {
+                        foreach (var item in modelList.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("name", out var name))
+                            {
+                                var nameStr = name.GetString() ?? "";
+                                if (!string.IsNullOrEmpty(nameStr))
+                                    models.Add(nameStr);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log($"GetOllamaModelsAsync: 响应中没有'models'属性");
+                    }
+                }
+                else
+                {
+                    Logger.Log($"GetOllamaModelsAsync: 请求失败, 状态码={response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"异常: {ex}");
+            }
+            return models;
+        }
+
+        private async Task<List<string>> GetLMStudioModelsAsync(string apiUrl)
+        {
+            var models = new List<string>();
+            try
+            {
+                var handler = new HttpClientHandler();
+                if (_plugin?.Settings?.Proxy?.IsEnabled == true)
+                {
+                    if (_plugin.Settings.Proxy.FollowSystemProxy)
+                    {
+                        handler.Proxy = WebRequest.GetSystemWebProxy();
+                    }
+                    else
+                    {
+                        var protocol = _plugin.Settings.Proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                        var proxyUri = $"{protocol}://{_plugin.Settings.Proxy.Address}";
+                        handler.Proxy = new WebProxy(new Uri(proxyUri));
+                    }
+                }
+
+                using var client = new HttpClient(handler);
+                client.Timeout = TimeSpan.FromSeconds(10);
+                var baseUrl = apiUrl.TrimEnd('/');
+                if (baseUrl.EndsWith("/v1") || baseUrl.EndsWith("/v1/"))
+                {
+                    baseUrl = baseUrl.Substring(0, baseUrl.LastIndexOf("/v1"));
+                }
+                var requestUrl = $"{baseUrl}/v1/models";
+                Logger.Log($"GetLMStudioModelsAsync: 请求URL={requestUrl}");
+                var response = await client.GetAsync(requestUrl);
+                Logger.Log($"GetLMStudioModelsAsync: 响应状态码={response.StatusCode}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    Logger.Log($"GetLMStudioModelsAsync: 响应内容长度={json.Length}");
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("data", out var data))
+                    {
+                        foreach (var item in data.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("id", out var id))
+                            {
+                                var idStr = id.GetString() ?? "";
+                                if (!string.IsNullOrEmpty(idStr))
+                                    models.Add(idStr);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log($"GetLMStudioModelsAsync: 响应中没有'data'属性");
+                    }
+                }
+                else
+                {
+                    Logger.Log($"GetLMStudioModelsAsync: 请求失败, 状态码={response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"GetLMStudioModelsAsync异常: {ex}");
             }
             return models;
         }
@@ -5256,7 +5627,7 @@ namespace VPetLLM.UI.Windows
                         else if (tbxApiKeyPlain != null)
                             openaiNode.ApiKey = tbxApiKeyPlain.Text;
                         if (tbApiUrl != null) openaiNode.Url = tbApiUrl.Text;
-                        if (cbModel != null && !string.IsNullOrEmpty(cbModel.Text))
+                        if (cbModel != null && !string.IsNullOrEmpty(cbModel.Text) && !cbModel.Text.Contains("刷新"))
                             openaiNode.Model = cbModel.Text;
                         if (cbEnableStreaming != null) openaiNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
                         if (cbEnableVision != null) openaiNode.EnableVision = cbEnableVision.IsChecked ?? false;
@@ -5283,7 +5654,8 @@ namespace VPetLLM.UI.Windows
                         else if (tbxApiKeyPlain != null)
                             geminiNode.ApiKey = tbxApiKeyPlain.Text;
                         if (tbApiUrl != null) geminiNode.Url = tbApiUrl.Text;
-                        if (cbModel != null) geminiNode.Model = cbModel.Text;
+                        if (cbModel != null && !string.IsNullOrEmpty(cbModel.Text) && !cbModel.Text.Contains("刷新"))
+                            geminiNode.Model = cbModel.Text;
                         if (cbEnableStreaming != null) geminiNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
                         if (cbEnableVision != null) geminiNode.EnableVision = cbEnableVision.IsChecked ?? false;
                         if (cbEnableAdvanced != null) geminiNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
@@ -5301,11 +5673,41 @@ namespace VPetLLM.UI.Windows
                     {
                         _plugin.Settings.Ollama.EnableLoadBalancing = cbEnableLoadBalancing.IsChecked ?? true;
                     }
+                    if (selectedNode is Setting.OllamaNodeSetting ollamaNode)
+                    {
+                        if (tbChannelName != null) ollamaNode.Name = tbChannelName.Text;
+                        if (tbApiUrl != null) ollamaNode.Url = tbApiUrl.Text;
+                        if (cbModel != null && !string.IsNullOrEmpty(cbModel.Text) && !cbModel.Text.Contains("刷新"))
+                            ollamaNode.Model = cbModel.Text;
+                        if (cbEnableStreaming != null) ollamaNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
+                        if (cbEnableVision != null) ollamaNode.EnableVision = cbEnableVision.IsChecked ?? false;
+                        if (cbEnableAdvanced != null) ollamaNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
+                        if (sliderTemperature != null) ollamaNode.Temperature = sliderTemperature.Value;
+                        if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
+                            ollamaNode.MaxTokens = maxTokens;
+                        if (cbChannelMode != null && cbChannelMode.SelectedItem is ComboBoxItem modeItem)
+                            ollamaNode.Mode = Enum.Parse<Setting.ChannelMode>(modeItem.Tag?.ToString() ?? "Unrestricted");
+                    }
                     break;
                 case "LMStudio":
                     if (cbEnableLoadBalancing != null)
                     {
                         _plugin.Settings.LMStudio.EnableLoadBalancing = cbEnableLoadBalancing.IsChecked ?? true;
+                    }
+                    if (selectedNode is Setting.LMStudioNodeSetting lmStudioNode)
+                    {
+                        if (tbChannelName != null) lmStudioNode.Name = tbChannelName.Text;
+                        if (tbApiUrl != null) lmStudioNode.Url = tbApiUrl.Text;
+                        if (cbModel != null && !string.IsNullOrEmpty(cbModel.Text) && !cbModel.Text.Contains("刷新"))
+                            lmStudioNode.Model = cbModel.Text;
+                        if (cbEnableStreaming != null) lmStudioNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
+                        if (cbEnableVision != null) lmStudioNode.EnableVision = cbEnableVision.IsChecked ?? false;
+                        if (cbEnableAdvanced != null) lmStudioNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
+                        if (sliderTemperature != null) lmStudioNode.Temperature = sliderTemperature.Value;
+                        if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
+                            lmStudioNode.MaxTokens = maxTokens;
+                        if (cbChannelMode != null && cbChannelMode.SelectedItem is ComboBoxItem modeItem)
+                            lmStudioNode.Mode = Enum.Parse<Setting.ChannelMode>(modeItem.Tag?.ToString() ?? "Unrestricted");
                     }
                     break;
             }
@@ -5431,6 +5833,14 @@ namespace VPetLLM.UI.Windows
         {
             if (!_isUpdatingNodeDetails)
             {
+                if (sender is ComboBox cbModel)
+                {
+                    var selectedText = cbModel.SelectedItem as string;
+                    if (!string.IsNullOrEmpty(selectedText) && selectedText.Contains("刷新"))
+                    {
+                        return;
+                    }
+                }
                 SaveCurrentNodeChanges();
                 ScheduleSecretSave();
             }

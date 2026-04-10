@@ -357,8 +357,16 @@ namespace VPetLLM
                 switch (Settings.Provider)
                 {
                     case SettingClass.LLMType.Ollama:
-                        ChatCore = new OllamaChatCore(Settings.Ollama, Settings, MW, ActionProcessor);
-                        Logger.Log("Chat core set to Ollama.");
+                        var ollamaNode = Settings.Ollama.GetCurrentOllamaSetting();
+                        if (ollamaNode != null)
+                        {
+                            ChatCore = new OllamaChatCore(ollamaNode, Settings, MW, ActionProcessor);
+                            Logger.Log("Chat core set to Ollama.");
+                        }
+                        else
+                        {
+                            Logger.Log("WARNING: No enabled Ollama node found.");
+                        }
                         break;
                     case SettingClass.LLMType.OpenAI:
                         ChatCore = new OpenAIChatCore(Settings.OpenAI, Settings, MW, ActionProcessor);
@@ -373,8 +381,16 @@ namespace VPetLLM
                         Logger.Log("Chat core set to Free.");
                         break;
                     case SettingClass.LLMType.LMStudio:
-                        ChatCore = new LMStudioChatCore(Settings.LMStudio, Settings, MW, ActionProcessor);
-                        Logger.Log("Chat core set to LM Studio.");
+                        var lmStudioNode = Settings.LMStudio.GetCurrentLMStudioSetting();
+                        if (lmStudioNode != null)
+                        {
+                            ChatCore = new LMStudioChatCore(lmStudioNode, Settings, MW, ActionProcessor);
+                            Logger.Log("Chat core set to LM Studio.");
+                        }
+                        else
+                        {
+                            Logger.Log("WARNING: No enabled LM Studio node found.");
+                        }
                         break;
                 }
                 

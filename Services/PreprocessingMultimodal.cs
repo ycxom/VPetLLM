@@ -207,10 +207,10 @@ namespace VPetLLM.Services
                         break;
 
                     case "Ollama":
-                        // Ollama 目前不支持多节点，直接使用设置
-                        if (_settings.Ollama?.EnableVision == true)
+                        var ollamaVisionNode = _settings.Ollama?.GetCurrentOllamaSetting();
+                        if (ollamaVisionNode != null && ollamaVisionNode.EnableVision)
                         {
-                            chatCore = new OllamaChatCore(_settings.Ollama, _settings, mainWindow, null!);
+                            chatCore = new OllamaChatCore(ollamaVisionNode, _settings, mainWindow, null!);
                         }
                         break;
                 }

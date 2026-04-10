@@ -910,8 +910,27 @@ namespace VPetLLM
             }
         }
 
+        public class OllamaNodeSetting
+        {
+            public string Model { get; set; } = "";
+            public string Url { get; set; } = "http://localhost:11434";
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
+            public bool Enabled { get; set; } = true;
+            public string Name { get; set; } = "Ollama节点";
+            public bool EnableVision { get; set; } = false;
+            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
+            public string? PluginModeId { get; set; }
+        }
+
         public class OllamaSetting
         {
+            public List<OllamaNodeSetting> OllamaNodes { get; set; } = new List<OllamaNodeSetting>();
+            public int CurrentNodeIndex { get; set; } = 0;
+            public bool EnableLoadBalancing { get; set; } = true;
+
             public string Url { get; set; } = "http://localhost:11434";
             public string? Model { get; set; }
             public double Temperature { get; set; } = 0.7;
@@ -919,7 +938,77 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
-            public bool EnableLoadBalancing { get; set; } = true;
+
+            public OllamaNodeSetting? GetCurrentOllamaSetting(string? purpose = null)
+            {
+                if (OllamaNodes.Count == 0)
+                {
+                    return new OllamaNodeSetting
+                    {
+                        Url = Url,
+                        Model = Model,
+                        Temperature = Temperature,
+                        MaxTokens = MaxTokens,
+                        EnableAdvanced = EnableAdvanced,
+                        EnableStreaming = EnableStreaming,
+                        Enabled = true,
+                        Name = "Ollama节点"
+                    };
+                }
+
+                var enabledNodes = OllamaNodes.Where(n => n.Enabled).ToList();
+                if (enabledNodes.Count == 0)
+                    return null;
+
+                if (!string.IsNullOrEmpty(purpose))
+                {
+                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurpose(n.Mode, n.PluginModeId, purpose)).ToList();
+                    if (filtered.Count == 0)
+                        filtered = enabledNodes.Where(n => n.Mode == ChannelMode.Unrestricted).ToList();
+                    if (filtered.Count > 0)
+                        enabledNodes = filtered;
+                }
+
+                if (EnableLoadBalancing)
+                {
+                    if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
+                        CurrentNodeIndex = 0;
+                    var node = enabledNodes[CurrentNodeIndex];
+                    CurrentNodeIndex = (CurrentNodeIndex + 1) % enabledNodes.Count;
+                    return node;
+                }
+
+                if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
+                    CurrentNodeIndex = 0;
+                return enabledNodes[CurrentNodeIndex];
+            }
+
+            public OllamaNodeSetting? GetNextUntriedNode(HashSet<int> triedIndices, string? purpose = null)
+            {
+                if (OllamaNodes.Count == 0)
+                    return null;
+                for (int i = 0; i < OllamaNodes.Count; i++)
+                {
+                    if (OllamaNodes[i].Enabled && !triedIndices.Contains(i))
+                    {
+                        if (!string.IsNullOrEmpty(purpose) &&
+                            !IsNodeMatchingPurpose(OllamaNodes[i].Mode, OllamaNodes[i].PluginModeId, purpose))
+                            continue;
+                        return OllamaNodes[i];
+                    }
+                }
+                return null;
+            }
+
+            public int GetNodeIndex(OllamaNodeSetting node)
+            {
+                return OllamaNodes.IndexOf(node);
+            }
+
+            public int GetEnabledNodeCount()
+            {
+                return OllamaNodes.Count(n => n.Enabled);
+            }
         }
 
         public class OpenAINodeSetting
@@ -1215,8 +1304,27 @@ namespace VPetLLM
             public bool EnableLoadBalancing { get; set; } = true;
         }
 
+        public class LMStudioNodeSetting
+        {
+            public string Model { get; set; } = "";
+            public string Url { get; set; } = "http://localhost:1234";
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
+            public bool Enabled { get; set; } = true;
+            public string Name { get; set; } = "LM Studio节点";
+            public bool EnableVision { get; set; } = false;
+            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
+            public string? PluginModeId { get; set; }
+        }
+
         public class LMStudioSetting
         {
+            public List<LMStudioNodeSetting> LMStudioNodes { get; set; } = new List<LMStudioNodeSetting>();
+            public int CurrentNodeIndex { get; set; } = 0;
+            public bool EnableLoadBalancing { get; set; } = true;
+
             public string Url { get; set; } = "http://localhost:1234";
             public string? Model { get; set; }
             public double Temperature { get; set; } = 0.7;
@@ -1224,7 +1332,77 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
-            public bool EnableLoadBalancing { get; set; } = true;
+
+            public LMStudioNodeSetting? GetCurrentLMStudioSetting(string? purpose = null)
+            {
+                if (LMStudioNodes.Count == 0)
+                {
+                    return new LMStudioNodeSetting
+                    {
+                        Url = Url,
+                        Model = Model,
+                        Temperature = Temperature,
+                        MaxTokens = MaxTokens,
+                        EnableAdvanced = EnableAdvanced,
+                        EnableStreaming = EnableStreaming,
+                        Enabled = true,
+                        Name = "LM Studio节点"
+                    };
+                }
+
+                var enabledNodes = LMStudioNodes.Where(n => n.Enabled).ToList();
+                if (enabledNodes.Count == 0)
+                    return null;
+
+                if (!string.IsNullOrEmpty(purpose))
+                {
+                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurpose(n.Mode, n.PluginModeId, purpose)).ToList();
+                    if (filtered.Count == 0)
+                        filtered = enabledNodes.Where(n => n.Mode == ChannelMode.Unrestricted).ToList();
+                    if (filtered.Count > 0)
+                        enabledNodes = filtered;
+                }
+
+                if (EnableLoadBalancing)
+                {
+                    if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
+                        CurrentNodeIndex = 0;
+                    var node = enabledNodes[CurrentNodeIndex];
+                    CurrentNodeIndex = (CurrentNodeIndex + 1) % enabledNodes.Count;
+                    return node;
+                }
+
+                if (CurrentNodeIndex < 0 || CurrentNodeIndex >= enabledNodes.Count)
+                    CurrentNodeIndex = 0;
+                return enabledNodes[CurrentNodeIndex];
+            }
+
+            public LMStudioNodeSetting? GetNextUntriedNode(HashSet<int> triedIndices, string? purpose = null)
+            {
+                if (LMStudioNodes.Count == 0)
+                    return null;
+                for (int i = 0; i < LMStudioNodes.Count; i++)
+                {
+                    if (LMStudioNodes[i].Enabled && !triedIndices.Contains(i))
+                    {
+                        if (!string.IsNullOrEmpty(purpose) &&
+                            !IsNodeMatchingPurpose(LMStudioNodes[i].Mode, LMStudioNodes[i].PluginModeId, purpose))
+                            continue;
+                        return LMStudioNodes[i];
+                    }
+                }
+                return null;
+            }
+
+            public int GetNodeIndex(LMStudioNodeSetting node)
+            {
+                return LMStudioNodes.IndexOf(node);
+            }
+
+            public int GetEnabledNodeCount()
+            {
+                return LMStudioNodes.Count(n => n.Enabled);
+            }
         }
 
         public class ProviderFallbackConfig

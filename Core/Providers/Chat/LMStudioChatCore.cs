@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Linq;
 using VPet_Simulator.Windows.Interface;
@@ -18,6 +19,22 @@ namespace VPetLLM.Core.Providers.Chat
             : base(setting, mainWindow, actionProcessor)
         {
             _lmStudioSetting = lmStudioSetting;
+            _setting = setting;
+        }
+
+        public LMStudioChatCore(Setting.LMStudioNodeSetting lmStudioNodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
+            : base(setting, mainWindow, actionProcessor)
+        {
+            _lmStudioSetting = new Setting.LMStudioSetting
+            {
+                Url = lmStudioNodeSetting.Url,
+                Model = lmStudioNodeSetting.Model,
+                Temperature = lmStudioNodeSetting.Temperature,
+                MaxTokens = lmStudioNodeSetting.MaxTokens,
+                EnableAdvanced = lmStudioNodeSetting.EnableAdvanced,
+                EnableStreaming = lmStudioNodeSetting.EnableStreaming,
+                LMStudioNodes = new List<Setting.LMStudioNodeSetting> { lmStudioNodeSetting }
+            };
             _setting = setting;
         }
 
@@ -459,6 +476,10 @@ namespace VPetLLM.Core.Providers.Chat
                 using (var client = GetClient())
                 {
                     var baseUrl = _lmStudioSetting.Url.TrimEnd('/');
+                    if (baseUrl.EndsWith("/v1"))
+                    {
+                        baseUrl = baseUrl.Substring(0, baseUrl.Length - 3);
+                    }
                     client.BaseAddress = new System.Uri(baseUrl);
                     var response = client.GetAsync("/v1/models").Result;
 

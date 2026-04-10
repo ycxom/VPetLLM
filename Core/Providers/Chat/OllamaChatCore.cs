@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
 
@@ -13,6 +14,22 @@ namespace VPetLLM.Core.Providers.Chat
             : base(setting, mainWindow, actionProcessor)
         {
             _ollamaSetting = ollamaSetting;
+            _setting = setting;
+        }
+
+        public OllamaChatCore(Setting.OllamaNodeSetting ollamaNodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
+            : base(setting, mainWindow, actionProcessor)
+        {
+            _ollamaSetting = new Setting.OllamaSetting
+            {
+                Url = ollamaNodeSetting.Url,
+                Model = ollamaNodeSetting.Model,
+                Temperature = ollamaNodeSetting.Temperature,
+                MaxTokens = ollamaNodeSetting.MaxTokens,
+                EnableAdvanced = ollamaNodeSetting.EnableAdvanced,
+                EnableStreaming = ollamaNodeSetting.EnableStreaming,
+                OllamaNodes = new List<Setting.OllamaNodeSetting> { ollamaNodeSetting }
+            };
             _setting = setting;
         }
 
