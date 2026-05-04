@@ -306,8 +306,10 @@ namespace VPetLLM.UI.Windows
         // UI 就绪标记：Loaded 后才允许保存，避免初始化阶段触发立即保存导致 NRE
         private bool _isReadyToSave = false;
         private bool _isUpdatingNodeDetails = false;
-        // 多模态提供商设置加载标记，防止加载时触发保存
+        private bool _isLoadingSettings = false;
         private bool _isLoadingMultimodalSettings = false;
+        private bool _isSaving = false;
+        private bool _uiSettingsChanged = false;
 
         // TTS服务
         private UtilsTTSService? _ttsService;
@@ -357,27 +359,19 @@ namespace VPetLLM.UI.Windows
             // 初始化触摸反馈设置控件
             InitializeTouchFeedbackSettings();
             _plugin.SettingWindow = this;
-            LoadSettings();
             Closed += Window_Closed;
 
-            // 移除窗口激活事件监听，避免不必要的弹窗
-            // this.Activated += WinSettingNew_Activated;
-
-            Loaded += (s, e) =>
+            Loaded += async (s, e) =>
             {
-                // 先确保语言资源已加载
+                _isLoadingSettings = true;
+
+                await LoadSettingsAsync();
+
                 LanguageHelper.ReloadLanguages();
-
-                // 同步本地化服务的语言，确保 XAML 中 {utils:Localize} 初次加载和后续切换都正确刷新
                 LocalizationService.Instance.ChangeLanguage(_plugin.Settings.Language);
-
-                // 更新UI语言
                 UpdateUIForLanguage();
-
-                // 在语言资源完全加载后设置窗口标题
                 this.Title = WindowTitle;
 
-                // 监听全局本地化变更，自动刷新手动赋值的 UI（如列头）
                 LocalizationService.Instance.PropertyChanged += (sender2, e2) =>
                 {
                     if (e2.PropertyName == "Item[]")
@@ -385,39 +379,38 @@ namespace VPetLLM.UI.Windows
                         Dispatcher.BeginInvoke(new Action(() =>
                         {
                             UpdateUIForLanguage();
-                            // 语言变化时也更新窗口标题
                             this.Title = WindowTitle;
                         }), System.Windows.Threading.DispatcherPriority.Background);
                     }
                 };
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
-                // 标记界面已就绪，允许后续的立即保存
-                _isReadyToSave = true;
 
-                // 在UI完全就绪后重新加载多模态提供商设置
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     LoadMultimodalProviderSettings();
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
-                // 视觉树稳定后再挂载列表冒泡监听，避免初始化/布局阶段触发保存
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     AttachImmediateSaveForChannelLists();
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
-                // 初始化时刷新TTS插件状态显示
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     var result = TTSPluginDetector.DetectAllOtherTTSPlugins(_plugin.MW);
                     RefreshTTSPluginStatus(result.HasOtherEnabledTTSPlugin, result.EnabledPluginNames);
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
-                // 加载 About 页面的 Free 提供者信息
-                // 注意：About Tab 在首次选中时才加载，因为 TabItem 内容延迟加载
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _isLoadingSettings = false;
+                    _isReadyToSave = true;
+                    _uiSettingsChanged = false;
+                }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+
                 if (FindName("Tab_About") is TabItem aboutTab)
                 {
-                    aboutTab.AddHandler(System.Windows.Controls.Primitives.Selector.SelectedEvent, new RoutedEventHandler((s, e) =>
+                    aboutTab.AddHandler(System.Windows.Controls.Primitives.Selector.SelectedEvent, new RoutedEventHandler((s2, e2) =>
                     {
                         if (!_aboutTabLoaded)
                         {
@@ -593,6 +586,8 @@ namespace VPetLLM.UI.Windows
 
         private void Control_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            if (_isLoadingSettings) return;
+            _uiSettingsChanged = true;
             // 实时更新温度值显示
             if (sender is Slider slider)
             {
@@ -643,6 +638,8 @@ namespace VPetLLM.UI.Windows
 
         private void Control_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isLoadingSettings) return;
+            _uiSettingsChanged = true;
             // 先处理特殊逻辑
             if (sender == FindName("ComboBox_Language"))
             {
@@ -707,6 +704,8 @@ namespace VPetLLM.UI.Windows
 
         private void Control_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (_isLoadingSettings) return;
+            _uiSettingsChanged = true;
             // 对于关键配置字段，立即保存
             if (sender is TextBox textBox)
             {
@@ -733,6 +732,8 @@ namespace VPetLLM.UI.Windows
 
         private void Control_Click(object sender, RoutedEventArgs e)
         {
+            if (_isLoadingSettings) return;
+            _uiSettingsChanged = true;
             if (sender is CheckBox cb && cb.Name == "CheckBox_AutoMigrateChatHistory")
                 return;
 
@@ -742,6 +743,8 @@ namespace VPetLLM.UI.Windows
 
         private void Control_PasswordChanged(object sender, RoutedEventArgs e)
         {
+            if (_isLoadingSettings) return;
+            _uiSettingsChanged = true;
             ScheduleSecretSave();
         }
 
@@ -762,7 +765,7 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private void LoadSettings()
+        private async Task LoadSettingsAsync()
         {
             ((ComboBox)this.FindName("ComboBox_Provider")).ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectedItem = _plugin.Settings.Provider;
@@ -782,6 +785,9 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
             ((TextBox)this.FindName("TextBox_Role")).Text = _plugin.Settings.Role;
+
+            await Task.Yield();
+
             if (_plugin.Settings.OpenAI is null)
             {
                 _plugin.Settings.OpenAI = new Setting.OpenAISetting();
@@ -798,34 +804,18 @@ namespace VPetLLM.UI.Windows
             {
                 _plugin.Settings.Ollama = new Setting.OllamaSetting();
             }
-            // Ollama/Free/LMStudio - 使用统一UI管理，暂不处理单一配置
-            //((TextBox)this.FindName("TextBox_OllamaUrl")).Text = _plugin.Settings.Ollama.Url;
-            //((ComboBox)this.FindName("ComboBox_OllamaModel")).Text = _plugin.Settings.Ollama.Model;
-            // OpenAI多节点配置 - 不再使用单一配置
-            // 这些控件现在用于多节点管理界面
-            //((TextBox)this.FindName("TextBox_OpenAIApiKey")).Text = "";
-            //((ComboBox)this.FindName("ComboBox_OpenAIModel")).Text = "";
-            //((TextBox)this.FindName("TextBox_OpenAIUrl")).Text = "";
             if (_plugin.Settings.Gemini is null)
             {
                 _plugin.Settings.Gemini = new Setting.GeminiSetting();
             }
-            // 负载均衡开关
             if (this.FindName("CheckBox_Gemini_EnableLoadBalancing") is CheckBox cbGemLB)
                 cbGemLB.IsChecked = _plugin.Settings.Gemini.EnableLoadBalancing;
-            // OpenAI 负载均衡开关
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLB)
                 cbOpenLB.IsChecked = _plugin.Settings.OpenAI.EnableLoadBalancing;
 
-            // 刷新Gemini多渠道列表
             RefreshGeminiNodesList();
 
-            // 兼容旧表单（保留显示） - 已删除旧控件
-            //if (this.FindName("TextBox_GeminiApiKey") is TextBox tbGeminiApiKey2)
-            //    tbGeminiApiKey2.Text = _plugin.Settings.Gemini.ApiKey;
-            //if (this.FindName("ComboBox_GeminiModel") is ComboBox cbGeminiModel)
-            //    cbGeminiModel.Text = _plugin.Settings.Gemini.Model;
-
+            await Task.Yield();
 
             ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked = _plugin.Settings.KeepContext;
             ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
@@ -882,41 +872,11 @@ namespace VPetLLM.UI.Windows
             //((Slider)this.FindName("Slider_OpenAI_Temperature")).Value = _plugin.Settings.OpenAI.Temperature;
             //((TextBlock)this.FindName("TextBlock_OpenAI_TemperatureValue")).Text = _plugin.Settings.OpenAI.Temperature.ToString("F2");
             //((TextBox)this.FindName("TextBox_OpenAI_MaxTokens")).Text = _plugin.Settings.OpenAI.MaxTokens.ToString();
-            // 刷新OpenAI多节点列表，确保迁移后的节点显示且避免空引用
             RefreshOpenAINodesList();
             _ = InitializeOpenAIUrlPresetsAsync();
-            // Gemini/Fre/LMStudio - 使用统一UI管理，暂不处理单一配置
-            //if (this.FindName("CheckBox_Gemini_EnableAdvanced") is CheckBox cbGemAdv)
-            //    cbGemAdv.IsChecked = _plugin.Settings.Gemini.EnableAdvanced;
-            //if (this.FindName("Slider_Gemini_Temperature") is Slider slGemTemp)
-            //{
-            //    slGemTemp.Value = _plugin.Settings.Gemini.Temperature;
-            //    if (this.FindName("TextBlock_Gemini_TemperatureValue") is TextBlock tvGemTemp)
-            //        tvGemTemp.Text = _plugin.Settings.Gemini.Temperature.ToString("F2");
-            //}
-            //if (this.FindName("TextBox_Gemini_MaxTokens") is TextBox tbGemMax)
-            //    tbGemMax.Text = _plugin.Settings.Gemini.MaxTokens.ToString();
-            //((CheckBox)this.FindName("CheckBox_Free_EnableStreaming")).IsChecked = _plugin.Settings.Free.EnableStreaming;
-            //((CheckBox)this.FindName("CheckBox_Free_EnableVision")).IsChecked = _plugin.Settings.Free.EnableVision;
-            //((CheckBox)this.FindName("CheckBox_Free_EnableAdvanced")).IsChecked = _plugin.Settings.Free.EnableAdvanced;
-            //((Slider)this.FindName("Slider_Free_Temperature")).Value = _plugin.Settings.Free.Temperature;
-            //((TextBlock)this.FindName("TextBlock_Free_TemperatureValue")).Text = _plugin.Settings.Free.Temperature.ToString("F2");
-            //((TextBox)this.FindName("TextBox_Free_MaxTokens")).Text = _plugin.Settings.Free.MaxTokens.ToString();
 
-            // LM Studio 设置 - 使用统一UI管理，暂不处理单一配置
-            //((TextBox)this.FindName("TextBox_LMStudioUrl")).Text = _plugin.Settings.LMStudio.Url;
-            //((ComboBox)this.FindName("ComboBox_LMStudioModel")).Text = _plugin.Settings.LMStudio.Model;
-            //((CheckBox)this.FindName("CheckBox_LMStudio_EnableStreaming")).IsChecked = _plugin.Settings.LMStudio.EnableStreaming;
-            //((CheckBox)this.FindName("CheckBox_LMStudio_EnableVision")).IsChecked = _plugin.Settings.LMStudio.EnableVision;
-            //((CheckBox)this.FindName("CheckBox_LMStudio_EnableAdvanced")).IsChecked = _plugin.Settings.LMStudio.EnableAdvanced;
-            //((Slider)this.FindName("Slider_LMStudio_Temperature")).Value = _plugin.Settings.LMStudio.Temperature;
-            //((TextBlock)this.FindName("TextBlock_LMStudio_TemperatureValue")).Text = _plugin.Settings.LMStudio.Temperature.ToString("F2");
-            //((TextBox)this.FindName("TextBox_LMStudio_MaxTokens")).Text = _plugin.Settings.LMStudio.MaxTokens.ToString();
+            await LoadFreeProviderInfoAsync();
 
-            // 加载Free Chat配置的提供者信息
-            LoadFreeProviderInfo();
-
-            // 安全地加载上下文长度，避免 ChatCore 为 null 时出现空引用异常
             if (_plugin.ChatCore != null)
             {
                 try
@@ -935,10 +895,10 @@ namespace VPetLLM.UI.Windows
                 Logger.Log("ChatCore is null when loading settings, context length set to 0");
             }
             
-            // 异步加载日志，避免日志过多时阻塞 UI
             LoadLogsAsync();
 
-            // Proxy settings
+            await Task.Yield();
+
             if (_plugin.Settings.Proxy is null)
             {
                 _plugin.Settings.Proxy = new Setting.ProxySetting();
@@ -972,7 +932,8 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_PluginStore_UseProxy")).IsChecked = _plugin.Settings.PluginStore.UseProxy;
             ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).Text = _plugin.Settings.PluginStore.ProxyUrl;
 
-            // TTS settings
+            await Task.Yield();
+
             if (_plugin.Settings.TTS is null)
             {
                 _plugin.Settings.TTS = new Setting.TTSSetting();
@@ -1050,10 +1011,10 @@ namespace VPetLLM.UI.Windows
             // 加载 GPT-SoVITS 设置
             LoadGPTSoVITSSettings();
 
-            // 初始化TTS服务
             _ttsService = new UtilsTTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
 
-            // ASR settings
+            await Task.Yield();
+
             if (_plugin.Settings.ASR is null)
             {
                 _plugin.Settings.ASR = new Setting.ASRSetting();
@@ -1076,8 +1037,7 @@ namespace VPetLLM.UI.Windows
                 }
             }
 
-            // ASR 录音设备设置
-            LoadRecordingDevices();
+            await LoadRecordingDevicesAsync();
 
             // OpenAI ASR 设置
             ((TextBox)this.FindName("TextBox_ASR_OpenAI_ApiKey")).Text = _plugin.Settings.ASR.OpenAI.ApiKey;
@@ -1097,16 +1057,14 @@ namespace VPetLLM.UI.Windows
 
             // Free ASR 无需配置
 
-            // 更新 ASR Provider 面板显示
             UpdateASRProviderPanel();
 
-            // 悬浮侧边栏设置
+            await Task.Yield();
+
             LoadFloatingSidebarSettings();
 
-            // 截图设置
             LoadScreenshotSettings();
 
-            // 更新 VPet TTS 插件状态 UI
             UpdateTTSPluginStatusUI();
         }
 
@@ -1235,7 +1193,10 @@ namespace VPetLLM.UI.Windows
 
         private void SaveSettings()
         {
-            if (!_isReadyToSave) return;
+            if (!_isReadyToSave || _isLoadingSettings || _isSaving) return;
+            _isSaving = true;
+            try
+            {
             var providerComboBox = (ComboBox)this.FindName("ComboBox_Provider");
             if (providerComboBox == null) return;
             var languageComboBox = (ComboBox)this.FindName("ComboBox_Language");
@@ -1620,12 +1581,10 @@ namespace VPetLLM.UI.Windows
                 Logger.Log($"新ChatCore已创建，历史记录已根据设置自动加载（SeparateChatByProvider={_plugin.Settings.SeparateChatByProvider}）");
                 _plugin.UpdateChatCore(newChatCore);
             }
-            else
+            else if (_uiSettingsChanged)
             {
-                // 如果提供商没变，也需要重新创建ChatCore以应用新的设置
                 Logger.Log($"提供商未变化，重新创建ChatCore以应用新设置");
 
-                // 先保存当前历史
                 _plugin.ChatCore?.SaveHistory();
 
                 IChatCore updatedChatCore = newProvider switch
@@ -1638,15 +1597,20 @@ namespace VPetLLM.UI.Windows
                     _ => throw new NotImplementedException()
                 };
 
-                // 同样让HistoryManager自动加载历史
                 _plugin.UpdateChatCore(updatedChatCore);
             }
+            _uiSettingsChanged = false;
             _plugin.UpdateActionProcessor();
 
             // 重置未保存更改标志
             lock (_saveLock)
             {
                 _hasUnsavedChanges = false;
+            }
+            }
+            finally
+            {
+                _isSaving = false;
             }
         }
         private async void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2225,14 +2189,56 @@ namespace VPetLLM.UI.Windows
             var logBox = (ListBox)this.FindName("LogBox");
             if (logBox is null) return;
 
-            // 先显示加载状态（可选）
             logBox.ItemsSource = null;
 
-            // 使用 Dispatcher 延迟绑定，让 UI 有机会先渲染
             await Dispatcher.InvokeAsync(() =>
             {
                 logBox.ItemsSource = Logger.Logs;
+                UpdateLogCount();
             }, System.Windows.Threading.DispatcherPriority.Background);
+
+            Logger.Logs.CollectionChanged += (s, args) =>
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    UpdateLogCount();
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            };
+        }
+
+        private void UpdateLogCount()
+        {
+            if (this.FindName("TextBlock_LogCount") is TextBlock logCountBlock)
+            {
+                var langCode = _plugin?.Settings?.Language;
+                var total = Logger.Logs.Count;
+                var maxLogCount = _plugin?.Settings?.MaxLogCount ?? 500;
+                var countText = LanguageHelper.Get("Log.CountFormat", langCode);
+                logCountBlock.Text = !string.IsNullOrEmpty(countText)
+                    ? string.Format(countText, total, maxLogCount)
+                    : $"{total} / {maxLogCount}";
+            }
+        }
+
+        private void TextBox_LogSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            var logBox = (ListBox)this.FindName("LogBox");
+            var searchBox = sender as TextBox;
+            if (logBox is null || searchBox is null) return;
+
+            var keyword = searchBox.Text?.Trim() ?? "";
+
+            if (string.IsNullOrEmpty(keyword))
+            {
+                logBox.ItemsSource = Logger.Logs;
+                return;
+            }
+
+            var filtered = new System.Collections.ObjectModel.ObservableCollection<string>(
+                Logger.Logs.Where(log =>
+                    log.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0));
+
+            logBox.ItemsSource = filtered;
         }
 
         private async void Button_AddTool_Click(object sender, RoutedEventArgs e)
@@ -2544,7 +2550,7 @@ namespace VPetLLM.UI.Windows
 
         private void ScheduleSecretSave()
         {
-            if (!_isReadyToSave) return;
+            if (!_isReadyToSave || _isLoadingSettings || _isSaving) return;
             // 标记有未保存变更，但不立即保存，延迟到用户停止输入片刻
             _hasUnsavedChanges = true;
             _secretSaveTimer?.Stop();
@@ -2577,8 +2583,7 @@ namespace VPetLLM.UI.Windows
         /// <param name="immediate">保留参数，维持兼容</param>
         private void ScheduleAutoSave(bool immediate = false)
         {
-            // 初始化阶段不保存，避免未构造完成的控件/服务导致 NRE
-            if (!_isReadyToSave) return;
+            if (!_isReadyToSave || _isLoadingSettings || _isSaving) return;
 
             lock (_saveLock)
             {
@@ -2875,6 +2880,9 @@ namespace VPetLLM.UI.Windows
             if (FindName("TextBlock_MaxLogCount") is TextBlock textBlockMaxLogCount) textBlockMaxLogCount.Text = LanguageHelper.Get("Log.MaxLogCount", langCode);
             if (FindName("Button_CopyLog") is Button buttonCopyLog) buttonCopyLog.Content = LanguageHelper.Get("Log.Copy", langCode);
             if (FindName("Button_ClearLog") is Button buttonClearLog) buttonClearLog.Content = LanguageHelper.Get("Log.Clear", langCode);
+            if (FindName("TextBlock_LogManagement") is TextBlock textBlockLogManagement) textBlockLogManagement.Text = LanguageHelper.Get("Log.Tab", langCode);
+            if (FindName("TextBox_LogSearch") is TextBox textBoxLogSearch) textBoxLogSearch.ToolTip = LanguageHelper.Get("Log.SearchPlaceholder", langCode);
+            UpdateLogCount();
 
             // 更新插件管理头部区域的多语言文本
             if (FindName("TextBlock_PluginManagementCenter") is TextBlock textBlockPluginManagementCenter)
@@ -6935,7 +6943,6 @@ namespace VPetLLM.UI.Windows
             {
                 var language = _plugin.Settings.Language ?? "zh-hans";
 
-                // 加载Chat配置
                 var chatConfig = FreeConfigManager.GetChatConfig();
                 if (chatConfig is not null)
                 {
@@ -6952,7 +6959,6 @@ namespace VPetLLM.UI.Windows
                     }
                 }
 
-                // 加载ASR配置
                 var asrConfig = FreeConfigManager.GetASRConfig();
                 if (asrConfig is not null)
                 {
@@ -6969,7 +6975,6 @@ namespace VPetLLM.UI.Windows
                     }
                 }
 
-                // 加载TTS配置
                 var ttsConfig = FreeConfigManager.GetTTSConfig();
                 if (ttsConfig is not null)
                 {
@@ -6985,6 +6990,59 @@ namespace VPetLLM.UI.Windows
                         tbTtsProv.Text = ttsProvider;
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"加载Free提供者信息失败: {ex.Message}");
+            }
+        }
+
+        private async Task LoadFreeProviderInfoAsync()
+        {
+            try
+            {
+                var language = _plugin.Settings.Language ?? "zh-hans";
+
+                var (chatDesc, chatProv, asrDesc, asrProv, ttsDesc, ttsProv) = await Task.Run(() =>
+                {
+                    string cd = null, cp = null, ad = null, ap = null, td = null, tp = null;
+
+                    var chatConfig = FreeConfigManager.GetChatConfig();
+                    if (chatConfig is not null)
+                    {
+                        cd = FreeConfigManager.GetDescription(chatConfig, language);
+                        cp = FreeConfigManager.GetProviderInfo(chatConfig, language);
+                    }
+
+                    var asrConfig = FreeConfigManager.GetASRConfig();
+                    if (asrConfig is not null)
+                    {
+                        ad = FreeConfigManager.GetDescription(asrConfig, language);
+                        ap = FreeConfigManager.GetProviderInfo(asrConfig, language);
+                    }
+
+                    var ttsConfig = FreeConfigManager.GetTTSConfig();
+                    if (ttsConfig is not null)
+                    {
+                        td = FreeConfigManager.GetDescription(ttsConfig, language);
+                        tp = FreeConfigManager.GetProviderInfo(ttsConfig, language);
+                    }
+
+                    return (cd, cp, ad, ap, td, tp);
+                });
+
+                if (this.FindName("TextBlock_Chat_Free_Description") is TextBlock tbChatDesc && !string.IsNullOrEmpty(chatDesc))
+                    tbChatDesc.Text = chatDesc;
+                if (this.FindName("TextBlock_Chat_Free_Provider") is TextBlock tbChatProv && !string.IsNullOrEmpty(chatProv))
+                    tbChatProv.Text = chatProv;
+                if (this.FindName("TextBlock_ASR_Free_Description") is TextBlock tbAsrDesc && !string.IsNullOrEmpty(asrDesc))
+                    tbAsrDesc.Text = asrDesc;
+                if (this.FindName("TextBlock_ASR_Free_Provider") is TextBlock tbAsrProv && !string.IsNullOrEmpty(asrProv))
+                    tbAsrProv.Text = asrProv;
+                if (this.FindName("TextBlock_TTS_Free_Description") is TextBlock tbTtsDesc && !string.IsNullOrEmpty(ttsDesc))
+                    tbTtsDesc.Text = ttsDesc;
+                if (this.FindName("TextBlock_TTS_Free_Provider") is TextBlock tbTtsProv && !string.IsNullOrEmpty(ttsProv))
+                    tbTtsProv.Text = ttsProv;
             }
             catch (Exception ex)
             {
@@ -7345,6 +7403,70 @@ namespace VPetLLM.UI.Windows
                 }
 
                 Logger.Log($"ASR Settings: Loaded {deviceCount} recording device(s)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error loading recording devices: {ex.Message}");
+            }
+        }
+
+        private async Task LoadRecordingDevicesAsync()
+        {
+            try
+            {
+                var comboBox = (ComboBox)this.FindName("ComboBox_ASR_RecordingDevice");
+                if (comboBox is null) return;
+
+                var recordingDeviceNumber = _plugin.Settings.ASR.RecordingDeviceNumber;
+
+                var devices = await Task.Run(() =>
+                {
+                    var list = new List<(int Index, string Name)>();
+                    var deviceCount = NAudio.Wave.WaveInEvent.DeviceCount;
+                    for (int i = 0; i < deviceCount; i++)
+                    {
+                        var capabilities = NAudio.Wave.WaveInEvent.GetCapabilities(i);
+                        list.Add((i, $"设备 #{i}: {capabilities.ProductName}"));
+                    }
+                    return (list, deviceCount);
+                });
+
+                comboBox.Items.Clear();
+
+                if (devices.deviceCount == 0)
+                {
+                    var item = new ComboBoxItem
+                    {
+                        Content = "未找到录音设备",
+                        Tag = 0,
+                        IsEnabled = false
+                    };
+                    comboBox.Items.Add(item);
+                    comboBox.SelectedIndex = 0;
+                    return;
+                }
+
+                foreach (var (index, name) in devices.list)
+                {
+                    var item = new ComboBoxItem
+                    {
+                        Content = name,
+                        Tag = index
+                    };
+                    comboBox.Items.Add(item);
+
+                    if (index == recordingDeviceNumber)
+                    {
+                        comboBox.SelectedItem = item;
+                    }
+                }
+
+                if (comboBox.SelectedItem is null && comboBox.Items.Count > 0)
+                {
+                    comboBox.SelectedIndex = 0;
+                }
+
+                Logger.Log($"ASR Settings: Loaded {devices.deviceCount} recording device(s)");
             }
             catch (Exception ex)
             {
@@ -7778,8 +7900,7 @@ namespace VPetLLM.UI.Windows
                 // 保存多模态提供商设置
                 SaveMultimodalProviderSettings();
 
-                // 确保设置被持久化到磁盘
-                _plugin.Settings.Save();
+                _hasUnsavedChanges = true;
                 Logger.Log("Screenshot settings saved to disk");
             }
             catch (Exception ex)
@@ -7853,8 +7974,7 @@ namespace VPetLLM.UI.Windows
                 // 注意：这里不调用 SaveMultimodalProviderSettings()
                 // 因为我们刚刚加载了已保存的多模态提供商设置，不需要再保存
 
-                // 确保设置被持久化到磁盘
-                _plugin.Settings.Save();
+                _hasUnsavedChanges = true;
                 Logger.Log("Screenshot settings saved to disk (without multimodal provider settings)");
             }
             catch (Exception ex)
@@ -7882,7 +8002,7 @@ namespace VPetLLM.UI.Windows
 
                 UpdateMultimodalProviderPanel();
                 SaveMultimodalProviderSettings();
-                _plugin.Settings.Save(); // 确保立即持久化到磁盘
+                ScheduleAutoSave(true);
             }
             catch (Exception ex)
             {
@@ -7910,7 +8030,7 @@ namespace VPetLLM.UI.Windows
                 {
                     wrapper.IsSelected = true;
                     SaveMultimodalProviderSettings();
-                    _plugin.Settings.Save();
+                    ScheduleAutoSave(true);
                 }
             }
             catch (Exception ex)
@@ -7939,7 +8059,7 @@ namespace VPetLLM.UI.Windows
                 {
                     wrapper.IsSelected = false;
                     SaveMultimodalProviderSettings();
-                    _plugin.Settings.Save();
+                    ScheduleAutoSave(true);
                 }
             }
             catch (Exception ex)

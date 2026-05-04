@@ -18,6 +18,8 @@
                 <ResourceDictionary Source="../Styles/Controls.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <converters:BoolInverter x:Key="BoolInverter"/>
+            <converters:LogTimestampConverter x:Key="LogTimestampConverter"/>
+            <converters:LogMessageConverter x:Key="LogMessageConverter"/>
 
             <!-- 现代化TabControl样式 -->
             <Style x:Key="ModernTabControl" TargetType="TabControl">
@@ -2633,51 +2635,127 @@
                     x:Name="Tab_Log"
                     Style="{StaticResource ModernTabItem}">
                 <Border Style="{StaticResource CardContainer}">
-                    <DockPanel>
-                        <StackPanel DockPanel.Dock="Top"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Left"
-                                Margin="0,0,0,16">
-                            <CheckBox x:Name="CheckBox_LogAutoScroll"
-                                    Content="{utils:Localize KeyPath=Log.AutoScroll}"
-                                    Margin="0,0,20,0"
-                                    Style="{StaticResource ModernCheckBox}"/>
-                            <TextBlock Text="{utils:Localize KeyPath=Log.MaxLogCount}"
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,8,0"
-                                    x:Name="TextBlock_MaxLogCount"
-                                    Foreground="{StaticResource PrimaryTextBrush}"
-                                    FontSize="14"/>
-                            <TextBox x:Name="TextBox_MaxLogCount"
-                                    Width="185"
-                                    VerticalAlignment="Center"
-                                    Style="{StaticResource ModernTextBox}"/>
-                        </StackPanel>
-                        <StackPanel DockPanel.Dock="Bottom"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Right"
-                                Margin="0,16,0,0">
-                            <Button x:Name="Button_CopyLog"
-                                    Content="{utils:Localize KeyPath=Log.Copy}"
-                                    Click="Button_CopyLog_Click"
-                                    Margin="0,0,8,0"
-                                    Style="{StaticResource SecondaryButton}"/>
-                            <Button x:Name="Button_ClearLog"
-                                    Content="{utils:Localize KeyPath=Log.Clear}"
-                                    Click="Button_ClearLog_Click"
-                                    Style="{StaticResource SecondaryButton}"/>
-                        </StackPanel>
-                        <ListBox x:Name="LogBox"
-                                MinHeight="200"
-                                Background="{StaticResource BackgroundBrush}"
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
-                                VirtualizingStackPanel.IsVirtualizing="True"
-                                VirtualizingStackPanel.VirtualizationMode="Recycling"
-                                ScrollViewer.CanContentScroll="True"
-                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                ScrollViewer.VerticalScrollBarVisibility="Auto"/>
-                    </DockPanel>
+                                CornerRadius="6"
+                                Padding="16,12"
+                                Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TextBlock_LogManagement"
+                                            Text="{utils:Localize KeyPath=Log.Tab}"
+                                            FontSize="16"
+                                            FontWeight="SemiBold"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            Margin="0,0,0,2"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1"
+                                           Orientation="Horizontal"
+                                           VerticalAlignment="Center">
+                                    <Button x:Name="Button_CopyLog"
+                                            Content="{utils:Localize KeyPath=Log.Copy}"
+                                            Margin="0,0,8,0"
+                                            Padding="12,6"
+                                            Click="Button_CopyLog_Click"
+                                            Style="{StaticResource SecondaryButton}"/>
+                                    <Button x:Name="Button_ClearLog"
+                                            Content="{utils:Localize KeyPath=Log.Clear}"
+                                            Padding="12,6"
+                                            Click="Button_ClearLog_Click"
+                                            Style="{StaticResource SecondaryButton}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="1" Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox x:Name="TextBox_LogSearch"
+                                    Grid.Column="0"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource ModernTextBox}"
+                                    TextChanged="TextBox_LogSearch_TextChanged" Margin="0,0,45,0"/>
+                            <CheckBox x:Name="CheckBox_LogAutoScroll"
+                                    Grid.Column="1"
+                                    Content="{utils:Localize KeyPath=Log.AutoScroll}"
+                                    Margin="16,0,10,0"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource ModernCheckBox}"/>
+                            <StackPanel Grid.Column="2"
+                                       Orientation="Horizontal"
+                                       Margin="16,0,0,0"
+                                       VerticalAlignment="Center">
+                                <TextBlock Text="{utils:Localize KeyPath=Log.MaxLogCount}"
+                                        VerticalAlignment="Center"
+                                        x:Name="TextBlock_MaxLogCount"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"/>
+                                <TextBox x:Name="TextBox_MaxLogCount"
+                                        Width="144"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource ModernTextBox}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Row="2"
+                                Background="{StaticResource ControlBackgroundBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                            <ListBox x:Name="LogBox"
+                                    MinHeight="200"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    VirtualizingStackPanel.IsVirtualizing="True"
+                                    VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                    ScrollViewer.CanContentScroll="True"
+                                    ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                    ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="4,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                      Foreground="{StaticResource SecondaryTextBrush}"
+                                                      FontSize="12"
+                                                      FontFamily="Consolas, Courier New"
+                                                      VerticalAlignment="Top"
+                                                      Margin="0,0,12,0"
+                                                      Text="{Binding Converter={StaticResource LogTimestampConverter}}"/>
+                                            <TextBlock Grid.Column="1"
+                                                      Foreground="{StaticResource PrimaryTextBrush}"
+                                                      FontSize="13"
+                                                      TextWrapping="Wrap"
+                                                      VerticalAlignment="Top"
+                                                      Text="{Binding Converter={StaticResource LogMessageConverter}}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+                    </Grid>
                 </Border>
             </TabItem>
             <TabItem Header="{utils:Localize KeyPath=Plugin.Tab}"

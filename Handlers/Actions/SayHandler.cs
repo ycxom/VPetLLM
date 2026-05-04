@@ -237,25 +237,97 @@ namespace VPetLLM.Handlers.Actions
                         }
 
                         // 验证动画是否可用
+                        // 关键：动画名字不一定叫"say"！VPet通过路径解析动画名，
+                        // 例如 happy/say/a/shy_500.png 的Name是"shy"而非"say"
+                        // 必须使用 FindName(GraphType.Say) 获取实际注册名，与VPet内部SayRndFunction一致
+                        // 同时 Main.Say 硬编码 AnimatType.A_Start，很多mod只有Single类型，需分别处理
                         var currentMode = mainWindow.Main.Core.Save.Mode;
-                        var graph = mainWindow.Main.Core.Graph.FindGraph(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, currentMode);
+                        var graphCore = mainWindow.Main.Core.Graph;
 
-                        if (graph is null)
+                        // 如果animName是默认的"say"，使用FindName获取VPet实际注册的Say动画名
+                        if (animName == "say")
                         {
-                            Logger.Log($"Say animation '{animName}' not found in mode '{currentMode}'. Using default say animation.");
-                            animName = "say";
+                            var registeredName = graphCore.FindName(VPet_Simulator.Core.GraphInfo.GraphType.Say);
+                            if (!string.IsNullOrEmpty(registeredName))
+                            {
+                                Logger.Log($"SayHandler: FindName(GraphType.Say) returned '{registeredName}', using it instead of 'say'");
+                                animName = registeredName;
+                            }
+                        }
+
+                        // 使用 FindGraphs 查找动画（支持mode回退，且最终回退返回所有非Ill动画）
+                        var graphsStart = graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, currentMode);
+                        var graphsSingle = graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.Single, currentMode);
+                        var graphStart = graphsStart?.Count > 0 ? graphsStart[VPet_Simulator.Core.Function.Rnd.Next(graphsStart.Count)] : null;
+                        var graphSingle = graphsSingle?.Count > 0 ? graphsSingle[VPet_Simulator.Core.Function.Rnd.Next(graphsSingle.Count)] : null;
+
+                        if (graphStart is null && graphSingle is null)
+                        {
+                            // 指定动画不存在，尝试用FindName回退到默认Say动画
+                            var fallbackName = graphCore.FindName(VPet_Simulator.Core.GraphInfo.GraphType.Say);
+                            if (!string.IsNullOrEmpty(fallbackName) && fallbackName != animName)
+                            {
+                                Logger.Log($"SayHandler: Animation '{animName}' not found, falling back to FindName result '{fallbackName}'");
+                                animName = fallbackName;
+                                graphsStart = graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, currentMode);
+                                graphsSingle = graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.Single, currentMode);
+                                graphStart = graphsStart?.Count > 0 ? graphsStart[VPet_Simulator.Core.Function.Rnd.Next(graphsStart.Count)] : null;
+                                graphSingle = graphsSingle?.Count > 0 ? graphsSingle[VPet_Simulator.Core.Function.Rnd.Next(graphsSingle.Count)] : null;
+                            }
+                        }
+
+                        if (graphStart is null && graphSingle is null)
+                        {
+                            // 完全没有say动画，仅显示气泡
+                            Logger.Log($"SayHandler: No say animation available for '{animName}' in mode '{currentMode}', showing bubble only.");
+                            await ShowBubbleOnlyAsync(mainWindow, text);
+
+                            if (originalMode.HasValue)
+                            {
+                                await Task.Delay(200);
+                                mainWindow.Main.Core.Save.Mode = originalMode.Value;
+                                Logger.Log($"SayHandler: 恢复到原始状态模式 {originalMode.Value}");
+                            }
+                            return;
+                        }
+
+                        // 如果找到的动画mode与当前mode不同，需要临时切换mode
+                        // 因为Main.Say内部使用FindGraph（i>=1无法回退到Happy），必须确保mode匹配
+                        var animMode = graphStart?.GraphInfo.ModeType ?? graphSingle?.GraphInfo.ModeType;
+                        if (animMode.HasValue && animMode.Value != currentMode)
+                        {
+                            if (!originalMode.HasValue)
+                                originalMode = currentMode;
+                            mainWindow.Main.Core.Save.Mode = animMode.Value;
+                            currentMode = animMode.Value;
+                            Logger.Log($"SayHandler: 临时切换mode {originalMode.Value} -> {animMode.Value} 以匹配Say动画");
                         }
 
                         // 添加UI操作延迟，减少瞬时性能压力
                         Utils.UI.BubbleDelayController.ApplyUIDelay();
-                        
-                        // 播放说话动画 - 直接使用VPet原生API
-                        mainWindow.Main.Say(text, animName, true);
-                        Logger.Log($"SayHandler: 显示完成 - 文本: \"{text}\", 动画: {animName}, 模式: {currentMode}");
+
+                        if (graphStart is not null)
+                        {
+                            // 有A_Start动画，使用VPet原生Say API（支持A_Start→B_Loop→C_End完整流程）
+                            mainWindow.Main.Say(text, animName, true);
+                            Logger.Log($"SayHandler: 显示完成(A_Start模式) - 文本: \"{text}\", 动画: {animName}, 模式: {currentMode}");
+                        }
+                        else
+                        {
+                            // 只有Single动画，Main.Say无法使用（它硬编码A_Start）
+                            // 改为：先显示气泡，再直接播放Single动画
+                            Logger.Log($"SayHandler: Animation '{animName}' has only Single type, using direct display instead of Main.Say.");
+                            await ShowBubbleOnlyAsync(mainWindow, text);
+                            mainWindow.Main.Display(animName, VPet_Simulator.Core.GraphInfo.AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                            Logger.Log($"SayHandler: 显示完成(Single模式) - 文本: \"{text}\", 动画: {animName}, 模式: {currentMode}");
+                        }
 
                         // 恢复原始状态模式
+                        // 注意：Main.Say 内部使用 Task.Run 异步执行 Display，
+                        // 必须等待 Task.Run 启动并读取 Core.Save.Mode 后再恢复
                         if (originalMode.HasValue)
                         {
+                            await Task.Delay(200);
                             mainWindow.Main.Core.Save.Mode = originalMode.Value;
                             Logger.Log($"SayHandler: 恢复到原始状态模式 {originalMode.Value}");
                         }
