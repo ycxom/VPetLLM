@@ -76,6 +76,10 @@ namespace VPetLLM
         /// </summary>
         public TTSServiceType? TTSService;
 
+        private volatile bool _isTTSServiceUnavailable;
+
+        public bool IsTTSServiceUnavailable => _isTTSServiceUnavailable;
+
         /// <summary>
         /// 插件列表
         /// </summary>
@@ -1559,10 +1563,20 @@ namespace VPetLLM
             {
                 try
                 {
-                    await TTSService.PlayTextAsync(text);
+                    var success = await TTSService.PlayTextAsync(text);
+                    if (success)
+                    {
+                        _isTTSServiceUnavailable = false;
+                    }
+                    else
+                    {
+                        _isTTSServiceUnavailable = true;
+                        Logger.Log("TTS: 服务不可用，PlayTextAsync 返回 false");
+                    }
                 }
                 catch (Exception ex)
                 {
+                    _isTTSServiceUnavailable = true;
                     Logger.Log($"TTS播放失败: {ex.Message}");
                 }
             }

@@ -1013,6 +1013,8 @@ namespace VPetLLM.UI.Windows
 
             _ttsService = new UtilsTTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
 
+            UpdateTTSServiceUnavailableUI(_plugin.IsTTSServiceUnavailable);
+
             await Task.Yield();
 
             if (_plugin.Settings.ASR is null)
@@ -3790,6 +3792,10 @@ namespace VPetLLM.UI.Windows
                     var provider = selectedItem.Tag?.ToString();
                     System.Diagnostics.Debug.WriteLine($"[TTS Provider] 切换到提供商: {provider}");
 
+                    var serviceUnavailableTextBlock = this.FindName("TextBlock_TTS_ServiceUnavailable") as TextBlock;
+                    if (serviceUnavailableTextBlock is not null)
+                        serviceUnavailableTextBlock.Visibility = Visibility.Collapsed;
+
                     // 先隐藏所有面板
                     var urlPanel = FindName("Panel_TTS_URL") as StackPanel;
                     var openAIPanel = FindName("Panel_TTS_OpenAI") as StackPanel;
@@ -4058,10 +4064,8 @@ namespace VPetLLM.UI.Windows
 
             try
             {
-                // 保存当前设置到TTS服务
                 SaveSettings();
 
-                // 重新创建TTS服务实例以使用最新设置
                 _ttsService?.Dispose();
                 _ttsService = new UtilsTTSService(_plugin.Settings.TTS, _plugin.Settings.Proxy);
 
@@ -4070,11 +4074,13 @@ namespace VPetLLM.UI.Windows
                     var success = await _ttsService.TestTTSAsync();
                     if (success)
                     {
+                        UpdateTTSServiceUnavailableUI(false);
                         MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.TestSuccess", _plugin.Settings.Language, "TTS测试成功！"),
                             ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
+                        UpdateTTSServiceUnavailableUI(true);
                         MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("TTS.TestFail", _plugin.Settings.Language, "TTS测试失败，请检查设置。"),
                             ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
                     }
@@ -4082,12 +4088,44 @@ namespace VPetLLM.UI.Windows
             }
             catch (Exception ex)
             {
+                UpdateTTSServiceUnavailableUI(true);
                 MessageBox.Show(ErrorMessageHelper.GetLocalizedError("TTS.TestError", _plugin.Settings.Language, "TTS测试出错", ex),
                     ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
                 StopButtonLoadingAnimation(button);
+            }
+        }
+
+        private void UpdateTTSServiceUnavailableUI(bool isUnavailable)
+        {
+            try
+            {
+                var textBlock = this.FindName("TextBlock_TTS_ServiceUnavailable") as TextBlock;
+                if (textBlock is null) return;
+
+                if (isUnavailable)
+                {
+                    var isFreeProvider = _plugin.Settings.TTS?.Provider == "Free";
+                    if (isFreeProvider)
+                    {
+                        textBlock.Text = ErrorMessageHelper.GetLocalizedMessage("TTS.ServiceUnavailableFree", _plugin.Settings.Language, "服务不可用，请检查网络是否正常，可能在维护中");
+                    }
+                    else
+                    {
+                        textBlock.Text = ErrorMessageHelper.GetLocalizedMessage("TTS.ServiceUnavailable", _plugin.Settings.Language, "服务不可用，请检查网络是否正常");
+                    }
+                    textBlock.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    textBlock.Visibility = Visibility.Collapsed;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"UpdateTTSServiceUnavailableUI: 更新TTS服务状态UI失败: {ex.Message}");
             }
         }
 

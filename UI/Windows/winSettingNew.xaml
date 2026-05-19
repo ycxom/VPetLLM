@@ -847,6 +847,13 @@
                                                 FontSize="14"/>
                                             </StackPanel>
 
+                                            <TextBlock x:Name="TextBlock_TTS_ServiceUnavailable"
+                                                Visibility="Collapsed"
+                                                Foreground="#FFD44444"
+                                                FontSize="12"
+                                                Margin="0,0,0,8"
+                                                TextWrapping="Wrap"/>
+
                                             <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,0">
                                                 <Button x:Name="Button_TTS_Test"
                                                 Click="Button_TTS_Test_Click"
