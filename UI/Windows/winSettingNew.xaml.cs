@@ -361,6 +361,8 @@ namespace VPetLLM.UI.Windows
             _plugin.SettingWindow = this;
             Closed += Window_Closed;
 
+            _plugin.TTSServiceAvailabilityChanged += OnTTSServiceAvailabilityChanged;
+
             Loaded += async (s, e) =>
             {
                 _isLoadingSettings = true;
@@ -385,23 +387,23 @@ namespace VPetLLM.UI.Windows
                 };
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
 
-                Dispatcher.BeginInvoke(new Action(() =>
+                _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
                     LoadMultimodalProviderSettings();
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
-                Dispatcher.BeginInvoke(new Action(() =>
+                _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
                     AttachImmediateSaveForChannelLists();
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
-                Dispatcher.BeginInvoke(new Action(() =>
+                _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
                     var result = TTSPluginDetector.DetectAllOtherTTSPlugins(_plugin.MW);
                     RefreshTTSPluginStatus(result.HasOtherEnabledTTSPlugin, result.EnabledPluginNames);
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
-                Dispatcher.BeginInvoke(new Action(() =>
+                _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
                     _isLoadingSettings = false;
                     _isReadyToSave = true;
@@ -2508,6 +2510,8 @@ namespace VPetLLM.UI.Windows
 
         private void Window_Closed(object? sender, EventArgs e)
         {
+            _plugin.TTSServiceAvailabilityChanged -= OnTTSServiceAvailabilityChanged;
+
             // 停止并清理定时器
             _autoSaveTimer?.Stop();
             _autoSaveTimer = null;
@@ -4126,6 +4130,21 @@ namespace VPetLLM.UI.Windows
             catch (Exception ex)
             {
                 Logger.Log($"UpdateTTSServiceUnavailableUI: 更新TTS服务状态UI失败: {ex.Message}");
+            }
+        }
+
+        private void OnTTSServiceAvailabilityChanged(object? sender, bool isUnavailable)
+        {
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    UpdateTTSServiceUnavailableUI(isUnavailable);
+                }));
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"OnTTSServiceAvailabilityChanged: 处理TTS可用性变化事件失败: {ex.Message}");
             }
         }
 

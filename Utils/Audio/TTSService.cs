@@ -12,6 +12,30 @@ namespace VPetLLM.Utils.Audio
         private bool _isPlaying = false;
         private TaskCompletionSource<bool>? _currentPlaybackTask;
 
+        private volatile bool _isServiceUnavailable;
+
+        public bool IsServiceUnavailable => _isServiceUnavailable;
+
+        public event EventHandler<bool>? ServiceAvailabilityChanged;
+
+        private void OnTTSSuccess()
+        {
+            if (_isServiceUnavailable)
+            {
+                _isServiceUnavailable = false;
+                ServiceAvailabilityChanged?.Invoke(this, false);
+            }
+        }
+
+        private void OnTTSFailure()
+        {
+            if (!_isServiceUnavailable)
+            {
+                _isServiceUnavailable = true;
+                ServiceAvailabilityChanged?.Invoke(this, true);
+            }
+        }
+
         // 统一TTS系统集成 - 通过依赖注入
         private readonly ITTSDispatcher? _unifiedTTSDispatcher;
         private readonly bool _useUnifiedSystem;
@@ -188,6 +212,7 @@ namespace VPetLLM.Utils.Audio
                     if (!response.Success || response.AudioData is null)
                     {
                         VPetLLMUtils.Logger.Log($"TTS: 统一系统处理失败: {response.ErrorMessage}");
+                        OnTTSFailure();
                         return null;
                     }
 
@@ -196,7 +221,6 @@ namespace VPetLLM.Utils.Audio
                 }
                 else
                 {
-                    // 使用传统TTS Core
                     var ttsCore = GetTTSCore();
                     audioData = await ttsCore.GenerateAudioAsync(text);
                     fileExtension = ttsCore.GetAudioFormat();
@@ -205,20 +229,22 @@ namespace VPetLLM.Utils.Audio
                 if (audioData is null || audioData.Length == 0)
                 {
                     VPetLLMUtils.Logger.Log("TTS: 未获取到音频数据");
+                    OnTTSFailure();
                     return null;
                 }
 
-                // 保存到临时文件
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
                 await File.WriteAllBytesAsync(tempFile, audioData);
 
+                OnTTSSuccess();
                 return tempFile;
             }
             catch (Exception ex)
             {
                 VPetLLMUtils.Logger.Log($"TTS下载错误: {ex.Message}");
+                OnTTSFailure();
                 return null;
             }
         }
@@ -287,7 +313,6 @@ namespace VPetLLM.Utils.Audio
         /// <returns></returns>
         public async Task<bool> StartPlayTextAsync(string text)
         {
-            // 实时检测 VPet TTS 插件状态
             if (IsVPetTTSPluginEnabled())
             {
                 VPetLLMUtils.Logger.Log("TTS: VPet TTS 插件已启用，跳过内置TTS播放");
@@ -299,7 +324,6 @@ namespace VPetLLM.Utils.Audio
                 return false;
             }
 
-            // 等待当前播放完成
             await WaitForCurrentPlaybackAsync();
 
             try
@@ -311,7 +335,6 @@ namespace VPetLLM.Utils.Audio
 
                 if (_useUnifiedSystem && _unifiedTTSDispatcher is not null)
                 {
-                    // 使用统一TTS系统
                     var request = new ModelsTTSRequest
                     {
                         RequestId = Guid.NewGuid().ToString(),
@@ -328,6 +351,7 @@ namespace VPetLLM.Utils.Audio
                     if (!response.Success || response.AudioData is null)
                     {
                         VPetLLMUtils.Logger.Log($"TTS: 统一系统处理失败: {response.ErrorMessage}");
+                        OnTTSFailure();
                         return false;
                     }
 
@@ -336,7 +360,6 @@ namespace VPetLLM.Utils.Audio
                 }
                 else
                 {
-                    // 使用传统TTS Core
                     var ttsCore = GetTTSCore();
                     audioData = await ttsCore.GenerateAudioAsync(text);
                     fileExtension = ttsCore.GetAudioFormat();
@@ -345,27 +368,28 @@ namespace VPetLLM.Utils.Audio
                 if (audioData is null || audioData.Length == 0)
                 {
                     VPetLLMUtils.Logger.Log("TTS: 未获取到音频数据");
+                    OnTTSFailure();
                     return false;
                 }
 
                 VPetLLMUtils.Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
-                // 保存到临时文件
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
                 await File.WriteAllBytesAsync(tempFile, audioData);
                 VPetLLMUtils.Logger.Log($"TTS: 音频文件保存到: {tempFile}");
 
-                // 开始播放音频（不等待播放完成，但设置播放状态）
                 _ = Task.Run(async () => await PlayAudioFileAsync(tempFile));
                 VPetLLMUtils.Logger.Log($"TTS: 音频开始播放，立即返回");
 
+                OnTTSSuccess();
                 return true;
             }
             catch (Exception ex)
             {
                 VPetLLMUtils.Logger.Log($"TTS播放错误: {ex.Message}");
+                OnTTSFailure();
                 return false;
             }
         }
@@ -377,7 +401,6 @@ namespace VPetLLM.Utils.Audio
         /// <returns>可等待的播放任务</returns>
         public async Task<Task> StartPlayTextAsyncWithTask(string text)
         {
-            // 实时检测 VPet TTS 插件状态
             if (IsVPetTTSPluginEnabled())
             {
                 VPetLLMUtils.Logger.Log("TTS: VPet TTS 插件已启用，跳过内置TTS播放");
@@ -389,7 +412,6 @@ namespace VPetLLM.Utils.Audio
                 return Task.CompletedTask;
             }
 
-            // 等待当前播放完成
             await WaitForCurrentPlaybackAsync();
 
             try
@@ -401,7 +423,6 @@ namespace VPetLLM.Utils.Audio
 
                 if (_useUnifiedSystem && _unifiedTTSDispatcher is not null)
                 {
-                    // 使用统一TTS系统
                     var request = new ModelsTTSRequest
                     {
                         RequestId = Guid.NewGuid().ToString(),
@@ -418,6 +439,7 @@ namespace VPetLLM.Utils.Audio
                     if (!response.Success || response.AudioData is null)
                     {
                         VPetLLMUtils.Logger.Log($"TTS: 统一系统处理失败: {response.ErrorMessage}");
+                        OnTTSFailure();
                         return Task.CompletedTask;
                     }
 
@@ -426,7 +448,6 @@ namespace VPetLLM.Utils.Audio
                 }
                 else
                 {
-                    // 使用传统TTS Core
                     var ttsCore = GetTTSCore();
                     audioData = await ttsCore.GenerateAudioAsync(text);
                     fileExtension = ttsCore.GetAudioFormat();
@@ -435,27 +456,28 @@ namespace VPetLLM.Utils.Audio
                 if (audioData is null || audioData.Length == 0)
                 {
                     VPetLLMUtils.Logger.Log("TTS: 未获取到音频数据");
+                    OnTTSFailure();
                     return Task.CompletedTask;
                 }
 
                 VPetLLMUtils.Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
-                // 保存到临时文件（音量增益由 mpv 播放器处理）
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
                 await File.WriteAllBytesAsync(tempFile, audioData);
                 VPetLLMUtils.Logger.Log($"TTS: 音频文件保存到: {tempFile}");
 
-                // 返回播放任务
                 var playTask = Task.Run(async () => await PlayAudioFileAsync(tempFile));
                 VPetLLMUtils.Logger.Log($"TTS: 音频开始播放，返回播放任务");
 
+                OnTTSSuccess();
                 return playTask;
             }
             catch (Exception ex)
             {
                 VPetLLMUtils.Logger.Log($"TTS播放错误: {ex.Message}");
+                OnTTSFailure();
                 return Task.CompletedTask;
             }
         }
@@ -467,7 +489,6 @@ namespace VPetLLM.Utils.Audio
         /// <returns></returns>
         public async Task<bool> PlayTextAsync(string text)
         {
-            // 实时检测 VPet TTS 插件状态
             if (IsVPetTTSPluginEnabled())
             {
                 VPetLLMUtils.Logger.Log("TTS: VPet TTS 插件已启用，跳过内置TTS播放");
@@ -488,7 +509,6 @@ namespace VPetLLM.Utils.Audio
 
                 if (_useUnifiedSystem && _unifiedTTSDispatcher is not null)
                 {
-                    // 使用统一TTS系统
                     var request = new ModelsTTSRequest
                     {
                         RequestId = Guid.NewGuid().ToString(),
@@ -505,6 +525,7 @@ namespace VPetLLM.Utils.Audio
                     if (!response.Success || response.AudioData is null)
                     {
                         VPetLLMUtils.Logger.Log($"TTS: 统一系统处理失败: {response.ErrorMessage}");
+                        OnTTSFailure();
                         return false;
                     }
 
@@ -513,7 +534,6 @@ namespace VPetLLM.Utils.Audio
                 }
                 else
                 {
-                    // 使用传统TTS Core
                     var ttsCore = GetTTSCore();
                     audioData = await ttsCore.GenerateAudioAsync(text);
                     fileExtension = ttsCore.GetAudioFormat();
@@ -522,26 +542,27 @@ namespace VPetLLM.Utils.Audio
                 if (audioData is null || audioData.Length == 0)
                 {
                     VPetLLMUtils.Logger.Log("TTS: 未获取到音频数据");
+                    OnTTSFailure();
                     return false;
                 }
 
                 VPetLLMUtils.Logger.Log($"TTS: 成功获取音频数据，大小: {audioData.Length} 字节");
 
-                // 保存到临时文件（音量增益由 mpv 播放器处理）
                 var tempDir = Path.GetTempPath();
                 var tempFileName = $"VPetLLM_TTS_{Guid.NewGuid():N}.{fileExtension}";
                 var tempFile = Path.Combine(tempDir, tempFileName);
                 await File.WriteAllBytesAsync(tempFile, audioData);
                 VPetLLMUtils.Logger.Log($"TTS: 音频文件保存到: {tempFile}");
 
-                // 播放音频
                 await PlayAudioFileAsync(tempFile);
 
+                OnTTSSuccess();
                 return true;
             }
             catch (Exception ex)
             {
                 VPetLLMUtils.Logger.Log($"TTS播放错误: {ex.Message}");
+                OnTTSFailure();
                 return false;
             }
         }

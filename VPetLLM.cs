@@ -80,6 +80,14 @@ namespace VPetLLM
 
         public bool IsTTSServiceUnavailable => _isTTSServiceUnavailable;
 
+        public event EventHandler<bool>? TTSServiceAvailabilityChanged;
+
+        private void OnTTSServiceAvailabilityChanged(object? sender, bool isUnavailable)
+        {
+            _isTTSServiceUnavailable = isUnavailable;
+            TTSServiceAvailabilityChanged?.Invoke(this, isUnavailable);
+        }
+
         /// <summary>
         /// 插件列表
         /// </summary>
@@ -473,6 +481,7 @@ namespace VPetLLM
 
                 // 保持旧版TTS服务用于兼容性，支持统一TTS注入
                 TTSService = new TTSServiceType(Settings.TTS, Settings.Proxy, unifiedDispatcher);
+                TTSService.ServiceAvailabilityChanged += OnTTSServiceAvailabilityChanged;
                 _logger.LogInformation("Legacy TTS service initialized with dependency injection support");
             }
             catch (Exception ex)
@@ -1563,20 +1572,10 @@ namespace VPetLLM
             {
                 try
                 {
-                    var success = await TTSService.PlayTextAsync(text);
-                    if (success)
-                    {
-                        _isTTSServiceUnavailable = false;
-                    }
-                    else
-                    {
-                        _isTTSServiceUnavailable = true;
-                        Logger.Log("TTS: 服务不可用，PlayTextAsync 返回 false");
-                    }
+                    await TTSService.PlayTextAsync(text);
                 }
                 catch (Exception ex)
                 {
-                    _isTTSServiceUnavailable = true;
                     Logger.Log($"TTS播放失败: {ex.Message}");
                 }
             }
