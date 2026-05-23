@@ -332,14 +332,14 @@ namespace VPetLLM.Handlers.Legacy
                         case "touch_head":
                         case "touchhead":
                             Logger.Log("ActionHandler: Executing interactive action 'touch_head'");
-                            mainWindow.Main.DisplayTouchHead();
+                            mainWindow.Main.DisplayTouchHead?.Invoke();
                             actionTriggered = true;
                             Logger.Log("ActionHandler: Interactive action 'touch_head' completed");
                             break;
                         case "touch_body":
                         case "touchbody":
                             Logger.Log("ActionHandler: Executing interactive action 'touch_body'");
-                            mainWindow.Main.DisplayTouchBody();
+                            mainWindow.Main.DisplayTouchBody?.Invoke();
                             actionTriggered = true;
                             Logger.Log("ActionHandler: Interactive action 'touch_body' completed");
                             break;

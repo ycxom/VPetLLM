@@ -73,7 +73,7 @@ namespace VPetLLM.Handlers.Actions
                 await PlayUseAnimationAsync(mainWindow, item);
 
                 // 直接调用 Item.Use() 方法
-                item.Use();
+                item.Use(mainWindow);
 
                 Logger.Log($"UseItemHandler: 物品使用成功 - {item.Name} (type: {item.ItemType})");
             }
@@ -125,7 +125,7 @@ namespace VPetLLM.Handlers.Actions
                 // 使用物品（多次调用 Use）
                 for (int i = 0; i < actualCount; i++)
                 {
-                    item.Use();
+                    item.Use(mainWindow);
                 }
 
                 Logger.Log($"UseItemHandler: 物品使用成功 - {item.Name} x{actualCount}");

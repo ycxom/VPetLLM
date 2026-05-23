@@ -82,12 +82,12 @@ namespace VPetLLM.Handlers.Actions
                     {
                         case "touch_head":
                         case "touchhead":
-                            mainWindow.Main.DisplayTouchHead();
+                            mainWindow.Main.DisplayTouchHead?.Invoke();
                             actionTriggered = true;
                             break;
                         case "touch_body":
                         case "touchbody":
-                            mainWindow.Main.DisplayTouchBody();
+                            mainWindow.Main.DisplayTouchBody?.Invoke();
                             actionTriggered = true;
                             break;
                         case "pinch":
