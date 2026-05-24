@@ -75,6 +75,11 @@ namespace VPetLLM
         public bool EnableFallback { get; set; } = false;
 
         /// <summary>
+        /// 是否启用自动诊断（连续5次AI请求失败时自动运行）
+        /// </summary>
+        public bool EnableAutoDiagnostic { get; set; } = true;
+
+        /// <summary>
         /// 降级提供商配置列表
         /// </summary>
         public List<ProviderFallbackConfig> FallbackProviders { get; set; } = new();

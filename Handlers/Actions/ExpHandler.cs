@@ -13,19 +13,51 @@ namespace VPetLLM.Handlers.Actions
 
         public Task Execute(int value, IMainWindow mainWindow)
         {
-            // 如果启用了状态限制，应用限制逻辑
-            if (VPetLLM.Instance.Settings.LimitStateChanges)
+            if (value > 0)
             {
-                double currentValue = mainWindow.Core.Save.Exp;
-                value = StateChangeLimiter.LimitStateChange(value, currentValue);
+                if (VPetLLM.Instance.Settings.LimitStateChanges)
+                {
+                    double currentValue = mainWindow.Core.Save.Exp;
+                    value = StateChangeLimiter.LimitStateChange(value, currentValue);
+                }
+
+                mainWindow.Core.Save.Exp += value;
+            }
+            else if (value < 0)
+            {
+                double newExp = mainWindow.Core.Save.Exp + value;
+                ExpSetHandler.SetExpDirect(mainWindow, newExp);
             }
 
-            mainWindow.Core.Save.Exp += value;
             mainWindow.Main.LabelDisplayShowChangeNumber("经验 ".Translate() + (value > 0 ? "+" : "") + "{0:f0}", value);
             return Task.CompletedTask;
         }
         public Task Execute(string value, IMainWindow mainWindow)
         {
+            if (!double.TryParse(value, out double doubleValue))
+                return Task.CompletedTask;
+
+            if (doubleValue > 0)
+            {
+                if (VPetLLM.Instance.Settings.LimitStateChanges)
+                {
+                    double currentValue = mainWindow.Core.Save.Exp;
+                    int safeInput = doubleValue > int.MaxValue ? int.MaxValue : (int)Math.Round(doubleValue);
+                    int limitedValue = StateChangeLimiter.LimitStateChange(safeInput, currentValue);
+                    mainWindow.Core.Save.Exp += limitedValue;
+                }
+                else
+                {
+                    mainWindow.Core.Save.Exp += doubleValue;
+                }
+            }
+            else if (doubleValue < 0)
+            {
+                double newExp = mainWindow.Core.Save.Exp + doubleValue;
+                ExpSetHandler.SetExpDirect(mainWindow, newExp);
+            }
+
+            mainWindow.Main.LabelDisplayShowChangeNumber("经验 ".Translate() + (doubleValue > 0 ? "+" : "") + "{0:f0}", doubleValue);
             return Task.CompletedTask;
         }
         public Task Execute(IMainWindow mainWindow)

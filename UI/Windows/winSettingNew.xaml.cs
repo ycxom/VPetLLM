@@ -10,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using VPetLLM.Services;
 using VPetLLM.UI.Controls;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
@@ -772,6 +773,7 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_Provider")).ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectedItem = _plugin.Settings.Provider;
             ((CheckBox)this.FindName("CheckBox_EnableFallback")).IsChecked = _plugin.Settings.EnableFallback;
+            ((CheckBox)this.FindName("CheckBox_EnableAutoDiagnostic")).IsChecked = _plugin.Settings.EnableAutoDiagnostic;
             if (_plugin.Settings.EnableFallback == true && Panel_FallbackPriority != null)
             {
                 Panel_FallbackPriority.Visibility = Visibility.Visible;
@@ -1643,6 +1645,14 @@ namespace VPetLLM.UI.Windows
             SaveFallbackSettings();
         }
 
+        private void CheckBox_EnableAutoDiagnostic_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_plugin == null) return;
+            var cb = sender as CheckBox;
+            _plugin.Settings.EnableAutoDiagnostic = cb?.IsChecked == true;
+            MarkUnsavedChanges();
+        }
+
         private void LoadFallbackProviders()
         {
             if (ListBox_FallbackProviders == null) return;
@@ -1721,6 +1731,7 @@ namespace VPetLLM.UI.Windows
                 }
 
                 _plugin.Settings.EnableFallback = CheckBox_EnableFallback?.IsChecked == true;
+                _plugin.Settings.EnableAutoDiagnostic = CheckBox_EnableAutoDiagnostic?.IsChecked == true;
                 MarkUnsavedChanges();
             }
             catch { }
@@ -8579,6 +8590,178 @@ namespace VPetLLM.UI.Windows
             catch (Exception ex)
             {
                 Logger.Log($"About: 加载版本信息失败: {ex.Message}");
+            }
+        }
+
+        private async void Button_RunDiagnostic_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            var statusText = FindName("TextBlock_DiagnosticStatus") as TextBlock;
+            var progPanel = FindName("StackPanel_DiagnosticProgress") as StackPanel;
+
+            if (btn != null) btn.IsEnabled = false;
+            if (progPanel != null) progPanel.Visibility = Visibility.Visible;
+            if (statusText != null) statusText.Text = LanguageHelper.Get("Advanced_Options.DiagnosticRunning", _plugin.Settings.Language) ?? "正在运行诊断...";
+
+            try
+            {
+                var lang = _plugin?.Settings?.Language ?? "zh-hans";
+                var diagService = new Services.DiagnosticService(_plugin.Settings, lang);
+
+                var result = await Task.Run(() => diagService.RunFullDiagnosticAsync(status =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (statusText != null) statusText.Text = status;
+                    });
+                }));
+
+                var report = diagService.FormatDiagnosticReport(result);
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    if (progPanel != null) progPanel.Visibility = Visibility.Collapsed;
+                    if (btn != null) btn.IsEnabled = true;
+                    if (statusText != null) statusText.Text = LanguageHelper.Get("Advanced_Options.DiagnosticComplete", lang) ?? "诊断完成";
+
+                    var title = lang.StartsWith("zh") ? "运行诊断结果" : "Diagnostic Results";
+
+                    var showLLMQuestion = lang.StartsWith("zh")
+                        ? "是否允许请求各渠道验证 LLM 是否能正常响应？\n\n(这将向各渠道发送测试消息)"
+                        : "Do you want to test each channel by sending a test message to verify LLM response?\n\n(This will send a test message to each channel)";
+
+                    var shouldShowLLM = MessageBox.Show(
+                        $"{title}\n\n{report}\n\n{showLLMQuestion}",
+                        lang.StartsWith("zh") ? "LLM 测试" : "LLM Test",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    if (shouldShowLLM == MessageBoxResult.Yes)
+                    {
+                        _ = TestChannelLLMsFromSettingsAsync(diagService, result, lang, statusText, progPanel, btn);
+                    }
+                    else
+                    {
+                        ShowRecommendationsInSettings(diagService, result, report, title, lang);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Diagnostic error: {ex.Message}");
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    if (progPanel != null) progPanel.Visibility = Visibility.Collapsed;
+                    if (btn != null) btn.IsEnabled = true;
+                    MessageBox.Show($"诊断失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+            }
+        }
+
+        private void ShowRecommendationsInSettings(
+            Services.DiagnosticService diagService,
+            Services.DiagnosticResult result,
+            string report,
+            string title,
+            string lang)
+        {
+            var recommendations = diagService.GenerateRecommendedSettings(result);
+            if (recommendations.Count > 0)
+            {
+                var recReport = diagService.FormatRecommendationsReport(recommendations);
+                var recTitle = lang.StartsWith("zh") ? "推荐设置调整" : "Recommended Settings";
+                var recQuestion = lang.StartsWith("zh")
+                    ? $"{report}\n\n{recReport}\n\n是否应用以上推荐设置？\n\n(包含：自动切换Free兜底、启用降级流程、修复代理配置等)"
+                    : $"{report}\n\n{recReport}\n\nApply the above recommended settings?\n\n(Includes: auto-switch to Free fallback, enable degradation, fix proxy, etc.)";
+
+                var recResult = MessageBox.Show(
+                    recQuestion,
+                    recTitle,
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (recResult == MessageBoxResult.Yes)
+                {
+                    diagService.ApplyRecommendedSettings(recommendations);
+
+                    var appliedMsg = lang.StartsWith("zh")
+                        ? "已应用推荐设置。\n\n设置将在下次请求中生效。"
+                        : "Recommended settings applied.\n\nSettings will take effect on next request.";
+
+                    MessageBox.Show(
+                        $"{appliedMsg}\n\n{recReport}",
+                        title,
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        $"{title}\n\n{report}",
+                        title,
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+            }
+            else
+            {
+                MessageBox.Show(
+                    $"{title}\n\n{report}",
+                    title,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
+        private async Task TestChannelLLMsFromSettingsAsync(
+            Services.DiagnosticService diagService,
+            Services.DiagnosticResult result,
+            string lang,
+            TextBlock statusText,
+            StackPanel progPanel,
+            Button btn)
+        {
+            if (progPanel != null) progPanel.Visibility = Visibility.Visible;
+            if (btn != null) btn.IsEnabled = false;
+
+            try
+            {
+                foreach (var cr in result.ChannelResults)
+                {
+                    if (cr.ApiAvailable && !cr.LlmTested)
+                    {
+                        var statusMsg = lang.StartsWith("zh")
+                            ? $"正在测试 {cr.ChannelType}: {cr.ChannelName}..."
+                            : $"Testing {cr.ChannelType}: {cr.ChannelName}...";
+                        Dispatcher.Invoke(() =>
+                        {
+                            if (statusText != null) statusText.Text = statusMsg;
+                        });
+
+                        await diagService.CheckChannelLLMAsync(cr);
+                    }
+                }
+
+                var finalReport = diagService.FormatDiagnosticReport(result);
+
+                Dispatcher.Invoke(() =>
+                {
+                    if (progPanel != null) progPanel.Visibility = Visibility.Collapsed;
+                    if (btn != null) btn.IsEnabled = true;
+
+                    ShowRecommendationsInSettings(diagService, result, finalReport,
+                        lang.StartsWith("zh") ? "诊断报告 - 含LLM测试" : "Diagnostic Report - With LLM Tests",
+                        lang);
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"LLM test error: {ex.Message}");
+                Dispatcher.Invoke(() =>
+                {
+                    if (progPanel != null) progPanel.Visibility = Visibility.Collapsed;
+                    if (btn != null) btn.IsEnabled = true;
+                });
             }
         }
 

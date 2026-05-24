@@ -58,6 +58,7 @@ namespace VPetLLM.Handlers.Core
             _handlerRegistry.Register("happy", new HappyHandler());
             _handlerRegistry.Register("health", new HealthHandler());
             _handlerRegistry.Register("exp", new ExpHandler());
+            _handlerRegistry.Register("exp_set", new ExpSetHandler());
             _handlerRegistry.Register("buy", new BuyHandler());
             _handlerRegistry.Register("use_item", new UseItemHandler());  // 新增：物品使用处理器
             _handlerRegistry.Register("action", new ActionHandler());

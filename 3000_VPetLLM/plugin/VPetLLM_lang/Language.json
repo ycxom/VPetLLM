@@ -855,6 +855,42 @@
             "zh-hans": "允许宠物通过mpv播放媒体（视频/音乐）",
             "zh-hant": "允許寵物通過mpv播放媒體（視頻/音樂）",
             "jp": "ペットにmpvでメディア（動画/音楽）の再生を許可する"
+        },
+        "DiagnosticTitle": {
+            "en": "Run Diagnostics",
+            "zh-hans": "运行诊断",
+            "zh-hant": "運行診斷",
+            "jp": "診断を実行"
+        },
+        "DiagnosticDesc": {
+            "en": "Check network connectivity, proxy availability, and API endpoint status to quickly identify connection issues. Also runs automatically after 5 consecutive AI request failures.",
+            "zh-hans": "检查网络连接、代理可用性及 API 接口状态，帮助快速定位连接问题。连续5次AI请求失败时也会自动运行。",
+            "zh-hant": "檢查網絡連接、代理可用性及 API 接口狀態，幫助快速定位連接問題。連續5次AI請求失敗時也會自動運行。",
+            "jp": "ネットワーク接続、プロキシの可用性、APIエンドポイントの状態をチェックして、接続の問題をすばやく特定します。5回連続でAIリクエストが失敗した場合にも自動的に実行されます。"
+        },
+        "RunDiagnostic": {
+            "en": "Run Diagnostics",
+            "zh-hans": "运行诊断",
+            "zh-hant": "運行診斷",
+            "jp": "診断を実行"
+        },
+        "DiagnosticRunning": {
+            "en": "Running diagnostics...",
+            "zh-hans": "正在运行诊断...",
+            "zh-hant": "正在運行診斷...",
+            "jp": "診断を実行中..."
+        },
+        "DiagnosticComplete": {
+            "en": "Diagnostic complete",
+            "zh-hans": "诊断完成",
+            "zh-hant": "診斷完成",
+            "jp": "診断完了"
+        },
+        "EnableAutoDiagnostic": {
+            "en": "Enable auto diagnostic (runs automatically after 5 consecutive AI request failures)",
+            "zh-hans": "启用自动诊断（连续5次AI请求失败时自动运行）",
+            "zh-hant": "啟用自動診斷（連續5次AI請求失敗時自動運行）",
+            "jp": "自動診断を有効にする（5回連続でAIリクエストが失敗した場合に自動実行）"
         }
     },
     "Tools": {
@@ -3391,10 +3427,10 @@
             "jp": "VPetLLMはVPet-Simulator用に設計されたプラグインで、複数のLLM、ASR、TTSプロバイダーをサポートしています。"
         },
         "Version": {
-            "en": "Version:",
-            "zh-hans": "版本:",
-            "zh-hant": "版本:",
-            "jp": "バージョン:"
+            "en": "Version Info",
+            "zh-hans": "版本信息",
+            "zh-hant": "版本資訊",
+            "jp": "バージョン情報"
         },
         "FreeProviders": {
             "en": "Free Provider Information",
@@ -3479,6 +3515,380 @@
             "zh-hans": "本项目遵循相关开源协议，仅供学习和研究使用。",
             "zh-hant": "本項目遵循相關開源協議，僅供學習和研究使用。",
             "jp": "このプロジェクトは関連するオープンソースライセンスに従い、学習および研究目的のみです。"
+        }
+    },
+    "Diagnostic": {
+        "StartingNetwork": {
+            "en": "Checking network connectivity...",
+            "zh-hans": "正在检查网络连接...",
+            "zh-hant": "正在檢查網絡連接...",
+            "jp": "ネットワーク接続を確認中..."
+        },
+        "CheckingProxy": {
+            "en": "Checking proxy settings...",
+            "zh-hans": "正在检查代理设置...",
+            "zh-hant": "正在檢查代理設置...",
+            "jp": "プロキシ設定を確認中..."
+        },
+        "CheckingChannels": {
+            "en": "Checking channel APIs...",
+            "zh-hans": "正在检查各渠道 API...",
+            "zh-hant": "正在檢查各渠道 API...",
+            "jp": "チャネルAPIを確認中..."
+        },
+        "CheckingOpenAI": {
+            "en": "Checking OpenAI channels...",
+            "zh-hans": "正在检查 OpenAI 渠道...",
+            "zh-hant": "正在檢查 OpenAI 渠道...",
+            "jp": "OpenAIチャネルを確認中..."
+        },
+        "CheckingGemini": {
+            "en": "Checking Gemini channels...",
+            "zh-hans": "正在检查 Gemini 渠道...",
+            "zh-hant": "正在檢查 Gemini 渠道...",
+            "jp": "Geminiチャネルを確認中..."
+        },
+        "CheckingOllama": {
+            "en": "Checking Ollama channels...",
+            "zh-hans": "正在检查 Ollama 渠道...",
+            "zh-hant": "正在檢查 Ollama 渠道...",
+            "jp": "Ollamaチャネルを確認中..."
+        },
+        "CheckingLMStudio": {
+            "en": "Checking LMStudio channels...",
+            "zh-hans": "正在检查 LMStudio 渠道...",
+            "zh-hant": "正在檢查 LMStudio 渠道...",
+            "jp": "LMStudioチャネルを確認中..."
+        },
+        "NetworkOk": {
+            "en": "Network connectivity OK",
+            "zh-hans": "网络连接正常",
+            "zh-hant": "網絡連接正常",
+            "jp": "ネットワーク接続正常"
+        },
+        "NetworkFail": {
+            "en": "Network connectivity failed, please check network settings",
+            "zh-hans": "网络连接失败，请检查网络设置",
+            "zh-hant": "網絡連接失敗，請檢查網絡設置",
+            "jp": "ネットワーク接続に失敗しました。ネットワーク設定を確認してください"
+        },
+        "NetworkBlocked": {
+            "en": "Network unavailable, cannot continue diagnostics",
+            "zh-hans": "网络不可用，无法继续诊断",
+            "zh-hant": "網絡不可用，無法繼續診斷",
+            "jp": "ネットワークが利用できません。診断を続行できません"
+        },
+        "ProxyOk": {
+            "en": "Proxy connection OK",
+            "zh-hans": "代理连接正常",
+            "zh-hant": "代理連接正常",
+            "jp": "プロキシ接続正常"
+        },
+        "ProxyFail": {
+            "en": "Proxy connection failed, please check proxy settings",
+            "zh-hans": "代理连接失败，请检查代理设置",
+            "zh-hant": "代理連接失敗，請檢查代理設置",
+            "jp": "プロキシ接続に失敗しました。プロキシ設定を確認してください"
+        },
+        "ProxyNotEnabled": {
+            "en": "Proxy not enabled",
+            "zh-hans": "代理未启用",
+            "zh-hant": "代理未啟用",
+            "jp": "プロキシは無効です"
+        },
+        "ProxyStatusEnabled": {
+            "en": "Proxy enabled",
+            "zh-hans": "代理已启用",
+            "zh-hant": "代理已啟用",
+            "jp": "プロキシ有効"
+        },
+        "ProxyStatusDisabled": {
+            "en": "Proxy disabled",
+            "zh-hans": "代理未启用",
+            "zh-hant": "代理未啟用",
+            "jp": "プロキシ無効"
+        },
+        "GlobalApiProxyOn": {
+            "en": "Global API proxy enabled",
+            "zh-hans": "全部API代理已启用",
+            "zh-hant": "全部API代理已啟用",
+            "jp": "全APIプロキシ有効"
+        },
+        "AllPassed": {
+            "en": "All checks passed",
+            "zh-hans": "所有检查通过",
+            "zh-hant": "所有檢查通過",
+            "jp": "すべてのチェックに合格"
+        },
+        "SomeFailed": {
+            "en": "Some checks failed",
+            "zh-hans": "部分检查未通过",
+            "zh-hant": "部分檢查未通過",
+            "jp": "一部のチェックに失敗"
+        },
+        "ModelsFound": {
+            "en": "Found {0} models",
+            "zh-hans": "获取到 {0} 个模型",
+            "zh-hant": "獲取到 {0} 個模型",
+            "jp": "{0}個のモデルが見つかりました"
+        },
+        "NoModelsFound": {
+            "en": "No models found",
+            "zh-hans": "未获取到模型列表",
+            "zh-hant": "未獲取到模型列表",
+            "jp": "モデルが見つかりません"
+        },
+        "NoGeminiModels": {
+            "en": "No Gemini models found",
+            "zh-hans": "未找到 Gemini 模型",
+            "zh-hant": "未找到 Gemini 模型",
+            "jp": "Geminiモデルが見つかりません"
+        },
+        "LLMResponseOk": {
+            "en": "LLM response OK",
+            "zh-hans": "LLM 响应正常",
+            "zh-hant": "LLM 響應正常",
+            "jp": "LLM応答正常"
+        },
+        "ReportTitle": {
+            "en": "VPetLLM Diagnostic Report",
+            "zh-hans": "VPetLLM 诊断报告",
+            "zh-hant": "VPetLLM 診斷報告",
+            "jp": "VPetLLM 診断レポート"
+        },
+        "SectionNetwork": {
+            "en": "Network",
+            "zh-hans": "网络连接",
+            "zh-hant": "網絡連接",
+            "jp": "ネットワーク"
+        },
+        "SectionProxy": {
+            "en": "Proxy",
+            "zh-hans": "代理设置",
+            "zh-hant": "代理設置",
+            "jp": "プロキシ"
+        },
+        "SectionChannels": {
+            "en": "API Channels",
+            "zh-hans": "API 渠道",
+            "zh-hant": "API 渠道",
+            "jp": "APIチャネル"
+        },
+        "NoEnabledChannels": {
+            "en": "No enabled channels",
+            "zh-hans": "没有启用的渠道",
+            "zh-hant": "沒有啟用的渠道",
+            "jp": "有効なチャネルがありません"
+        },
+        "ApiUrl": {
+            "en": "API URL",
+            "zh-hans": "API地址",
+            "zh-hant": "API地址",
+            "jp": "APIアドレス"
+        },
+        "Model": {
+            "en": "Model",
+            "zh-hans": "模型",
+            "zh-hant": "模型",
+            "jp": "モデル"
+        },
+        "NotSet": {
+            "en": "Not set",
+            "zh-hans": "未设置",
+            "zh-hant": "未設置",
+            "jp": "未設定"
+        },
+        "ProxyMode": {
+            "en": "Proxy Mode",
+            "zh-hans": "代理模式",
+            "zh-hant": "代理模式",
+            "jp": "プロキシモード"
+        },
+        "UsesProxy": {
+            "en": "Uses Proxy",
+            "zh-hans": "使用代理",
+            "zh-hant": "使用代理",
+            "jp": "プロキシ使用"
+        },
+        "Yes": {
+            "en": "Yes",
+            "zh-hans": "是",
+            "zh-hant": "是",
+            "jp": "はい"
+        },
+        "No": {
+            "en": "No",
+            "zh-hans": "否",
+            "zh-hant": "否",
+            "jp": "いいえ"
+        },
+        "ApiStatus": {
+            "en": "API Status",
+            "zh-hans": "API状态",
+            "zh-hant": "API狀態",
+            "jp": "APIステータス"
+        },
+        "AvailableModels": {
+            "en": "Available Models",
+            "zh-hans": "可用模型",
+            "zh-hant": "可用模型",
+            "jp": "利用可能なモデル"
+        },
+        "LLMResponse": {
+            "en": "LLM Response",
+            "zh-hans": "LLM响应",
+            "zh-hant": "LLM響應",
+            "jp": "LLM応答"
+        },
+        "OverallResult": {
+            "en": "Overall Result",
+            "zh-hans": "总体结果",
+            "zh-hant": "總體結果",
+            "jp": "総合結果"
+        },
+        "RecReportTitle": {
+            "en": "Recommended Settings Report",
+            "zh-hans": "推荐设置调整报告",
+            "zh-hant": "推薦設置調整報告",
+            "jp": "推奨設定レポート"
+        },
+        "RecCritical": {
+            "en": "Critical Issues",
+            "zh-hans": "关键问题",
+            "zh-hant": "關鍵問題",
+            "jp": "重要な問題"
+        },
+        "RecRecommended": {
+            "en": "Suggested Optimizations",
+            "zh-hans": "建议优化",
+            "zh-hant": "建議優化",
+            "jp": "推奨最適化"
+        },
+        "RecCurrent": {
+            "en": "Current",
+            "zh-hans": "当前值",
+            "zh-hant": "當前值",
+            "jp": "現在値"
+        },
+        "RecSuggest": {
+            "en": "Suggested",
+            "zh-hans": "建议值",
+            "zh-hant": "建議值",
+            "jp": "推奨値"
+        },
+        "RecReason": {
+            "en": "Reason",
+            "zh-hans": "原因",
+            "zh-hant": "原因",
+            "jp": "理由"
+        },
+        "RecNoIssues": {
+            "en": "No issues found, settings are properly configured.",
+            "zh-hans": "未发现设置问题，配置正常。",
+            "zh-hant": "未發現設置問題，配置正常。",
+            "jp": "問題は見つかりませんでした。設定は正常です。"
+        },
+        "RecProvider": {
+            "en": "Switch primary provider to Free",
+            "zh-hans": "切换主提供商为 Free",
+            "zh-hant": "切換主提供商為 Free",
+            "jp": "メインプロバイダーをFreeに切り替え"
+        },
+        "RecNoApiReason": {
+            "en": "No API key or endpoint configured. Free mode works without any API key and is recommended for new users.",
+            "zh-hans": "未配置任何 API 密钥或接口。Free 模式无需 API 密钥即可使用，推荐新手使用。",
+            "zh-hant": "未配置任何 API 密鑰或接口。Free 模式無需 API 密鑰即可使用，推薦新手使用。",
+            "jp": "APIキーまたはエンドポイントが設定されていません。FreeモードはAPIキーなしで使用でき、初心者におすすめです。"
+        },
+        "RecFreeAdvanced": {
+            "en": "Enable Free advanced mode",
+            "zh-hans": "启用 Free 高级模式",
+            "zh-hant": "啟用 Free 高級模式",
+            "jp": "Free詳細モードを有効化"
+        },
+        "RecFreeAdvancedReason": {
+            "en": "Advanced mode enables better model selection and response quality in Free mode.",
+            "zh-hans": "高级模式可在 Free 模式下提供更好的模型选择和回复质量。",
+            "zh-hant": "高級模式可在 Free 模式下提供更好的模型選擇和回復質量。",
+            "jp": "詳細モードでは、Freeモードでのより良いモデル選択と応答品質が有効になります。"
+        },
+        "RecFreeLoadBalance": {
+            "en": "Enable Free load balancing",
+            "zh-hans": "启用 Free 负载均衡",
+            "zh-hant": "啟用 Free 負載均衡",
+            "jp": "Free負荷分散を有効化"
+        },
+        "RecFreeLoadBalanceReason": {
+            "en": "Load balancing distributes requests across multiple Free providers for better reliability.",
+            "zh-hans": "负载均衡可将请求分发到多个 Free 提供商，提高可靠性。",
+            "zh-hant": "負載均衡可將請求分發到多個 Free 提供商，提高可靠性。",
+            "jp": "負荷分散により、複数のFreeプロバイダーにリクエストを分散し、信頼性を向上させます。"
+        },
+        "RecEnableFallback": {
+            "en": "Enable provider fallback (degradation)",
+            "zh-hans": "启用提供商降级流程",
+            "zh-hant": "啟用提供商降級流程",
+            "jp": "プロバイダーフォールバック（デグラデーション）を有効化"
+        },
+        "RecEnableFallbackReason": {
+            "en": "When the primary provider fails, the system will automatically fall back to Free to ensure uninterrupted service.",
+            "zh-hans": "当主提供商请求失败时，系统将自动降级到 Free 以确保服务不中断。",
+            "zh-hant": "當主提供商請求失敗時，系統將自動降級到 Free 以確保服務不中斷。",
+            "jp": "メインプロバイダーが失敗した場合、システムは自動的にFreeにフォールバックし、サービスが中断されません。"
+        },
+        "RecFallbackFree": {
+            "en": "Add Free as fallback provider",
+            "zh-hans": "添加 Free 作为降级提供商",
+            "zh-hant": "添加 Free 作為降級提供商",
+            "jp": "Freeをフォールバックプロバイダーとして追加"
+        },
+        "RecFallbackFreeReason": {
+            "en": "Free requires no API key and serves as an ideal fallback when other providers are unavailable.",
+            "zh-hans": "Free 无需 API 密钥，是其他提供商不可用时的理想兜底方案。",
+            "zh-hant": "Free 無需 API 密鑰，是其他提供商不可用時的最佳兜底方案。",
+            "jp": "FreeはAPIキーを必要とせず、他のプロバイダーが利用できない場合の理想的なフォールバックとして機能します。"
+        },
+        "RecDisableProxy": {
+            "en": "Disable proxy",
+            "zh-hans": "关闭代理",
+            "zh-hant": "關閉代理",
+            "jp": "プロキシを無効化"
+        },
+        "RecDisableProxyReason": {
+            "en": "Proxy connection failed. Disabling proxy may restore direct network access.",
+            "zh-hans": "代理连接失败，关闭代理可能恢复直接网络访问。",
+            "zh-hant": "代理連接失敗，關閉代理可能恢復直接網絡訪問。",
+            "jp": "プロキシ接続に失敗しました。プロキシを無効にすると直接ネットワークアクセスが回復する可能性があります。"
+        },
+        "RecDisableGlobalApiProxy": {
+            "en": "Disable global API proxy",
+            "zh-hans": "关闭全部API代理",
+            "zh-hant": "關閉全部API代理",
+            "jp": "全APIプロキシを無効化"
+        },
+        "RecDisableGlobalApiProxyReason": {
+            "en": "Global API proxy is causing connection failures. Disabling it may allow direct access to work.",
+            "zh-hans": "全部API代理导致连接失败，关闭后可能恢复直连。",
+            "zh-hant": "全部API代理導致連接失敗，關閉後可能恢復直連。",
+            "jp": "全APIプロキシが接続障害を引き起こしています。無効にすると直接アクセスが回復する可能性があります。"
+        },
+        "RecChannelProxy": {
+            "en": "{0} channel: {1} - disable proxy",
+            "zh-hans": "{0} 渠道: {1} - 关闭代理",
+            "zh-hant": "{0} 渠道: {1} - 關閉代理",
+            "jp": "{0}チャネル: {1} - プロキシを無効化"
+        },
+        "RecChannelProxyReason": {
+            "en": "This channel is using proxy but proxy is not working. Switching to direct connection is recommended.",
+            "zh-hans": "该渠道配置了代理但代理不可用，建议切换为直连。",
+            "zh-hant": "該渠道配置了代理但代理不可用，建議切換為直連。",
+            "jp": "このチャネルはプロキシを使用していますが、プロキシが機能していません。直接接続に切り替えることをお勧めします。"
+        },
+        "RecLlmFailFallbackReason": {
+            "en": "Some channel LLM tests failed. Enabling fallback with Free ensures service availability even when primary providers fail.",
+            "zh-hans": "部分渠道 LLM 测试失败。启用 Free 降级可确保主提供商失败时服务仍然可用。",
+            "zh-hant": "部分渠道 LLM 測試失敗。啟用 Free 降級可確保主提供商失敗時服務仍然可用。",
+            "jp": "一部のチャネルLLMテストが失敗しました。Freeフォールバックを有効にすると、メインプロバイダーが失敗してもサービスが利用可能になります。"
         }
     }
 }

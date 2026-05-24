@@ -83,18 +83,6 @@
         "en": "Invalid TTS settings",
         "jp": "TTS設定が無効です"
     },
-    "TTS.ServiceUnavailable": {
-        "zh-hans": "服务不可用，请检查网络是否正常",
-        "zh-hant": "服務不可用，請檢查網絡是否正常",
-        "en": "Service unavailable, please check your network connection",
-        "jp": "サービスは利用できません。ネットワーク接続を確認してください"
-    },
-    "TTS.ServiceUnavailableFree": {
-        "zh-hans": "服务不可用，请检查网络是否正常，可能在维护中",
-        "zh-hant": "服務不可用，請檢查網絡是否正常，可能在維護中",
-        "en": "Service unavailable, please check your network connection. May be under maintenance",
-        "jp": "サービスは利用できません。ネットワーク接続を確認してください。メンテナンス中の可能性があります"
-    },
     "TouchFeedback.InitializeFailed": {
         "zh-hans": "身体交互功能初始化失败",
         "zh-hant": "身體交互功能初始化失敗",

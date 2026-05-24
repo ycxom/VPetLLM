@@ -2355,6 +2355,44 @@
                                         FontSize="14"/>
                             </StackPanel>
 
+                            <!-- 运行诊断 -->
+                            <Separator Margin="0,20,0,20"
+                                     Background="{StaticResource BorderBrush}"
+                                     Height="1"/>
+                            <TextBlock Name="TextBlock_DiagnosticTitle"
+                                     Text="{utils:Localize KeyPath=Advanced_Options.DiagnosticTitle, Default=运行诊断}"
+                                     FontSize="16"
+                                     FontWeight="SemiBold"
+                                     Margin="0,0,0,12"
+                                     Foreground="{StaticResource PrimaryTextBrush}"/>
+                            <TextBlock Name="TextBlock_DiagnosticDesc"
+                                     Text="{utils:Localize KeyPath=Advanced_Options.DiagnosticDesc, Default=检查网络连接、代理可用性及 API 接口状态，帮助快速定位连接问题。连续5次AI请求失败时也会自动运行。}"
+                                     Foreground="{StaticResource SecondaryTextBrush}"
+                                     FontSize="12"
+                                     TextWrapping="Wrap"
+                                     Margin="0,0,0,12"/>
+                            <Button x:Name="Button_RunDiagnostic"
+                                    Content="{utils:Localize KeyPath=Advanced_Options.RunDiagnostic, Default=运行诊断}"
+                                    Width="150"
+                                    Height="36"
+                                    Margin="0,0,0,12"
+                                    Click="Button_RunDiagnostic_Click"
+                                    Style="{StaticResource PrimaryButton}"/>
+                            <CheckBox x:Name="CheckBox_EnableAutoDiagnostic"
+                                      Content="{utils:Localize KeyPath=Advanced_Options.EnableAutoDiagnostic, Default=启用自动诊断（连续5次AI请求失败时自动运行）}"
+                                      IsChecked="True"
+                                      Margin="0,0,0,12"
+                                      Checked="CheckBox_EnableAutoDiagnostic_Changed"
+                                      Unchecked="CheckBox_EnableAutoDiagnostic_Changed"
+                                      Style="{StaticResource ModernCheckBox}"/>
+                            <StackPanel x:Name="StackPanel_DiagnosticProgress" Visibility="Collapsed" Margin="0,0,0,16">
+                                <TextBlock x:Name="TextBlock_DiagnosticStatus"
+                                         Foreground="{StaticResource PrimaryTextBrush}"
+                                         FontSize="14"
+                                         TextWrapping="Wrap"
+                                         Margin="0,0,0,8"/>
+                            </StackPanel>
+
                             <!-- 身体交互设置 -->
                             <Separator Margin="0,20,0,20"
                                      Background="{StaticResource BorderBrush}"
