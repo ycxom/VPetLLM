@@ -1,0 +1,449 @@
+<Window x:Class="VPetLLM.UI.Windows.winDiagnosticReport"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="运行诊断"
+        Height="680" Width="780"
+        MinHeight="460" MinWidth="560"
+        MaxHeight="950"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F5"
+        ResizeMode="CanResizeWithGrip"
+        Topmost="True">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/Colors.xaml"/>
+                <ResourceDictionary Source="../Styles/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="CardBorder" TargetType="Border">
+                <Setter Property="Background" Value="White"/>
+                <Setter Property="BorderBrush" Value="#E1DFDD"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="6"/>
+                <Setter Property="Padding" Value="14,10"/>
+                <Setter Property="Margin" Value="0,0,0,8"/>
+            </Style>
+
+            <Style x:Key="CardTitle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="#323130"/>
+            </Style>
+
+            <Style x:Key="CardSubtitle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Foreground" Value="#605E5C"/>
+            </Style>
+
+            <Style x:Key="MetricLabel" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="Foreground" Value="#8A8886"/>
+            </Style>
+
+            <Style x:Key="MetricValue" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Foreground" Value="#323130"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+            </Style>
+
+            <Style x:Key="SectionTitle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="#0078D4"/>
+                <Setter Property="Margin" Value="0,6,0,8"/>
+            </Style>
+
+            <Style x:Key="StatusOk" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="#107C10"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="FontSize" Value="12"/>
+            </Style>
+
+            <Style x:Key="StatusWarn" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="#FF8C00"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="FontSize" Value="12"/>
+            </Style>
+
+            <Style x:Key="StatusFail" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="#D13438"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="FontSize" Value="12"/>
+            </Style>
+
+            <Style x:Key="StatusIndicator" TargetType="Border">
+                <Setter Property="Width" Value="10"/>
+                <Setter Property="Height" Value="10"/>
+                <Setter Property="CornerRadius" Value="5"/>
+                <Setter Property="Margin" Value="0,0,8,0"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+
+            <DataTemplate x:Key="ChannelCardTemplate">
+                <Border Style="{StaticResource CardBorder}" Padding="14,8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0" Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="StatusDot" Style="{StaticResource StatusIndicator}"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock x:Name="TxtChType" Style="{StaticResource CardTitle}"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtChName" Style="{StaticResource CardSubtitle}"
+                                           Margin="6,1,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel Grid.Row="1" Orientation="Horizontal">
+                            <TextBlock x:Name="TxtChMetrics" Style="{StaticResource CardSubtitle}" Margin="0,0,12,0"/>
+                            <TextBlock x:Name="TxtChModels" Style="{StaticResource MetricValue}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </DataTemplate>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题栏 -->
+        <Grid Grid.Row="0" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock x:Name="TxtTitle" Text="运行诊断"
+                           FontSize="18" FontWeight="Bold" Foreground="#323130"/>
+                <TextBlock x:Name="TxtStatus" Text=""
+                           FontSize="12" Foreground="#605E5C" Margin="0,2,0,0"/>
+            </StackPanel>
+            <Border x:Name="BorderOverall"
+                    Grid.Column="1"
+                    CornerRadius="12" Padding="10,4"
+                    VerticalAlignment="Top">
+                <TextBlock x:Name="TxtOverallStatus"
+                           FontSize="13" FontWeight="Bold"/>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="1" Height="1" Background="#E1DFDD" Margin="0,4"/>
+
+        <!-- 可视化内容区域 -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                      Margin="0,8,0,0">
+            <StackPanel x:Name="PanelCards">
+                <!-- 网络卡片 -->
+                <Border x:Name="CardNetwork" Style="{StaticResource CardBorder}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Border x:Name="DotNetwork" Style="{StaticResource StatusIndicator}"/>
+                            <TextBlock Text="网络连通性" Style="{StaticResource CardTitle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Margin="4,0,0,0">
+                            <TextBlock x:Name="TxtNetworkPing" Style="{StaticResource CardSubtitle}" Margin="0,0,0,2"/>
+                            <TextBlock x:Name="TxtNetworkHttp" Style="{StaticResource CardSubtitle}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 代理卡片 -->
+                <Border x:Name="CardProxy" Style="{StaticResource CardBorder}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Border x:Name="DotProxy" Style="{StaticResource StatusIndicator}"/>
+                            <TextBlock Text="代理连接" Style="{StaticResource CardTitle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Margin="4,0,0,0">
+                            <TextBlock x:Name="TxtProxyStatus" Style="{StaticResource CardSubtitle}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 渠道区标题 -->
+                <TextBlock x:Name="TxtChannelSection" Text="API 渠道" Style="{StaticResource SectionTitle}"/>
+
+                <!-- 渠道卡片容器 -->
+                <ItemsControl x:Name="ItemsChannels">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="White" BorderBrush="#E1DFDD" BorderThickness="1"
+                                    CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
+                                        <Border Width="10" Height="10" CornerRadius="5"
+                                                VerticalAlignment="Center" Margin="0,0,8,0"
+                                                Background="{Binding StatusColor}"/>
+                                        <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#323130"
+                                                   Text="{Binding ChannelType}"/>
+                                        <TextBlock FontSize="12" Foreground="#605E5C"
+                                                   Margin="6,1,0,0"
+                                                   Text="{Binding ChannelName}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="4,0,0,2">
+                                        <TextBlock FontSize="11" Foreground="#8A8886" Text="地址: "/>
+                                        <TextBlock FontSize="11" Foreground="#605E5C"
+                                                   Text="{Binding ApiUrl}" TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="400"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="4,0,0,0">
+                                        <TextBlock FontSize="11" Foreground="#8A8886" Text="直连: "/>
+                                        <TextBlock FontSize="11" Foreground="#107C10"
+                                                   Text="{Binding DirectStatus}" Margin="0,0,12,0"
+                                                   Visibility="{Binding HasDirectTest}"/>
+                                        <TextBlock FontSize="11" Foreground="#D13438"
+                                                   Text="{Binding DirectStatus}" Margin="0,0,12,0"
+                                                   Visibility="{Binding HasDirectFail}"/>
+                                        <TextBlock FontSize="11" Foreground="#8A8886" Text="代理: "/>
+                                        <TextBlock FontSize="11" Foreground="#107C10"
+                                                   Text="{Binding ProxyStatus}" Margin="0,0,12,0"
+                                                   Visibility="{Binding HasProxyTest}"/>
+                                        <TextBlock FontSize="11" Foreground="#D13438"
+                                                   Text="{Binding ProxyStatus}" Margin="0,0,12,0"
+                                                   Visibility="{Binding HasProxyFail}"/>
+                                        <TextBlock FontSize="11" Foreground="#0078D4" FontWeight="SemiBold"
+                                                   Text="{Binding ModelCount}" Margin="0,0,12,0"
+                                                   Visibility="{Binding HasModels}"/>
+                                        <TextBlock FontSize="11" Foreground="#FF8C00"
+                                                   Text="{Binding LLMStatus}" Margin="0,0,12,0"
+                                                   Visibility="{Binding HasLLMResult}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- 插件商店卡片 -->
+                <Border x:Name="CardStore" Style="{StaticResource CardBorder}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Border x:Name="DotStore" Style="{StaticResource StatusIndicator}"/>
+                            <TextBlock Text="插件商店" Style="{StaticResource CardTitle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Margin="4,0,0,0">
+                            <TextBlock x:Name="TxtStoreUrl" Style="{StaticResource CardSubtitle}" Margin="0,0,0,2"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="TxtStoreDirect" Style="{StaticResource CardSubtitle}" Margin="0,0,16,0"/>
+                                <TextBlock x:Name="TxtStoreProxy" Style="{StaticResource CardSubtitle}" Margin="0,0,16,0"/>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtStoreRec" FontSize="11" Foreground="#0078D4" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- TTS 卡片 -->
+                <Border x:Name="CardTTS" Style="{StaticResource CardBorder}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Border x:Name="DotTTS" Style="{StaticResource StatusIndicator}"/>
+                            <TextBlock Text="语音合成 (TTS)" Style="{StaticResource CardTitle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Margin="4,0,0,0">
+                            <TextBlock x:Name="TxtTTSMain" Style="{StaticResource CardSubtitle}" Margin="0,0,0,2"/>
+                            <TextBlock x:Name="TxtTTSEndpoint" Style="{StaticResource CardSubtitle}" Margin="0,0,0,2"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="TxtTTSDirect" Style="{StaticResource CardSubtitle}" Margin="0,0,16,0"/>
+                                <TextBlock x:Name="TxtTTSProxy" Style="{StaticResource CardSubtitle}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 推荐设置区域 -->
+                <Border x:Name="PanelRecommendations"
+                        Background="White" BorderBrush="#E1DFDD"
+                        BorderThickness="1" CornerRadius="6" Margin="0,0,0,8"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="14,12,14,2">
+                            <Border Width="10" Height="10" CornerRadius="5"
+                                    VerticalAlignment="Center" Margin="0,0,8,0"
+                                    Background="#0078D4"/>
+                            <TextBlock x:Name="TxtRecSectionTitle" Text="推荐设置调整"
+                                       FontSize="14" FontWeight="SemiBold" Foreground="#0078D4"/>
+                            <TextBlock x:Name="TxtRecCount" FontSize="12"
+                                       Foreground="#605E5C" VerticalAlignment="Center" Margin="8,2,0,0"/>
+                        </StackPanel>
+                        <ItemsControl x:Name="ItemsRecommendations" Grid.Row="1"
+                                      Margin="8,4,8,6">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#FAFAFA" BorderBrush="#E8E8E8"
+                                            BorderThickness="1" CornerRadius="4"
+                                            Padding="12,10" Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+                                                <Border Width="8" Height="8" CornerRadius="4"
+                                                        VerticalAlignment="Center" Margin="0,0,8,0"
+                                                        Background="{Binding CategoryColor}"/>
+                                                <TextBlock FontSize="13" FontWeight="SemiBold"
+                                                           Foreground="#323130"
+                                                           Text="{Binding DisplayName}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="4,0,0,4">
+                                                <TextBlock FontSize="11" Foreground="#8A8886"
+                                                           Text="{Binding CurrentLabel}"/>
+                                                <TextBlock FontSize="11" Foreground="#D13438"
+                                                           FontWeight="SemiBold"
+                                                           Text="{Binding CurrentDisplay}"/>
+                                                <TextBlock FontSize="11" Foreground="#8A8886"
+                                                           Text="  →  "/>
+                                                <TextBlock FontSize="11" Foreground="#107C10"
+                                                           FontWeight="SemiBold"
+                                                           Text="{Binding RecommendedDisplay}"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Row="2" FontSize="11"
+                                                       Foreground="#605E5C"
+                                                       Text="{Binding Reason}"
+                                                       Margin="4,0,0,0" TextWrapping="Wrap"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Grid.Row="2" Orientation="Horizontal"
+                                    HorizontalAlignment="Right" Margin="14,6,14,12">
+                            <Button x:Name="BtnRecIgnore" Content="忽略"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Width="70" Margin="0,0,8,0"
+                                    Click="BtnRecIgnore_Click"/>
+                            <Button x:Name="BtnRecApplyAll" Content="全部应用"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Width="90" Click="BtnRecApplyAll_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 详细文本区域 -->
+                <Border x:Name="CardDetails" Background="White" BorderBrush="#E1DFDD"
+                        BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,8,0,8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <ToggleButton x:Name="BtnToggleDetails" Grid.Row="0"
+                                      Content="▶ 查看详细文本报告"
+                                      FontSize="12" Foreground="#0078D4"
+                                      Background="Transparent" BorderThickness="0"
+                                      Cursor="Hand" HorizontalAlignment="Left"
+                                      Padding="0,4"
+                                      Click="BtnToggleDetails_Click"/>
+                        <TextBox x:Name="TxtDetailReport"
+                                 Grid.Row="1"
+                                 Visibility="Collapsed"
+                                 Foreground="#323130"
+                                 Background="#F8F8F8"
+                                 FontFamily="Consolas"
+                                 FontSize="11.5"
+                                 IsReadOnly="True"
+                                 BorderBrush="#E1DFDD"
+                                 BorderThickness="1"
+                                 Padding="10,6"
+                                 VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 TextWrapping="NoWrap"
+                                 MaxHeight="300"/>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="3" Height="1" Background="#E1DFDD" Margin="0,4"/>
+
+        <!-- 确认面板（替代MessageBox） -->
+        <Border x:Name="BorderConfirm"
+                Grid.Row="3"
+                Background="#F8F8F8"
+                BorderBrush="#E1DFDD"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="14,4,14,10"
+                Margin="0,4,0,8"
+                Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock x:Name="TxtConfirmTitle"
+                           FontSize="13" FontWeight="SemiBold"
+                           Foreground="#323130" Margin="0,4,0,2"/>
+                <TextBlock x:Name="TxtConfirmMessage"
+                           FontSize="13" Foreground="#605E5C"
+                           TextWrapping="Wrap" Margin="0,8,0,10"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="BtnConfirmNo" Content="否"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="80" Margin="0,0,8,0"
+                            Click="BtnConfirmNo_Click" Visibility="Collapsed"/>
+                    <Button x:Name="BtnConfirmYes" Content="是"
+                            Style="{StaticResource PrimaryButton}"
+                            Width="80" Click="BtnConfirmYes_Click" Visibility="Collapsed"/>
+                    <Button x:Name="BtnConfirmOk" Content="确定"
+                            Style="{StaticResource PrimaryButton}"
+                            Width="80" Click="BtnConfirmOk_Click" Visibility="Collapsed"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 底部操作按钮 -->
+        <StackPanel x:Name="PanelActions"
+                    Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right"
+                    Margin="0,8,0,0">
+            <Button x:Name="BtnTestLLM" Content="测试 LLM 响应"
+                    Style="{StaticResource ModernButton}" Margin="0,0,8,0"
+                    Click="BtnTestLLM_Click" Visibility="Collapsed"/>
+            <Button x:Name="BtnApplyRecs" Content="应用推荐设置"
+                    Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
+                    Click="BtnApplyRecs_Click" Visibility="Collapsed"/>
+            <Button x:Name="BtnOpenSettings" Content="打开设置"
+                    Style="{StaticResource ModernButton}" Margin="0,0,8,0"
+                    Click="BtnOpenSettings_Click"/>
+            <Button x:Name="BtnClose" Content="关闭"
+                    Style="{StaticResource SecondaryButton}"
+                    Click="BtnClose_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

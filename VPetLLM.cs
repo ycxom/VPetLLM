@@ -1542,25 +1542,50 @@ namespace VPetLLM
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     var title = lang.StartsWith("zh") ? "运行诊断结果" : "Diagnostic Results";
-                    var showLLMQuestion = lang.StartsWith("zh")
-                        ? "是否允许请求各渠道验证 LLM 是否能正常响应？\n\n(这将向各渠道发送测试消息)"
-                        : "Do you want to test each channel by sending a test message to verify LLM response?\n\n(This will send a test message to each channel)";
-                    var showLLMTitle = lang.StartsWith("zh") ? "LLM 测试" : "LLM Test";
+                    UI.Windows.winDiagnosticReport? diagWindow = null;
+                    diagWindow = new UI.Windows.winDiagnosticReport(
+                        title, result, report,
+                        lang.StartsWith("zh") ? "可选择测试LLM或应用推荐设置" : "You can test LLM or apply recommended settings",
+                        onTestLLM: async () =>
+                        {
+                            diagWindow!.ShowProgress(lang.StartsWith("zh") ? "正在测试各渠道 LLM 响应..." : "Testing channel LLM responses...");
+                            await TestAllChannelLLMsAsync(diagService, result, diagWindow, lang);
+                        },
+                        onApplyRecommendations: () =>
+                        {
+                            var recommendations = diagService.GenerateRecommendedSettings(result);
+                            if (recommendations.Count > 0)
+                            {
+                                diagWindow!.ShowRecommendations(recommendations, accepted =>
+                                {
+                                    if (accepted)
+                                    {
+                                        diagService.ApplyRecommendedSettings(recommendations);
+                                        diagWindow!.OnRecommendationsApplied();
 
-                    var shouldShowLLM = MessageBox.Show(
-                        $"{title}\n\n{report}\n\n{showLLMQuestion}",
-                        showLLMTitle,
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Question);
-
-                    if (shouldShowLLM == MessageBoxResult.Yes)
-                    {
-                        _ = TestAllChannelLLMsAsync(diagService, result, lang);
-                    }
-                    else
-                    {
-                        ShowRecommendationsAndApply(diagService, result, report, title, lang);
-                    }
+                                        var appliedMsg = lang.StartsWith("zh")
+                                            ? "已应用推荐设置。建议重启对话以使用新设置。"
+                                            : "Recommended settings applied. Restart conversation to use new settings.";
+                                        diagWindow!.UpdateFromResult(result,
+                                            diagService.FormatDiagnosticReport(result),
+                                            appliedMsg);
+                                    }
+                                });
+                            }
+                            else
+                            {
+                                var noAdjustTitle = lang.StartsWith("zh") ? "提示" : "Note";
+                                var noAdjustMsg = lang.StartsWith("zh")
+                                    ? "未发现需要调整的设置。"
+                                    : "No settings adjustments needed.";
+                                diagWindow!.ShowInfo(noAdjustTitle, noAdjustMsg);
+                            }
+                        },
+                        onOpenSettings: () =>
+                        {
+                            OpenSettingWindow();
+                        });
+                    diagWindow.ShowDialog();
                 });
             }
             catch (Exception ex)
@@ -1569,91 +1594,11 @@ namespace VPetLLM
             }
         }
 
-        private void ShowRecommendationsAndApply(
+        private async Task TestAllChannelLLMsAsync(
             Services.DiagnosticService diagService,
             Services.DiagnosticResult result,
-            string report,
-            string title,
+            UI.Windows.winDiagnosticReport diagWindow,
             string lang)
-        {
-            var recommendations = diagService.GenerateRecommendedSettings(result);
-            if (recommendations.Count > 0)
-            {
-                var recReport = diagService.FormatRecommendationsReport(recommendations);
-                var recTitle = lang.StartsWith("zh") ? "推荐设置调整" : "Recommended Settings";
-                var recQuestion = lang.StartsWith("zh")
-                    ? $"{report}\n\n{recReport}\n\n是否应用以上推荐设置？\n\n(包含：自动切换Free兜底、启用降级流程、修复代理配置等)"
-                    : $"{report}\n\n{recReport}\n\nApply the above recommended settings?\n\n(Includes: auto-switch to Free fallback, enable degradation, fix proxy, etc.)";
-
-                var recResult = MessageBox.Show(
-                    recQuestion,
-                    recTitle,
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (recResult == MessageBoxResult.Yes)
-                {
-                    diagService.ApplyRecommendedSettings(recommendations);
-
-                    var appliedMsg = lang.StartsWith("zh")
-                        ? "已应用推荐设置。\n\n建议重启对话以使用新设置。"
-                        : "Recommended settings applied.\n\nRestart the conversation to use new settings.";
-
-                    var needRestart = lang.StartsWith("zh")
-                        ? $"{appliedMsg}\n\n是否打开设置页面查看详情？"
-                        : $"{appliedMsg}\n\nOpen settings to view details?";
-
-                    var openSettings = MessageBox.Show(
-                        $"{title}\n\n{recReport}\n\n{needRestart}",
-                        title,
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Information);
-
-                    if (openSettings == MessageBoxResult.Yes)
-                    {
-                        OpenSettingWindow();
-                    }
-                }
-                else
-                {
-                    var openTitle = lang.StartsWith("zh") ? "提示" : "Note";
-                    var openMsg = lang.StartsWith("zh")
-                        ? "已跳过推荐设置。你可以随时在 设置 → 高级选项 → 运行诊断 中重新诊断。\n\n是否打开设置页面？"
-                        : "Recommendations skipped. You can re-run diagnostics anytime in Settings → Advanced Options → Run Diagnostics.\n\nOpen settings?";
-
-                    var openResult = MessageBox.Show(
-                        $"{title}\n\n{report}\n\n{openMsg}",
-                        openTitle,
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Information);
-
-                    if (openResult == MessageBoxResult.Yes)
-                    {
-                        OpenSettingWindow();
-                    }
-                }
-            }
-            else
-            {
-                var okTitle = lang.StartsWith("zh") ? "诊断完成" : "Diagnostic Complete";
-                var okMsg = lang.StartsWith("zh")
-                    ? "未发现需要调整的设置。\n\n是否打开设置页面？"
-                    : "No settings adjustments needed.\n\nOpen settings page?";
-
-                var okResult = MessageBox.Show(
-                    $"{okTitle}\n\n{report}\n\n{okMsg}",
-                    okTitle,
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Information);
-
-                if (okResult == MessageBoxResult.Yes)
-                {
-                    OpenSettingWindow();
-                }
-            }
-        }
-
-        private async Task TestAllChannelLLMsAsync(Services.DiagnosticService diagService, Services.DiagnosticResult result, string lang)
         {
             foreach (var cr in result.ChannelResults)
             {
@@ -1662,7 +1607,8 @@ namespace VPetLLM
                     var statusMsg = lang.StartsWith("zh")
                         ? $"正在测试 {cr.ChannelType}: {cr.ChannelName}..."
                         : $"Testing {cr.ChannelType}: {cr.ChannelName}...";
-                    Logger.Log(statusMsg);
+                    Application.Current.Dispatcher.Invoke(() =>
+                        diagWindow.ShowProgress(statusMsg));
 
                     await diagService.CheckChannelLLMAsync(cr);
                 }
@@ -1672,9 +1618,32 @@ namespace VPetLLM
 
             Application.Current.Dispatcher.Invoke(() =>
             {
-                ShowRecommendationsAndApply(diagService, result, finalReport,
-                    lang.StartsWith("zh") ? "诊断报告 - 含LLM测试" : "Diagnostic Report - With LLM Tests",
-                    lang);
+                diagWindow.HideProgress();
+                diagWindow.UpdateTitle(
+                    lang.StartsWith("zh") ? "诊断报告 - 含LLM测试" : "Diagnostic Report - With LLM Tests");
+                diagWindow.UpdateFromResult(result,
+                    diagService.FormatDiagnosticReport(result),
+                    lang.StartsWith("zh") ? "LLM 测试完成" : "LLM test complete");
+
+                var recommendations = diagService.GenerateRecommendedSettings(result);
+                if (recommendations.Count > 0)
+                {
+                    diagWindow.ShowRecommendations(recommendations, accepted =>
+                    {
+                        if (accepted)
+                        {
+                            diagService.ApplyRecommendedSettings(recommendations);
+                            diagWindow.OnRecommendationsApplied();
+
+                            var appliedMsg = lang.StartsWith("zh")
+                                ? "已应用推荐设置。建议重启对话。"
+                                : "Recommended settings applied. Restart conversation.";
+                            diagWindow.UpdateFromResult(result,
+                                diagService.FormatDiagnosticReport(result),
+                                appliedMsg);
+                        }
+                    });
+                }
             });
         }
 

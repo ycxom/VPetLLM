@@ -16,6 +16,8 @@ namespace VPetLLM.Services
         public bool ProxyEnabled { get; set; }
         public bool GlobalApiProxyEnabled { get; set; }
         public List<ChannelDiagnosticResult> ChannelResults { get; set; } = new();
+        public PluginStoreDiagnosticResult PluginStoreResult { get; set; } = new();
+        public TTSDiagnosticResult TTSResult { get; set; } = new();
         public bool AllPassed { get; set; }
         public string Summary { get; set; } = "";
     }
@@ -35,6 +37,38 @@ namespace VPetLLM.Services
         public bool LlmTested { get; set; }
         public bool LlmResponded { get; set; }
         public string LlmMessage { get; set; } = "";
+        public bool DirectTried { get; set; }
+        public bool DirectOk { get; set; }
+        public string DirectMessage { get; set; } = "";
+        public bool ProxyTried { get; set; }
+        public bool ProxyConnectionOk { get; set; }
+        public string ProxyConnectionMessage { get; set; } = "";
+        public Setting.ChannelProxyMode RecommendedProxyMode { get; set; } = Setting.ChannelProxyMode.FollowDefault;
+        public string RecommendedProxyReason { get; set; } = "";
+    }
+
+    public class PluginStoreDiagnosticResult
+    {
+        public string StoreUrl { get; set; } = "";
+        public bool DirectOk { get; set; }
+        public string DirectMessage { get; set; } = "";
+        public bool ProxyOk { get; set; }
+        public string ProxyMessage { get; set; } = "";
+        public bool UseProxyRecommended { get; set; }
+        public string Recommendation { get; set; } = "";
+    }
+
+    public class TTSDiagnosticResult
+    {
+        public bool TTSEnabled { get; set; }
+        public string Provider { get; set; } = "";
+        public string Endpoint { get; set; } = "";
+        public bool DirectOk { get; set; }
+        public string DirectMessage { get; set; } = "";
+        public bool ProxyOk { get; set; }
+        public string ProxyMessage { get; set; } = "";
+        public bool Reachable { get; set; }
+        public string Summary { get; set; } = "";
     }
 
     public class RecommendedSetting
@@ -97,6 +131,12 @@ namespace VPetLLM.Services
 
             var channelResults = await CheckAllChannelsAsync(statusCallback);
             result.ChannelResults = channelResults;
+
+            statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingPluginStore"));
+            result.PluginStoreResult = await CheckPluginStoreAsync();
+
+            statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingTTS"));
+            result.TTSResult = await CheckTTSAsync();
 
             bool allChannelsOk = true;
             foreach (var cr in channelResults)
@@ -338,6 +378,107 @@ namespace VPetLLM.Services
             return handler;
         }
 
+        private async Task<(bool directOk, string directMsg, bool proxyOk, string proxyMsg)> TryBothModesAsync(
+            string channelType, Func<HttpClientHandler, Task<(bool success, string message, List<string> models)>> requestFunc)
+        {
+            bool directOk = false;
+            string directMsg = "";
+            bool proxyOk = false;
+            string proxyMsg = "";
+
+            try
+            {
+                var directHandler = new HttpClientHandler { UseProxy = false, Proxy = null };
+                var (dOk, dMsg, dModels) = await requestFunc(directHandler);
+                directOk = dOk;
+                directMsg = dMsg;
+            }
+            catch (Exception ex)
+            {
+                directOk = false;
+                directMsg = ex.Message;
+            }
+
+            try
+            {
+                var proxyHandler = CreateProxyHandler();
+                if (proxyHandler.Proxy != null || proxyHandler.UseProxy)
+                {
+                    var (pOk, pMsg, pModels) = await requestFunc(proxyHandler);
+                    proxyOk = pOk;
+                    proxyMsg = pMsg;
+                }
+                else
+                {
+                    proxyOk = false;
+                    proxyMsg = GetLocalizedText("Diagnostic.ProxyNotConfigured");
+                }
+            }
+            catch (Exception ex)
+            {
+                proxyOk = false;
+                proxyMsg = ex.Message;
+            }
+
+            return (directOk, directMsg, proxyOk, proxyMsg);
+        }
+
+        private HttpClientHandler CreateDirectHandler()
+        {
+            return new HttpClientHandler { UseProxy = false, Proxy = null };
+        }
+
+        private HttpClientHandler CreateProxyHandler()
+        {
+            var handler = new HttpClientHandler();
+            var proxy = _settings.Proxy;
+
+            if (proxy == null || !proxy.IsEnabled)
+            {
+                handler.UseProxy = false;
+                handler.Proxy = null;
+                return handler;
+            }
+
+            if (proxy.FollowSystemProxy)
+            {
+                handler.Proxy = WebRequest.GetSystemWebProxy();
+                handler.UseProxy = true;
+            }
+            else if (!string.IsNullOrEmpty(proxy.Address))
+            {
+                var protocol = proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                handler.Proxy = new WebProxy(new Uri($"{protocol}://{proxy.Address}"));
+                handler.UseProxy = true;
+            }
+
+            return handler;
+        }
+
+        private void EvaluateProxyRecommendation(ChannelDiagnosticResult result, Setting.ChannelProxyMode currentMode)
+        {
+            if (result.DirectOk && result.ProxyConnectionOk)
+            {
+                result.RecommendedProxyMode = currentMode;
+                result.RecommendedProxyReason = GetLocalizedText("Diagnostic.BothModesWork");
+            }
+            else if (result.DirectOk && !result.ProxyConnectionOk)
+            {
+                result.RecommendedProxyMode = Setting.ChannelProxyMode.Direct;
+                result.RecommendedProxyReason = GetLocalizedText("Diagnostic.DirectWorksProxyFails");
+            }
+            else if (!result.DirectOk && result.ProxyConnectionOk)
+            {
+                result.RecommendedProxyMode = Setting.ChannelProxyMode.ForceProxy;
+                result.RecommendedProxyReason = GetLocalizedText("Diagnostic.ProxyWorksDirectFails");
+            }
+            else
+            {
+                result.RecommendedProxyMode = currentMode;
+                result.RecommendedProxyReason = GetLocalizedText("Diagnostic.BothModesFail");
+            }
+        }
+
         private async Task<ChannelDiagnosticResult> CheckOpenAIChannelAsync(Setting.OpenAINodeSetting node)
         {
             var result = new ChannelDiagnosticResult
@@ -348,44 +489,54 @@ namespace VPetLLM.Services
                 Model = node.Model ?? "",
                 Enabled = node.Enabled,
                 ProxyMode = node.ProxyMode,
-                UsesProxy = ShouldUseProxyForChannel(node.ProxyMode, "OpenAI")
+                UsesProxy = ShouldUseProxyForChannel(node.ProxyMode, "OpenAI"),
+                DirectTried = true,
+                ProxyTried = true
             };
 
-            try
+            var (directOk, directMsg, proxyOk, proxyMsg) = await TryBothModesAsync("OpenAI", async (handler) =>
             {
-                var handler = CreateHandlerForChannel(node.ProxyMode, "OpenAI");
                 using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
                 client.DefaultRequestHeaders.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", node.ApiKey);
-
                 var response = await client.GetAsync($"{result.ApiUrl.TrimEnd('/')}/models");
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();
                     var doc = JsonDocument.Parse(json);
+                    var models = new List<string>();
                     if (doc.RootElement.TryGetProperty("data", out var data))
                     {
                         foreach (var item in data.EnumerateArray())
                         {
                             if (item.TryGetProperty("id", out var id))
-                                result.AvailableModels.Add(id.GetString() ?? "");
+                                models.Add(id.GetString() ?? "");
                         }
                     }
-                    result.ApiAvailable = result.AvailableModels.Count > 0;
-                    result.ApiMessage = result.ApiAvailable
-                        ? string.Format(GetLocalizedText("Diagnostic.ModelsFound"), result.AvailableModels.Count)
-                        : GetLocalizedText("Diagnostic.NoModelsFound");
+                    return (models.Count > 0, string.Format(GetLocalizedText("Diagnostic.ModelsFound"), models.Count), models);
                 }
-                else
-                {
-                    result.ApiAvailable = false;
-                    result.ApiMessage = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
-                }
-            }
-            catch (Exception ex)
+                return (false, $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}", new List<string>());
+            });
+
+            result.DirectOk = directOk;
+            result.DirectMessage = directMsg;
+            result.ProxyConnectionOk = proxyOk;
+            result.ProxyConnectionMessage = proxyMsg;
+            result.ApiAvailable = directOk || proxyOk;
+
+            EvaluateProxyRecommendation(result, node.ProxyMode);
+
+            if (directOk)
             {
-                result.ApiAvailable = false;
-                result.ApiMessage = ex.Message;
+                result.ApiMessage = directMsg;
+            }
+            else if (proxyOk)
+            {
+                result.ApiMessage = proxyMsg;
+            }
+            else
+            {
+                result.ApiMessage = directMsg;
             }
 
             return result;
@@ -401,12 +552,13 @@ namespace VPetLLM.Services
                 Model = node.Model ?? "",
                 Enabled = node.Enabled,
                 ProxyMode = node.ProxyMode,
-                UsesProxy = ShouldUseProxyForChannel(node.ProxyMode, "Gemini")
+                UsesProxy = ShouldUseProxyForChannel(node.ProxyMode, "Gemini"),
+                DirectTried = true,
+                ProxyTried = true
             };
 
-            try
+            var (directOk, directMsg, proxyOk, proxyMsg) = await TryBothModesAsync("Gemini", async (handler) =>
             {
-                var handler = CreateHandlerForChannel(node.ProxyMode, "Gemini");
                 using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
 
                 var url = $"https://generativelanguage.googleapis.com/v1beta/models?key={node.ApiKey}";
@@ -422,6 +574,7 @@ namespace VPetLLM.Services
                 {
                     var json = await response.Content.ReadAsStringAsync();
                     var doc = JsonDocument.Parse(json);
+                    var models = new List<string>();
                     if (doc.RootElement.TryGetProperty("models", out var modelList))
                     {
                         foreach (var item in modelList.EnumerateArray())
@@ -432,26 +585,39 @@ namespace VPetLLM.Services
                                 if (nameStr.Contains("gemini"))
                                 {
                                     nameStr = nameStr.Replace("models/", "");
-                                    result.AvailableModels.Add(nameStr);
+                                    models.Add(nameStr);
                                 }
                             }
                         }
                     }
-                    result.ApiAvailable = result.AvailableModels.Count > 0;
-                    result.ApiMessage = result.ApiAvailable
-                        ? string.Format(GetLocalizedText("Diagnostic.ModelsFound"), result.AvailableModels.Count)
-                        : GetLocalizedText("Diagnostic.NoGeminiModels");
+                    return (models.Count > 0,
+                        models.Count > 0
+                            ? string.Format(GetLocalizedText("Diagnostic.ModelsFound"), models.Count)
+                            : GetLocalizedText("Diagnostic.NoGeminiModels"),
+                        models);
                 }
-                else
-                {
-                    result.ApiAvailable = false;
-                    result.ApiMessage = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
-                }
-            }
-            catch (Exception ex)
+                return (false, $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}", new List<string>());
+            });
+
+            result.DirectOk = directOk;
+            result.DirectMessage = directMsg;
+            result.ProxyConnectionOk = proxyOk;
+            result.ProxyConnectionMessage = proxyMsg;
+            result.ApiAvailable = directOk || proxyOk;
+
+            EvaluateProxyRecommendation(result, node.ProxyMode);
+
+            if (directOk)
             {
-                result.ApiAvailable = false;
-                result.ApiMessage = ex.Message;
+                result.ApiMessage = directMsg;
+            }
+            else if (proxyOk)
+            {
+                result.ApiMessage = proxyMsg;
+            }
+            else
+            {
+                result.ApiMessage = directMsg;
             }
 
             return result;
@@ -467,20 +633,21 @@ namespace VPetLLM.Services
                 Model = node.Model ?? "",
                 Enabled = node.Enabled,
                 ProxyMode = Setting.ChannelProxyMode.FollowDefault,
-                UsesProxy = ShouldUseProxyForChannel(Setting.ChannelProxyMode.FollowDefault, "Ollama")
+                UsesProxy = ShouldUseProxyForChannel(Setting.ChannelProxyMode.FollowDefault, "Ollama"),
+                DirectTried = true,
+                ProxyTried = true
             };
 
-            try
+            var (directOk, directMsg, proxyOk, proxyMsg) = await TryBothModesAsync("Ollama", async (handler) =>
             {
-                var handler = CreateHandlerForChannel(Setting.ChannelProxyMode.FollowDefault, "Ollama");
                 using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
-
                 var baseUrl = result.ApiUrl.TrimEnd('/');
                 var response = await client.GetAsync($"{baseUrl}/api/tags");
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();
                     var doc = JsonDocument.Parse(json);
+                    var models = new List<string>();
                     if (doc.RootElement.TryGetProperty("models", out var modelList))
                     {
                         foreach (var item in modelList.EnumerateArray())
@@ -489,25 +656,38 @@ namespace VPetLLM.Services
                             {
                                 var nameStr = name.GetString() ?? "";
                                 if (!string.IsNullOrEmpty(nameStr))
-                                    result.AvailableModels.Add(nameStr);
+                                    models.Add(nameStr);
                             }
                         }
                     }
-                    result.ApiAvailable = result.AvailableModels.Count > 0;
-                    result.ApiMessage = result.ApiAvailable
-                        ? string.Format(GetLocalizedText("Diagnostic.ModelsFound"), result.AvailableModels.Count)
-                        : GetLocalizedText("Diagnostic.NoModelsFound");
+                    return (models.Count > 0,
+                        models.Count > 0
+                            ? string.Format(GetLocalizedText("Diagnostic.ModelsFound"), models.Count)
+                            : GetLocalizedText("Diagnostic.NoModelsFound"),
+                        models);
                 }
-                else
-                {
-                    result.ApiAvailable = false;
-                    result.ApiMessage = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
-                }
-            }
-            catch (Exception ex)
+                return (false, $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}", new List<string>());
+            });
+
+            result.DirectOk = directOk;
+            result.DirectMessage = directMsg;
+            result.ProxyConnectionOk = proxyOk;
+            result.ProxyConnectionMessage = proxyMsg;
+            result.ApiAvailable = directOk || proxyOk;
+
+            EvaluateProxyRecommendation(result, Setting.ChannelProxyMode.FollowDefault);
+
+            if (directOk)
             {
-                result.ApiAvailable = false;
-                result.ApiMessage = ex.Message;
+                result.ApiMessage = directMsg;
+            }
+            else if (proxyOk)
+            {
+                result.ApiMessage = proxyMsg;
+            }
+            else
+            {
+                result.ApiMessage = directMsg;
             }
 
             return result;
@@ -523,43 +703,138 @@ namespace VPetLLM.Services
                 Model = node.Model ?? "",
                 Enabled = node.Enabled,
                 ProxyMode = Setting.ChannelProxyMode.FollowDefault,
-                UsesProxy = ShouldUseProxyForChannel(Setting.ChannelProxyMode.FollowDefault, "LMStudio")
+                UsesProxy = ShouldUseProxyForChannel(Setting.ChannelProxyMode.FollowDefault, "LMStudio"),
+                DirectTried = true,
+                ProxyTried = true
             };
 
-            try
+            var (directOk, directMsg, proxyOk, proxyMsg) = await TryBothModesAsync("LMStudio", async (handler) =>
             {
-                var handler = CreateHandlerForChannel(Setting.ChannelProxyMode.FollowDefault, "LMStudio");
                 using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
-
                 var baseUrl = result.ApiUrl.TrimEnd('/');
                 var response = await client.GetAsync($"{baseUrl}/v1/models");
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();
                     var doc = JsonDocument.Parse(json);
+                    var models = new List<string>();
                     if (doc.RootElement.TryGetProperty("data", out var data))
                     {
                         foreach (var item in data.EnumerateArray())
                         {
                             if (item.TryGetProperty("id", out var id))
-                                result.AvailableModels.Add(id.GetString() ?? "");
+                                models.Add(id.GetString() ?? "");
                         }
                     }
-                    result.ApiAvailable = result.AvailableModels.Count > 0;
-                    result.ApiMessage = result.ApiAvailable
-                        ? string.Format(GetLocalizedText("Diagnostic.ModelsFound"), result.AvailableModels.Count)
-                        : GetLocalizedText("Diagnostic.NoModelsFound");
+                    return (models.Count > 0,
+                        models.Count > 0
+                            ? string.Format(GetLocalizedText("Diagnostic.ModelsFound"), models.Count)
+                            : GetLocalizedText("Diagnostic.NoModelsFound"),
+                        models);
+                }
+                return (false, $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}", new List<string>());
+            });
+
+            result.DirectOk = directOk;
+            result.DirectMessage = directMsg;
+            result.ProxyConnectionOk = proxyOk;
+            result.ProxyConnectionMessage = proxyMsg;
+            result.ApiAvailable = directOk || proxyOk;
+
+            EvaluateProxyRecommendation(result, Setting.ChannelProxyMode.FollowDefault);
+
+            if (directOk)
+            {
+                result.ApiMessage = directMsg;
+            }
+            else if (proxyOk)
+            {
+                result.ApiMessage = proxyMsg;
+            }
+            else
+            {
+                result.ApiMessage = directMsg;
+            }
+
+            return result;
+        }
+
+        public async Task<PluginStoreDiagnosticResult> CheckPluginStoreAsync()
+        {
+            var result = new PluginStoreDiagnosticResult();
+
+            var storeUrl = _settings.PluginStore?.ProxyUrl ?? "https://ghfast.top";
+            var githubUrl = "https://raw.githubusercontent.com";
+
+            result.StoreUrl = _settings.PluginStore?.UseProxy == true ? storeUrl : githubUrl;
+
+            try
+            {
+                using var directClient = new HttpClient(new HttpClientHandler { UseProxy = false, Proxy = null })
+                    { Timeout = TimeSpan.FromSeconds(10) };
+                var directResponse = await directClient.GetAsync(githubUrl);
+                result.DirectOk = directResponse.IsSuccessStatusCode;
+                result.DirectMessage = directResponse.IsSuccessStatusCode
+                    ? GetLocalizedText("Diagnostic.StoreDirectOk")
+                    : $"HTTP {(int)directResponse.StatusCode}";
+            }
+            catch (Exception ex)
+            {
+                result.DirectOk = false;
+                result.DirectMessage = ex.Message;
+            }
+
+            try
+            {
+                var proxyHandler = CreateProxyHandler();
+                if (proxyHandler.Proxy != null || proxyHandler.UseProxy)
+                {
+                    using var proxyClient = new HttpClient(proxyHandler) { Timeout = TimeSpan.FromSeconds(10) };
+                    var proxyResponse = await proxyClient.GetAsync(githubUrl);
+                    result.ProxyOk = proxyResponse.IsSuccessStatusCode;
+                    result.ProxyMessage = proxyResponse.IsSuccessStatusCode
+                        ? GetLocalizedText("Diagnostic.StoreProxyOk")
+                        : $"HTTP {(int)proxyResponse.StatusCode}";
                 }
                 else
                 {
-                    result.ApiAvailable = false;
-                    result.ApiMessage = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
+                    if (!string.IsNullOrEmpty(storeUrl) && storeUrl != githubUrl)
+                    {
+                        using var altClient = new HttpClient(new HttpClientHandler { UseProxy = false, Proxy = null })
+                            { Timeout = TimeSpan.FromSeconds(10) };
+                        var altResponse = await altClient.GetAsync(storeUrl);
+                        result.ProxyOk = altResponse.IsSuccessStatusCode;
+                        result.ProxyMessage = altResponse.IsSuccessStatusCode
+                            ? GetLocalizedText("Diagnostic.StoreMirrorOk")
+                            : $"HTTP {(int)altResponse.StatusCode}";
+                    }
+                    else
+                    {
+                        result.ProxyOk = false;
+                        result.ProxyMessage = GetLocalizedText("Diagnostic.StoreNoProxy");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                result.ApiAvailable = false;
-                result.ApiMessage = ex.Message;
+                result.ProxyOk = false;
+                result.ProxyMessage = ex.Message;
+            }
+
+            if (result.DirectOk)
+            {
+                result.UseProxyRecommended = false;
+                result.Recommendation = GetLocalizedText("Diagnostic.StoreDirectRec");
+            }
+            else if (result.ProxyOk)
+            {
+                result.UseProxyRecommended = true;
+                result.Recommendation = GetLocalizedText("Diagnostic.StoreProxyRec");
+            }
+            else
+            {
+                result.UseProxyRecommended = _settings.PluginStore?.UseProxy ?? true;
+                result.Recommendation = GetLocalizedText("Diagnostic.StoreFailRec");
             }
 
             return result;
@@ -798,6 +1073,94 @@ namespace VPetLLM.Services
             return false;
         }
 
+        public async Task<TTSDiagnosticResult> CheckTTSAsync()
+        {
+            var result = new TTSDiagnosticResult();
+            var tts = _settings.TTS;
+
+            if (tts == null || !tts.IsEnabled)
+            {
+                result.TTSEnabled = false;
+                result.Summary = GetLocalizedText("Diagnostic.TTSNotEnabled");
+                return result;
+            }
+
+            result.TTSEnabled = true;
+            result.Provider = tts.Provider;
+
+            string endpoint = "";
+            switch (tts.Provider?.ToLower())
+            {
+                case "url":
+                    endpoint = tts.URL?.BaseUrl ?? "";
+                    break;
+                case "openai":
+                    endpoint = tts.OpenAI?.BaseUrl ?? "";
+                    break;
+                case "diy":
+                    endpoint = tts.DIY?.BaseUrl ?? "";
+                    break;
+                case "gptsovits":
+                    endpoint = tts.GPTSoVITS?.BaseUrl ?? "";
+                    break;
+            }
+
+            result.Endpoint = string.IsNullOrEmpty(endpoint) ? GetLocalizedText("Diagnostic.NotSet") : endpoint;
+
+            if (string.IsNullOrEmpty(endpoint))
+            {
+                result.Summary = GetLocalizedText("Diagnostic.TTSNoEndpoint");
+                return result;
+            }
+
+            try
+            {
+                using var directHandler = new HttpClientHandler { UseProxy = false, Proxy = null };
+                using var directClient = new HttpClient(directHandler) { Timeout = TimeSpan.FromSeconds(10) };
+                var directResponse = await directClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, endpoint));
+                result.DirectOk = directResponse.IsSuccessStatusCode;
+                result.DirectMessage = directResponse.IsSuccessStatusCode
+                    ? GetLocalizedText("Diagnostic.TTSReachable")
+                    : $"HTTP {(int)directResponse.StatusCode}";
+            }
+            catch (Exception ex)
+            {
+                result.DirectOk = false;
+                result.DirectMessage = ex.Message;
+            }
+
+            try
+            {
+                var proxyHandler = CreateProxyHandler();
+                if (proxyHandler.Proxy != null || proxyHandler.UseProxy)
+                {
+                    using var proxyClient = new HttpClient(proxyHandler) { Timeout = TimeSpan.FromSeconds(10) };
+                    var proxyResponse = await proxyClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, endpoint));
+                    result.ProxyOk = proxyResponse.IsSuccessStatusCode;
+                    result.ProxyMessage = proxyResponse.IsSuccessStatusCode
+                        ? GetLocalizedText("Diagnostic.TTSReachable")
+                        : $"HTTP {(int)proxyResponse.StatusCode}";
+                }
+                else
+                {
+                    result.ProxyOk = false;
+                    result.ProxyMessage = GetLocalizedText("Diagnostic.ProxyNotConfigured");
+                }
+            }
+            catch (Exception ex)
+            {
+                result.ProxyOk = false;
+                result.ProxyMessage = ex.Message;
+            }
+
+            result.Reachable = result.DirectOk || result.ProxyOk;
+            result.Summary = result.Reachable
+                ? GetLocalizedText("Diagnostic.TTSOk")
+                : GetLocalizedText("Diagnostic.TTSFail");
+
+            return result;
+        }
+
         public string FormatDiagnosticReport(DiagnosticResult result)
         {
             var sb = new StringBuilder();
@@ -838,6 +1201,19 @@ namespace VPetLLM.Services
                     sb.AppendLine($"  {GetLocalizedText("Diagnostic.ProxyMode")}: {cr.ProxyMode}");
                     sb.AppendLine($"  {GetLocalizedText("Diagnostic.UsesProxy")}: {(cr.UsesProxy ? GetLocalizedText("Diagnostic.Yes") : GetLocalizedText("Diagnostic.No"))}");
                     sb.AppendLine($"  {GetLocalizedText("Diagnostic.ApiStatus")}: {(cr.ApiAvailable ? "✅" : "❌")} {cr.ApiMessage}");
+                    if (cr.DirectTried)
+                    {
+                        sb.AppendLine($"  {GetLocalizedText("Diagnostic.DirectTest")}: {(cr.DirectOk ? "✅" : "❌")} {cr.DirectMessage}");
+                    }
+                    if (cr.ProxyTried)
+                    {
+                        sb.AppendLine($"  {GetLocalizedText("Diagnostic.ProxyTest")}: {(cr.ProxyConnectionOk ? "✅" : "❌")} {cr.ProxyConnectionMessage}");
+                    }
+                    if (cr.RecommendedProxyMode != cr.ProxyMode)
+                    {
+                        sb.AppendLine($"  ⚠ {GetLocalizedText("Diagnostic.ProxyRecommend")}: {cr.ProxyMode} → {cr.RecommendedProxyMode}");
+                        sb.AppendLine($"     {cr.RecommendedProxyReason}");
+                    }
                     if (cr.ApiAvailable && cr.AvailableModels.Count > 0)
                     {
                         sb.AppendLine($"  {GetLocalizedText("Diagnostic.AvailableModels")}: {string.Join(", ", cr.AvailableModels.Take(10))}");
@@ -848,6 +1224,38 @@ namespace VPetLLM.Services
                     }
                     sb.AppendLine();
                 }
+            }
+
+            var ps = result.PluginStoreResult;
+            if (ps != null)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"【{GetLocalizedText("Diagnostic.SectionPluginStore")}】");
+                sb.AppendLine($"  {GetLocalizedText("Diagnostic.StoreUrl")}: {ps.StoreUrl}");
+                sb.AppendLine($"  {GetLocalizedText("Diagnostic.DirectTest")}: {(ps.DirectOk ? "✅" : "❌")} {ps.DirectMessage}");
+                sb.AppendLine($"  {GetLocalizedText("Diagnostic.ProxyTest")}: {(ps.ProxyOk ? "✅" : "❌")} {ps.ProxyMessage}");
+                sb.AppendLine($"  {GetLocalizedText("Diagnostic.StoreRecommendation")}: {ps.Recommendation}");
+                sb.AppendLine();
+            }
+
+            var tts = result.TTSResult;
+            if (tts != null)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"【{GetLocalizedText("Diagnostic.SectionTTS")}】");
+                if (!tts.TTSEnabled)
+                {
+                    sb.AppendLine($"  {tts.Summary}");
+                }
+                else
+                {
+                    sb.AppendLine($"  {GetLocalizedText("Diagnostic.TTSProvider")}: {tts.Provider}");
+                    sb.AppendLine($"  {GetLocalizedText("Diagnostic.TTSEndpoint")}: {tts.Endpoint}");
+                    sb.AppendLine($"  {GetLocalizedText("Diagnostic.DirectTest")}: {(tts.DirectOk ? "✅" : "❌")} {tts.DirectMessage}");
+                    sb.AppendLine($"  {GetLocalizedText("Diagnostic.ProxyTest")}: {(tts.ProxyOk ? "✅" : "❌")} {tts.ProxyMessage}");
+                    sb.AppendLine($"  {(tts.Reachable ? "✅" : "❌")} {tts.Summary}");
+                }
+                sb.AppendLine();
             }
 
             sb.AppendLine("═══════════════════════════════════");
@@ -928,55 +1336,74 @@ namespace VPetLLM.Services
                 });
             }
 
-            if (_settings.Proxy != null && _settings.Proxy.IsEnabled && !result.ProxyOk)
-            {
-                recommendations.Add(new RecommendedSetting
-                {
-                    Key = "Proxy.IsEnabled",
-                    DisplayName = GetLocalizedText("Diagnostic.RecDisableProxy"),
-                    CurrentValue = "true",
-                    RecommendedValue = "false",
-                    Reason = GetLocalizedText("Diagnostic.RecDisableProxyReason"),
-                    Category = "critical"
-                });
-            }
-
-            if (_settings.Proxy != null && _settings.Proxy.IsEnabled && _settings.Proxy.ForAllAPI && !result.ProxyOk)
-            {
-                recommendations.Add(new RecommendedSetting
-                {
-                    Key = "Proxy.ForAllAPI",
-                    DisplayName = GetLocalizedText("Diagnostic.RecDisableGlobalApiProxy"),
-                    CurrentValue = "true",
-                    RecommendedValue = "false",
-                    Reason = GetLocalizedText("Diagnostic.RecDisableGlobalApiProxyReason"),
-                    Category = "critical"
-                });
-            }
-
-            var failingChannels = result.ChannelResults
-                .Where(cr => cr.Enabled && !cr.ApiAvailable)
+            var channelsWithProxyIssue = result.ChannelResults
+                .Where(cr => cr.Enabled && cr.ProxyTried && cr.DirectTried
+                    && cr.RecommendedProxyMode != cr.ProxyMode)
                 .ToList();
-            foreach (var fc in failingChannels)
+
+            foreach (var ch in channelsWithProxyIssue)
             {
-                if (fc.UsesProxy && !result.ProxyOk)
+                var recValue = ch.RecommendedProxyMode switch
                 {
-                    recommendations.Add(new RecommendedSetting
+                    Setting.ChannelProxyMode.Direct => "Direct",
+                    Setting.ChannelProxyMode.ForceProxy => "ForceProxy",
+                    _ => "FollowDefault"
+                };
+
+                recommendations.Add(new RecommendedSetting
+                {
+                    Key = $"Channel.{ch.ChannelType}.{ch.ChannelName}.ProxyMode",
+                    DisplayName = string.Format(GetLocalizedText("Diagnostic.RecChannelProxyFix"),
+                        ch.ChannelType, ch.ChannelName),
+                    CurrentValue = ch.ProxyMode.ToString(),
+                    RecommendedValue = recValue,
+                    Reason = ch.RecommendedProxyReason,
+                    Category = ch.RecommendedProxyMode == Setting.ChannelProxyMode.Direct
+                        || ch.RecommendedProxyMode == Setting.ChannelProxyMode.ForceProxy
+                        ? "critical" : "recommended"
+                });
+            }
+
+            foreach (var ch in result.ChannelResults.Where(cr => cr.Enabled && !cr.ApiAvailable))
+            {
+                if (!channelsWithProxyIssue.Any(pi =>
+                    pi.ChannelType == ch.ChannelType && pi.ChannelName == ch.ChannelName))
+                {
+                    if (!ch.DirectTried && !ch.ProxyTried)
                     {
-                        Key = $"Channel.{fc.ChannelType}.{fc.ChannelName}.ProxyMode",
-                        DisplayName = string.Format(GetLocalizedText("Diagnostic.RecChannelProxy"),
-                            fc.ChannelType, fc.ChannelName),
-                        CurrentValue = fc.ProxyMode.ToString(),
-                        RecommendedValue = "Direct",
-                        Reason = GetLocalizedText("Diagnostic.RecChannelProxyReason"),
-                        Category = "critical"
-                    });
+                        recommendations.Add(new RecommendedSetting
+                        {
+                            Key = $"Channel.{ch.ChannelType}.{ch.ChannelName}.Check",
+                            DisplayName = string.Format(GetLocalizedText("Diagnostic.RecChannelCheck"),
+                                ch.ChannelType, ch.ChannelName),
+                            CurrentValue = GetLocalizedText("Diagnostic.NotSet"),
+                            RecommendedValue = GetLocalizedText("Diagnostic.RecVerify"),
+                            Reason = ch.ApiMessage,
+                            Category = "critical"
+                        });
+                    }
                 }
             }
 
             var testedChannels = result.ChannelResults
                 .Where(cr => cr.LlmTested && !cr.LlmResponded)
                 .ToList();
+
+            var ps = result.PluginStoreResult;
+            if (ps != null && !ps.DirectOk && ps.ProxyOk &&
+                (_settings.PluginStore?.UseProxy != true))
+            {
+                recommendations.Add(new RecommendedSetting
+                {
+                    Key = "PluginStore.UseProxy",
+                    DisplayName = GetLocalizedText("Diagnostic.RecPluginStoreEnableProxy"),
+                    CurrentValue = "false",
+                    RecommendedValue = "true",
+                    Reason = GetLocalizedText("Diagnostic.RecPluginStoreEnableProxyReason"),
+                    Category = "critical"
+                });
+            }
+
             if (testedChannels.Count > 0 && !freeFallbackExists && !_settings.EnableFallback)
             {
                 recommendations.Add(new RecommendedSetting
@@ -1054,22 +1481,34 @@ namespace VPetLLM.Services
                                 var channelType = parts[1];
                                 var channelName = parts[2];
 
+                                var proxyMode = rec.RecommendedValue switch
+                                    {
+                                        "Direct" => Setting.ChannelProxyMode.Direct,
+                                        "ForceProxy" => Setting.ChannelProxyMode.ForceProxy,
+                                        _ => Setting.ChannelProxyMode.FollowDefault
+                                    };
+
                                 switch (channelType)
                                 {
                                     case "OpenAI":
                                         var oaNode = _settings.OpenAI.OpenAINodes
                                             .FirstOrDefault(n => n.Name == channelName);
                                         if (oaNode != null)
-                                            oaNode.ProxyMode = Setting.ChannelProxyMode.Direct;
+                                            oaNode.ProxyMode = proxyMode;
                                         break;
                                     case "Gemini":
                                         var gmNode = _settings.Gemini.GeminiNodes
                                             .FirstOrDefault(n => n.Name == channelName);
                                         if (gmNode != null)
-                                            gmNode.ProxyMode = Setting.ChannelProxyMode.Direct;
+                                            gmNode.ProxyMode = proxyMode;
                                         break;
                                 }
                             }
+                        }
+                        else if (rec.Key == "PluginStore.UseProxy")
+                        {
+                            if (_settings.PluginStore != null)
+                                _settings.PluginStore.UseProxy = rec.RecommendedValue == "true";
                         }
                         break;
                 }
@@ -1239,6 +1678,39 @@ namespace VPetLLM.Services
                 "Diagnostic.RecChannelProxy" => _language.StartsWith("zh") ? "{0} 渠道: {1} - 关闭代理" : "{0} channel: {1} - disable proxy",
                 "Diagnostic.RecChannelProxyReason" => _language.StartsWith("zh") ? "该渠道配置了代理但代理不可用，建议切换为直连。" : "This channel is using proxy but proxy is not working. Switching to direct connection is recommended.",
                 "Diagnostic.RecLlmFailFallbackReason" => _language.StartsWith("zh") ? "部分渠道 LLM 测试失败。启用 Free 降级可确保主提供商失败时服务仍然可用。" : "Some channel LLM tests failed. Enabling fallback with Free ensures service availability even when primary providers fail.",
+                "Diagnostic.RecChannelProxyFix" => _language.StartsWith("zh") ? "{0} 渠道 [{1}] - 修正代理模式" : "{0} channel [{1}] - fix proxy mode",
+                "Diagnostic.RecChannelCheck" => _language.StartsWith("zh") ? "{0} 渠道 [{1}] - 无法诊断，请手动检查" : "{0} channel [{1}] - unable to diagnose, please verify manually",
+                "Diagnostic.RecVerify" => _language.StartsWith("zh") ? "请手动验证" : "Verify manually",
+                "Diagnostic.RecPluginStoreEnableProxy" => _language.StartsWith("zh") ? "启用插件商店代理" : "Enable plugin store proxy",
+                "Diagnostic.RecPluginStoreEnableProxyReason" => _language.StartsWith("zh") ? "无法直连插件商店，启用代理可恢复插件商店访问。" : "Cannot access plugin store directly. Enabling proxy will restore plugin store access.",
+                "Diagnostic.CheckingPluginStore" => _language.StartsWith("zh") ? "正在检查插件商店连接..." : "Checking plugin store connectivity...",
+                "Diagnostic.DirectTest" => _language.StartsWith("zh") ? "直连" : "Direct",
+                "Diagnostic.ProxyTest" => _language.StartsWith("zh") ? "代理" : "Proxy",
+                "Diagnostic.ProxyRecommend" => _language.StartsWith("zh") ? "推荐" : "Recommended",
+                "Diagnostic.ProxyNotConfigured" => _language.StartsWith("zh") ? "代理未配置" : "Proxy not configured",
+                "Diagnostic.BothModesWork" => _language.StartsWith("zh") ? "直连和代理均可用，无需调整。" : "Both direct and proxy work, no change needed.",
+                "Diagnostic.DirectWorksProxyFails" => _language.StartsWith("zh") ? "直连可用但代理失败，建议切换为直连模式。" : "Direct connection works but proxy fails. Recommend switching to Direct mode.",
+                "Diagnostic.ProxyWorksDirectFails" => _language.StartsWith("zh") ? "代理可用但直连失败，建议切换为强制代理模式。" : "Proxy connection works but direct fails. Recommend switching to ForceProxy mode.",
+                "Diagnostic.BothModesFail" => _language.StartsWith("zh") ? "直连和代理均失败，请检查网络或API配置。" : "Both direct and proxy connections failed. Please check network or API configuration.",
+                "Diagnostic.StoreDirectOk" => _language.StartsWith("zh") ? "插件商店直连正常" : "Plugin store direct access OK",
+                "Diagnostic.StoreProxyOk" => _language.StartsWith("zh") ? "插件商店代理访问正常" : "Plugin store proxy access OK",
+                "Diagnostic.StoreMirrorOk" => _language.StartsWith("zh") ? "插件商店镜像访问正常" : "Plugin store mirror access OK",
+                "Diagnostic.StoreNoProxy" => _language.StartsWith("zh") ? "未配置插件商店代理/镜像" : "No proxy/mirror configured for plugin store",
+                "Diagnostic.StoreDirectRec" => _language.StartsWith("zh") ? "直连正常，建议保持直连。" : "Direct connection works well. Keeping direct connection is recommended.",
+                "Diagnostic.StoreProxyRec" => _language.StartsWith("zh") ? "直连失败但代理/镜像可用，建议启用代理。" : "Direct connection failed but proxy/mirror works. Using proxy is recommended.",
+                "Diagnostic.StoreFailRec" => _language.StartsWith("zh") ? "直连和代理/镜像均失败，请检查网络设置或稍后重试。" : "Both direct and proxy/mirror failed. Please check network settings or try again later.",
+                "Diagnostic.SectionPluginStore" => _language.StartsWith("zh") ? "插件商店" : "Plugin Store",
+                "Diagnostic.StoreUrl" => _language.StartsWith("zh") ? "商店地址" : "Store URL",
+                "Diagnostic.StoreRecommendation" => _language.StartsWith("zh") ? "建议" : "Recommendation",
+                "Diagnostic.CheckingTTS" => _language.StartsWith("zh") ? "正在检查 TTS 连接..." : "Checking TTS connectivity...",
+                "Diagnostic.SectionTTS" => _language.StartsWith("zh") ? "语音合成(TTS)" : "TTS",
+                "Diagnostic.TTSNotEnabled" => _language.StartsWith("zh") ? "TTS 未启用，跳过。" : "TTS is not enabled, skipped.",
+                "Diagnostic.TTSNoEndpoint" => _language.StartsWith("zh") ? "TTS 端点未配置。" : "TTS endpoint not configured.",
+                "Diagnostic.TTSProvider" => _language.StartsWith("zh") ? "提供商" : "Provider",
+                "Diagnostic.TTSEndpoint" => _language.StartsWith("zh") ? "端点" : "Endpoint",
+                "Diagnostic.TTSReachable" => _language.StartsWith("zh") ? "TTS 端点可达" : "TTS endpoint reachable",
+                "Diagnostic.TTSOk" => _language.StartsWith("zh") ? "TTS 服务可用" : "TTS service available",
+                "Diagnostic.TTSFail" => _language.StartsWith("zh") ? "TTS 服务不可达" : "TTS service unreachable",
                 _ => key
             };
         }

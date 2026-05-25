@@ -3889,6 +3889,270 @@
             "zh-hans": "部分渠道 LLM 测试失败。启用 Free 降级可确保主提供商失败时服务仍然可用。",
             "zh-hant": "部分渠道 LLM 測試失敗。啟用 Free 降級可確保主提供商失敗時服務仍然可用。",
             "jp": "一部のチャネルLLMテストが失敗しました。Freeフォールバックを有効にすると、メインプロバイダーが失敗してもサービスが利用可能になります。"
+        },
+        "RecChannelProxyFix": {
+            "en": "{0} channel [{1}] - fix proxy mode",
+            "zh-hans": "{0} 渠道 [{1}] - 修正代理模式",
+            "zh-hant": "{0} 渠道 [{1}] - 修正代理模式",
+            "jp": "{0}チャネル [{1}] - プロキシモードを修正"
+        },
+        "RecChannelCheck": {
+            "en": "{0} channel [{1}] - unable to diagnose, please verify manually",
+            "zh-hans": "{0} 渠道 [{1}] - 无法诊断，请手动检查",
+            "zh-hant": "{0} 渠道 [{1}] - 無法診斷，請手動檢查",
+            "jp": "{0}チャネル [{1}] - 診断できません。手動で確認してください"
+        },
+        "RecVerify": {
+            "en": "Verify manually",
+            "zh-hans": "请手动验证",
+            "zh-hant": "請手動驗證",
+            "jp": "手動で確認"
+        },
+        "RecPluginStoreEnableProxy": {
+            "en": "Enable plugin store proxy",
+            "zh-hans": "启用插件商店代理",
+            "zh-hant": "啟用插件商店代理",
+            "jp": "プラグインストアプロキシを有効化"
+        },
+        "RecPluginStoreEnableProxyReason": {
+            "en": "Cannot access plugin store directly. Enabling proxy will restore plugin store access.",
+            "zh-hans": "无法直连插件商店，启用代理可恢复插件商店访问。",
+            "zh-hant": "無法直連插件商店，啟用代理可恢復插件商店訪問。",
+            "jp": "プラグインストアに直接アクセスできません。プロキシを有効にするとアクセスが回復します。"
+        },
+        "CheckingPluginStore": {
+            "en": "Checking plugin store connectivity...",
+            "zh-hans": "正在检查插件商店连接...",
+            "zh-hant": "正在檢查插件商店連接...",
+            "jp": "プラグインストア接続を確認中..."
+        },
+        "DirectTest": {
+            "en": "Direct",
+            "zh-hans": "直连",
+            "zh-hant": "直連",
+            "jp": "直接接続"
+        },
+        "ProxyTest": {
+            "en": "Proxy",
+            "zh-hans": "代理",
+            "zh-hant": "代理",
+            "jp": "プロキシ"
+        },
+        "ProxyRecommend": {
+            "en": "Recommended",
+            "zh-hans": "推荐",
+            "zh-hant": "推薦",
+            "jp": "推奨"
+        },
+        "ProxyNotConfigured": {
+            "en": "Proxy not configured",
+            "zh-hans": "代理未配置",
+            "zh-hant": "代理未配置",
+            "jp": "プロキシが設定されていません"
+        },
+        "BothModesWork": {
+            "en": "Both direct and proxy work, no change needed.",
+            "zh-hans": "直连和代理均可用，无需调整。",
+            "zh-hant": "直連和代理均可使用，無需調整。",
+            "jp": "直接接続とプロキシの両方が機能しているため、変更不要です。"
+        },
+        "DirectWorksProxyFails": {
+            "en": "Direct connection works but proxy fails. Recommend switching to Direct mode.",
+            "zh-hans": "直连可用但代理失败，建议切换为直连模式。",
+            "zh-hant": "直連可用但代理失敗，建議切換為直連模式。",
+            "jp": "直接接続は機能しますがプロキシが失敗しています。直接モードに切り替えをお勧めします。"
+        },
+        "ProxyWorksDirectFails": {
+            "en": "Proxy connection works but direct fails. Recommend switching to ForceProxy mode.",
+            "zh-hans": "代理可用但直连失败，建议切换为强制代理模式。",
+            "zh-hant": "代理可用但直連失敗，建議切換為強制代理模式。",
+            "jp": "プロキシ接続は機能しますが直接接続が失敗しています。ForceProxyモードに切り替えをお勧めします。"
+        },
+        "BothModesFail": {
+            "en": "Both direct and proxy connections failed. Please check network or API configuration.",
+            "zh-hans": "直连和代理均失败，请检查网络或API配置。",
+            "zh-hant": "直連和代理均失敗，請檢查網絡或API配置。",
+            "jp": "直接接続とプロキシの両方が失敗しました。ネットワークまたはAPI設定を確認してください。"
+        },
+        "StoreDirectOk": {
+            "en": "Plugin store direct access OK",
+            "zh-hans": "插件商店直连正常",
+            "zh-hant": "插件商店直連正常",
+            "jp": "プラグインストア直接アクセス正常"
+        },
+        "StoreProxyOk": {
+            "en": "Plugin store proxy access OK",
+            "zh-hans": "插件商店代理访问正常",
+            "zh-hant": "插件商店代理訪問正常",
+            "jp": "プラグインストアプロキシアクセス正常"
+        },
+        "StoreMirrorOk": {
+            "en": "Plugin store mirror access OK",
+            "zh-hans": "插件商店镜像访问正常",
+            "zh-hant": "插件商店鏡像訪問正常",
+            "jp": "プラグインストアミラーアクセス正常"
+        },
+        "StoreNoProxy": {
+            "en": "No proxy/mirror configured for plugin store",
+            "zh-hans": "未配置插件商店代理/镜像",
+            "zh-hant": "未配置插件商店代理/鏡像",
+            "jp": "プラグインストアのプロキシ/ミラーが設定されていません"
+        },
+        "StoreDirectRec": {
+            "en": "Direct connection works well. Keeping direct connection is recommended.",
+            "zh-hans": "直连正常，建议保持直连。",
+            "zh-hant": "直連正常，建議保持直連。",
+            "jp": "直接接続が正常です。直接接続を維持することをお勧めします。"
+        },
+        "StoreProxyRec": {
+            "en": "Direct connection failed but proxy/mirror works. Using proxy is recommended.",
+            "zh-hans": "直连失败但代理/镜像可用，建议启用代理。",
+            "zh-hant": "直連失敗但代理/鏡像可用，建議啟用代理。",
+            "jp": "直接接続は失敗しましたがプロキシ/ミラーが機能します。プロキシの使用をお勧めします。"
+        },
+        "StoreFailRec": {
+            "en": "Both direct and proxy/mirror failed. Please check network settings or try again later.",
+            "zh-hans": "直连和代理/镜像均失败，请检查网络设置或稍后重试。",
+            "zh-hant": "直連和代理/鏡像均失敗，請檢查網絡設置或稍後重試。",
+            "jp": "直接接続とプロキシ/ミラーの両方が失敗しました。ネットワーク設定を確認するか、後で再試行してください。"
+        },
+        "SectionPluginStore": {
+            "en": "Plugin Store",
+            "zh-hans": "插件商店",
+            "zh-hant": "插件商店",
+            "jp": "プラグインストア"
+        },
+        "StoreUrl": {
+            "en": "Store URL",
+            "zh-hans": "商店地址",
+            "zh-hant": "商店地址",
+            "jp": "ストアURL"
+        },
+        "StoreRecommendation": {
+            "en": "Recommendation",
+            "zh-hans": "建议",
+            "zh-hant": "建議",
+            "jp": "推奨事項"
+        },
+        "CheckingTTS": {
+            "en": "Checking TTS connectivity...",
+            "zh-hans": "正在检查 TTS 连接...",
+            "zh-hant": "正在檢查 TTS 連接...",
+            "jp": "TTS接続を確認中..."
+        },
+        "SectionTTS": {
+            "en": "TTS",
+            "zh-hans": "语音合成(TTS)",
+            "zh-hant": "語音合成(TTS)",
+            "jp": "音声合成(TTS)"
+        },
+        "TTSNotEnabled": {
+            "en": "TTS is not enabled, skipped.",
+            "zh-hans": "TTS 未启用，跳过。",
+            "zh-hant": "TTS 未啟用，跳過。",
+            "jp": "TTSは無効です。スキップします。"
+        },
+        "TTSNoEndpoint": {
+            "en": "TTS endpoint not configured.",
+            "zh-hans": "TTS 端点未配置。",
+            "zh-hant": "TTS 端點未配置。",
+            "jp": "TTSエンドポイントが設定されていません。"
+        },
+        "TTSProvider": {
+            "en": "Provider",
+            "zh-hans": "提供商",
+            "zh-hant": "提供商",
+            "jp": "プロバイダー"
+        },
+        "TTSEndpoint": {
+            "en": "Endpoint",
+            "zh-hans": "端点",
+            "zh-hant": "端點",
+            "jp": "エンドポイント"
+        },
+        "TTSReachable": {
+            "en": "TTS endpoint reachable",
+            "zh-hans": "TTS 端点可达",
+            "zh-hant": "TTS 端點可達",
+            "jp": "TTSエンドポイント到達可能"
+        },
+        "TTSOk": {
+            "en": "TTS service available",
+            "zh-hans": "TTS 服务可用",
+            "zh-hant": "TTS 服務可用",
+            "jp": "TTSサービス利用可能"
+        },
+        "TTSFail": {
+            "en": "TTS service unreachable",
+            "zh-hans": "TTS 服务不可达",
+            "zh-hant": "TTS 服務不可達",
+            "jp": "TTSサービスに到達できません"
+        },
+        "ValueEnabled": {
+            "en": "Enabled",
+            "zh-hans": "启用",
+            "zh-hant": "啟用",
+            "jp": "有効"
+        },
+        "ValueDisabled": {
+            "en": "Disabled",
+            "zh-hans": "禁用",
+            "zh-hant": "禁用",
+            "jp": "無効"
+        },
+        "ValueDirect": {
+            "en": "Direct",
+            "zh-hans": "直连",
+            "zh-hant": "直連",
+            "jp": "直接"
+        },
+        "ValueForceProxy": {
+            "en": "Force Proxy",
+            "zh-hans": "强制代理",
+            "zh-hant": "強制代理",
+            "jp": "強制プロキシ"
+        },
+        "ValueFollowDefault": {
+            "en": "Follow Default",
+            "zh-hans": "跟随默认",
+            "zh-hant": "跟隨默認",
+            "jp": "デフォルトに従う"
+        },
+        "ValueNotConfigured": {
+            "en": "Not configured",
+            "zh-hans": "未配置",
+            "zh-hant": "未配置",
+            "jp": "未設定"
+        },
+        "RecApplyAll": {
+            "en": "Apply All",
+            "zh-hans": "全部应用",
+            "zh-hant": "全部應用",
+            "jp": "すべて適用"
+        },
+        "RecIgnore": {
+            "en": "Ignore",
+            "zh-hans": "忽略",
+            "zh-hant": "忽略",
+            "jp": "無視"
+        },
+        "RecSectionTitle": {
+            "en": "Recommended Settings",
+            "zh-hans": "推荐设置调整",
+            "zh-hant": "推薦設置調整",
+            "jp": "推奨設定"
+        },
+        "CurrentPrefix": {
+            "en": "Current: ",
+            "zh-hans": "当前: ",
+            "zh-hant": "當前: ",
+            "jp": "現在: "
+        },
+        "SuggestPrefix": {
+            "en": "Suggested: ",
+            "zh-hans": "建议: ",
+            "zh-hant": "建議: ",
+            "jp": "推奨: "
         }
     }
 }
