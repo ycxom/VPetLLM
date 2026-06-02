@@ -7,6 +7,7 @@ namespace VPetLLM
     public partial class Setting
     {
         public LLMType Provider { get; set; } = LLMType.Ollama;
+        public string LastSelectedChannelType { get; set; } = "OpenAI";
         public string Language { get; set; } = "zh-hans";
         public string PromptLanguage { get; set; } = "zh";
         public OllamaSetting Ollama { get; set; } = new OllamaSetting();
@@ -1298,15 +1299,31 @@ namespace VPetLLM
             }
         }
 
-        public class FreeSetting
+        public class FreeNodeSetting
         {
+            public string Name { get; set; } = "Free";
             public string? Model { get; set; }
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
+            public bool Enabled { get; set; } = true;
+            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
+        }
+
+        public class FreeSetting
+        {
+            public List<FreeNodeSetting> FreeNodes { get; set; } = new List<FreeNodeSetting>();
+            public int CurrentNodeIndex { get; set; } = 0;
             public bool EnableLoadBalancing { get; set; } = true;
+
+            public string? Model { get; set; }
+            public double Temperature { get; set; } = 0.7;
+            public int MaxTokens { get; set; } = 2048;
+            public bool EnableAdvanced { get; set; } = false;
+            public bool EnableStreaming { get; set; } = false;
+            public bool EnableVision { get; set; } = false;
         }
 
         public class LMStudioNodeSetting

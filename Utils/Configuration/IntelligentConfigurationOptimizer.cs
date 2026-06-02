@@ -125,7 +125,8 @@ namespace VPetLLM.Utils.Configuration
                 {
                     "FloatingSidebarSettings",
                     "ScreenshotSettings",
-                    "TouchFeedbackSettings"
+                    "TouchFeedbackSettings",
+                    "ModelCacheSetting"  // 包含Dictionary类型，不需要重新实例化
                 };
 
                 if (skipTypes.Contains(property.PropertyType.Name))
@@ -169,7 +170,9 @@ namespace VPetLLM.Utils.Configuration
                 "FloatingSidebarSettings",
                 "ScreenshotSettings",
                 "TouchFeedbackSettings",
-                "SidebarButton"
+                "SidebarButton",
+                "ModelCacheSetting",  // 包含Dictionary类型，不需要递归检查
+                "ModelCacheEntry"     // 避免对缓存条目进行不必要的实例化
             };
 
             if (skipTypes.Contains(objType.Name))
@@ -186,6 +189,13 @@ namespace VPetLLM.Utils.Configuration
 
                 // 跳过特殊类型
                 if (skipTypes.Contains(propertyType.Name))
+                {
+                    continue;
+                }
+
+                // 跳过Dictionary和集合类型，这些类型不应该被重新实例化
+                if (typeof(global::System.Collections.IEnumerable).IsAssignableFrom(propertyType) && 
+                    propertyType != typeof(string))
                 {
                     continue;
                 }

@@ -411,6 +411,7 @@
                 <ComboBoxItem Content="Gemini" Tag="Gemini"/>
                 <ComboBoxItem Content="Ollama" Tag="Ollama"/>
                 <ComboBoxItem Content="LMStudio" Tag="LMStudio"/>
+                <ComboBoxItem Content="Free" Tag="Free"/>
             </ComboBox>
             <CheckBox x:Name="CheckBox_EnableLoadBalancing"
                     Content="{utils:Localize KeyPath=LLM_Settings.EnableLoadBalancing}"

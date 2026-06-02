@@ -770,7 +770,9 @@ namespace VPetLLM.UI.Windows
 
         private async Task LoadSettingsAsync()
         {
-            ((ComboBox)this.FindName("ComboBox_Provider")).ItemsSource = Enum.GetValues(typeof(Setting.LLMType));
+            // 使用列表而非数组，确保 WPF ComboBox 正确匹配选中项
+            var providerList = new List<Setting.LLMType>((Setting.LLMType[])Enum.GetValues(typeof(Setting.LLMType)));
+            ((ComboBox)this.FindName("ComboBox_Provider")).ItemsSource = providerList;
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectedItem = _plugin.Settings.Provider;
             ((CheckBox)this.FindName("CheckBox_EnableFallback")).IsChecked = _plugin.Settings.EnableFallback;
             ((CheckBox)this.FindName("CheckBox_EnableAutoDiagnostic")).IsChecked = _plugin.Settings.EnableAutoDiagnostic;
@@ -792,6 +794,20 @@ namespace VPetLLM.UI.Windows
 
             await Task.Yield();
 
+            // 恢复上次选中的渠道类型
+            var cbChannelType = this.FindName("ComboBox_ChannelType") as ComboBox;
+            if (cbChannelType != null && !string.IsNullOrEmpty(_plugin.Settings.LastSelectedChannelType))
+            {
+                foreach (ComboBoxItem item in cbChannelType.Items)
+                {
+                    if (item.Tag?.ToString() == _plugin.Settings.LastSelectedChannelType)
+                    {
+                        cbChannelType.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+
             if (_plugin.Settings.OpenAI is null)
             {
                 _plugin.Settings.OpenAI = new Setting.OpenAISetting();
@@ -799,6 +815,23 @@ namespace VPetLLM.UI.Windows
             if (_plugin.Settings.Free is null)
             {
                 _plugin.Settings.Free = new Setting.FreeSetting();
+            }
+            if (_plugin.Settings.Free.FreeNodes == null || _plugin.Settings.Free.FreeNodes.Count == 0)
+            {
+                _plugin.Settings.Free.FreeNodes = new List<Setting.FreeNodeSetting>
+                {
+                    new Setting.FreeNodeSetting
+                    {
+                        Name = "Free",
+                        Model = null,
+                        EnableStreaming = _plugin.Settings.Free.EnableStreaming,
+                        EnableVision = _plugin.Settings.Free.EnableVision,
+                        EnableAdvanced = _plugin.Settings.Free.EnableAdvanced,
+                        Temperature = _plugin.Settings.Free.Temperature,
+                        MaxTokens = _plugin.Settings.Free.MaxTokens,
+                        Enabled = true
+                    }
+                };
             }
             if (_plugin.Settings.LMStudio is null)
             {
@@ -1370,13 +1403,7 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("CheckBox_OpenAI_EnableLoadBalancing") is CheckBox cbOpenLB2)
                 _plugin.Settings.OpenAI.EnableLoadBalancing = cbOpenLB2.IsChecked ?? false;
 
-            // 保存 Free/LMStudio 设置 - 使用统一UI管理，暂不处理单一配置
-            //if (freeEnableStreamingCheckBox is not null)
-            //    _plugin.Settings.Free.EnableStreaming = freeEnableStreamingCheckBox.IsChecked ?? false;
-            //if (this.FindName("CheckBox_Free_EnableVision") is CheckBox cbFreeVision)
-            //    _plugin.Settings.Free.EnableVision = cbFreeVision.IsChecked ?? false;
-            //if (freeEnableAdvancedCheckBox is not null)
-            //    _plugin.Settings.Free.EnableAdvanced = freeEnableAdvancedCheckBox.IsChecked ?? false;
+            // Free/LMStudio 设置通过统一UI管理，节点保存由 SaveCurrentNodeChanges 处理
             //if (freeTemperatureSlider is not null)
             //    _plugin.Settings.Free.Temperature = freeTemperatureSlider.Value;
             //if (freeMaxTokensTextBox is not null && int.TryParse(freeMaxTokensTextBox.Text, out int freeMaxTokens))
@@ -1622,6 +1649,7 @@ namespace VPetLLM.UI.Windows
         private async void ComboBox_Provider_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_plugin?.Settings == null) return;
+            
             if (CheckBox_EnableFallback?.IsChecked == true)
             {
                 await Task.Delay(100);
@@ -4398,6 +4426,10 @@ namespace VPetLLM.UI.Windows
                 LoadChannelNodes(channelType);
                 UpdateChannelSpecificUI(channelType);
 
+                // 持久化上次选中的渠道类型
+                _plugin.Settings.LastSelectedChannelType = channelType ?? "OpenAI";
+                _plugin.Settings.Save();
+
                 // 确保模型被正确设置 - 使用专门的函数
                 var listView = this.FindName("ListView_Channels") as ListView;
                 if (listView?.SelectedItem != null && channelType != null)
@@ -4463,6 +4495,13 @@ namespace VPetLLM.UI.Windows
                     targetModel = lmStudioNode.Model;
                     cbModel.ItemsSource = modelsList;
                 }
+                else if (channelType == "Free" && selectedNode is Setting.FreeNodeSetting freeNode)
+                {
+                    // Free 渠道：模型由后端自动分配，无需手动选择
+                    var modelsList = new List<string> { "auto" };
+                    targetModel = freeNode.Model ?? "auto";
+                    cbModel.ItemsSource = modelsList;
+                }
                 
                 // 关键修复：始终强制设置 Text，确保即使目标模型不在列表中也不会被重置
                 if (!string.IsNullOrEmpty(targetModel))
@@ -4500,6 +4539,9 @@ namespace VPetLLM.UI.Windows
                     break;
                 case "LMStudio":
                     listView.ItemsSource = _plugin.Settings.LMStudio.LMStudioNodes;
+                    break;
+                case "Free":
+                    listView.ItemsSource = _plugin.Settings.Free.FreeNodes;
                     break;
             }
             listView.UpdateLayout();
@@ -4619,6 +4661,27 @@ namespace VPetLLM.UI.Windows
                         cbEnableLoadBalancing.IsChecked = _plugin.Settings.LMStudio.EnableLoadBalancing;
                     }
                     break;
+                case "Free":
+                    // Free 渠道：无需 API Key/URL，显示流式传输和视觉能力开关
+                    if (labelApiKey != null) labelApiKey.Visibility = Visibility.Collapsed;
+                    if (gridApiKey != null) gridApiKey.Visibility = Visibility.Collapsed;
+                    if (labelApiAddress != null) labelApiAddress.Visibility = Visibility.Collapsed;
+                    if (gridApiAddress != null) gridApiAddress.Visibility = Visibility.Collapsed;
+                    if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
+                    if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
+                    if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Collapsed;
+                    if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Collapsed;
+                    if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Collapsed;
+                    if (cbChannelProxyMode != null) cbChannelProxyMode.Visibility = Visibility.Collapsed;
+                    if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
+                    if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
+                    if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Collapsed;
+                    if (cbEnableLoadBalancing != null)
+                    {
+                        cbEnableLoadBalancing.Visibility = Visibility.Collapsed;
+                    }
+                    break;
             }
         }
 
@@ -4707,6 +4770,25 @@ namespace VPetLLM.UI.Windows
                             listView.SelectedItem = lmStudioNode;
                         }
                         break;
+                    case "Free":
+                        var freeNode = new Setting.FreeNodeSetting
+                        {
+                            Name = $"Free渠道{_plugin.Settings.Free.FreeNodes.Count + 1}",
+                            Model = "auto",
+                            Enabled = true,
+                            EnableAdvanced = false,
+                            EnableStreaming = _plugin.Settings.Free.EnableStreaming,
+                            EnableVision = _plugin.Settings.Free.EnableVision,
+                            Temperature = 0.7,
+                            MaxTokens = 2048
+                        };
+                        _plugin.Settings.Free.FreeNodes.Add(freeNode);
+                        LoadChannelNodes(channelType);
+                        if (listView != null)
+                        {
+                            listView.SelectedItem = freeNode;
+                        }
+                        break;
                 }
             }
             finally
@@ -4753,6 +4835,12 @@ namespace VPetLLM.UI.Windows
                     {
                         ClearChannelCache(channelType, lmStudioNode.GetHashCode().ToString());
                         _plugin.Settings.LMStudio.LMStudioNodes.Remove(lmStudioNode);
+                    }
+                    break;
+                case "Free":
+                    if (listView.SelectedItem is Setting.FreeNodeSetting freeNode)
+                    {
+                        _plugin.Settings.Free.FreeNodes.Remove(freeNode);
                     }
                     break;
             }
@@ -4928,6 +5016,18 @@ namespace VPetLLM.UI.Windows
                                     }
                                 }
                             }
+                        }
+                        break;
+                    case "Free":
+                        if (selectedNode is Setting.FreeNodeSetting freeNode)
+                        {
+                            if (tbChannelName != null) tbChannelName.Text = freeNode.Name;
+                            if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = freeNode.EnableStreaming;
+                            if (cbEnableVision != null) cbEnableVision.IsChecked = freeNode.EnableVision;
+                            if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = freeNode.EnableAdvanced;
+                            if (sliderTemperature != null) sliderTemperature.Value = freeNode.Temperature;
+                            if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = freeNode.Temperature.ToString("F2");
+                            if (tbMaxTokens != null) tbMaxTokens.Text = freeNode.MaxTokens.ToString();
                         }
                         break;
                 }
@@ -5784,6 +5884,29 @@ namespace VPetLLM.UI.Windows
                             lmStudioNode.MaxTokens = maxTokens;
                         if (cbChannelMode != null && cbChannelMode.SelectedItem is ComboBoxItem modeItem)
                             lmStudioNode.Mode = Enum.Parse<Setting.ChannelMode>(modeItem.Tag?.ToString() ?? "Unrestricted");
+                    }
+                    break;
+                case "Free":
+                    if (selectedNode is Setting.FreeNodeSetting freeNode)
+                    {
+                        if (tbChannelName != null) freeNode.Name = tbChannelName.Text;
+                        if (cbModel != null && !string.IsNullOrEmpty(cbModel.Text) && !cbModel.Text.Contains("刷新"))
+                            freeNode.Model = cbModel.Text;
+                        if (cbEnableStreaming != null) freeNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
+                        if (cbEnableVision != null) freeNode.EnableVision = cbEnableVision.IsChecked ?? false;
+                        if (cbEnableAdvanced != null) freeNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
+                        if (sliderTemperature != null) freeNode.Temperature = sliderTemperature.Value;
+                        if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
+                            freeNode.MaxTokens = maxTokens;
+                        
+                        // 同步到 FreeSetting 顶层属性（向后兼容）
+                        _plugin.Settings.Free.EnableStreaming = freeNode.EnableStreaming;
+                        _plugin.Settings.Free.EnableVision = freeNode.EnableVision;
+                        _plugin.Settings.Free.EnableAdvanced = freeNode.EnableAdvanced;
+                        _plugin.Settings.Free.Temperature = freeNode.Temperature;
+                        _plugin.Settings.Free.MaxTokens = freeNode.MaxTokens;
+                        if (freeNode.Model != null)
+                            _plugin.Settings.Free.Model = freeNode.Model;
                     }
                     break;
             }

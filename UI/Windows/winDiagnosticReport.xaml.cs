@@ -25,7 +25,9 @@ namespace VPetLLM.UI.Windows
         public Visibility HasModels { get; set; } = Visibility.Collapsed;
         public Visibility HasLLMResult { get; set; } = Visibility.Collapsed;
 
+#pragma warning disable CS0067
         public event PropertyChangedEventHandler? PropertyChanged;
+#pragma warning restore CS0067
     }
 
     public class RecommendationCardViewModel

@@ -950,7 +950,7 @@ namespace VPetLLM.Handlers.Core
                 {
                     // 回退到传统的 VPet 语音等待
                     Logger.Log("SmartMessageProcessor: 状态监控器不可用，使用传统等待");
-                    await WaitForVPetVoiceCompleteAsync().ConfigureAwait(false);
+                    await WaitForVPetVoiceCompleteAsync(text).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
@@ -961,7 +961,7 @@ namespace VPetLLM.Handlers.Core
                 // 发生异常时回退到传统等待
                 try
                 {
-                    await WaitForVPetVoiceCompleteAsync().ConfigureAwait(false);
+                    await WaitForVPetVoiceCompleteAsync(text).ConfigureAwait(false);
                 }
                 catch (Exception fallbackEx)
                 {
@@ -1212,7 +1212,7 @@ namespace VPetLLM.Handlers.Core
         /// 优化：减少轮询频率，利用VPet新的SayInfo架构提供的状态信息
         /// 修复：正确处理VPetTTS插件协作，当检测到外部TTS插件时应该等待而不是跳过
         /// </summary>
-        private async Task WaitForVPetVoiceCompleteAsync()
+        private async Task WaitForVPetVoiceCompleteAsync(string text = null)
         {
             try
             {
@@ -1236,7 +1236,7 @@ namespace VPetLLM.Handlers.Core
                     return;
                 }
 
-                await WaitForVPetVoiceWithSayInfoAsync();
+                await WaitForVPetVoiceWithSayInfoAsync(text);
             }
             catch (Exception ex)
             {
@@ -1250,7 +1250,7 @@ namespace VPetLLM.Handlers.Core
         /// 增加：为外置TTS额外添加等待时间，并改进VPetTTS插件的播放状态检测
         /// 修复：通过VPetTTS集成管理器检测播放完成
         /// </summary>
-        private async Task WaitForVPetVoiceWithSayInfoAsync()
+        private async Task WaitForVPetVoiceWithSayInfoAsync(string text = null)
         {
             try
             {
@@ -1302,24 +1302,49 @@ namespace VPetLLM.Handlers.Core
                     }
                     else
                     {
-                        Logger.Log("SmartMessageProcessor: VPetTTS未在播放，添加标准等待时间");
-                        await Task.Delay(1000).ConfigureAwait(false);
+                        // 根据文本长度计算合理的等待时间（替代硬编码的1秒）
+                        int calculatedWaitTime = CalculateTTSWaitTime(text);
+                        Logger.Log($"SmartMessageProcessor: VPetTTS未在播放，根据文本长度计算等待时间: {calculatedWaitTime}ms");
+                        await Task.Delay(calculatedWaitTime).ConfigureAwait(false);
                     }
                 }
                 else
                 {
-                    // 为其他外置TTS添加标准等待时间
-                    Logger.Log("SmartMessageProcessor: 为外置TTS添加额外1秒等待时间");
-                    await Task.Delay(1000).ConfigureAwait(false);
+                    // 根据文本长度计算合理的等待时间（替代硬编码的1秒）
+                    int calculatedWaitTime = CalculateTTSWaitTime(text);
+                    Logger.Log($"SmartMessageProcessor: 为外置TTS添加基于文本长度的等待时间: {calculatedWaitTime}ms");
+                    await Task.Delay(calculatedWaitTime).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"SmartMessageProcessor: 智能等待 VPet 语音失败: {ex.Message}");
                 // 发生异常时也添加额外等待时间，确保安全
-                Logger.Log("SmartMessageProcessor: 异常情况下为外置TTS添加额外等待");
-                await Task.Delay(2000).ConfigureAwait(false);
+                int fallbackWaitTime = CalculateTTSWaitTime(text);
+                Logger.Log($"SmartMessageProcessor: 异常情况下为外置TTS添加额外等待: {fallbackWaitTime}ms");
+                await Task.Delay(fallbackWaitTime).ConfigureAwait(false);
             }
+        }
+
+        /// <summary>
+        /// 根据文本长度计算TTS播放等待时间
+        /// 使用 BubbleDisplayConfig 计算基础显示时间，并添加20%安全余量
+        /// </summary>
+        private int CalculateTTSWaitTime(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return 1500; // 默认1.5秒
+            }
+
+            // 基于文本长度计算基础显示时间
+            int baseTime = BubbleDisplayConfig.CalculateActualDisplayTime(text);
+            
+            // 添加20%安全余量以确保TTS播放完成
+            int waitTime = (int)(baseTime * 1.2);
+            
+            // 确保至少1秒，最多15秒
+            return Math.Max(1000, Math.Min(waitTime, 15000));
         }
 
         /// <summary>
