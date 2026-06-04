@@ -15,6 +15,7 @@ using VPetLLM.UI.Controls;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 using VPetLLM.Utils.Plugin;
+using VPetLLM.Core.Data.Models;
 using NewPlugin = VPetLLM.Core.Abstractions.Interfaces.Plugin;
 
 namespace VPetLLM.UI.Windows
@@ -107,6 +108,62 @@ namespace VPetLLM.UI.Windows
         }
     }
 
+    /// <summary>
+    /// Display wrapper for Skill items in the DataGrid
+    /// </summary>
+    public class SkillDisplayItem
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string TriggerHint { get; set; } = "";
+        public string ActionTemplate { get; set; } = "";
+        public int UseCount { get; set; }
+        public bool Enabled { get; set; } = true;
+        public DateTime CreatedAt { get; set; }
+        public DateTime? LastUsed { get; set; }
+
+        public static List<SkillDisplayItem> FromSkills(List<Skill> skills)
+        {
+            return skills.Select(s => new SkillDisplayItem
+            {
+                Id = s.Id,
+                Name = s.Name,
+                Description = s.Description,
+                TriggerHint = s.TriggerHint,
+                ActionTemplate = s.ActionTemplate,
+                UseCount = s.UseCount,
+                Enabled = s.Enabled,
+                CreatedAt = s.CreatedAt,
+                LastUsed = s.LastUsed
+            }).ToList();
+        }
+    }
+
+
+    /// <summary>
+    /// JSON import model for skills (only user-defined fields, no stats)
+    /// </summary>
+    public class SkillImportItem
+    {
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string TriggerHint { get; set; } = "";
+        public string ActionTemplate { get; set; } = "";
+        public bool Enabled { get; set; } = true;
+    }
+
+    /// <summary>
+    /// JSON export model for skills (strips runtime stats)
+    /// </summary>
+    public class SkillExportItem
+    {
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string TriggerHint { get; set; } = "";
+        public string ActionTemplate { get; set; } = "";
+        public bool Enabled { get; set; } = true;
+    }
     public partial class winSettingNew : Window
     {
         private ObservableCollection<ProviderFallbackItem> _fallbackProviders;
@@ -562,6 +619,8 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_ASR_OpenAI_Model")).SelectionChanged += Control_SelectionChanged;
 
             ((Button)this.FindName("Button_RefreshPlugins")).Click += Button_RefreshPlugins_Click;
+            ((Button)this.FindName("Button_SkillsRefresh")).Click += Button_SkillsRefresh_Click;
+            ((Button)this.FindName("Button_SkillsImport")).Click += Button_SkillsImport_Click;
 
             // 绑定 OpenAI 节点详情控件事件，确保编辑即时回写
             EnsureOpenAINodeDetailHandlers();
@@ -933,6 +992,7 @@ namespace VPetLLM.UI.Windows
             }
             
             LoadLogsAsync();
+            LoadSkillsData();
 
             await Task.Yield();
 
@@ -2547,6 +2607,248 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+
+        private void LoadSkillsData()
+        {
+            try
+            {
+                var skillManager = _plugin.ChatCore?.SkillManager;
+                if (skillManager is not null)
+                {
+                    var skills = skillManager.GetAllSkills();
+                    var displayItems = SkillDisplayItem.FromSkills(skills);
+                    if (FindName("DataGrid_Skills") is DataGrid dataGrid)
+                    {
+                        dataGrid.ItemsSource = displayItems;
+                    }
+                }
+                else
+                {
+                    if (FindName("DataGrid_Skills") is DataGrid dataGrid)
+                    {
+                        dataGrid.ItemsSource = new List<SkillDisplayItem>();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error loading skills: {ex.Message}");
+            }
+        }
+
+        private void Button_SkillsRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            if (button is not null && !button.IsEnabled) return;
+            StartButtonLoadingAnimation(button);
+            try
+            {
+                LoadSkillsData();
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
+        }
+
+        private void Button_SkillRowDelete_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var langCode = _plugin.Settings.Language;
+            var skill = (button?.DataContext as SkillDisplayItem);
+            if (skill is null) return;
+
+            var confirmMsg = string.Format(
+                LanguageHelper.Get("Skills.ConfirmDelete", langCode) ?? "Are you sure you want to delete skill \"{0}\"?",
+                skill.Name);
+
+            var result = MessageBox.Show(confirmMsg,
+                LanguageHelper.Get("Warning", langCode) ?? "Warning",
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            StartButtonLoadingAnimation(button);
+            try
+            {
+                var skillManager = _plugin.ChatCore?.SkillManager;
+                if (skillManager is not null)
+                {
+                    skillManager.DeleteSkill(skill.Name);
+                }
+                LoadSkillsData();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error deleting skill: {ex.Message}");
+                MessageBox.Show(
+                    $"{LanguageHelper.Get("Error", langCode) ?? "Error"}: {ex.Message}",
+                    LanguageHelper.Get("Error", langCode) ?? "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
+        }
+
+        private void Button_SkillRowExport_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var langCode = _plugin.Settings.Language;
+            var skill = (button?.DataContext as SkillDisplayItem);
+            if (skill is null) return;
+
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "JSON files (*.json)|*.json",
+                Title = LanguageHelper.Get("Skills.Export", langCode) ?? "Export Skill",
+                FileName = $"VPetLLM_Skill_{skill.Name}.json"
+            };
+
+            if (dialog.ShowDialog() != true) return;
+
+            try
+            {
+                var item = new SkillExportItem
+                {
+                    Name = skill.Name,
+                    Description = skill.Description,
+                    TriggerHint = skill.TriggerHint,
+                    ActionTemplate = skill.ActionTemplate,
+                    Enabled = skill.Enabled
+                };
+
+                var json = JsonConvert.SerializeObject(new[] { item }, Formatting.Indented);
+                File.WriteAllText(dialog.FileName, json);
+
+                MessageBox.Show(
+                    LanguageHelper.Get("Skills.ExportResult", langCode)?.Replace("{0}", "1") ?? "Exported 1 skill.",
+                    LanguageHelper.Get("Skills.Export", langCode) ?? "Export",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Skill export error: {ex.Message}");
+                MessageBox.Show($"Export failed: {ex.Message}",
+                    LanguageHelper.Get("Error", langCode) ?? "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void Button_SkillRowView_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var langCode = _plugin.Settings.Language;
+            var skill = (button?.DataContext as SkillDisplayItem);
+            if (skill is null) return;
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Name: {skill.Name}");
+            sb.AppendLine($"Description: {skill.Description}");
+            sb.AppendLine($"Trigger: {skill.TriggerHint}");
+            sb.AppendLine($"Used: {skill.UseCount} times");
+            sb.AppendLine($"Last Used: {(skill.LastUsed?.ToString("yyyy-MM-dd HH:mm") ?? "Never")}");
+            sb.AppendLine(new string('-', 40));
+            sb.AppendLine("Action Template:");
+            sb.AppendLine(skill.ActionTemplate);
+
+            MessageBox.Show(sb.ToString(),
+                LanguageHelper.Get("Skills.View", langCode) ?? "Skill Details",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void Button_SkillsImport_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var langCode = _plugin.Settings.Language;
+
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "JSON files (*.json)|*.json",
+                Title = LanguageHelper.Get("Skills.Import", langCode) ?? "Import Skills"
+            };
+
+            if (dialog.ShowDialog() != true) return;
+
+            StartButtonLoadingAnimation(button);
+            try
+            {
+                var json = File.ReadAllText(dialog.FileName);
+                var items = JsonConvert.DeserializeObject<List<SkillImportItem>>(json);
+
+                if (items is null || items.Count == 0)
+                {
+                    MessageBox.Show(
+                        LanguageHelper.Get("Skills.ImportEmpty", langCode) ?? "File contains no valid skills.",
+                        LanguageHelper.Get("Warning", langCode) ?? "Warning",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var skillManager = _plugin.ChatCore?.SkillManager;
+                if (skillManager is null)
+                {
+                    MessageBox.Show("SkillManager not available.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                int imported = 0, skipped = 0;
+                foreach (var item in items)
+                {
+                    if (string.IsNullOrWhiteSpace(item.Name))
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    var existing = skillManager.GetSkill(item.Name);
+                    if (existing is not null)
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    var created = skillManager.CreateSkill(
+                        item.Name,
+                        item.Description ?? "",
+                        item.TriggerHint ?? "",
+                        item.ActionTemplate ?? "");
+
+                    if (created is not null)
+                    {
+                        if (!item.Enabled)
+                            skillManager.ModifySkill(item.Name, null, null, null, false);
+                        imported++;
+                    }
+                    else
+                    {
+                        skipped++;
+                    }
+                }
+
+                LoadSkillsData();
+
+                var resultMsg = string.Format(
+                    LanguageHelper.Get("Skills.ImportResult", langCode) ?? "Import complete. {0} imported, {1} skipped.",
+                    imported, skipped);
+                MessageBox.Show(resultMsg,
+                    LanguageHelper.Get("Skills.Import", langCode) ?? "Import",
+                    MessageBoxButton.OK, imported > 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Skills Import error: {ex.Message}");
+                MessageBox.Show($"Import failed: {ex.Message}",
+                    LanguageHelper.Get("Error", langCode) ?? "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                StopButtonLoadingAnimation(button);
+            }
+        }
+
         private void Window_Closed(object? sender, EventArgs e)
         {
             _plugin.TTSServiceAvailabilityChanged -= OnTTSServiceAvailabilityChanged;
@@ -2745,6 +3047,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("Tab_Tools") is TabItem tabTools) tabTools.Header = LanguageHelper.Get("Tools.Tab", langCode);
             if (FindName("Tab_Log") is TabItem tabLog) tabLog.Header = LanguageHelper.Get("Log.Tab", langCode);
             if (FindName("Tab_Plugin") is TabItem tabPlugin) tabPlugin.Header = LanguageHelper.Get("Plugin.Tab", langCode);
+            if (FindName("Tab_Skills") is TabItem tabSkills) tabSkills.Header = LanguageHelper.Get("Skills.Tab", langCode);
             if (FindName("Tab_Proxy") is TabItem tabProxy) tabProxy.Header = LanguageHelper.Get("Proxy.Tab", langCode);
             if (FindName("Tab_TTS") is TabItem tabTTS) tabTTS.Header = LanguageHelper.Get("TTS.Tab", langCode);
 
@@ -2988,6 +3291,26 @@ namespace VPetLLM.UI.Windows
                 if (dataGridPlugins.Columns.Count > 4)
                     dataGridPlugins.Columns[4].Header = LanguageHelper.Get("Plugin.Action", langCode) ?? "操作";
                 dataGridPlugins.Items.Refresh();
+
+            // 更新 Skills DataGrid 列标题
+            if (FindName("DataGrid_Skills") is DataGrid dataGridSkills)
+            {
+                if (dataGridSkills.Columns.Count > 0)
+                    dataGridSkills.Columns[0].Header = LanguageHelper.Get("Skills.Enabled", langCode) ?? "On";
+                if (dataGridSkills.Columns.Count > 1)
+                    dataGridSkills.Columns[1].Header = LanguageHelper.Get("Skills.Name", langCode) ?? "Name";
+                if (dataGridSkills.Columns.Count > 2)
+                    dataGridSkills.Columns[2].Header = LanguageHelper.Get("Skills.Description", langCode) ?? "Description";
+                if (dataGridSkills.Columns.Count > 3)
+                    dataGridSkills.Columns[3].Header = LanguageHelper.Get("Skills.Trigger", langCode) ?? "Trigger";
+                if (dataGridSkills.Columns.Count > 4)
+                    dataGridSkills.Columns[4].Header = LanguageHelper.Get("Skills.UseCount", langCode) ?? "Used";
+                if (dataGridSkills.Columns.Count > 5)
+                    dataGridSkills.Columns[5].Header = LanguageHelper.Get("Skills.LastUsed", langCode) ?? "Last Used";
+                if (dataGridSkills.Columns.Count > 6)
+                    dataGridSkills.Columns[6].Header = LanguageHelper.Get("Skills.ActionTemplate", langCode) ?? "Action Template";
+                dataGridSkills.Items.Refresh();
+            }
             }
 
             // OpenAI 多节点 ListView 列头（GridViewColumn.Header 非依赖属性，需手动刷新）

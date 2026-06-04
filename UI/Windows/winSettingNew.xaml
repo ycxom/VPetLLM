@@ -3097,6 +3097,217 @@
                     </Grid>
                 </Border>
             </TabItem>
+            <TabItem Header="{utils:Localize KeyPath=Skills.Tab}"
+                    x:Name="Tab_Skills"
+                    Style="{StaticResource ModernTabItem}">
+                <Border Style="{StaticResource CardContainer}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Skills management header -->
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="16,12"
+                                Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TextBlock_SkillsManagement"
+                                            Text="{utils:Localize KeyPath=Skills.Management}"
+                                            FontSize="16"
+                                            FontWeight="SemiBold"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="TextBlock_SkillsManagementDescription"
+                                            Text="{utils:Localize KeyPath=Skills.ManagementDescription}"
+                                            Foreground="{StaticResource SecondaryTextBrush}"
+                                            FontSize="12"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" 
+                                           Orientation="Horizontal" 
+                                           VerticalAlignment="Center">
+                                    <Button x:Name="Button_SkillsRefresh"
+                                            Content="{utils:Localize KeyPath=Skills.Refresh}"
+                                            Margin="0,0,8,0"
+                                            Padding="12,6"
+                                            Click="Button_SkillsRefresh_Click"
+                                            Style="{StaticResource SecondaryButton}"/>
+                                    <Button x:Name="Button_SkillsImport"
+                                            Content="{utils:Localize KeyPath=Skills.Import}"
+                                            Padding="12,6"
+                                            Click="Button_SkillsImport_Click"
+                                            Style="{StaticResource SecondaryButton}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Skills list -->
+                        <Border Background="{StaticResource ControlBackgroundBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Grid.Row="1">
+                            <DataGrid x:Name="DataGrid_Skills"
+                                    AutoGenerateColumns="False"
+                                    CanUserAddRows="False"
+                                    RowHeight="52"
+                                    GridLinesVisibility="Horizontal"
+                                    HeadersVisibility="Column"
+                                    AlternatingRowBackground="{StaticResource SecondaryBrush}"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Style="{StaticResource ModernDataGrid}"
+                                    ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+                                    HorizontalGridLinesBrush="{StaticResource BorderBrush}"
+                                    SelectionMode="Single"
+                                    SelectionUnit="FullRow"
+                                    IsReadOnly="True">
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Skills.Enabled}" Width="50">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"
+                                                         IsHitTestVisible="False"
+                                                         Focusable="False"
+                                                         Style="{StaticResource ModernCheckBox}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                        <DataGridTemplateColumn.HeaderStyle>
+                                            <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource ModernDataGridColumnHeader}">
+                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTemplateColumn.HeaderStyle>
+                                    </DataGridTemplateColumn>
+
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Skills.Name}"
+                                    Binding="{Binding Name}"
+                                    Width="130"
+                                    MinWidth="100">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Padding" Value="8,4"/>
+                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Skills.Description}"
+                                    Binding="{Binding Description}"
+                                    Width="200"
+                                    MinWidth="140">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Padding" Value="8,4"/>
+                                                <Setter Property="TextWrapping" Value="Wrap"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                                                <Setter Property="LineHeight" Value="16"/>
+                                                <Setter Property="MaxHeight" Value="40"/>
+                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                <Setter Property="ToolTip" Value="{Binding Description}"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Skills.Trigger}"
+                                    Binding="{Binding TriggerHint}"
+                                    Width="160"
+                                    MinWidth="120">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Padding" Value="8,4"/>
+                                                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                <Setter Property="ToolTip" Value="{Binding TriggerHint}"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Skills.UseCount}"
+                                    Binding="{Binding UseCount}"
+                                    Width="60">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Padding" Value="8,4"/>
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTextColumn Header="{utils:Localize KeyPath=Skills.LastUsed}"
+                                    Binding="{Binding LastUsed, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
+                                    Width="140"
+                                    MinWidth="120">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Padding" Value="8,4"/>
+                                                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="FontSize" Value="11"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTemplateColumn Header="{utils:Localize KeyPath=Plugin.Action}" Width="*" MinWidth="180">
+                                        <DataGridTemplateColumn.HeaderStyle>
+                                            <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource ModernDataGridColumnHeader}">
+                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTemplateColumn.HeaderStyle>
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" 
+                                                           Margin="8,4"
+                                                           HorizontalAlignment="Left"
+                                                           VerticalAlignment="Center">
+                                                    <Button Content="{utils:Localize KeyPath=Skills.Export}"
+                                                            Click="Button_SkillRowExport_Click" 
+                                                            Padding="6,3"
+                                                            Margin="0,0,4,0"
+                                                            FontSize="11"
+                                                            ToolTip="{utils:Localize KeyPath=Skills.Export}"
+                                                            Style="{StaticResource SecondaryButton}"/>
+                                                    <Button Content="{utils:Localize KeyPath=Skills.Delete}"
+                                                            Click="Button_SkillRowDelete_Click" 
+                                                            Padding="6,3"
+                                                            Margin="0,0,4,0"
+                                                            FontSize="11"
+                                                            ToolTip="{utils:Localize KeyPath=Skills.Delete}"
+                                                            Style="{StaticResource SecondaryButton}"/>
+                                                    <Button Content="{utils:Localize KeyPath=Skills.View}"
+                                                            Click="Button_SkillRowView_Click" 
+                                                            Padding="6,3"
+                                                            FontSize="11"
+                                                            ToolTip="{utils:Localize KeyPath=Skills.View}"
+                                                            Style="{StaticResource SecondaryButton}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </Grid>
+                </Border>
+            </TabItem>
             <TabItem Header="{utils:Localize KeyPath=About.Tab, Default=关于}"
                     x:Name="Tab_About"
                     Style="{StaticResource ModernTabItem}">

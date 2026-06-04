@@ -2,6 +2,8 @@ using System.Text.RegularExpressions;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Handlers.Legacy;
+using VPetLLM.Handlers.Actions;
+using VPetLLM.Core.Data.Managers;
 
 namespace VPetLLM.Handlers.Core
 {
@@ -15,6 +17,7 @@ namespace VPetLLM.Handlers.Core
         private readonly IMainWindow _mainWindow;
         private readonly IHandlerRegistry _handlerRegistry;
         private RecordManager _recordManager;
+        private SkillManager _skillManager;
         private Setting _settings;
         private IMediaPlaybackService _mediaPlaybackService;
 
@@ -40,6 +43,13 @@ namespace VPetLLM.Handlers.Core
         {
             _recordManager = recordManager;
             // Re-register handlers to include RecordCommandHandler
+            RegisterHandlers();
+        }
+
+        public void SetSkillManager(SkillManager skillManager)
+        {
+            _skillManager = skillManager;
+            // Re-register handlers to include SkillCommandHandler
             RegisterHandlers();
         }
 
@@ -77,6 +87,16 @@ namespace VPetLLM.Handlers.Core
             if (_settings is not null)
             {
                 _handlerRegistry.Register("vpet_settings", new VPetSettingsHandler(_settings));
+            }
+
+            // Add SkillCommandHandlers if SkillManager is available
+            if (_skillManager is not null)
+            {
+                _handlerRegistry.Register("skill_create", new SkillCreateHandler(_skillManager));
+                _handlerRegistry.Register("skill_modify", new SkillModifyHandler(_skillManager));
+                _handlerRegistry.Register("skill_delete", new SkillDeleteHandler(_skillManager));
+                _handlerRegistry.Register("skill_call", new SkillCallHandler(_skillManager));
+                _handlerRegistry.Register("skill_list", new SkillListHandler(_skillManager));
             }
 
             // Add PlayHandler if MediaPlaybackService is available
@@ -118,6 +138,15 @@ namespace VPetLLM.Handlers.Core
                     Logger.Log($"ActionProcessor: New plugin format detected - plugin name: {pluginName}");
                 }
 
+                // Check for skill_call format: skill_call_SkillName
+                string skillName = null;
+                if (actionType.StartsWith("skill_call_"))
+                {
+                    skillName = actionType.Substring(11); // Remove "skill_call_" prefix
+                    actionType = "skill_call"; // Use base keyword for handler lookup
+                    Logger.Log($"ActionProcessor: Skill call format detected - skill name: {skillName}");
+                }
+
                 // Find corresponding handler using HandlerRegistry
                 IActionHandler handler = _handlerRegistry.GetHandler(actionType);
 
@@ -153,6 +182,12 @@ namespace VPetLLM.Handlers.Core
                     PluginHandler.SetPluginName(pluginName);
                 }
 
+                // For skill call format, set the skill name before execution
+                if (!string.IsNullOrEmpty(skillName) && handler is SkillCallHandler)
+                {
+                    SkillCallHandler.SetSkillName(skillName);
+                }
+
                 bool isEnabled = IsHandlerEnabled(handler, settings);
 
                 if (!isEnabled)
@@ -179,7 +214,7 @@ namespace VPetLLM.Handlers.Core
                 ActionType.Body => (handler.Keyword.ToLower() == "move" && settings.EnableMove) || (handler.Keyword.ToLower() == "action" && settings.EnableActionExecution),
                 ActionType.Talk => true,
                 ActionType.Plugin => settings.EnablePlugin,
-                ActionType.Tool => true, // Tool handlers (including record) are always enabled
+                ActionType.Tool => true, // Tool handlers (including record and skill) are always enabled
                 _ => false
             };
             if (handler.Keyword.ToLower() == "buy") isEnabled = settings.EnableBuy;

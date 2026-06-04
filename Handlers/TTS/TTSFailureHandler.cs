@@ -199,7 +199,7 @@ namespace VPetLLM.Handlers.TTS
                     {
                         if (string.IsNullOrEmpty(action.Value))
                             await action.Handler.Execute(_plugin.MW).ConfigureAwait(false);
-                        else if (int.TryParse(action.Value, out int intValue))
+                        else if (!string.IsNullOrWhiteSpace(action.Value) && int.TryParse(action.Value, out int intValue))
                             await action.Handler.Execute(intValue, _plugin.MW).ConfigureAwait(false);
                         else
                             await action.Handler.Execute(action.Value, _plugin.MW).ConfigureAwait(false);

@@ -1,5 +1,6 @@
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Infrastructure;
+using VPetLLM.Core.Data.Managers;
 
 namespace VPetLLM.Core.Services
 {
@@ -9,6 +10,12 @@ namespace VPetLLM.Core.Services
         private readonly IMainWindow _mainWindow;
         private readonly ActionProcessor _actionProcessor;
         private FoodSearchService _foodSearchService;
+
+        /// <summary>
+        /// Optional SkillManager for injecting available skills into the system prompt.
+        /// Set by ChatCoreBase after construction.
+        /// </summary>
+        public SkillManager? SkillManager { get; set; }
 
         public SystemMessageProvider(Setting settings, IMainWindow mainWindow, ActionProcessor actionProcessor)
         {
@@ -235,6 +242,16 @@ namespace VPetLLM.Core.Services
                     if (!string.IsNullOrEmpty(recordInstructions))
                     {
                         parts.Add(recordInstructions);
+                    }
+                }
+
+                // Add skills system instructions if SkillManager is available
+                if (SkillManager is not null)
+                {
+                    var skillInstructions = PromptHelper.Get("Skill_System_Instructions", lang);
+                    if (!string.IsNullOrEmpty(skillInstructions))
+                    {
+                        parts.Add(skillInstructions);
                     }
                 }
 

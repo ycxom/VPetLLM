@@ -893,6 +893,128 @@
             "jp": "自動診断を有効にする（5回連続でAIリクエストが失敗した場合に自動実行）"
         }
     },
+    "Skills": {
+        "Tab": {
+            "en": "Skills",
+            "zh-hans": "技能管理",
+            "zh-hant": "技能管理",
+            "jp": "スキル"
+        },
+        "Management": {
+            "en": "Skills Management",
+            "zh-hans": "技能管理",
+            "zh-hant": "技能管理",
+            "jp": "スキル管理"
+        },
+        "ManagementDescription": {
+            "en": "Manage AI-created skills. Skills are reusable behavior templates the AI can create, call, and evolve on its own.",
+            "zh-hans": "管理 AI 自创技能。技能是 AI 自行创建、调用和进化的可复用行为模板。",
+            "zh-hant": "管理 AI 自創技能。技能是 AI 自行創建、調用和進化的可復用行為模板。",
+            "jp": "AIが作成したスキルを管理します。スキルはAIが自ら作成・呼び出し・進化できる再利用可能な行動テンプレートです。"
+        },
+        "Name": {
+            "en": "Name",
+            "zh-hans": "名称",
+            "zh-hant": "名稱",
+            "jp": "名前"
+        },
+        "Description": {
+            "en": "Description",
+            "zh-hans": "描述",
+            "zh-hant": "描述",
+            "jp": "説明"
+        },
+        "Trigger": {
+            "en": "Trigger",
+            "zh-hans": "触发条件",
+            "zh-hant": "觸發條件",
+            "jp": "トリガー"
+        },
+        "ActionTemplate": {
+            "en": "Action Template",
+            "zh-hans": "动作模板",
+            "zh-hant": "動作模板",
+            "jp": "アクションテンプレート"
+        },
+        "UseCount": {
+            "en": "Used",
+            "zh-hans": "使用次数",
+            "zh-hant": "使用次數",
+            "jp": "使用回数"
+        },
+        "LastUsed": {
+            "en": "Last Used",
+            "zh-hans": "上次使用",
+            "zh-hant": "上次使用",
+            "jp": "最終使用"
+        },
+        "Enabled": {
+            "en": "On",
+            "zh-hans": "启用",
+            "zh-hant": "啟用",
+            "jp": "有効"
+        },
+        "Refresh": {
+            "en": "Refresh",
+            "zh-hans": "刷新",
+            "zh-hant": "刷新",
+            "jp": "更新"
+        },
+        "Delete": {
+            "en": "Delete",
+            "zh-hans": "删除",
+            "zh-hant": "刪除",
+            "jp": "削除"
+        },
+        "NoSkills": {
+            "en": "No skills yet. The AI creates skills automatically as it learns your habits.",
+            "zh-hans": "暂无技能。AI 会在互动中根据你的习惯自动创建技能。",
+            "zh-hant": "暫無技能。AI 會在互動中根據你的習慣自動創建技能。",
+            "jp": "スキルはまだありません。AIがあなたの習慣を学習すると自動的にスキルを作成します。"
+        },
+        "ConfirmDelete": {
+            "en": "Are you sure you want to delete skill \"{0}\"?",
+            "zh-hans": "确定要删除技能 \"{0}\" 吗？",
+            "zh-hant": "確定要刪除技能 \"{0}\" 嗎？",
+            "jp": "スキル「{0}」を削除してもよろしいですか？"
+        },
+        "View": {
+            "en": "View",
+            "zh-hans": "查看详情",
+            "zh-hant": "查看詳情",
+            "jp": "表示"
+        },
+        "Import": {
+            "en": "Import",
+            "zh-hans": "导入",
+            "zh-hant": "匯入",
+            "jp": "インポート"
+        },
+        "Export": {
+            "en": "Export",
+            "zh-hans": "导出",
+            "zh-hant": "匯出",
+            "jp": "エクスポート"
+        },
+        "ImportResult": {
+            "en": "Import complete. {0} imported, {1} skipped.",
+            "zh-hans": "导入完成。成功 {0} 个，跳过 {1} 个。",
+            "zh-hant": "匯入完成。成功 {0} 個，跳過 {1} 個。",
+            "jp": "インポート完了。{0}件成功、{1}件スキップ。"
+        },
+        "ExportResult": {
+            "en": "Exported {0} skills successfully.",
+            "zh-hans": "成功导出 {0} 个技能。",
+            "zh-hant": "成功匯出 {0} 個技能。",
+            "jp": "{0}件のスキルをエクスポートしました。"
+        },
+        "ImportEmpty": {
+            "en": "The file contains no valid skills.",
+            "zh-hans": "文件中没有有效的技能数据。",
+            "zh-hant": "文件中沒有有效的技能數據。",
+            "jp": "ファイルに有効なスキルが含まれていません。"
+        }
+    },
     "Tools": {
         "Tab": {
             "en": "Tools",

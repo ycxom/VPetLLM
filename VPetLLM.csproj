@@ -20,8 +20,8 @@
 		<PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.0" />
 		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
-		<PackageReference Include="VPet-Simulator.Windows.Interface" Version="1.1.0.66" />
-		<PackageReference Include="VPet-Simulator.Core" Version="1.1.0.66" />
+		<PackageReference Include="VPet-Simulator.Windows.Interface" Version="1.1.0.67-a" />
+		<PackageReference Include="VPet-Simulator.Core" Version="1.1.0.67-a" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -50,7 +50,7 @@
 	<Target Name="CopyResources" AfterTargets="Build">
 		<ItemGroup>
 			<!-- 只复制 Windows x64/x86 运行时，排除其他平台和 e_sqlite3.dll -->
-			<FilesToCopy Include="$(OutDir)**\*" 
+			<FilesToCopy Include="$(OutDir)**\*"
 				Exclude="$(OutDir)**\e_sqlite3.dll;
 				$(OutDir)runtimes\linux-**\**;
 				$(OutDir)runtimes\osx-**\**;

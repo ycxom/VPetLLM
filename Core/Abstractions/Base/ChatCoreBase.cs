@@ -1,6 +1,7 @@
+using VPet_Simulator.Windows.Interface;
 using System.Net;
 using System.Net.Http;
-using VPet_Simulator.Windows.Interface;
+using VPetLLM.Core.Data.Managers;
 
 namespace VPetLLM.Core.Abstractions.Base
 {
@@ -9,6 +10,7 @@ namespace VPetLLM.Core.Abstractions.Base
         public abstract string Name { get; }
         public HistoryManager HistoryManager { get; }
         public RecordManager RecordManager { get; }
+        public SkillManager SkillManager { get; }
         protected Setting? Settings { get; }
         protected IMainWindow? MainWindow { get; }
         protected ActionProcessor? ActionProcessor { get; }
@@ -85,20 +87,34 @@ namespace VPetLLM.Core.Abstractions.Base
         }
 
         /// <summary>
-        /// Inject important records into message history before sending to LLM
+        /// Inject important records and skills into message history before sending to LLM
         /// </summary>
         protected List<Message> InjectRecordsIntoHistory(List<Message> history)
         {
             try
             {
+                // Inject records if enabled
                 if (RecordManager is not null && Settings?.Records?.EnableRecords == true)
                 {
-                    return RecordManager.InjectRecordsIntoHistory(history);
+                    history = RecordManager.InjectRecordsIntoHistory(history);
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"Error injecting records into history: {ex.Message}");
+            }
+
+            try
+            {
+                // Inject skills context if SkillManager is available
+                if (SkillManager is not null)
+                {
+                    history = SkillManager.InjectSkillsIntoHistory(history);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error injecting skills into history: {ex.Message}");
             }
 
             return history;
@@ -129,8 +145,31 @@ namespace VPetLLM.Core.Abstractions.Base
             catch (Exception ex)
             {
                 Logger.Log($"Failed to initialize RecordManager: {ex.Message}");
-                // Create a dummy RecordManager to prevent null reference errors
                 RecordManager = null;
+            }
+
+            // Initialize SkillManager
+            try
+            {
+                SkillManager = new SkillManager(Name);
+                Logger.Log($"SkillManager initialized for {Name}");
+
+                // Register SkillManager with ActionProcessor
+                if (actionProcessor is not null)
+                {
+                    actionProcessor.SetSkillManager(SkillManager);
+                }
+
+                // Register SkillManager with SystemMessageProvider
+                if (SystemMessageProvider is not null)
+                {
+                    SystemMessageProvider.SkillManager = SkillManager;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to initialize SkillManager: {ex.Message}");
+                SkillManager = null;
             }
         }
 

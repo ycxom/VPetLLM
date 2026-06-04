@@ -5,8 +5,10 @@ namespace VPetLLM.Core.Abstractions.Interfaces
         string Name { get; }
         HistoryManager HistoryManager { get; }
         RecordManager RecordManager { get; }
+        SkillManager SkillManager { get; }
         Task<string> Chat(string prompt);
         Task<string> Chat(string prompt, bool isFunctionCall);
+        Task<string> Summarize(string systemPrompt, string userContent);
 
         /// <summary>
         /// 发送带图像的多模态消息

@@ -291,6 +291,30 @@
         "en": "Play media (video/music) from URL using mpv player.\nFormat: <|play_begin|> url <|play_end|> or <|play_begin|> url, volume <|play_end|>\nStop playback: <|play_begin|> stop <|play_end|>\n\nParameters:\n- url: Media URL (video or audio link)\n- volume: Optional, 0-100 (default: 100)\n\nExamples:\n- Play video: <|play_begin|> https://example.com/video.mp4 <|play_end|>\n- Play music with volume: <|play_begin|> https://example.com/music.mp3, 80 <|play_end|>\n- Stop playback: <|play_begin|> stop <|play_end|>\n\nNOTE: The mpv window will always be visible during playback.",
         "zh": "使用 mpv 播放器播放媒体（视频/音乐）链接。\n格式：<|play_begin|> url <|play_end|> 或 <|play_begin|> url, 音量 <|play_end|>\n停止播放：<|play_begin|> stop <|play_end|>\n\n参数说明：\n- url：媒体链接（视频或音频）\n- 音量：可选，0-100（默认：100）\n\n示例：\n- 播放视频：<|play_begin|> https://example.com/video.mp4 <|play_end|>\n- 指定音量播放音乐：<|play_begin|> https://example.com/music.mp3, 80 <|play_end|>\n- 停止播放：<|play_begin|> stop <|play_end|>\n\n注意：播放期间 mpv 窗口将始终保持可见。"
     },
+    "Skill_System_Instructions": {
+        "en": "SKILLS SYSTEM (SELF-EVOLUTION):\nYou can create, modify, delete, and call your own SKILLS using a Markdown-style key:value format. Skills are reusable behavior templates you define yourself.\n\nCREATING SKILLS — Use `key: value` lines inside the command block:\n```\n<|skill_create_begin|>\nname: MySkill\ndescription: What this skill does\ntrigger: When to trigger it\naction:\n<|say_begin|> \"Hello!\" <|say_end|>\n<|plugin_Weather_begin|> city(Beijing) <|plugin_Weather_end|>\n<|skill_create_end|>\n```\n- name: required, unique, letters/numbers/underscores only\n- description: optional but recommended, explains the skill\n- trigger: optional, hints when to use this skill\n- action: REQUIRED. Put 'action:' on its own line, then each command line below it. NO escaping needed — write commands exactly as you would in a reply. Blank lines are preserved.\n\nMODIFYING SKILLS — same key:value format, only specify fields you want to change:\n```\n<|skill_modify_begin|>\nname: MySkill\ntrigger: New trigger condition\nenabled: false\n<|skill_modify_end|>\n```\n\nDELETING SKILLS:\n```\n<|skill_delete_begin|>\nname: MySkill\n<|skill_delete_end|>\n```\n\nCALLING SKILLS — use skill_call_SkillName prefix:\n<|skill_call_MySkill_begin|> <|skill_call_MySkill_end|>\n\nLISTING SKILLS:\n<|skill_list_begin|> <|skill_list_end|>\n\nBEST PRACTICES:\n- Create skills for repetitive task combinations\n- Review and clean up unused skills periodically\n- Max skills: 50. Delete old/unused skills to make room.",
+        "zh": "技能系统（自进化）：\n你可以使用 Markdown 风格的 key:value 格式创建、修改、删除和调用自己的技能。\n\n创建技能 — 在命令块内使用 `key: value` 行格式：\n```\n<|skill_create_begin|>\nname: 我的技能\ndescription: 技能用途说明\ntrigger: 触发条件提示\naction:\n<|say_begin|> \"你好！\" <|say_end|>\n<|plugin_Weather_begin|> city(北京) <|plugin_Weather_end|>\n<|skill_create_end|>\n```\n- name: 必填，唯一，仅用字母/数字/下划线\n- description: 可选但推荐，说明技能用途\n- trigger: 可选，描述何时触发\n- action: 必填。'action:' 独占一行，其下每行是一条命令。不需要转义 — 像平时回复一样直接写命令即可。空行会被保留。\n\n修改技能 — 相同 key:value 格式，只写要改的字段：\n```\n<|skill_modify_begin|>\nname: 我的技能\ntrigger: 新的触发条件\nenabled: false\n<|skill_modify_end|>\n```\n\n删除技能：\n```\n<|skill_delete_begin|>\nname: 我的技能\n<|skill_delete_end|>\n```\n\n调用技能 — 使用 skill_call_技能名 前缀：\n<|skill_call_我的技能_begin|> <|skill_call_我的技能_end|>\n\n列出技能：\n<|skill_list_begin|> <|skill_list_end|>\n\n最佳实践：\n- 为重复的任务组合创建技能\n- 定期检查和清理不用的技能\n- 最多 50 个技能。删除旧技能腾出空间。"
+    },
+    "Handler_SkillCreate_Description": {
+        "en": "Create a new skill. Format: <|skill_create_begin|>\\nname: SkillName\\ndescription: what it does\\ntrigger: when to use\\naction:\\n<|say_begin|> ... <|say_end|>\\n<|skill_create_end|>\\nAction template goes after 'action:' line — no escaping needed.",
+        "zh": "创建一个新技能。格式：<|skill_create_begin|>\\nname: 技能名\\ndescription: 用途\\ntrigger: 触发条件\\naction:\\n<|say_begin|> ... <|say_end|>\\n<|skill_create_end|>\\n动作模板写在 'action:' 之后 — 无需转义。"
+    },
+    "Handler_SkillModify_Description": {
+        "en": "Modify a skill. Format: <|skill_modify_begin|>\\nname: SkillName\\ndescription: new desc\\naction:\\nnew commands\\nenabled: true\\n<|skill_modify_end|>\\nOnly specify fields you want to change.",
+        "zh": "修改一个技能。格式：<|skill_modify_begin|>\\nname: 技能名\\ndescription: 新描述\\naction:\\n新命令\\nenabled: true\\n<|skill_modify_end|>\\n只写要修改的字段。"
+    },
+    "Handler_SkillDelete_Description": {
+        "en": "Delete a skill. Format: <|skill_delete_begin|>\\nname: SkillName\\n<|skill_delete_end|>",
+        "zh": "删除一个技能。格式：<|skill_delete_begin|>\\nname: 技能名\\n<|skill_delete_end|>"
+    },
+    "Handler_SkillCall_Description": {
+        "en": "Call/execute a skill. Format: <|skill_call_SkillName_begin|> <|skill_call_SkillName_end|>",
+        "zh": "调用/执行一个技能。格式：<|skill_call_技能名_begin|> <|skill_call_技能名_end|>"
+    },
+    "Handler_SkillList_Description": {
+        "en": "List all skills. Format: <|skill_list_begin|> <|skill_list_end|>",
+        "zh": "列出所有技能。格式：<|skill_list_begin|> <|skill_list_end|>"
+    },
     "Screenshot_ImageDescription_Prompt": {
         "en": "Please describe this image in detail, including:\n1. Main elements and objects in the image\n2. Any text or characters visible\n3. Layout and composition\n4. Colors and visual style\n5. Any notable details or context\n\nProvide a comprehensive description that captures all important information from the image.",
         "zh": "请详细描述这张图片，包括：\n1. 图片中的主要元素和物体\n2. 可见的任何文字或字符\n3. 布局和构图\n4. 颜色和视觉风格\n5. 任何值得注意的细节或上下文\n\n请提供一个全面的描述，捕捉图片中所有重要的信息。"
