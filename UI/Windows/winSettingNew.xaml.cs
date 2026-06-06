@@ -3308,7 +3308,7 @@ namespace VPetLLM.UI.Windows
                 if (dataGridSkills.Columns.Count > 5)
                     dataGridSkills.Columns[5].Header = LanguageHelper.Get("Skills.LastUsed", langCode) ?? "Last Used";
                 if (dataGridSkills.Columns.Count > 6)
-                    dataGridSkills.Columns[6].Header = LanguageHelper.Get("Skills.ActionTemplate", langCode) ?? "Action Template";
+                    dataGridSkills.Columns[6].Header = LanguageHelper.Get("Plugin.Action", langCode) ?? "Action";
                 dataGridSkills.Items.Refresh();
             }
             }

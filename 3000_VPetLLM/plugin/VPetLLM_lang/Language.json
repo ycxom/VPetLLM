@@ -930,12 +930,6 @@
             "zh-hant": "觸發條件",
             "jp": "トリガー"
         },
-        "ActionTemplate": {
-            "en": "Action Template",
-            "zh-hans": "动作模板",
-            "zh-hant": "動作模板",
-            "jp": "アクションテンプレート"
-        },
         "UseCount": {
             "en": "Used",
             "zh-hans": "使用次数",
