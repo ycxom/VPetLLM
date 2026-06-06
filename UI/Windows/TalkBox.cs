@@ -636,6 +636,7 @@ namespace VPetLLM.UI.Windows
         /// <summary>
         /// 停止思考动画但不隐藏气泡（用于流式响应，让新气泡直接覆盖）
         /// 优化：改为同步清理，确保在返回前完成状态清理
+        /// 注意：不调用 ClearStreamState，因为它会清除 oldsaysstream 导致正在显示的 Say 气泡消失
         /// </summary>
         public void StopThinkingAnimationWithoutHide()
         {
@@ -650,7 +651,7 @@ namespace VPetLLM.UI.Windows
                 try { cts.Cancel(); cts.Dispose(); } catch { }
             }
 
-            // 改为同步执行，确保在返回前完成清理
+            // 同步清理思考动画循环状态（不触碰 oldsaysstream，保护正在显示的 Say 气泡）
             Logger.Log("TalkBox: 使用DirectBubbleManager停止思考动画（同步清理模式）");
             
             try
@@ -662,7 +663,9 @@ namespace VPetLLM.UI.Windows
                         var msgBar = _plugin.MW.Main.MsgBar;
                         if (msgBar is not null)
                         {
-                            MessageBarHelper.ClearStreamState(msgBar);
+                            // 只清除流式输出缓冲区（outputtext/outputtextsample），不清除 oldsaysstream
+                            // oldsaysstream 保存的是当前正在显示的 Say 气泡文本，清除会导致气泡消失
+                            MessageBarHelper.ClearStreamBuffersOnly(msgBar);
                             Logger.Log("TalkBox: 流式状态已清理");
                         }
                     }

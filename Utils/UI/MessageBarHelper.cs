@@ -294,6 +294,45 @@ namespace VPetLLM.Utils.UI
         }
 
         /// <summary>
+        /// 仅清空流式输出缓冲区（outputtext/outputtextsample），保留 oldsaysstream。
+        /// 用于停止思考动画时保护正在显示的 Say 气泡不被意外清除。
+        /// </summary>
+        /// <param name="msgBar">MessageBar实例</param>
+        public static void ClearStreamBuffersOnly(object msgBar)
+        {
+            if (msgBar is null) return;
+
+            if (!_isInitialized)
+            {
+                Initialize(msgBar);
+            }
+
+            try
+            {
+                // 清空 outputtext（流式输出字符缓冲区）
+                if (_outputtextField is not null)
+                {
+                    var outputtext = _outputtextField.GetValue(msgBar) as List<char>;
+                    outputtext?.Clear();
+                }
+
+                // 清空 outputtextsample（流式输出字符串缓冲区）
+                if (_outputtextsampleField is not null)
+                {
+                    var outputtextsample = _outputtextsampleField.GetValue(msgBar) as StringBuilder;
+                    outputtextsample?.Clear();
+                }
+
+                // 注意：不清除 oldsaysstream！它保存的是当前 Say 气泡的文本，
+                // 清除它会导致正在显示的 Say 气泡消失。
+            }
+            catch (Exception ex)
+            {
+                VPetLLMUtils.Logger.Log($"MessageBarHelper.ClearStreamBuffersOnly: 清空缓冲区失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 异步清理MessageBar状态（不阻塞UI线程）
         /// </summary>
         /// <param name="msgBar">MessageBar实例</param>

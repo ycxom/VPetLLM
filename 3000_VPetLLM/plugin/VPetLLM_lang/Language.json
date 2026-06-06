@@ -838,6 +838,96 @@
             "zh-hant": "保留的最大記憶記錄數量。超過時將自動清理權重最低的記錄。若權重相同，優先清除添加時間較早的記錄。默認：10。範圍：1-100。",
             "jp": "保持するメモリ記録の最大数。超過すると、最も重みの低い記録が自動的に削除されます。重みが同じ場合は、古い記録が優先的に削除されます。デフォルト：10。範囲：1-100。"
         },
+        "ContextMode": {
+            "en": "Context Mode:",
+            "zh-hans": "上下文模式:",
+            "zh-hant": "上下文模式:",
+            "jp": "コンテキストモード:"
+        },
+        "ContextMode_Overflow": {
+            "en": "Long Context (Overflow — recommended)",
+            "zh-hans": "长上下文模式（推荐）",
+            "zh-hant": "長上下文模式（推薦）",
+            "jp": "長コンテキストモード（推奨）"
+        },
+        "ContextMode_Compression": {
+            "en": "Chat Compression (Lossy)",
+            "zh-hans": "聊天压缩模式（有损）",
+            "zh-hant": "聊天壓縮模式（有損）",
+            "jp": "チャット圧縮モード（非可逆）"
+        },
+        "EnableOverflowMode": {
+            "en": "Enable Overflow Long Memory (replace lossy compression)",
+            "zh-hans": "启用溢出式超长记忆（替代有损压缩）",
+            "zh-hant": "啟用溢出式超長記憶（替代有損壓縮）",
+            "jp": "オーバーフロー式長期記憶を有効にする（非可逆圧縮を置き換え）"
+        },
+        "EnableOverflowModeTooltip": {
+            "en": "When enabled, chat history is no longer lossily compressed. Messages exceeding the token limit are evicted but not deleted. Overflowed content is periodically summarized into memory points. Requires memory retrieval to be enabled for full long-memory effect.",
+            "zh-hans": "启用后不再有损压缩聊天记录，超出Token阈值的消息会被挤出但不删除，累积到一定程度自动总结为记忆点。配合专家模型检索使用可实现超长记忆。",
+            "zh-hant": "啟用後不再有損壓縮聊天記錄，超出Token閾值的消息會被擠出但不刪除，累積到一定程度自動總結為記憶點。配合專家模型檢索使用可實現超長記憶。",
+            "jp": "有効にすると、チャット履歴が非可逆圧縮されなくなります。トークン制限を超えたメッセージは削除されずに退避され、蓄積されたコンテンツは定期的にメモリポイントに要約されます。完全な長期記憶効果を得るには、メモリ検索を有効にする必要があります。"
+        },
+        "OverflowTokenLimit": {
+            "en": "Prompt Token Limit:",
+            "zh-hans": "Prompt Token 上限:",
+            "zh-hant": "Prompt Token 上限:",
+            "jp": "プロンプトトークン上限:"
+        },
+        "OverflowTriggerMode": {
+            "en": "Trigger Mode:",
+            "zh-hans": "触发方式:",
+            "zh-hant": "觸發方式:",
+            "jp": "トリガーモード:"
+        },
+        "OverflowTriggerMode_Sync": {
+            "en": "Sync with global thresholds",
+            "zh-hans": "同步全局阈值",
+            "zh-hant": "同步全局閾值",
+            "jp": "グローバル閾値と同期"
+        },
+        "OverflowTriggerMode_Independent": {
+            "en": "Independent setting",
+            "zh-hans": "独立设置",
+            "zh-hant": "獨立設置",
+            "jp": "独立設定"
+        },
+        "OverflowCount": {
+            "en": "Overflowed:",
+            "zh-hans": "累计溢出:",
+            "zh-hant": "累計溢出:",
+            "jp": "オーバーフロー累計:"
+        },
+        "OverflowTokenCount": {
+            "en": "Overflow Tokens:",
+            "zh-hans": "累计溢出Token:",
+            "zh-hant": "累計溢出Token:",
+            "jp": "オーバーフロートークン:"
+        },
+        "ExpertMemoryContextLength": {
+            "en": "Expert Retrieval Context:",
+            "zh-hans": "专家检索上下文长度:",
+            "zh-hant": "專家檢索上下文長度:",
+            "jp": "エキスパート検索コンテキスト長:"
+        },
+        "OverflowSummaryTriggerTokens": {
+            "en": "Overflow Trigger Tokens:",
+            "zh-hans": "累积溢出 Token 后触发总结:",
+            "zh-hant": "累積溢出 Token 後觸發總結:",
+            "jp": "オーバーフロー要約トリガートークン:"
+        },
+        "EnableExpertMemoryRetrieval": {
+            "en": "Enable Expert Model Memory Retrieval",
+            "zh-hans": "启用专家模型检索溢出记忆",
+            "zh-hant": "啟用專家模型檢索溢出記憶",
+            "jp": "エキスパートモデルによるメモリ検索を有効にする"
+        },
+        "EnableExpertMemoryRetrievalTooltip": {
+            "en": "When user asks a question, the system searches overflowed memory points and chat summaries, processes them via an expert model, and injects relevant context into the conversation. Enables long-term memory recall.",
+            "zh-hans": "用户提问时自动搜索被溢出的记忆点和聊天摘要，由专家模型处理后注入当前对话。可实现超长记忆的回忆。",
+            "zh-hant": "用戶提問時自動搜索被溢出的記憶點和聊天摘要，由專家模型處理後注入當前對話。可實現超長記憶的回忆。",
+            "jp": "ユーザーが質問すると、システムは退避されたメモリポイントとチャット要約を検索し、エキスパートモデルで処理して関連コンテキストを会話に注入します。長期記憶の呼び出しを実現します。"
+        },
         "MaxRecordsLimitUnit": {
             "en": "records",
             "zh-hans": "条",

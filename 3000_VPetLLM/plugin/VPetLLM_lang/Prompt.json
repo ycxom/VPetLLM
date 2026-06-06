@@ -318,5 +318,17 @@
     "Screenshot_ImageDescription_Prompt": {
         "en": "Please describe this image in detail, including:\n1. Main elements and objects in the image\n2. Any text or characters visible\n3. Layout and composition\n4. Colors and visual style\n5. Any notable details or context\n\nProvide a comprehensive description that captures all important information from the image.",
         "zh": "请详细描述这张图片，包括：\n1. 图片中的主要元素和物体\n2. 可见的任何文字或字符\n3. 布局和构图\n4. 颜色和视觉风格\n5. 任何值得注意的细节或上下文\n\n请提供一个全面的描述，捕捉图片中所有重要的信息。"
+    },
+    "Overflow_Summary_Prefix": {
+        "en": "You are a knowledge extraction assistant. Given a segment of conversation that has been removed from the main context window, extract and record ONLY the factual knowledge, key events, user preferences, and important state changes. DO NOT summarize conversational flow or continuity — focus purely on facts and information that may be needed in future conversations. Output format: plain text summary of facts. Be concise and information-dense.",
+        "zh": "你是知识提取助手。给定一段已从主上下文窗口中移除的对话，仅提取并记录事实性知识、关键事件、用户偏好和重要状态变化。不要总结对话流程或连续性——仅关注未来对话可能需要的事实和信息。输出格式：纯文本事实摘要。请简洁且信息密集。"
+    },
+    "Memory_Retrieval_Prefix": {
+        "en": "You are a memory retrieval assistant. Below are retrieved memories, records, and past conversation segments that may be relevant to the current user query. Summarize them into a concise context paragraph that will be injected into the main conversation. Only include information that is clearly relevant. Be brief and factual. Output only the summary, no explanations.",
+        "zh": "你是记忆检索助手。以下是检索到的可能与当前用户查询相关的记忆、记录和过去的对话片段。将它们总结为一段简洁的上下文段落，将注入到主对话中。只包含明确相关的信息。请简洁且基于事实。仅输出摘要，无需解释。"
+    },
+    "Memory_Retrieval_Injection": {
+        "en": "[RETRIEVED MEMORIES — use this information if relevant to the current conversation]\n{Memories}\n[/RETRIEVED MEMORIES]",
+        "zh": "[检索到的记忆 — 如果与当前对话相关，请使用这些信息]\n{Memories}\n[/检索到的记忆]"
     }
 }

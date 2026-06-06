@@ -10,6 +10,7 @@ namespace VPetLLM.Core.Data.Managers
         private readonly ChatCoreBase _chatCore;
         private SystemMessageProvider _systemMessageProvider;
         private readonly ChatHistoryDatabase _database;
+        private OverflowManager? _overflowManager;
 
         public HistoryManager(Setting settings, string name, ChatCoreBase chatCore)
         {
@@ -28,6 +29,19 @@ namespace VPetLLM.Core.Data.Managers
         {
             _systemMessageProvider = provider;
         }
+
+        /// <summary>
+        /// Set the OverflowManager for overflow-mode context handling.
+        /// </summary>
+        public void SetOverflowManager(OverflowManager overflowManager)
+        {
+            _overflowManager = overflowManager;
+        }
+
+        /// <summary>
+        /// Get the OverflowManager (null if overflow mode is not enabled).
+        /// </summary>
+        public OverflowManager? GetOverflowManager() => _overflowManager;
 
         public List<Message> GetHistory() => _history;
 
@@ -71,7 +85,9 @@ namespace VPetLLM.Core.Data.Managers
 
         public async Task AddMessage(Message message)
         {
-            if (_settings.EnableHistoryCompression && ShouldCompress())
+            // Only use compression path in Compression mode; in Overflow mode we never compress
+            if (_settings.OverflowMode != Setting.ContextOverflowMode.Overflow
+                && _settings.EnableHistoryCompression && ShouldCompress())
             {
                 await CompressHistory();
             }
@@ -151,6 +167,60 @@ namespace VPetLLM.Core.Data.Managers
             catch (Exception ex)
             {
                 Logger.Log($"清除数据库历史记录失败: {ex.Message}");
+            }
+
+            // Clear overflow data too
+            _overflowManager?.ClearAll();
+        }
+
+        /// <summary>
+        /// Gets history messages for prompt construction using a sliding window.
+        /// In overflow mode, returns only messages that fit within the token limit,
+        /// starting from the most recent and moving backward.
+        /// Always keeps at least the most recent message.
+        /// Returns (includedMessages, overflowedMessages, overflowedTokenCount).
+        /// </summary>
+        public (List<Message> Included, List<Message> Overflowed, int OverflowedTokens) GetHistoryForPrompt(int tokenLimit)
+        {
+            if (_history.Count == 0)
+                return (new List<Message>(), new List<Message>(), 0);
+
+            var included = new List<Message>();
+            var overflowed = new List<Message>();
+            int currentTokens = 0;
+
+            // Walk from most recent to oldest, accumulating tokens
+            for (int i = _history.Count - 1; i >= 0; i--)
+            {
+                var msg = _history[i];
+                var msgTokens = TokenCounter.EstimateTokenCount(msg.Content ?? "") + 4; // +4 for role/formatting
+
+                if (currentTokens + msgTokens <= tokenLimit || included.Count == 0)
+                {
+                    // Include this message (always include at least one)
+                    included.Insert(0, msg);
+                    currentTokens += msgTokens;
+                }
+                else
+                {
+                    // This message overflows
+                    overflowed.Insert(0, msg);
+                }
+            }
+
+            var overflowedTokens = TokenCounter.EstimateMessagesTokenCount(overflowed);
+            return (included, overflowed, overflowedTokens);
+        }
+
+        /// <summary>
+        /// Notify the OverflowManager about messages that were evicted from the prompt.
+        /// Called after GetHistoryForPrompt when overflowed messages exist.
+        /// </summary>
+        public async Task OnMessagesOverflowedAsync(List<Message> overflowedMessages, int overflowedTokenCount)
+        {
+            if (_overflowManager is not null && overflowedMessages.Count > 0)
+            {
+                await _overflowManager.OnMessagesOverflowedAsync(overflowedMessages, overflowedTokenCount);
             }
         }
 

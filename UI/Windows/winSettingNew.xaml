@@ -2178,10 +2178,22 @@
                                         </ToolTip>
                                     </CheckBox.ToolTip>
                                 </CheckBox>
-                                <CheckBox x:Name="CheckBox_EnableHistoryCompression"
-                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableHistoryCompression}"
-                                        Margin="0,0,0,12"
-                                        Style="{StaticResource ModernCheckBox}"/>
+                                <!-- 上下文模式选择（压缩模式 vs 长上下文模式）-->
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="0,0,0,12">
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ContextMode, Default=上下文模式:}"
+                                            VerticalAlignment="Center"
+                                            x:Name="TextBlock_ContextMode"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="80"/>
+                                    <ComboBox x:Name="ComboBox_ContextMode"
+                                            Width="220"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.ContextMode_Overflow, Default=长上下文模式（推荐）}" Tag="Overflow"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.ContextMode_Compression, Default=聊天压缩模式（有损）}" Tag="Compression"/>
+                                    </ComboBox>
+                                </StackPanel>
                                 <!-- 压缩触发模式 -->
                                 <StackPanel Orientation="Horizontal"
                                         Margin="20,0,0,12">
@@ -2228,7 +2240,8 @@
 
                                 <!-- Token数量阈值-->
                                 <StackPanel Orientation="Horizontal"
-                                        Margin="20,0,0,0">
+                                        Margin="20,0,0,0"
+                                        x:Name="Panel_HistoryCompressionTokenThreshold">
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.HistoryCompressionTokenThreshold}"
                                             VerticalAlignment="Center"
                                             x:Name="TextBlock_HistoryCompressionTokenThreshold"
@@ -2251,9 +2264,10 @@
                                             FontSize="14"/>
                                 </StackPanel>
 
-                                <!-- 总结后保留对话消息数 -->
+                                <!-- 总结后保留对话消息数（仅压缩模式有效） -->
                                 <StackPanel Orientation="Horizontal"
-                                        Margin="20,12,0,12">
+                                        Margin="20,12,0,12"
+                                        x:Name="Panel_CompressionRetainCount">
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.CompressionRetainCount}"
                                             VerticalAlignment="Center"
                                             x:Name="TextBlock_CompressionRetainCount"
@@ -2291,6 +2305,43 @@
                                         </CheckBox.ToolTip>
                                     </CheckBox>
                                 </StackPanel>
+
+                                <!-- ===== 长上下文模式设置 ===== -->
+
+                                <!-- 溢出总结触发阈值（仅长上下文模式有效） -->
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="20,0,0,12"
+                                        x:Name="Panel_OverflowSummaryTriggerTokens">
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.OverflowSummaryTriggerTokens, Default=累积溢出 Token 后触发总结}"
+                                            VerticalAlignment="Center"
+                                            x:Name="TextBlock_OverflowSummaryTriggerTokens"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="140"/>
+                                    <TextBox x:Name="TextBox_OverflowSummaryTriggerTokens"
+                                            Width="152"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+
+                                <!-- 专家模型检索上下文长度（仅长上下文模式有效） -->
+                                <StackPanel Orientation="Horizontal"
+                                        Margin="20,0,0,12"
+                                        x:Name="Panel_ExpertMemoryContextLength">
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ExpertMemoryContextLength, Default=专家检索上下文长度:}"
+                                            VerticalAlignment="Center"
+                                            x:Name="TextBlock_ExpertMemoryContextLength"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="140"/>
+                                    <TextBox x:Name="TextBox_ExpertMemoryContextLength"
+                                            Width="152"
+                                            Margin="10,0"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+
+                                <!-- 注意：Prompt Token 预算使用下方"消息Token阈值"控制 -->
+                                <!-- 注意：选择长上下文模式时自动启用专家模型记忆检索 -->
                             </StackPanel>
 
                             <!-- 强化记忆高级设置 -->

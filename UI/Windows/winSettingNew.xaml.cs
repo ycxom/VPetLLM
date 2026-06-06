@@ -522,7 +522,12 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableTime")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).Click += Control_Click;
-            ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).Click += Control_Click;
+            // 上下文模式选择（替代旧的 CheckBox_EnableHistoryCompression）
+            if (this.FindName("ComboBox_ContextMode") is ComboBox cmbCtxMode)
+            {
+                cmbCtxMode.SelectionChanged += Control_SelectionChanged;
+                cmbCtxMode.SelectionChanged += ComboBox_ContextMode_SelectionChanged;
+            }
             ((CheckBox)this.FindName("CheckBox_EnableVPetSettingsControl")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableMediaPlayback")).Click += Control_Click;
             ((ComboBox)this.FindName("ComboBox_CompressionMode")).SelectionChanged += Control_SelectionChanged;
@@ -531,6 +536,14 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_CompressionRetainCount")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_EnableAIRetainCount")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableCompressionRecords")).Click += Control_Click;
+            // 溢出模式事件
+            if (this.FindName("ComboBox_OverflowTriggerMode") is ComboBox cmbOverflowTrig)
+            {
+                cmbOverflowTrig.SelectionChanged += Control_SelectionChanged;
+                cmbOverflowTrig.SelectionChanged += ComboBox_OverflowTriggerMode_SelectionChanged;
+            }
+            ((TextBox)this.FindName("TextBox_OverflowSummaryTriggerTokens")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_ExpertMemoryContextLength")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
             // Ollama/Free/LMStudio - 使用统一UI管理，暂不处理单一配置
@@ -764,6 +777,58 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+        /// <summary>
+        /// 溢出触发模式切换时实时显隐独立阈值输入框
+        /// </summary>
+        private void ComboBox_OverflowTriggerMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            if (sender is not ComboBox cmb || cmb.SelectedItem is not ComboBoxItem item) return;
+
+            var isIndependent = item.Tag?.ToString() == "Independent";
+            _plugin.Settings.OverflowThresholdSyncGlobal = !isIndependent;
+
+            if (FindName("Panel_OverflowIndependentThreshold") is StackPanel panelIndep)
+                panelIndep.Visibility = isIndependent ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// 更新溢出计数显示
+        /// </summary>
+        private void UpdateOverflowCounts()
+        {
+            try
+            {
+                var overflowMgr = (_plugin.ChatCore as ChatCoreBase)?.OverflowManager;
+                if (this.FindName("TextBlock_OverflowMessageCount") is TextBlock tbMsg)
+                    tbMsg.Text = overflowMgr?.AccumulatedOverflowMessageCount.ToString() ?? "0";
+                if (this.FindName("TextBlock_OverflowTokenCount") is TextBlock tbToken)
+                    tbToken.Text = overflowMgr?.AccumulatedOverflowTokens.ToString() ?? "0";
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"UpdateOverflowCounts failed: {ex.Message}");
+            }
+        }
+        private void ComboBox_ContextMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            if (sender is not ComboBox cmb || cmb.SelectedItem is not ComboBoxItem item) return;
+
+            var isOverflow = item.Tag?.ToString() == "Overflow";
+
+            if (FindName("Panel_CompressionRetainCount") is StackPanel panelRetain)
+                panelRetain.Visibility = isOverflow ? Visibility.Collapsed : Visibility.Visible;
+
+            if (FindName("Panel_OverflowSummaryTriggerTokens") is StackPanel panelOverflow)
+                panelOverflow.Visibility = isOverflow ? Visibility.Visible : Visibility.Collapsed;
+            if (FindName("Panel_ExpertMemoryContextLength") is StackPanel panelExpertCtx)
+                panelExpertCtx.Visibility = isOverflow ? Visibility.Visible : Visibility.Collapsed;
+            if (FindName("Panel_OverflowIndependentThreshold") is StackPanel panelIndep)
+                panelIndep.Visibility = (isOverflow && !_plugin.Settings.OverflowThresholdSyncGlobal)
+                    ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private void Control_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (_isLoadingSettings) return;
@@ -934,7 +999,18 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableBuyFeedback")).IsChecked = _plugin.Settings.EnableBuyFeedback;
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).IsChecked = _plugin.Settings.EnableLiveMode;
             ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).IsChecked = _plugin.Settings.LimitStateChanges;
-            ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked = _plugin.Settings.EnableHistoryCompression;
+
+            // 加载上下文模式（替代旧的 CheckBox_EnableHistoryCompression 和 CheckBox_EnableOverflowMode）
+            var contextModeComboBox = (ComboBox)this.FindName("ComboBox_ContextMode");
+            foreach (ComboBoxItem item in contextModeComboBox.Items)
+            {
+                if (item.Tag.ToString() == _plugin.Settings.OverflowMode.ToString())
+                {
+                    contextModeComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
             ((CheckBox)this.FindName("CheckBox_EnableVPetSettingsControl")).IsChecked = _plugin.Settings.EnableVPetSettingsControl;
             ((CheckBox)this.FindName("CheckBox_EnableMediaPlayback")).IsChecked = _plugin.Settings.EnableMediaPlayback;
 
@@ -954,6 +1030,47 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_CompressionRetainCount")).Text = _plugin.Settings.CompressionRetainCount.ToString();
             ((CheckBox)this.FindName("CheckBox_EnableAIRetainCount")).IsChecked = _plugin.Settings.EnableAIRetainCount;
             ((CheckBox)this.FindName("CheckBox_EnableCompressionRecords")).IsChecked = _plugin.Settings.EnableCompressionRecords;
+
+            // 加载溢出模式设置
+            var overflowTriggerComboBox = (ComboBox)this.FindName("ComboBox_OverflowTriggerMode");
+            if (overflowTriggerComboBox != null)
+            {
+                foreach (ComboBoxItem item in overflowTriggerComboBox.Items)
+                {
+                    var tag = item.Tag?.ToString() ?? "";
+                    var expected = _plugin.Settings.OverflowThresholdSyncGlobal ? "Sync" : "Independent";
+                    if (tag == expected)
+                    {
+                        overflowTriggerComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+
+            ((TextBox)this.FindName("TextBox_OverflowSummaryTriggerTokens")).Text = _plugin.Settings.OverflowSummaryTriggerTokens.ToString();
+            ((TextBox)this.FindName("TextBox_ExpertMemoryContextLength")).Text = _plugin.Settings.ExpertMemoryContextLength.ToString();
+
+            // 独立设置模式下显示文本框
+            if (this.FindName("Panel_OverflowIndependentThreshold") is StackPanel panelIndep)
+                panelIndep.Visibility = _plugin.Settings.OverflowThresholdSyncGlobal
+                    ? Visibility.Collapsed : Visibility.Visible;
+
+            // 加载溢出计数
+            UpdateOverflowCounts();
+
+            // 长上下文模式下隐藏"总结后保留对话消息数"（仅压缩模式有效），压缩模式下隐藏溢出阈值
+            if (this.FindName("Panel_CompressionRetainCount") is StackPanel panelRetain)
+                panelRetain.Visibility = _plugin.Settings.OverflowMode == Setting.ContextOverflowMode.Overflow
+                    ? Visibility.Collapsed : Visibility.Visible;
+
+            if (this.FindName("Panel_OverflowSummaryTriggerTokens") is StackPanel panelOverflowTrigger)
+                panelOverflowTrigger.Visibility = _plugin.Settings.OverflowMode == Setting.ContextOverflowMode.Overflow
+                    ? Visibility.Visible : Visibility.Collapsed;
+
+            if (this.FindName("Panel_ExpertMemoryContextLength") is StackPanel panelExpertCtx)
+                panelExpertCtx.Visibility = _plugin.Settings.OverflowMode == Setting.ContextOverflowMode.Overflow
+                    ? Visibility.Visible : Visibility.Collapsed;
+
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).IsChecked = _plugin.Settings.LogAutoScroll;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).Text = _plugin.Settings.MaxLogCount.ToString();
             ((DataGrid)this.FindName("DataGrid_Tools")).ItemsSource = _plugin.Settings.Tools;
@@ -1407,7 +1524,22 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableBuyFeedback = enableBuyFeedbackCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableLiveMode = enableLiveModeCheckBox.IsChecked ?? false;
             _plugin.Settings.LimitStateChanges = ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).IsChecked ?? false;
-            _plugin.Settings.EnableHistoryCompression = ((CheckBox)this.FindName("CheckBox_EnableHistoryCompression")).IsChecked ?? false;
+
+            // 保存上下文模式（ComboBox_ContextMode 替代旧的 CheckBox_EnableHistoryCompression + CheckBox_EnableOverflowMode）
+            // EnableHistoryCompression 在 Overflow 模式下也需要为 true（兼容旧逻辑）
+            var contextModeComboBoxSave = (ComboBox)this.FindName("ComboBox_ContextMode");
+            if (contextModeComboBoxSave.SelectedItem is ComboBoxItem selectedContextItem)
+            {
+                if (Enum.TryParse<Setting.ContextOverflowMode>(selectedContextItem.Tag.ToString(), out var ctxMode))
+                {
+                    _plugin.Settings.OverflowMode = ctxMode;
+                    // 压缩模式下启用 EnableHistoryCompression，溢出模式下禁用
+                    _plugin.Settings.EnableHistoryCompression = ctxMode == Setting.ContextOverflowMode.Compression;
+                    // 长上下文模式下自动启用专家模型记忆检索
+                    _plugin.Settings.EnableExpertMemoryRetrieval = ctxMode == Setting.ContextOverflowMode.Overflow;
+                }
+            }
+
             _plugin.Settings.EnableVPetSettingsControl = ((CheckBox)this.FindName("CheckBox_EnableVPetSettingsControl")).IsChecked ?? false;
             _plugin.Settings.EnableMediaPlayback = ((CheckBox)this.FindName("CheckBox_EnableMediaPlayback")).IsChecked ?? true;
 
@@ -1435,6 +1567,15 @@ namespace VPetLLM.UI.Windows
 
             if (this.FindName("CheckBox_EnableCompressionRecords") is CheckBox cbCompRecords)
                 _plugin.Settings.EnableCompressionRecords = cbCompRecords.IsChecked ?? false;
+
+            // 保存溢出模式设置
+            // OverflowThresholdSyncGlobal is set in real-time by ComboBox_OverflowTriggerMode_SelectionChanged
+
+            if (int.TryParse(((TextBox)this.FindName("TextBox_OverflowSummaryTriggerTokens")).Text, out int overflowSummaryTriggerTokens))
+                _plugin.Settings.OverflowSummaryTriggerTokens = overflowSummaryTriggerTokens;
+
+            if (int.TryParse(((TextBox)this.FindName("TextBox_ExpertMemoryContextLength")).Text, out int expertMemCtxLen))
+                _plugin.Settings.ExpertMemoryContextLength = expertMemCtxLen;
 
             _plugin.Settings.LogAutoScroll = logAutoScrollCheckBox.IsChecked ?? true;
             if (int.TryParse(maxLogCountTextBox.Text, out int maxLogCount))
@@ -3193,6 +3334,38 @@ namespace VPetLLM.UI.Windows
 
             // 总结后保留对话消息数
             if (FindName("TextBlock_CompressionRetainCount") is TextBlock textBlockCompressionRetainCount) textBlockCompressionRetainCount.Text = LanguageHelper.Get("Advanced_Options.CompressionRetainCount", langCode);
+
+            // 上下文模式选择本地化
+            if (FindName("TextBlock_ContextMode") is TextBlock tbCtxMode)
+                tbCtxMode.Text = LanguageHelper.Get("Advanced_Options.ContextMode", langCode);
+            if (FindName("ComboBox_ContextMode") is ComboBox cmbCtxMode)
+            {
+                foreach (ComboBoxItem item in cmbCtxMode.Items)
+                {
+                    var tag = item.Tag?.ToString() ?? "";
+                    item.Content = LanguageHelper.Get($"Advanced_Options.ContextMode_{tag}", langCode);
+                }
+            }
+
+            // 溢出模式本地化
+            if (FindName("TextBlock_OverflowTriggerMode") is TextBlock tbOverflowTrigMode)
+                tbOverflowTrigMode.Text = LanguageHelper.Get("Advanced_Options.OverflowTriggerMode", langCode);
+            if (FindName("ComboBox_OverflowTriggerMode") is ComboBox cmbOverflowTrig)
+            {
+                foreach (ComboBoxItem item in cmbOverflowTrig.Items)
+                {
+                    var tag = item.Tag?.ToString() ?? "";
+                    item.Content = LanguageHelper.Get($"Advanced_Options.OverflowTriggerMode_{tag}", langCode);
+                }
+            }
+            if (FindName("TextBlock_OverflowSummaryTriggerTokens") is TextBlock tbOverflowSummary)
+                tbOverflowSummary.Text = LanguageHelper.Get("Advanced_Options.OverflowSummaryTriggerTokens", langCode);
+            if (FindName("TextBlock_ExpertMemoryContextLength") is TextBlock tbExpertCtxLen)
+                tbExpertCtxLen.Text = LanguageHelper.Get("Advanced_Options.ExpertMemoryContextLength", langCode);
+            if (FindName("TextBlock_OverflowMessageCountLabel") is TextBlock tbOvMsgLabel)
+                tbOvMsgLabel.Text = LanguageHelper.Get("Advanced_Options.OverflowCount", langCode);
+            if (FindName("TextBlock_OverflowTokenCountLabel") is TextBlock tbOvTokLabel)
+                tbOvTokLabel.Text = LanguageHelper.Get("Advanced_Options.OverflowTokenCount", langCode);
 
             // 记录器高级设置本地化
             if (FindName("TextBlock_RecordsAdvancedTitle") is TextBlock textBlockRecordsAdvancedTitle) textBlockRecordsAdvancedTitle.Text = LanguageHelper.Get("Advanced_Options.RecordsAdvancedTitle", langCode);

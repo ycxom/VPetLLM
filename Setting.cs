@@ -41,6 +41,15 @@ namespace VPetLLM
         public int CompressionRetainCount { get; set; } = 4;
         public bool EnableAIRetainCount { get; set; } = false;
         public bool EnableCompressionRecords { get; set; } = false;
+
+        // 上下文溢出模式（新机制：不压缩，溢出超出阈值的聊天内容）
+        public ContextOverflowMode OverflowMode { get; set; } = ContextOverflowMode.Overflow;
+        public int OverflowSummaryTriggerTokens { get; set; } = 2000;
+        public bool OverflowThresholdSyncGlobal { get; set; } = true;
+        public bool EnableExpertMemoryRetrieval { get; set; } = false;
+        public int ExpertMemoryContextLength { get; set; } = 500;
+        public string ExpertMemoryModel { get; set; } = "";
+
         public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         public bool ShowUninstallWarning { get; set; } = true;
@@ -1458,6 +1467,15 @@ namespace VPetLLM
             Both           // 两者任一达到阈值即触发
         }
 
+        /// <summary>
+        /// 上下文溢出模式
+        /// </summary>
+        public enum ContextOverflowMode
+        {
+            Compression,  // 有损压缩（旧机制，默认）
+            Overflow      // 溢出模式（新机制：不压缩，超出阈值的聊天内容挤出并总结为记忆点）
+        }
+
         public enum ChannelMode
         {
             Unrestricted = 0,      // 无限制（默认）
@@ -1482,7 +1500,7 @@ namespace VPetLLM
             {
                 ChannelMode.Unrestricted => true,
                 ChannelMode.ChatOnly => purpose == "Chat",
-                ChannelMode.CompressionOnly => purpose == "Compression",
+                ChannelMode.CompressionOnly => purpose == "Compression" || purpose == "Overflow",
                 ChannelMode.PluginDefined => !string.IsNullOrEmpty(pluginModeId) && purpose == pluginModeId,
                 _ => true
             };

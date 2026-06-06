@@ -90,7 +90,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 // 构建历史记录
-                List<Message> history = GetCoreHistory();
+                List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
                 if (tempUserMessage is not null)
                 {
@@ -262,7 +262,7 @@ namespace VPetLLM.Core.Providers.Chat
                 // 使用 CreateUserMessage 自动设置时间戳和状态信息
                 var tempUserMessage = CreateUserMessage(prompt);
 
-                List<Message> history = GetCoreHistory();
+                List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
                 if (tempUserMessage is not null)
                 {
@@ -447,21 +447,16 @@ namespace VPetLLM.Core.Providers.Chat
             }
         }
 
-        private List<Message> GetCoreHistory(bool injectRecords = false)
+        private async Task<List<Message>> GetCoreHistoryAsync(bool injectRecords = false, string? userQuery = null)
         {
-            var history = new List<Message>
-            {
-                new Message { Role = "system", Content = GetSystemMessage() }
-            };
-            history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - _setting.HistoryCompressionThreshold)));
+            var result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
 
-            // Inject important records into history (only when explicitly requested, after user message is added)
-            if (injectRecords)
+            if (result.OverflowedMessages.Count > 0)
             {
-                history = InjectRecordsIntoHistory(history);
+                _ = HistoryManager.OnMessagesOverflowedAsync(result.OverflowedMessages, result.OverflowedTokens);
             }
 
-            return history;
+            return result.History;
         }
         /// <summary>
         /// 手动刷新可用模型列表

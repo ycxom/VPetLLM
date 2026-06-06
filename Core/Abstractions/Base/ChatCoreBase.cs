@@ -11,6 +11,7 @@ namespace VPetLLM.Core.Abstractions.Base
         public HistoryManager HistoryManager { get; }
         public RecordManager RecordManager { get; }
         public SkillManager SkillManager { get; }
+        public OverflowManager? OverflowManager { get; private set; }
         protected Setting? Settings { get; }
         protected IMainWindow? MainWindow { get; }
         protected ActionProcessor? ActionProcessor { get; }
@@ -171,6 +172,130 @@ namespace VPetLLM.Core.Abstractions.Base
                 Logger.Log($"Failed to initialize SkillManager: {ex.Message}");
                 SkillManager = null;
             }
+
+            // Initialize OverflowManager (for overflow-mode context handling)
+            try
+            {
+                if (settings?.OverflowMode == Setting.ContextOverflowMode.Overflow)
+                {
+                    OverflowManager = new OverflowManager(settings, Name, this, RecordManager);
+                    HistoryManager.SetOverflowManager(OverflowManager);
+                    Logger.Log($"OverflowManager initialized for {Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to initialize OverflowManager: {ex.Message}");
+                OverflowManager = null;
+            }
+
+            // Initialize MemoryRetrievalService (for expert memory retrieval)
+            try
+            {
+                if (settings?.OverflowMode == Setting.ContextOverflowMode.Overflow
+                    && settings?.EnableExpertMemoryRetrieval == true)
+                {
+                    var retrievalService = new MemoryRetrievalService(
+                        settings, this, HistoryManager, OverflowManager, RecordManager);
+                    SystemMessageProvider.MemoryRetrieval = retrievalService;
+                    Logger.Log($"MemoryRetrievalService initialized for {Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to initialize MemoryRetrievalService: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Result of GetCoreHistoryCommonAsync.
+        /// </summary>
+        protected class CoreHistoryResult
+        {
+            public List<Message> History { get; set; } = new();
+            public List<Message> OverflowedMessages { get; set; } = new();
+            public int OverflowedTokens { get; set; }
+        }
+
+        /// <summary>
+        /// Builds the core history list for prompt construction.
+        /// In overflow mode, uses a sliding window based on token limit.
+        /// In compression mode, uses the legacy truncation approach.
+        /// </summary>
+        /// <param name="injectRecords">Whether to inject important records into the history.</param>
+        /// <param name="userQuery">Optional user query for triggering memory retrieval.</param>
+        protected async Task<CoreHistoryResult> GetCoreHistoryCommonAsync(bool injectRecords, string? userQuery = null)
+        {
+            var result = new CoreHistoryResult();
+
+            // Trigger memory retrieval for the user query if available
+            if (!string.IsNullOrWhiteSpace(userQuery)
+                && SystemMessageProvider?.MemoryRetrieval is not null
+                && Settings?.EnableExpertMemoryRetrieval == true)
+            {
+                try
+                {
+                    var tokenBudget = Settings?.ExpertMemoryContextLength ?? 500;
+                    var memories = await SystemMessageProvider.MemoryRetrieval.RetrieveRelevantMemoriesAsync(userQuery, tokenBudget);
+                    SystemMessageProvider.RetrievedMemories = memories;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Memory retrieval failed: {ex.Message}");
+                    SystemMessageProvider.RetrievedMemories = null;
+                }
+            }
+
+            var history = new List<Message>
+            {
+                new Message { Role = "system", Content = GetSystemMessage() }
+            };
+
+            // Clear retrieved memories after use (one-shot)
+            SystemMessageProvider.RetrievedMemories = null;
+
+            if (Settings?.OverflowMode == Setting.ContextOverflowMode.Overflow)
+            {
+                // Overflow mode: include ALL history (no token limit on prompt)
+                history.AddRange(HistoryManager.GetHistory());
+
+                // Trigger summary if total history tokens exceed OverflowSummaryTriggerTokens
+                var totalTokens = TokenCounter.EstimateMessagesTokenCount(HistoryManager.GetHistory());
+                if (totalTokens >= (Settings?.OverflowSummaryTriggerTokens ?? 2000))
+                {
+                    // Find oldest portion that exceeds the trigger
+                    var allHistory = HistoryManager.GetHistory();
+                    var overflowCount = 0;
+                    var overflowTokens = 0;
+                    for (int i = 0; i < allHistory.Count && overflowTokens < totalTokens - (Settings?.OverflowSummaryTriggerTokens ?? 2000); i++)
+                    {
+                        var t = TokenCounter.EstimateTokenCount(allHistory[i].Content ?? "") + 4;
+                        overflowTokens += t;
+                        overflowCount++;
+                    }
+                    if (overflowCount > 0)
+                    {
+                        var overflowed = allHistory.Take(overflowCount).ToList();
+                        result.OverflowedMessages = overflowed;
+                        result.OverflowedTokens = overflowTokens;
+                    }
+                }
+            }
+            else
+            {
+                // Compression/legacy mode: use naive truncation
+                var threshold = Settings?.HistoryCompressionThreshold ?? 20;
+                history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - threshold)));
+            }
+
+            // Inject important records into history (only when explicitly requested)
+            if (injectRecords)
+            {
+                history = InjectRecordsIntoHistory(history);
+            }
+
+            result.History = history;
+            return result;
         }
 
         /// <summary>
