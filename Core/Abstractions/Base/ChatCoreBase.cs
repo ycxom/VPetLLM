@@ -173,15 +173,12 @@ namespace VPetLLM.Core.Abstractions.Base
                 SkillManager = null;
             }
 
-            // Initialize OverflowManager (for overflow-mode context handling)
+            // Initialize OverflowManager (always created; activates only in Overflow mode)
             try
             {
-                if (settings?.OverflowMode == Setting.ContextOverflowMode.Overflow)
-                {
-                    OverflowManager = new OverflowManager(settings, Name, this, RecordManager);
-                    HistoryManager.SetOverflowManager(OverflowManager);
-                    Logger.Log($"OverflowManager initialized for {Name}");
-                }
+                OverflowManager = new OverflowManager(settings, Name, this, RecordManager);
+                HistoryManager.SetOverflowManager(OverflowManager);
+                Logger.Log($"OverflowManager initialized for {Name} (active={settings?.OverflowMode == Setting.ContextOverflowMode.Overflow})");
             }
             catch (Exception ex)
             {
@@ -189,17 +186,13 @@ namespace VPetLLM.Core.Abstractions.Base
                 OverflowManager = null;
             }
 
-            // Initialize MemoryRetrievalService (for expert memory retrieval)
+            // Initialize MemoryRetrievalService (always created; activates only when enabled)
             try
             {
-                if (settings?.OverflowMode == Setting.ContextOverflowMode.Overflow
-                    && settings?.EnableExpertMemoryRetrieval == true)
-                {
-                    var retrievalService = new MemoryRetrievalService(
-                        settings, this, HistoryManager, OverflowManager, RecordManager);
-                    SystemMessageProvider.MemoryRetrieval = retrievalService;
-                    Logger.Log($"MemoryRetrievalService initialized for {Name}");
-                }
+                var retrievalService = new MemoryRetrievalService(
+                    settings, this, HistoryManager, OverflowManager, RecordManager);
+                SystemMessageProvider.MemoryRetrieval = retrievalService;
+                Logger.Log($"MemoryRetrievalService initialized for {Name} (active={settings?.EnableExpertMemoryRetrieval == true})");
             }
             catch (Exception ex)
             {
@@ -213,8 +206,6 @@ namespace VPetLLM.Core.Abstractions.Base
         protected class CoreHistoryResult
         {
             public List<Message> History { get; set; } = new();
-            public List<Message> OverflowedMessages { get; set; } = new();
-            public int OverflowedTokens { get; set; }
         }
 
         /// <summary>
@@ -256,30 +247,23 @@ namespace VPetLLM.Core.Abstractions.Base
 
             if (Settings?.OverflowMode == Setting.ContextOverflowMode.Overflow)
             {
-                // Overflow mode: include ALL history (no token limit on prompt)
-                history.AddRange(HistoryManager.GetHistory());
+                // Overflow mode: include ALL history, inject summary if exists
+                var fullHistory = HistoryManager.GetHistory();
 
-                // Trigger summary if total history tokens exceed OverflowSummaryTriggerTokens
-                var totalTokens = TokenCounter.EstimateMessagesTokenCount(HistoryManager.GetHistory());
-                if (totalTokens >= (Settings?.OverflowSummaryTriggerTokens ?? 2000))
+                // Inject overflow summary as a system message if it exists
+                if (OverflowManager?.LatestSummary is string summary && summary.Length > 0)
                 {
-                    // Find oldest portion that exceeds the trigger
-                    var allHistory = HistoryManager.GetHistory();
-                    var overflowCount = 0;
-                    var overflowTokens = 0;
-                    for (int i = 0; i < allHistory.Count && overflowTokens < totalTokens - (Settings?.OverflowSummaryTriggerTokens ?? 2000); i++)
+                    history.Add(new Message
                     {
-                        var t = TokenCounter.EstimateTokenCount(allHistory[i].Content ?? "") + 4;
-                        overflowTokens += t;
-                        overflowCount++;
-                    }
-                    if (overflowCount > 0)
-                    {
-                        var overflowed = allHistory.Take(overflowCount).ToList();
-                        result.OverflowedMessages = overflowed;
-                        result.OverflowedTokens = overflowTokens;
-                    }
+                        Role = "system",
+                        Content = $"[Previous Conversation Summary]\n{summary}\n[/Previous Conversation Summary]"
+                    });
                 }
+
+                history.AddRange(fullHistory);
+
+                // Check and trigger overflow summary (fire-and-forget)
+                _ = OverflowManager?.CheckAndTriggerAsync(fullHistory);
             }
             else
             {

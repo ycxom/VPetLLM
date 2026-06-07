@@ -148,6 +148,12 @@
             "zh-hant": "清除上下文",
             "jp": "コンテキストをクリアする"
         },
+        "ClearContextConfirm": {
+            "en": "Are you sure you want to clear ALL chat context? In long-context mode, this will also delete all overflow summaries and important records.",
+            "zh-hans": "确认清空所有聊天上下文？长上下文模式下将同时清空所有溢出总结和重要记忆。",
+            "zh-hant": "確認清空所有聊天上下文？長上下文模式下將同時清空所有溢出總結和重要記憶。",
+            "jp": "全てのチャットコンテキストをクリアしますか？長コンテキストモードでは、すべてのオーバーフロー要約と重要レコードも削除されます。"
+        },
         "EditContext": {
             "en": "Edit Context",
             "zh-hans": "编辑上下文",
@@ -902,6 +908,18 @@
             "en": "Overflow Tokens:",
             "zh-hans": "累计溢出Token:",
             "zh-hant": "累計溢出Token:",
+            "jp": "オーバーフロートークン:"
+        },
+        "OverflowMsgThreshold": {
+            "en": "Overflow Msg:",
+            "zh-hans": "溢出消息阈值:",
+            "zh-hant": "溢出消息閾值:",
+            "jp": "オーバーフローメッセージ:"
+        },
+        "OverflowTokenThresholdLabel": {
+            "en": "Overflow Token:",
+            "zh-hans": "溢出Token阈值:",
+            "zh-hant": "溢出Token閾值:",
             "jp": "オーバーフロートークン:"
         },
         "ExpertMemoryContextLength": {

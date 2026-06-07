@@ -44,11 +44,8 @@ namespace VPetLLM
 
         // 上下文溢出模式（新机制：不压缩，溢出超出阈值的聊天内容）
         public ContextOverflowMode OverflowMode { get; set; } = ContextOverflowMode.Overflow;
-        public int OverflowSummaryTriggerTokens { get; set; } = 2000;
-        public bool OverflowThresholdSyncGlobal { get; set; } = true;
         public bool EnableExpertMemoryRetrieval { get; set; } = false;
         public int ExpertMemoryContextLength { get; set; } = 500;
-        public string ExpertMemoryModel { get; set; } = "";
 
         public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();

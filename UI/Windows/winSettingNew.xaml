@@ -2236,6 +2236,11 @@
                                             VerticalAlignment="Center"
                                             Foreground="{StaticResource SecondaryTextBrush}"
                                             FontSize="14"/>
+                                    <TextBlock x:Name="TextBlock_OverflowMessageCount"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource WarningBrush}"
+                                            FontSize="12"
+                                            Margin="10,0,0,0"/>
                                 </StackPanel>
 
                                 <!-- Token数量阈值-->
@@ -2262,6 +2267,11 @@
                                             VerticalAlignment="Center"
                                             Foreground="{StaticResource SecondaryTextBrush}"
                                             FontSize="14"/>
+                                    <TextBlock x:Name="TextBlock_OverflowTokenCount"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource WarningBrush}"
+                                            FontSize="12"
+                                            Margin="10,0,0,0"/>
                                 </StackPanel>
 
                                 <!-- 总结后保留对话消息数（仅压缩模式有效） -->
@@ -2307,22 +2317,6 @@
                                 </StackPanel>
 
                                 <!-- ===== 长上下文模式设置 ===== -->
-
-                                <!-- 溢出总结触发阈值（仅长上下文模式有效） -->
-                                <StackPanel Orientation="Horizontal"
-                                        Margin="20,0,0,12"
-                                        x:Name="Panel_OverflowSummaryTriggerTokens">
-                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.OverflowSummaryTriggerTokens, Default=累积溢出 Token 后触发总结}"
-                                            VerticalAlignment="Center"
-                                            x:Name="TextBlock_OverflowSummaryTriggerTokens"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"
-                                            Width="140"/>
-                                    <TextBox x:Name="TextBox_OverflowSummaryTriggerTokens"
-                                            Width="152"
-                                            Margin="10,0"
-                                            Style="{StaticResource ModernTextBox}"/>
-                                </StackPanel>
 
                                 <!-- 专家模型检索上下文长度（仅长上下文模式有效） -->
                                 <StackPanel Orientation="Horizontal"

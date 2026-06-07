@@ -3,11 +3,18 @@ using VPetLLM.Core.Data.Database;
 namespace VPetLLM.Core.Data.Managers
 {
     /// <summary>
-    /// Manages the overflow-based context handling.
-    /// When messages are evicted from the prompt window (overflow mode),
-    /// this manager tracks them and triggers summaries when thresholds are met.
-    /// Summaries are stored both as overflow_summaries (for expert retrieval)
-    /// and as important_records (via RecordManager) for regular context injection.
+    /// Manages the overflow-based context handling for long-context mode.
+    /// 
+    /// Logic (example with message threshold = 10):
+    ///   9 msgs → nothing
+    ///   10 msgs → first summary of msgs[0..10), creates memory record
+    ///   11 msgs → 1 overflowed, attaches summary note
+    ///   20 msgs → 10 overflowed since last summary → incremental summary of overflowed batch
+    ///   21 msgs → 1 new overflow, attaches summary note
+    /// 
+    /// Summaries accumulate incrementally and are injected into the prompt as a
+    /// [Previous Conversation Summary] system message.
+    /// Messages are NEVER deleted from history.
     /// </summary>
     public class OverflowManager
     {
@@ -18,29 +25,39 @@ namespace VPetLLM.Core.Data.Managers
         private readonly ChatCoreBase _chatCore;
 
         /// <summary>
-        /// Accumulated token count of overflowed messages since last summary trigger.
+        /// Index (in full history) up to which messages have been summarized.
+        /// 0 = no summary yet. Messages [0.._lastSummarizedIndex) are covered.
         /// </summary>
-        private int _accumulatedOverflowTokens;
+        private int _lastSummarizedIndex;
 
         /// <summary>
-        /// Accumulated message count of overflowed messages since last summary trigger.
+        /// Accumulated summary text. Injected into prompt as context.
         /// </summary>
-        private int _accumulatedOverflowMessageCount;
+        private readonly List<string> _summaryChunks = new();
 
         /// <summary>
-        /// Public accessor for UI — current accumulated overflow tokens waiting for summary.
+        /// The full concatenated summary, or null if no summary exists.
         /// </summary>
-        public int AccumulatedOverflowTokens => _accumulatedOverflowTokens;
+        public string? LatestSummary => _summaryChunks.Count > 0
+            ? string.Join("\n\n---\n\n", _summaryChunks)
+            : null;
 
         /// <summary>
-        /// Public accessor for UI — current accumulated overflow message count waiting for summary.
+        /// Whether any summary has been created (for UI display).
         /// </summary>
-        public int AccumulatedOverflowMessageCount => _accumulatedOverflowMessageCount;
+        public bool HasSummary => _summaryChunks.Count > 0;
 
         /// <summary>
-        /// The global message index at which the next overflow segment starts.
+        /// Number of messages overflowed since last summary (for UI).
         /// </summary>
-        private int _nextMessageIndex;
+        public int AccumulatedOverflowMessageCount { get; private set; }
+
+        /// <summary>
+        /// Estimated tokens overflowed since last summary (for UI).
+        /// </summary>
+        public int AccumulatedOverflowTokens { get; private set; }
+
+        private int _lastRangeHash;
 
         public OverflowManager(Setting settings, string providerName, ChatCoreBase chatCore, RecordManager? recordManager)
         {
@@ -49,95 +66,76 @@ namespace VPetLLM.Core.Data.Managers
             _chatCore = chatCore;
             _recordManager = recordManager;
             _database = new OverflowDatabase(GetDatabasePath());
-            _accumulatedOverflowTokens = _database.GetTotalOverflowedTokens();
-            _nextMessageIndex = 0;
         }
 
         /// <summary>
-        /// Tracks recently processed overflow ranges to prevent double-counting if
-        /// the same messages are evicted again (e.g., on chat retry before success).
+        /// Check if any overflow has occurred and trigger summaries as needed.
+        /// Called after every user message is added to history.
         /// </summary>
-        private readonly HashSet<int> _processedSegmentRanges = new HashSet<int>();
-        private int _lastRangeHash;
-
-        /// <summary>
-        /// Called when messages are evicted from the prompt window (overflowed).
-        /// Tracks the evicted messages and triggers a summary when accumulated tokens
-        /// exceed the threshold. Idempotent: duplicate calls for the same message range are ignored.
-        /// </summary>
-        /// <param name="overflowedMessages">The messages that were evicted from the prompt.</param>
-        /// <param name="overflowedTokenCount">Estimated token count of the evicted messages.</param>
-        public async Task OnMessagesOverflowedAsync(List<Message> overflowedMessages, int overflowedTokenCount)
+        /// <param name="fullHistory">The complete message history.</param>
+        public async Task CheckAndTriggerAsync(List<Message> fullHistory)
         {
-            if (overflowedMessages is null || overflowedMessages.Count == 0)
+            if (fullHistory is null || fullHistory.Count == 0)
                 return;
 
-            // Compute a range hash to detect duplicate notifications
-            var rangeHash = ComputeRangeHash(overflowedMessages);
-            if (_lastRangeHash == rangeHash && _accumulatedOverflowTokens > 0)
+            var msgThreshold = _settings.HistoryCompressionThreshold;
+            var tokenThreshold = _settings.HistoryCompressionTokenThreshold;
+            if (msgThreshold <= 0) msgThreshold = 20;
+
+            // Get the overflowed portion: messages from _lastSummarizedIndex to (count - threshold)
+            var keepCount = Math.Min(msgThreshold, fullHistory.Count);
+            var overflowStart = _lastSummarizedIndex;
+            var overflowEnd = fullHistory.Count - keepCount;
+
+            if (overflowEnd <= overflowStart)
             {
-                // Same range already processed; skip double-counting
-                Logger.Log($"OverflowManager: Skipping duplicate overflow notification (hash={rangeHash:x8})");
+                // No new messages to summarize
+                AccumulatedOverflowMessageCount = Math.Max(0, fullHistory.Count - keepCount - _lastSummarizedIndex);
+                AccumulatedOverflowTokens = TokenCounter.EstimateMessagesTokenCount(
+                    fullHistory.Skip(_lastSummarizedIndex).Take(Math.Max(0, fullHistory.Count - keepCount - _lastSummarizedIndex)));
                 return;
             }
-            _lastRangeHash = rangeHash;
 
-            _accumulatedOverflowTokens += overflowedTokenCount;
-            _accumulatedOverflowMessageCount += overflowedMessages.Count;
-            var segmentStartIndex = _nextMessageIndex;
-            _nextMessageIndex += overflowedMessages.Count;
+            // Overflow exists — compute overflow range
+            var overflowed = fullHistory.Skip(overflowStart).Take(overflowEnd - overflowStart).ToList();
+            var ovTokens = TokenCounter.EstimateMessagesTokenCount(overflowed);
 
-            Logger.Log($"OverflowManager: {overflowedMessages.Count} messages overflowed ({overflowedTokenCount} tokens). Accumulated: {_accumulatedOverflowTokens}/{_settings.OverflowSummaryTriggerTokens}");
+            AccumulatedOverflowMessageCount = overflowed.Count;
+            AccumulatedOverflowTokens = ovTokens;
 
-            if (ShouldTriggerSummary())
+            Logger.Log($"OverflowManager: overflowStart={overflowStart} overflowEnd={overflowEnd} totalHistory={fullHistory.Count} keep={keepCount} overflowed={overflowed.Count} tokens={ovTokens}");
+
+            // Trigger if count or token threshold met
+            var shouldTrigger = false;
+            switch (_settings.CompressionMode)
             {
-                await TriggerSummaryAsync(overflowedMessages, segmentStartIndex, overflowedTokenCount);
+                case Setting.CompressionTriggerMode.MessageCount:
+                    shouldTrigger = overflowed.Count >= msgThreshold;
+                    break;
+                case Setting.CompressionTriggerMode.TokenCount:
+                    shouldTrigger = ovTokens >= tokenThreshold;
+                    break;
+                case Setting.CompressionTriggerMode.Both:
+                default:
+                    shouldTrigger = overflowed.Count >= msgThreshold || ovTokens >= tokenThreshold;
+                    break;
+            }
+
+            if (shouldTrigger && overflowed.Count > 0)
+            {
+                await TriggerSummaryAsync(overflowed, overflowStart, overflowEnd);
             }
         }
 
         /// <summary>
-        /// Checks whether accumulated overflow tokens exceed the trigger threshold.
-        /// When OverflowThresholdSyncGlobal is true, uses global HistoryCompressionThreshold
-        /// and HistoryCompressionTokenThreshold. Otherwise uses OverflowSummaryTriggerTokens.
+        /// Triggers an incremental overflow summary.
         /// </summary>
-        public bool ShouldTriggerSummary()
-        {
-            if (_settings.OverflowThresholdSyncGlobal)
-            {
-                // Sync with global thresholds — use CompressionMode to decide trigger method
-                switch (_settings.CompressionMode)
-                {
-                    case Setting.CompressionTriggerMode.MessageCount:
-                        return _accumulatedOverflowMessageCount >= _settings.HistoryCompressionThreshold;
-
-                    case Setting.CompressionTriggerMode.TokenCount:
-                        return _accumulatedOverflowTokens >= _settings.HistoryCompressionTokenThreshold;
-
-                    case Setting.CompressionTriggerMode.Both:
-                    default:
-                        return _accumulatedOverflowMessageCount >= _settings.HistoryCompressionThreshold
-                            || _accumulatedOverflowTokens >= _settings.HistoryCompressionTokenThreshold;
-                }
-            }
-            else
-            {
-                // Independent threshold
-                return _accumulatedOverflowTokens >= _settings.OverflowSummaryTriggerTokens
-                       && _settings.OverflowSummaryTriggerTokens > 0;
-            }
-        }
-
-        /// <summary>
-        /// Triggers an overflow summary: calls the LLM to summarize the overflowed content,
-        /// stores the summary, creates memory records, and resets the accumulator.
-        /// </summary>
-        public async Task TriggerSummaryAsync(List<Message> overflowedMessages, int segmentStartIndex, int tokenCount)
+        private async Task TriggerSummaryAsync(List<Message> overflowedMessages, int segmentStart, int segmentEnd)
         {
             try
             {
-                Logger.Log($"OverflowManager: Triggering overflow summary for {overflowedMessages.Count} messages ({tokenCount} tokens)");
+                Logger.Log($"OverflowManager: Triggering incremental summary for messages [{segmentStart}..{segmentEnd}) ({overflowedMessages.Count} msgs)");
 
-                // Build history text for summarization
                 var historyText = string.Join("\n", overflowedMessages
                     .Where(m => !string.IsNullOrWhiteSpace(m.Content))
                     .Select(m => $"[{m.Role}]: {m.Content}"));
@@ -145,118 +143,90 @@ namespace VPetLLM.Core.Data.Managers
                 if (string.IsNullOrWhiteSpace(historyText))
                 {
                     Logger.Log("OverflowManager: No content to summarize, skipping");
-                    _accumulatedOverflowTokens = 0;
-                _accumulatedOverflowMessageCount = 0;
-                    _accumulatedOverflowMessageCount = 0;
                     return;
                 }
 
-                // Get the overflow summary prompt
                 var systemPrompt = PromptHelper.Get("Overflow_Summary_Prefix", _settings.PromptLanguage);
                 if (systemPrompt.StartsWith("[Prompt Missing"))
-                {
-                    // Fall back to the existing compression summary prefix
                     systemPrompt = PromptHelper.Get("Context_Summary_Prefix", _settings.PromptLanguage);
-                }
 
-                // Add record hint if enabled
-                if (_settings.EnableCompressionRecords && _recordManager is not null)
+                // If we already have a prior summary, tell the LLM to extend it
+                if (_summaryChunks.Count > 0)
                 {
-                    systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RecordHint", _settings.PromptLanguage);
+                    systemPrompt += "\n\nPrevious summary context:\n" + string.Join("\n", _summaryChunks.TakeLast(2));
+                    systemPrompt += "\n\nThe above is the existing summary. Please EXTEND it with the new information below, keeping all prior facts. Output the COMPLETE updated summary.";
                 }
 
-                // Call the LLM to summarize.
-                // Uses the existing Summarize method which selects nodes via "Compression" purpose,
-                // allowing CompressionOnly channels to be used for overflow summaries.
+                if (_settings.EnableCompressionRecords && _recordManager is not null)
+                    systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RecordHint", _settings.PromptLanguage);
+
                 var summary = await _chatCore.Summarize(systemPrompt, historyText);
 
                 if (string.IsNullOrWhiteSpace(summary))
                 {
-                    Logger.Log("OverflowManager: Summary returned empty, resetting accumulator");
-                    _accumulatedOverflowTokens = 0;
-                _accumulatedOverflowMessageCount = 0;
-                    _accumulatedOverflowMessageCount = 0;
+                    Logger.Log("OverflowManager: Summary returned empty");
                     return;
                 }
 
-                // Extract and execute record commands from the summary
+                // Extract record commands
                 if (_settings.EnableCompressionRecords && _recordManager is not null)
-                {
                     summary = ExtractAndExecuteRecordCommands(summary);
-                }
 
-                // Store the summary in the overflow database
-                var summaryId = _database.CreateSummary(summary, segmentStartIndex,
-                    segmentStartIndex + overflowedMessages.Count - 1, tokenCount);
+                // Store in database
+                var tokenCount = TokenCounter.EstimateMessagesTokenCount(overflowedMessages);
+                var summaryId = _database.CreateSummary(summary, segmentStart, segmentEnd - 1, tokenCount);
 
-                // Store segment metadata for keyword-based retrieval
                 var segments = overflowedMessages.Select((m, i) => new OverflowSegmentData
                 {
                     ContentHash = ComputeSimpleHash(m.Content ?? ""),
-                    MessageIndex = segmentStartIndex + i,
+                    MessageIndex = segmentStart + i,
                     Role = m.Role,
                     ContentPreview = Truncate(m.Content, 200),
                     TokenCount = TokenCounter.EstimateTokenCount(m.Content ?? "")
                 }).ToList();
 
                 if (summaryId > 0)
-                {
                     _database.AddSegments(summaryId, segments);
-                }
 
-                // Reset accumulator after successful summary
-                _accumulatedOverflowTokens = 0;
-                _accumulatedOverflowMessageCount = 0;
+                // Append to summary chunks and advance index
+                _summaryChunks.Add(summary);
+                _lastSummarizedIndex = segmentEnd;
+                AccumulatedOverflowMessageCount = 0;
+                AccumulatedOverflowTokens = 0;
 
-                Logger.Log($"OverflowManager: Overflow summary completed. SummaryId={summaryId}, Reset accumulator.");
+                Logger.Log($"OverflowManager: Incremental summary completed. SummaryId={summaryId}, lastSummarizedIndex={_lastSummarizedIndex}, total chunks={_summaryChunks.Count}");
             }
             catch (Exception ex)
             {
                 Logger.Log($"OverflowManager: Failed to trigger overflow summary: {ex.Message}");
-                // Don't reset accumulator on failure — try again next time
             }
         }
 
         /// <summary>
-        /// Search overflow summaries by keyword. Used by the expert memory retrieval system.
+        /// Search overflow summaries by keyword.
         /// </summary>
         public List<OverflowSummaryRecord> SearchSummaries(string keyword, int limit = 10)
-        {
-            return _database.SearchSummaries(keyword, limit);
-        }
+            => _database.SearchSummaries(keyword, limit);
 
         /// <summary>
         /// Get segments associated with a summary.
         /// </summary>
         public List<OverflowSegmentRecord> GetSegmentsForSummary(int summaryId)
-        {
-            return _database.GetSegmentsForSummary(summaryId);
-        }
+            => _database.GetSegmentsForSummary(summaryId);
 
         /// <summary>
-        /// Get all overflow summaries.
-        /// </summary>
-        public List<OverflowSummaryRecord> GetAllSummaries()
-        {
-            return _database.SearchSummaries("", 100);
-        }
-
-        /// <summary>
-        /// Clear all overflow data (called when context is cleared).
+        /// Clear all overflow data.
         /// </summary>
         public void ClearAll()
         {
-            _accumulatedOverflowTokens = 0;
-            _accumulatedOverflowMessageCount = 0;
-            _nextMessageIndex = 0;
+            _lastSummarizedIndex = 0;
+            _summaryChunks.Clear();
+            AccumulatedOverflowMessageCount = 0;
+            AccumulatedOverflowTokens = 0;
             _lastRangeHash = 0;
             _database.ClearAll();
         }
 
-        /// <summary>
-        /// Extract and execute record commands from summary text.
-        /// Mirrors the logic in HistoryManager.ExtractAndExecuteRecordCommands.
-        /// </summary>
         private string ExtractAndExecuteRecordCommands(string summary)
         {
             try
@@ -264,10 +234,8 @@ namespace VPetLLM.Core.Data.Managers
                 var recordRegex = new System.Text.RegularExpressions.Regex(
                     @"<\|\s*record\s*_begin\s*\|>(.*?)<\|\s*record\s*_end\s*\|>",
                     System.Text.RegularExpressions.RegexOptions.Singleline);
-
                 var matches = recordRegex.Matches(summary);
-                if (matches.Count == 0)
-                    return summary;
+                if (matches.Count == 0) return summary;
 
                 var textRegex = new System.Text.RegularExpressions.Regex(@"text\s*\(\s*""([^""]*)""\s*\)");
                 var weightRegex = new System.Text.RegularExpressions.Regex(@"weight\s*\(\s*(\d+)\s*\)");
@@ -277,21 +245,14 @@ namespace VPetLLM.Core.Data.Managers
                     var commandValue = match.Groups[1].Value;
                     var textMatch = textRegex.Match(commandValue);
                     var weightMatch = weightRegex.Match(commandValue);
-
                     if (textMatch.Success)
                     {
                         var content = textMatch.Groups[1].Value;
                         var weight = weightMatch.Success ? int.Parse(weightMatch.Groups[1].Value) : 5;
                         weight = Math.Clamp(weight, 1, 10);
-
-                        if (_recordManager is not null)
-                        {
-                            var recordId = _recordManager.CreateRecord(content, weight);
-                            Logger.Log($"Overflow memory extracted: Created record #{recordId} - '{content}' (weight: {weight})");
-                        }
+                        _recordManager?.CreateRecord(content, weight);
                     }
                 }
-
                 var cleaned = recordRegex.Replace(summary, "").Trim();
                 cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\n{3,}", "\n\n");
                 return cleaned;
@@ -306,32 +267,7 @@ namespace VPetLLM.Core.Data.Managers
         private static string ComputeSimpleHash(string input)
         {
             if (string.IsNullOrEmpty(input)) return "empty";
-            // Simple fast hash for content fingerprinting
-            unchecked
-            {
-                int hash = 17;
-                foreach (char c in input)
-                    hash = hash * 31 + c;
-                return hash.ToString("x8");
-            }
-        }
-
-        /// <summary>
-        /// Compute a hash representing a range of overflowed messages for deduplication.
-        /// Uses the first and last message content hashes + count.
-        /// </summary>
-        private static int ComputeRangeHash(List<Message> messages)
-        {
-            if (messages.Count == 0) return 0;
-            unchecked
-            {
-                int hash = messages.Count;
-                var first = messages[0].Content ?? "";
-                var last = messages[messages.Count - 1].Content ?? "";
-                foreach (char c in first) hash = hash * 31 + c;
-                foreach (char c in last) hash = hash * 31 + c;
-                return hash;
-            }
+            unchecked { int hash = 17; foreach (char c in input) hash = hash * 31 + c; return hash.ToString("x8"); }
         }
 
         private static string Truncate(string? text, int maxLen)
@@ -344,10 +280,7 @@ namespace VPetLLM.Core.Data.Managers
         {
             var docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var dataPath = Path.Combine(docPath, "VPetLLM", "Chat");
-            if (!Directory.Exists(dataPath))
-            {
-                Directory.CreateDirectory(dataPath);
-            }
+            if (!Directory.Exists(dataPath)) Directory.CreateDirectory(dataPath);
             return Path.Combine(dataPath, "chat_history.db");
         }
     }

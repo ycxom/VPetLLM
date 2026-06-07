@@ -450,12 +450,6 @@ namespace VPetLLM.Core.Providers.Chat
         private async Task<List<Message>> GetCoreHistoryAsync(bool injectRecords = false, string? userQuery = null)
         {
             var result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
-
-            if (result.OverflowedMessages.Count > 0)
-            {
-                _ = HistoryManager.OnMessagesOverflowedAsync(result.OverflowedMessages, result.OverflowedTokens);
-            }
-
             return result.History;
         }
         /// <summary>

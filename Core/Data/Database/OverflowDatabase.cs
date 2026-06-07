@@ -232,6 +232,34 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
+        /// Delete a summary and its associated segments by ID.
+        /// </summary>
+        public void DeleteSummary(int summaryId)
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                using var transaction = connection.BeginTransaction();
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM overflow_segments WHERE summary_id = @id";
+                cmd.Parameters.AddWithValue("@id", summaryId);
+                cmd.ExecuteNonQuery();
+
+                cmd.CommandText = "DELETE FROM overflow_summaries WHERE id = @id";
+                cmd.ExecuteNonQuery();
+
+                transaction.Commit();
+                Logger.Log($"Deleted overflow summary #{summaryId} and its segments");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to delete summary #{summaryId}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Get the total count of overflowed tokens across all summaries.
         /// </summary>
         public int GetTotalOverflowedTokens()

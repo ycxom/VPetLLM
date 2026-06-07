@@ -148,8 +148,8 @@ namespace VPetLLM.Core.Services
                 if (string.IsNullOrEmpty(rawResults))
                     return string.Empty;
 
-                // If expert model is configured, use it to summarize the retrieved memories
-                if (!string.IsNullOrWhiteSpace(_settings.ExpertMemoryModel) && _settings.EnableExpertMemoryRetrieval)
+                // If expert memory retrieval is enabled, summarize the retrieved memories
+                if (_settings.EnableExpertMemoryRetrieval)
                 {
                     return await SummarizeWithExpertAsync(rawResults);
                 }
