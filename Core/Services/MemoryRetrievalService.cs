@@ -205,6 +205,152 @@ namespace VPetLLM.Core.Services
         }
 
         /// <summary>
+        /// Search with keyword, expand each hit with surrounding context messages,
+        /// then call expert model (LLM) to summarize. 
+        /// Used by the AI-triggered memory retrieval handler.
+        /// </summary>
+        /// <param name="userQuery">The AI's search query (keywords).</param>
+        /// <param name="contextWindow">Number of messages before/after each hit to include for context.</param>
+        /// <returns>Expert-summarized memory context, or empty if nothing found.</returns>
+        public async Task<string> SearchWithExpertAsync(string userQuery, int contextWindow = 5)
+        {
+            if (string.IsNullOrWhiteSpace(userQuery))
+                return string.Empty;
+
+            try
+            {
+                var keywords = ExtractKeywords(userQuery);
+                if (keywords.Count == 0)
+                    return string.Empty;
+
+                var allResults = new List<MemoryHit>();
+                var fullHistory = _historyManager.GetHistory();
+                var matchedIndices = new HashSet<int>();
+
+                // 1. Search important records
+                if (_recordManager is not null && _settings.Records?.EnableRecords == true)
+                {
+                    var records = _recordManager.GetAllRecordsForEditing();
+                    foreach (var record in records)
+                    {
+                        foreach (var kw in keywords)
+                        {
+                            if (record.Content.Contains(kw, StringComparison.OrdinalIgnoreCase))
+                            {
+                                allResults.Add(new MemoryHit
+                                {
+                                    Source = "Record",
+                                    Content = $"[记忆 #{record.Id}] {record.Content}",
+                                    Relevance = 8,
+                                    Keyword = kw
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // 2. Search overflow summaries
+                if (_overflowManager is not null)
+                {
+                    foreach (var kw in keywords)
+                    {
+                        var summaries = _overflowManager.SearchSummaries(kw, limit: 5);
+                        foreach (var sum in summaries)
+                        {
+                            allResults.Add(new MemoryHit
+                            {
+                                Source = "OverflowSummary",
+                                Content = $"[历史摘要 #{sum.Id}] {sum.SummaryText}",
+                                Relevance = 6,
+                                Keyword = kw,
+                                SummaryId = sum.Id
+                            });
+                        }
+                    }
+                }
+
+                // 3. Search recent chat history with surrounding context
+                for (int i = 0; i < fullHistory.Count; i++)
+                {
+                    var msg = fullHistory[i];
+                    foreach (var kw in keywords)
+                    {
+                        if (!string.IsNullOrEmpty(msg.Content) &&
+                            msg.Content.Contains(kw, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Found a match — record its index for context expansion
+                            matchedIndices.Add(i);
+                            break;
+                        }
+                    }
+                }
+
+                // Expand matched indices with ±contextWindow surrounding messages
+                if (matchedIndices.Count > 0)
+                {
+                    var expandedIndices = new HashSet<int>();
+                    foreach (var idx in matchedIndices)
+                    {
+                        for (int offset = -contextWindow; offset <= contextWindow; offset++)
+                        {
+                            var targetIdx = idx + offset;
+                            if (targetIdx >= 0 && targetIdx < fullHistory.Count)
+                                expandedIndices.Add(targetIdx);
+                        }
+                    }
+
+                    foreach (var idx in expandedIndices.OrderBy(i => i))
+                    {
+                        var msg = fullHistory[idx];
+                        var relevance = matchedIndices.Contains(idx) ? 5 : 3;
+                        allResults.Add(new MemoryHit
+                        {
+                            Source = "RecentChat",
+                            Content = $"[{msg.Role}]: {msg.Content}",
+                            Relevance = relevance,
+                            Keyword = matchedIndices.Contains(idx) ? keywords.First() : ""
+                        });
+                    }
+                }
+
+                if (allResults.Count == 0)
+                    return string.Empty;
+
+                // Deduplicate by content
+                var seenContent = new HashSet<string>();
+                var uniqueResults = new List<MemoryHit>();
+                foreach (var hit in allResults.OrderByDescending(h => h.Relevance))
+                {
+                    if (seenContent.Add(hit.Content.Trim()))
+                    {
+                        uniqueResults.Add(hit);
+                    }
+                }
+
+                // Build raw text for expert summarization (no token budget — let expert handle)
+                var sb = new StringBuilder();
+                foreach (var hit in uniqueResults)
+                {
+                    sb.AppendLine(hit.Content);
+                }
+
+                var rawResults = sb.ToString().Trim();
+                if (string.IsNullOrEmpty(rawResults))
+                    return string.Empty;
+
+                // Call expert model to summarize
+                var summary = await SummarizeWithExpertAsync(rawResults);
+                return summary;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MemoryRetrievalService: SearchWithExpert error: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
         /// Performs local search only (no LLM summarization).
         /// Extracts keywords, searches records/overflow summaries/history,
         /// deduplicates, trims to token budget, and returns formatted results.

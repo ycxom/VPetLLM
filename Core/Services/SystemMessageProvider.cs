@@ -17,17 +17,6 @@ namespace VPetLLM.Core.Services
         /// </summary>
         public SkillManager? SkillManager { get; set; }
 
-        /// <summary>
-        /// Optional MemoryRetrievalService for retrieving memories from overflow summaries.
-        /// </summary>
-        public MemoryRetrievalService? MemoryRetrieval { get; set; }
-
-        /// <summary>
-        /// Retrieved memories to inject into the system message.
-        /// Set before GetSystemMessage() when expert retrieval is active.
-        /// </summary>
-        public string? RetrievedMemories { get; set; }
-
         public SystemMessageProvider(Setting settings, IMainWindow mainWindow, ActionProcessor actionProcessor)
         {
             _settings = settings;
@@ -334,12 +323,6 @@ namespace VPetLLM.Core.Services
                 var pluginDescriptions = VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => $"{p.Name}: {p.Description} {p.Examples}");
                 parts.Add(PromptHelper.Get("Available_Plugins_Prefix", lang)
                             .Replace("{PluginList}", string.Join("\n", pluginDescriptions)));
-            }
-
-            // Inject retrieved memories at the top of the system message if available
-            if (!string.IsNullOrWhiteSpace(RetrievedMemories))
-            {
-                parts.Insert(1, RetrievedMemories);
             }
 
             var systemMessage = string.Join("\n", parts);

@@ -69,8 +69,6 @@ namespace VPetLLM.Core.Providers.Chat
             try
             {
                 OnConversationTurn();
-                // 系统注入时跳过主动记忆检索
-                _suppressMemoryRetrieval = isFunctionCall;
 
                 if (!Settings.KeepContext)
                 {

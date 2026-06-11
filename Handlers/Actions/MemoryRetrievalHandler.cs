@@ -7,7 +7,9 @@ namespace VPetLLM.Handlers.Actions
     /// Memory retrieval tool handler.
     /// AI invokes via <|retrieve_memories_begin|> query <|retrieve_memories_end|>
     /// when it cannot find needed information in the current conversation context.
-    /// Performs local search only (no LLM API call) and feeds results back via ResultAggregator.
+    /// 
+    /// Flow: keyword → local search (with ±5 surrounding context per hit)
+    ///       → expert model summarization  → feed back via ResultAggregator
     /// </summary>
     public class MemoryRetrievalHandler : IActionHandler
     {
@@ -29,7 +31,7 @@ namespace VPetLLM.Handlers.Actions
         public ActionCategory Category => ActionCategory.Unknown;
 
         public string Description => IsEnabled
-            ? "Retrieve past memories and conversation records when you cannot find needed information in the current context. Format: <|retrieve_memories_begin|> search query <|retrieve_memories_end|>"
+            ? PromptHelper.Get("Handler_RetrieveMemories_Description", VPetLLM.Instance.Settings.PromptLanguage)
             : "";
 
         public async Task Execute(string value, IMainWindow mainWindow)
@@ -40,19 +42,19 @@ namespace VPetLLM.Handlers.Actions
             try
             {
                 var query = value.Trim();
-                Logger.Log($"MemoryRetrievalHandler: Searching for: {query}");
+                Logger.Log($"MemoryRetrievalHandler: AI 发起记忆检索: {query}");
 
-                var result = await _retrievalService.SearchLocalOnlyAsync(query, tokenBudget: 800);
+                var result = await _retrievalService.SearchWithExpertAsync(query, contextWindow: 5);
 
                 if (!string.IsNullOrEmpty(result))
                 {
-                    var formattedResult = $"[记忆检索结果] {result}";
-                    Logger.Log($"MemoryRetrievalHandler: Found results, feeding back to AI");
+                    var formattedResult = $"[记忆检索结果]\n{result}\n[/记忆检索结果]";
+                    Logger.Log($"MemoryRetrievalHandler: 专家总结完成，回灌给 AI");
                     ResultAggregator.Enqueue(formattedResult);
                 }
                 else
                 {
-                    Logger.Log($"MemoryRetrievalHandler: No results found for: {query}");
+                    Logger.Log($"MemoryRetrievalHandler: 未找到相关记忆: {query}");
                     ResultAggregator.Enqueue("[记忆检索结果] 未找到相关记忆。");
                 }
             }

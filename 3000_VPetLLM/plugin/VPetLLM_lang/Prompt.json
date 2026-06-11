@@ -330,5 +330,9 @@
     "Memory_Retrieval_Injection": {
         "en": "[RETRIEVED MEMORIES — use this information if relevant to the current conversation]\n{Memories}\n[/RETRIEVED MEMORIES]",
         "zh": "[检索到的记忆 — 如果与当前对话相关，请使用这些信息]\n{Memories}\n[/检索到的记忆]"
+    },
+    "Handler_RetrieveMemories_Description": {
+        "en": "When you need to recall something but can't remember clearly, first say something natural like \"Let me think...\", \"I remember...\", or \"Oh! I recall!\" then use this tool to search past memories and conversations. Format: <|retrieve_memories_begin|> search keywords <|retrieve_memories_end|>. Example: <|say_begin|> \"Let me think...\" <|say_end|><|retrieve_memories_begin|> user's name <|retrieve_memories_end|>",
+        "zh": "当你需要回忆之前的事情但记不清时，可以先自然地说「让我想想...」「我记得好像...」「我记得记得！」之类的话，然后再用此工具搜索过去的记忆和对话记录。格式：<|retrieve_memories_begin|> 搜索关键词 <|retrieve_memories_end|>。示例：<|say_begin|> \"让我想想...\" <|say_end|><|retrieve_memories_begin|> 用户的名字 <|retrieve_memories_end|>"
     }
 }

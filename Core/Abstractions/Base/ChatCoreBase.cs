@@ -21,8 +21,6 @@ namespace VPetLLM.Core.Abstractions.Base
         // 溢出检查缓存数据 — 在各 Provider API 成功时触发，而非 GetCoreHistoryCommonAsync 中火抛
         protected List<Message>? _pendingOverflowHistory;
         protected int _pendingOverflowSnapshotCount;
-        // 系统注入标记 — 由 Provider 在 ResultAggregator 回灌时设置，跳过主动记忆检索
-        protected bool _suppressMemoryRetrieval;
         protected Action<string> ResponseHandler;
         protected Action<string> StreamingChunkHandler;
         public abstract Task<string> Chat(string prompt);
@@ -197,7 +195,6 @@ namespace VPetLLM.Core.Abstractions.Base
             {
                 var retrievalService = new MemoryRetrievalService(
                     settings, this, HistoryManager, OverflowManager, RecordManager);
-                SystemMessageProvider.MemoryRetrieval = retrievalService;
 
                 // Register MemoryRetrievalService with ActionProcessor for the retrieval tool handler
                 if (actionProcessor is not null)
@@ -263,36 +260,13 @@ namespace VPetLLM.Core.Abstractions.Base
         {
             var result = new CoreHistoryResult();
 
-            // 一次性标记，用完后立即复位
-            _suppressMemoryRetrieval = false;
-
-            // Trigger memory retrieval for the user query if available
-            // 系统注入（ResultAggregator 回灌）时跳过，避免自身引出的 Plugin Result 触发自检索
-            if (!_suppressMemoryRetrieval
-                && !string.IsNullOrWhiteSpace(userQuery)
-                && SystemMessageProvider?.MemoryRetrieval is not null
-                && Settings?.EnableExpertMemoryRetrieval == true)
-            {
-                try
-                {
-                    var tokenBudget = Settings?.ExpertMemoryContextLength ?? 500;
-                    var memories = await SystemMessageProvider.MemoryRetrieval.RetrieveRelevantMemoriesAsync(userQuery, tokenBudget);
-                    SystemMessageProvider.RetrievedMemories = memories;
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Memory retrieval failed: {ex.Message}");
-                    SystemMessageProvider.RetrievedMemories = null;
-                }
-            }
+            // 记忆检索已移至 Tool/Handler 机制 (<|retrieve_memories_begin|> query <|retrieve_memories_end|>)
+            // 由 AI 主动决定何时需要检索，不再自动匹配注入
 
             var history = new List<Message>
             {
                 new Message { Role = "system", Content = GetSystemMessage() }
             };
-
-            // Clear retrieved memories after use (one-shot)
-            SystemMessageProvider.RetrievedMemories = null;
 
             if (Settings?.OverflowMode == Setting.ContextOverflowMode.Overflow)
             {

@@ -15,7 +15,6 @@ namespace VPetLLM.Core.Providers.Chat
         private string _apiUrl;
         private string _model;
         private int _maxTokensLimit = 3000;
-        private bool _enableMemoryRetrieval = false;
 
         // 保留硬编码的User-Agent
         private const string ENCODED_UA = "566c426c6445784d54563947636d566c58304a3558304a5a54513d3d";
@@ -68,7 +67,6 @@ namespace VPetLLM.Core.Providers.Chat
                     // 读取云端下发的记忆检索开关
                     if (config["EnableMemoryRetrieval"] is not null && bool.TryParse(config["EnableMemoryRetrieval"]?.ToString(), out bool enableRetrieval))
                     {
-                        _enableMemoryRetrieval = enableRetrieval;
                         // 同步到 handler 的全局开关
                         Handlers.Actions.MemoryRetrievalHandler.IsEnabled = enableRetrieval;
                         Logger.Log($"FreeChatCore: 记忆检索工具模式={(enableRetrieval ? "启用" : "禁用")}");
@@ -347,8 +345,6 @@ namespace VPetLLM.Core.Providers.Chat
                 var tempUserMessage = CreateUserMessage(prompt);
 
                 // 系统注入（isRetry=true 来自 ResultAggregator 回灌）时跳过主动记忆检索
-                if (isRetry)
-                    _suppressMemoryRetrieval = true;
 
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
@@ -665,27 +661,7 @@ namespace VPetLLM.Core.Providers.Chat
 
         private async Task<List<Message>> GetCoreHistoryAsync(bool injectRecords = false, string? userQuery = null)
         {
-            CoreHistoryResult result;
-
-            // 当使用 Tool 模式时，跳过基类的主动记忆检索，让 AI 自行决定何时检索
-            if (_enableMemoryRetrieval)
-            {
-                var savedRetrieval = SystemMessageProvider.MemoryRetrieval;
-                SystemMessageProvider.MemoryRetrieval = null;
-                try
-                {
-                    result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
-                }
-                finally
-                {
-                    SystemMessageProvider.MemoryRetrieval = savedRetrieval;
-                }
-            }
-            else
-            {
-                result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
-            }
-
+            var result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
             return CaptureOverflowCheckData(result);
         }
 

@@ -369,8 +369,6 @@ namespace VPetLLM.Core.Providers.Chat
             // Handle conversation turn for record weight decrement
             OnConversationTurn();
 
-            // 系统注入时跳过主动记忆检索，避免 ResultAggregator 回灌 Plugin Result 时自匹配
-            _suppressMemoryRetrieval = isFunctionCall;
 
             if (!Settings.KeepContext)
             {

@@ -253,8 +253,6 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
-                // 系统注入时跳过主动记忆检索
-                _suppressMemoryRetrieval = isFunctionCall;
 
                 if (!Settings.KeepContext)
                 {
