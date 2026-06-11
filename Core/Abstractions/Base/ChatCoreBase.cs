@@ -17,6 +17,12 @@ namespace VPetLLM.Core.Abstractions.Base
         protected ActionProcessor? ActionProcessor { get; }
         protected SystemMessageProvider SystemMessageProvider { get; }
         protected ContextFilter ContextFilter { get; }
+
+        // 溢出检查缓存数据 — 在各 Provider API 成功时触发，而非 GetCoreHistoryCommonAsync 中火抛
+        protected List<Message>? _pendingOverflowHistory;
+        protected int _pendingOverflowSnapshotCount;
+        // 系统注入标记 — 由 Provider 在 ResultAggregator 回灌时设置，跳过主动记忆检索
+        protected bool _suppressMemoryRetrieval;
         protected Action<string> ResponseHandler;
         protected Action<string> StreamingChunkHandler;
         public abstract Task<string> Chat(string prompt);
@@ -192,6 +198,13 @@ namespace VPetLLM.Core.Abstractions.Base
                 var retrievalService = new MemoryRetrievalService(
                     settings, this, HistoryManager, OverflowManager, RecordManager);
                 SystemMessageProvider.MemoryRetrieval = retrievalService;
+
+                // Register MemoryRetrievalService with ActionProcessor for the retrieval tool handler
+                if (actionProcessor is not null)
+                {
+                    actionProcessor.SetMemoryRetrievalService(retrievalService);
+                }
+
                 Logger.Log($"MemoryRetrievalService initialized for {Name} (active={settings?.EnableExpertMemoryRetrieval == true})");
             }
             catch (Exception ex)
@@ -206,6 +219,37 @@ namespace VPetLLM.Core.Abstractions.Base
         protected class CoreHistoryResult
         {
             public List<Message> History { get; set; } = new();
+            /// <summary>
+            /// Snapshot of full history for later overflow check. Set only in Overflow mode.
+            /// Consumer (Provider) should call OverflowManager after successful API round.
+            /// </summary>
+            public List<Message>? OverflowCheckHistory { get; set; }
+            public int OverflowCheckSnapshotCount { get; set; }
+        }
+
+        /// <summary>
+        /// 从 CoreHistoryResult 中捕获溢出检查数据，供 API 成功后触发。
+        /// 各 Provider 在 GetCoreHistoryAsync 中调用此方法代替直接返回 result.History。
+        /// </summary>
+        protected List<Message> CaptureOverflowCheckData(CoreHistoryResult result)
+        {
+            _pendingOverflowHistory = result.OverflowCheckHistory;
+            _pendingOverflowSnapshotCount = result.OverflowCheckSnapshotCount;
+            return result.History;
+        }
+
+        /// <summary>
+        /// 在 API 调用成功且历史已保存后触发溢出检查。
+        /// 替代旧的火抛方式（在 GetCoreHistoryCommonAsync 中 fire-and-forget），
+        /// 确保只在 Chat 请求真正成功时才触发，避免失败重试时重复浪费。
+        /// </summary>
+        protected void TriggerOverflowCheckAfterSuccess()
+        {
+            if (OverflowManager is not null && _pendingOverflowHistory is not null)
+            {
+                OverflowManager.TriggerCheck(_pendingOverflowHistory, _pendingOverflowSnapshotCount);
+                _pendingOverflowHistory = null;
+            }
         }
 
         /// <summary>
@@ -219,8 +263,13 @@ namespace VPetLLM.Core.Abstractions.Base
         {
             var result = new CoreHistoryResult();
 
+            // 一次性标记，用完后立即复位
+            _suppressMemoryRetrieval = false;
+
             // Trigger memory retrieval for the user query if available
-            if (!string.IsNullOrWhiteSpace(userQuery)
+            // 系统注入（ResultAggregator 回灌）时跳过，避免自身引出的 Plugin Result 触发自检索
+            if (!_suppressMemoryRetrieval
+                && !string.IsNullOrWhiteSpace(userQuery)
                 && SystemMessageProvider?.MemoryRetrieval is not null
                 && Settings?.EnableExpertMemoryRetrieval == true)
             {
@@ -262,8 +311,9 @@ namespace VPetLLM.Core.Abstractions.Base
 
                 history.AddRange(fullHistory);
 
-                // Check and trigger overflow summary (fire-and-forget)
-                _ = OverflowManager?.CheckAndTriggerAsync(fullHistory);
+                // 记录快照用于后续溢出检查（由各 Provider 在 API 成功后显式触发）
+                result.OverflowCheckHistory = fullHistory;
+                result.OverflowCheckSnapshotCount = fullHistory.Count;
             }
             else
             {

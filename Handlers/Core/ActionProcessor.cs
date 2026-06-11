@@ -4,6 +4,7 @@ using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Handlers.Legacy;
 using VPetLLM.Handlers.Actions;
 using VPetLLM.Core.Data.Managers;
+using VPetLLM.Core.Services;
 
 namespace VPetLLM.Handlers.Core
 {
@@ -20,6 +21,7 @@ namespace VPetLLM.Handlers.Core
         private SkillManager _skillManager;
         private Setting _settings;
         private IMediaPlaybackService _mediaPlaybackService;
+        private MemoryRetrievalService _memoryRetrievalService;
 
         public ActionProcessor(IMainWindow mainWindow) : this(mainWindow, HandlerRegistry.Instance)
         {
@@ -57,6 +59,13 @@ namespace VPetLLM.Handlers.Core
         {
             _mediaPlaybackService = mediaPlaybackService;
             // Re-register handlers to include PlayHandler
+            RegisterHandlers();
+        }
+
+        public void SetMemoryRetrievalService(MemoryRetrievalService memoryRetrievalService)
+        {
+            _memoryRetrievalService = memoryRetrievalService;
+            // Re-register handlers to include MemoryRetrievalHandler
             RegisterHandlers();
         }
 
@@ -103,6 +112,12 @@ namespace VPetLLM.Handlers.Core
             if (_mediaPlaybackService is not null)
             {
                 _handlerRegistry.Register("play", new PlayHandler(_mediaPlaybackService));
+            }
+
+            // Add MemoryRetrievalHandler if MemoryRetrievalService is available
+            if (_memoryRetrievalService is not null)
+            {
+                _handlerRegistry.Register("retrieve_memories", new MemoryRetrievalHandler(_memoryRetrievalService));
             }
         }
 

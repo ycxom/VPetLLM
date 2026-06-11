@@ -218,6 +218,7 @@ namespace VPetLLM.Core.Providers.Chat
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
                     // 保存历史记录
                     SaveHistory();
+                    TriggerOverflowCheckAfterSuccess();
                 }
                 return "";
             }
@@ -252,6 +253,8 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
+                // 系统注入时跳过主动记忆检索
+                _suppressMemoryRetrieval = isFunctionCall;
 
                 if (!Settings.KeepContext)
                 {
@@ -371,6 +374,7 @@ namespace VPetLLM.Core.Providers.Chat
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
                     // 保存历史记录
                     SaveHistory();
+                    TriggerOverflowCheckAfterSuccess();
                 }
                 return "";
             }
@@ -450,7 +454,7 @@ namespace VPetLLM.Core.Providers.Chat
         private async Task<List<Message>> GetCoreHistoryAsync(bool injectRecords = false, string? userQuery = null)
         {
             var result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
-            return result.History;
+            return CaptureOverflowCheckData(result);
         }
         /// <summary>
         /// 手动刷新可用模型列表

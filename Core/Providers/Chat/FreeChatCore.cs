@@ -14,9 +14,13 @@ namespace VPetLLM.Core.Providers.Chat
         private string _apiKey;
         private string _apiUrl;
         private string _model;
+        private int _maxTokensLimit = 3000;
+        private bool _enableMemoryRetrieval = false;
 
         // 保留硬编码的User-Agent
         private const string ENCODED_UA = "566c426c6445784d54563947636d566c58304a3558304a5a54513d3d";
+
+
 
         public FreeChatCore(Setting.FreeSetting freeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
@@ -56,6 +60,23 @@ namespace VPetLLM.Core.Providers.Chat
                     _apiKey = DecodeString(config["API_KEY"]?.ToString() ?? "");
                     _apiUrl = DecodeString(config["API_URL"]?.ToString() ?? "");
                     _model = config["Model"]?.ToString() ?? "";
+                    // 读取云端下发的 MaxTokensLimit，未设置则默认 10000
+                    if (config["MaxTokensLimit"] is not null && int.TryParse(config["MaxTokensLimit"]?.ToString(), out int cloudLimit) && cloudLimit > 0)
+                    {
+                        _maxTokensLimit = cloudLimit;
+                    }
+                    // 读取云端下发的记忆检索开关
+                    if (config["EnableMemoryRetrieval"] is not null && bool.TryParse(config["EnableMemoryRetrieval"]?.ToString(), out bool enableRetrieval))
+                    {
+                        _enableMemoryRetrieval = enableRetrieval;
+                        // 同步到 handler 的全局开关
+                        Handlers.Actions.MemoryRetrievalHandler.IsEnabled = enableRetrieval;
+                        Logger.Log($"FreeChatCore: 记忆检索工具模式={(enableRetrieval ? "启用" : "禁用")}");
+                    }
+                    else
+                    {
+                        Handlers.Actions.MemoryRetrievalHandler.IsEnabled = false;
+                    }
                     Logger.Log("FreeChatCore: 配置加载成功");
                 }
                 else
@@ -111,13 +132,12 @@ namespace VPetLLM.Core.Providers.Chat
                     return "";
                 }
 
-                // 检查 MaxTokens 限制，超过 10000 自动启用上下文压缩模式
-                const int MAX_TOKENS_LIMIT = 10000;
-                if (_freeSetting.MaxTokens > MAX_TOKENS_LIMIT)
+                // 检查 MaxTokens 限制，超过云端限制则自动启用上下文压缩模式
+                if (_freeSetting.MaxTokens > _maxTokensLimit)
                 {
                     if (!Settings.EnableHistoryCompression)
                     {
-                        Logger.Log($"Free Chat: MaxTokens ({_freeSetting.MaxTokens}) 超过限制 ({MAX_TOKENS_LIMIT})，自动启用上下文压缩模式");
+                        Logger.Log($"Free Chat: MaxTokens ({_freeSetting.MaxTokens}) 超过限制 ({_maxTokensLimit})，自动启用上下文压缩模式");
                         Settings.EnableHistoryCompression = true;
                     }
                 }
@@ -154,7 +174,7 @@ namespace VPetLLM.Core.Providers.Chat
                     model = _model,
                     messages = requestMessages,
                     temperature = _freeSetting.Temperature,
-                    max_tokens = _freeSetting.MaxTokens,
+                    max_tokens = Math.Min(_freeSetting.MaxTokens, _maxTokensLimit),
                     stream = _freeSetting.EnableStreaming
                 };
 
@@ -259,6 +279,7 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
                     SaveHistory();
+                    TriggerOverflowCheckAfterSuccess();
                 }
 
                 return "";
@@ -306,13 +327,12 @@ namespace VPetLLM.Core.Providers.Chat
                     return "";
                 }
 
-                // 检查 MaxTokens 限制，超过 10000 自动启用上下文压缩模式
-                const int MAX_TOKENS_LIMIT = 10000;
-                if (_freeSetting.MaxTokens > MAX_TOKENS_LIMIT)
+                // 检查 MaxTokens 限制，超过云端限制则自动启用上下文压缩模式
+                if (_freeSetting.MaxTokens > _maxTokensLimit)
                 {
                     if (!Settings.EnableHistoryCompression)
                     {
-                        Logger.Log($"Free Chat: MaxTokens ({_freeSetting.MaxTokens}) 超过限制 ({MAX_TOKENS_LIMIT})，自动启用上下文压缩模式");
+                        Logger.Log($"Free Chat: MaxTokens ({_freeSetting.MaxTokens}) 超过限制 ({_maxTokensLimit})，自动启用上下文压缩模式");
                         Settings.EnableHistoryCompression = true;
                     }
                 }
@@ -326,7 +346,10 @@ namespace VPetLLM.Core.Providers.Chat
                 // 使用 CreateUserMessage 自动设置时间戳和状态信息
                 var tempUserMessage = CreateUserMessage(prompt);
 
-                // 构建请求数据，使用和OpenAI相同的逻辑
+                // 系统注入（isRetry=true 来自 ResultAggregator 回灌）时跳过主动记忆检索
+                if (isRetry)
+                    _suppressMemoryRetrieval = true;
+
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
                 if (tempUserMessage is not null)
@@ -340,7 +363,7 @@ namespace VPetLLM.Core.Providers.Chat
                     model = _model,
                     messages = ShapeMessages(history),
                     temperature = _freeSetting.Temperature,
-                    max_tokens = _freeSetting.MaxTokens,
+                    max_tokens = Math.Min(_freeSetting.MaxTokens, _maxTokensLimit),
                     stream = _freeSetting.EnableStreaming
                 };
 
@@ -417,6 +440,8 @@ namespace VPetLLM.Core.Providers.Chat
                             }
                             await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
                             SaveHistory();
+
+                            TriggerOverflowCheckAfterSuccess();
                         }
                     }
                     else
@@ -483,6 +508,8 @@ namespace VPetLLM.Core.Providers.Chat
                             }
                             await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
                             SaveHistory();
+
+                            TriggerOverflowCheckAfterSuccess();
                         }
                     }
                     else
@@ -586,7 +613,7 @@ namespace VPetLLM.Core.Providers.Chat
                     model = _model,
                     messages = messages,
                     temperature = _freeSetting.Temperature,
-                    max_tokens = _freeSetting.MaxTokens
+                    max_tokens = Math.Min(_freeSetting.MaxTokens, _maxTokensLimit)
                 };
 
                 var json = JsonConvert.SerializeObject(requestBody);
@@ -638,8 +665,28 @@ namespace VPetLLM.Core.Providers.Chat
 
         private async Task<List<Message>> GetCoreHistoryAsync(bool injectRecords = false, string? userQuery = null)
         {
-            var result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
-            return result.History;
+            CoreHistoryResult result;
+
+            // 当使用 Tool 模式时，跳过基类的主动记忆检索，让 AI 自行决定何时检索
+            if (_enableMemoryRetrieval)
+            {
+                var savedRetrieval = SystemMessageProvider.MemoryRetrieval;
+                SystemMessageProvider.MemoryRetrieval = null;
+                try
+                {
+                    result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
+                }
+                finally
+                {
+                    SystemMessageProvider.MemoryRetrieval = savedRetrieval;
+                }
+            }
+            else
+            {
+                result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
+            }
+
+            return CaptureOverflowCheckData(result);
         }
 
         /// <summary>

@@ -34,6 +34,7 @@ namespace VPetLLM.Core.Data.Database
                         segment_start_index INTEGER NOT NULL,
                         segment_end_index INTEGER NOT NULL,
                         token_count INTEGER NOT NULL DEFAULT 0,
+                        threshold INTEGER NOT NULL DEFAULT 0,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     );
 
@@ -59,6 +60,18 @@ namespace VPetLLM.Core.Data.Database
                 ";
                 cmd.ExecuteNonQuery();
 
+                // 兼容旧表：尝试添加 threshold 列（已存在则忽略）
+                try
+                {
+                    var alterCmd = connection.CreateCommand();
+                    alterCmd.CommandText = "ALTER TABLE overflow_summaries ADD COLUMN threshold INTEGER NOT NULL DEFAULT 0";
+                    alterCmd.ExecuteNonQuery();
+                }
+                catch (SqliteException)
+                {
+                    // 列已存在，忽略
+                }
+
                 Logger.Log("Overflow database tables initialized successfully");
             }
             catch (Exception ex)
@@ -70,7 +83,7 @@ namespace VPetLLM.Core.Data.Database
         /// <summary>
         /// Create an overflow summary record.
         /// </summary>
-        public int CreateSummary(string summaryText, int segmentStartIndex, int segmentEndIndex, int tokenCount)
+        public int CreateSummary(string summaryText, int segmentStartIndex, int segmentEndIndex, int tokenCount, int threshold = 0)
         {
             try
             {
@@ -79,14 +92,15 @@ namespace VPetLLM.Core.Data.Database
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    INSERT INTO overflow_summaries (summary_text, segment_start_index, segment_end_index, token_count, created_at)
-                    VALUES (@text, @start, @end, @tokens, @time);
+                    INSERT INTO overflow_summaries (summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at)
+                    VALUES (@text, @start, @end, @tokens, @threshold, @time);
                     SELECT last_insert_rowid();
                 ";
                 cmd.Parameters.AddWithValue("@text", summaryText);
                 cmd.Parameters.AddWithValue("@start", segmentStartIndex);
                 cmd.Parameters.AddWithValue("@end", segmentEndIndex);
                 cmd.Parameters.AddWithValue("@tokens", tokenCount);
+                cmd.Parameters.AddWithValue("@threshold", threshold);
                 cmd.Parameters.AddWithValue("@time", DateTime.UtcNow);
 
                 var id = Convert.ToInt32(cmd.ExecuteScalar());
@@ -158,7 +172,7 @@ namespace VPetLLM.Core.Data.Database
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    SELECT id, summary_text, segment_start_index, segment_end_index, token_count, created_at
+                    SELECT id, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at
                     FROM overflow_summaries
                     WHERE summary_text LIKE @kw
                     ORDER BY created_at DESC
@@ -177,7 +191,8 @@ namespace VPetLLM.Core.Data.Database
                         SegmentStartIndex = reader.GetInt32(2),
                         SegmentEndIndex = reader.GetInt32(3),
                         TokenCount = reader.GetInt32(4),
-                        CreatedAt = reader.GetDateTime(5)
+                        Threshold = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                        CreatedAt = reader.GetDateTime(6)
                     });
                 }
             }
@@ -281,6 +296,92 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
+        /// Get the maximum segment_end_index across all summaries (for restoring _lastSummarizedIndex).
+        /// </summary>
+        public int GetMaxSegmentEndIndex()
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT COALESCE(MAX(segment_end_index), 0) FROM overflow_summaries";
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to get max segment end index: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Get the threshold from the most recent summary (for restoring _lastSummarizedThreshold).
+        /// </summary>
+        public int GetMaxSegmentThreshold()
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT COALESCE(threshold, 0) FROM overflow_summaries ORDER BY created_at DESC LIMIT 1";
+                var result = cmd.ExecuteScalar();
+                return result is not null ? Convert.ToInt32(result) : 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to get max segment threshold: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Store just the threshold marker (for tracking config changes without creating a summary).
+        /// </summary>
+        public void StoreThresholdMarker(int threshold)
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT INTO overflow_summaries (summary_text, segment_start_index, segment_end_index, token_count, threshold) VALUES (@text, 0, 0, 0, @th)";
+                cmd.Parameters.AddWithValue("@text", $"[threshold marker: {threshold}]");
+                cmd.Parameters.AddWithValue("@th", threshold);
+                cmd.ExecuteNonQuery();
+                Logger.Log($"Stored threshold marker: {threshold}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to store threshold marker: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get all summary texts ordered by creation (for restoring _summaryChunks).
+        /// </summary>
+        public List<string> GetAllSummaryTexts()
+        {
+            var results = new List<string>();
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT summary_text FROM overflow_summaries ORDER BY created_at ASC";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    results.Add(reader.GetString(0));
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to get all summary texts: {ex.Message}");
+            }
+            return results;
+        }
+
+        /// <summary>
         /// Clear all overflow data.
         /// </summary>
         public void ClearAll()
@@ -329,6 +430,7 @@ namespace VPetLLM.Core.Data.Database
         public int SegmentStartIndex { get; set; }
         public int SegmentEndIndex { get; set; }
         public int TokenCount { get; set; }
+        public int Threshold { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

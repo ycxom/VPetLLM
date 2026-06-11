@@ -61,7 +61,7 @@ namespace VPetLLM.Core.Providers.Chat
         private async Task<List<Message>> GetCoreHistoryAsync(bool injectRecords = false, string? userQuery = null)
         {
             var result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
-            return result.History;
+            return CaptureOverflowCheckData(result);
         }
 
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
@@ -69,6 +69,8 @@ namespace VPetLLM.Core.Providers.Chat
             try
             {
                 OnConversationTurn();
+                // 系统注入时跳过主动记忆检索
+                _suppressMemoryRetrieval = isFunctionCall;
 
                 if (!Settings.KeepContext)
                 {
@@ -196,6 +198,7 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
                     SaveHistory();
+                    TriggerOverflowCheckAfterSuccess();
                 }
 
                 return "";
@@ -376,6 +379,7 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
                     SaveHistory();
+                    TriggerOverflowCheckAfterSuccess();
                 }
 
                 return "";

@@ -205,6 +205,136 @@ namespace VPetLLM.Core.Services
         }
 
         /// <summary>
+        /// Performs local search only (no LLM summarization).
+        /// Extracts keywords, searches records/overflow summaries/history,
+        /// deduplicates, trims to token budget, and returns formatted results.
+        /// Used by the memory retrieval tool handler (AI decides when to call).
+        /// </summary>
+        public async Task<string> SearchLocalOnlyAsync(string userQuery, int tokenBudget = 500)
+        {
+            if (string.IsNullOrWhiteSpace(userQuery))
+                return string.Empty;
+
+            try
+            {
+                var keywords = ExtractKeywords(userQuery);
+                if (keywords.Count == 0)
+                    return string.Empty;
+
+                var allResults = new List<MemoryHit>();
+
+                // 1. Search important records
+                if (_recordManager is not null && _settings.Records?.EnableRecords == true)
+                {
+                    var records = _recordManager.GetAllRecordsForEditing();
+                    foreach (var record in records)
+                    {
+                        foreach (var kw in keywords)
+                        {
+                            if (record.Content.Contains(kw, StringComparison.OrdinalIgnoreCase))
+                            {
+                                allResults.Add(new MemoryHit
+                                {
+                                    Source = "Record",
+                                    Content = $"[记忆 #{record.Id}] {record.Content}",
+                                    Relevance = 8,
+                                    Keyword = kw
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // 2. Search overflow summaries
+                if (_overflowManager is not null)
+                {
+                    foreach (var kw in keywords)
+                    {
+                        var summaries = _overflowManager.SearchSummaries(kw, limit: 5);
+                        foreach (var summary in summaries)
+                        {
+                            allResults.Add(new MemoryHit
+                            {
+                                Source = "OverflowSummary",
+                                Content = $"[历史摘要 #{summary.Id}] {summary.SummaryText}",
+                                Relevance = 6,
+                                Keyword = kw,
+                                SummaryId = summary.Id
+                            });
+                        }
+                    }
+                }
+
+                // 3. Search recent chat history
+                var fullHistory = _historyManager.GetHistory();
+                foreach (var msg in fullHistory)
+                {
+                    foreach (var kw in keywords)
+                    {
+                        if (!string.IsNullOrEmpty(msg.Content) &&
+                            msg.Content.Contains(kw, StringComparison.OrdinalIgnoreCase))
+                        {
+                            allResults.Add(new MemoryHit
+                            {
+                                Source = "RecentChat",
+                                Content = $"[{msg.Role}]: {msg.Content}",
+                                Relevance = 5,
+                                Keyword = kw
+                            });
+                            break;
+                        }
+                    }
+                }
+
+                if (allResults.Count == 0)
+                    return string.Empty;
+
+                // Deduplicate by content
+                var seenContent = new HashSet<string>();
+                var uniqueResults = new List<MemoryHit>();
+                foreach (var hit in allResults.OrderByDescending(h => h.Relevance))
+                {
+                    if (seenContent.Add(hit.Content.Trim()))
+                    {
+                        uniqueResults.Add(hit);
+                    }
+                }
+
+                // Trim to token budget
+                var sb = new StringBuilder();
+                var currentTokens = 0;
+                foreach (var hit in uniqueResults)
+                {
+                    var hitTokens = TokenCounter.EstimateTokenCount(hit.Content);
+                    if (currentTokens + hitTokens > tokenBudget)
+                        break;
+
+                    sb.AppendLine(hit.Content);
+                    currentTokens += hitTokens;
+                }
+
+                var rawResults = sb.ToString().Trim();
+                if (string.IsNullOrEmpty(rawResults))
+                    return string.Empty;
+
+                // Wrap with injection template (no LLM summarization)
+                var injectionTemplate = PromptHelper.Get("Memory_Retrieval_Injection", _settings.PromptLanguage);
+                if (!injectionTemplate.StartsWith("[Prompt Missing"))
+                {
+                    return injectionTemplate.Replace("{Memories}", rawResults);
+                }
+
+                return $"[检索到的记忆]\n{rawResults}\n[/检索到的记忆]";
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MemoryRetrievalService: Local search error: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
         /// Extract search keywords from a user query.
         /// Splits on common delimiters, removes stop words, and returns distinct meaningful terms.
         /// </summary>
