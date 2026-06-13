@@ -33,7 +33,6 @@ namespace VPetLLM.Handlers.Infrastructure
                     Logger.Log($"Handler for action '{actionName}' is being replaced");
                 }
                 _handlers[actionName] = handler;
-                Logger.Log($"Handler registered for action: {actionName}");
             }
         }
 
@@ -125,7 +124,6 @@ namespace VPetLLM.Handlers.Infrastructure
             lock (_lock)
             {
                 _handlers.Clear();
-                Logger.Log("All handlers cleared from registry");
             }
         }
     }

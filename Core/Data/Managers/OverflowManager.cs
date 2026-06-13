@@ -69,7 +69,6 @@ namespace VPetLLM.Core.Data.Managers
             _ = CheckAndTriggerAsync(fullHistory, snapshotCount);
         }
 
-        private int _lastRangeHash;
         private volatile int _isTriggering;  // 0 = idle, 1 = running — 防止并发触发多个 Summarize
         private int _lastSummarizedThreshold; // 上次总结时的阈值，用于检测阈值变更
 
@@ -318,7 +317,6 @@ namespace VPetLLM.Core.Data.Managers
             _summaryChunks.Clear();
             AccumulatedOverflowMessageCount = 0;
             AccumulatedOverflowTokens = 0;
-            _lastRangeHash = 0;
             _database.ClearAll();
         }
 

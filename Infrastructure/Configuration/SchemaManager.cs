@@ -598,7 +598,6 @@ public class SchemaManager
 
                     if (configFile == null)
                     {
-                        Logger.Log($"No configuration file found for plugin: {pluginName}");
                         continue;
                     }
 
