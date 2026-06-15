@@ -479,6 +479,28 @@ namespace VPetLLM.Services
             }
         }
 
+        /// <summary>
+        /// 从 API URL 构造 /models 端点（兼容 /chat/completions 和 /responses 两种格式）
+        /// </summary>
+        private static string BuildModelsUrl(string apiUrl)
+        {
+            var trimmed = apiUrl.TrimEnd('/');
+            // 如果 URL 包含具体端点路径，替换为 /models
+            if (trimmed.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+                return trimmed.Replace("/chat/completions", "/models");
+            if (trimmed.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
+                return trimmed.Replace("/responses", "/models");
+            return $"{trimmed}/models";
+        }
+
+        /// <summary>
+        /// 判断 URL 是否指向 Responses API
+        /// </summary>
+        private static bool IsResponsesApiUrl(string url)
+        {
+            return url.IndexOf("/responses", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private async Task<ChannelDiagnosticResult> CheckOpenAIChannelAsync(Setting.OpenAINodeSetting node)
         {
             var result = new ChannelDiagnosticResult
@@ -494,12 +516,14 @@ namespace VPetLLM.Services
                 ProxyTried = true
             };
 
+            var modelsUrl = BuildModelsUrl(result.ApiUrl);
+
             var (directOk, directMsg, proxyOk, proxyMsg) = await TryBothModesAsync("OpenAI", async (handler) =>
             {
                 using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
                 client.DefaultRequestHeaders.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", node.ApiKey);
-                var response = await client.GetAsync($"{result.ApiUrl.TrimEnd('/')}/models");
+                var response = await client.GetAsync(modelsUrl);
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();
@@ -891,7 +915,57 @@ namespace VPetLLM.Services
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", node.ApiKey);
 
             var model = !string.IsNullOrEmpty(channelResult.Model) ? channelResult.Model : "gpt-3.5-turbo";
-            var requestBody = new
+            var baseUrl = channelResult.ApiUrl.TrimEnd('/');
+
+            // 根据 URL 判断 API 格式偏好，依次尝试两种格式
+            var prefersResponses = IsResponsesApiUrl(channelResult.ApiUrl);
+            var formats = prefersResponses
+                ? new[] { (endpoint: $"{baseUrl}", body: BuildResponsesRequestBody(model, prompt), name: "Responses") }
+                : new[] { (endpoint: $"{baseUrl}/chat/completions", body: BuildChatCompletionsRequestBody(model, prompt), name: "Chat Completions") };
+
+            // 如果首选格式失败，补充另一种格式作为 fallback
+            if (prefersResponses)
+                formats = formats.Append((endpoint: $"{baseUrl}/chat/completions", body: BuildChatCompletionsRequestBody(model, prompt), name: "Chat Completions")).ToArray();
+            else
+                formats = formats.Append((endpoint: $"{baseUrl}/responses", body: BuildResponsesRequestBody(model, prompt), name: "Responses")).ToArray();
+
+            foreach (var (endpoint, body, name) in formats)
+            {
+                try
+                {
+                    var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+                    var response = await client.PostAsync(endpoint, content);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        // 如果成功的是非首选格式，记录到诊断报告中提示用户
+                        if (name != (prefersResponses ? "Responses" : "Chat Completions"))
+                        {
+                            Logger.Log($"Diagnostic: OpenAI LLM test succeeded with fallback format '{name}' (URL prefers {(prefersResponses ? "Responses" : "Chat Completions")})");
+                            channelResult.ApiMessage += string.Format(GetLocalizedText("Diagnostic.OpenAIFallbackFormat"), name);
+                        }
+
+                        channelResult.LlmResponded = true;
+                        channelResult.LlmMessage = GetLocalizedText("Diagnostic.LLMResponseOk");
+                        return true;
+                    }
+
+                    Logger.Log($"Diagnostic: OpenAI LLM test with '{name}' failed: HTTP {(int)response.StatusCode}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Diagnostic: OpenAI LLM test with '{name}' exception: {ex.Message}");
+                }
+            }
+
+            channelResult.LlmResponded = false;
+            channelResult.LlmMessage = GetLocalizedText("Diagnostic.LLMResponseFail");
+            return false;
+        }
+
+        private static object BuildChatCompletionsRequestBody(string model, string prompt)
+        {
+            return new
             {
                 model,
                 messages = new[]
@@ -901,19 +975,17 @@ namespace VPetLLM.Services
                 max_tokens = 10,
                 temperature = 0
             };
-            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+        }
 
-            var response = await client.PostAsync($"{channelResult.ApiUrl.TrimEnd('/')}/chat/completions", content);
-            if (response.IsSuccessStatusCode)
+        private static object BuildResponsesRequestBody(string model, string prompt)
+        {
+            return new
             {
-                channelResult.LlmResponded = true;
-                channelResult.LlmMessage = GetLocalizedText("Diagnostic.LLMResponseOk");
-                return true;
-            }
-
-            channelResult.LlmResponded = false;
-            channelResult.LlmMessage = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
-            return false;
+                model,
+                input = prompt,
+                max_output_tokens = 10,
+                temperature = 0
+            };
         }
 
         private async Task<bool> CheckGeminiLLMAsync(ChannelDiagnosticResult channelResult, string prompt)
@@ -940,20 +1012,37 @@ namespace VPetLLM.Services
 
             if (node.UseOpenAIAuth && !string.IsNullOrEmpty(channelResult.ApiUrl))
             {
-                url = $"{channelResult.ApiUrl.TrimEnd('/')}/chat/completions";
+                var trimmedUrl = channelResult.ApiUrl.TrimEnd('/');
+                // 根据 URL 自动选择 API 格式
+                if (IsResponsesApiUrl(channelResult.ApiUrl))
+                {
+                    url = trimmedUrl;
+                    var rb = new
+                    {
+                        model,
+                        input = prompt,
+                        max_output_tokens = 10,
+                        temperature = 0
+                    };
+                    requestContent = new StringContent(JsonSerializer.Serialize(rb), Encoding.UTF8, "application/json");
+                }
+                else
+                {
+                    url = $"{trimmedUrl}/chat/completions";
+                    var rb = new
+                    {
+                        model,
+                        messages = new[]
+                        {
+                            new { role = "user", content = prompt }
+                        },
+                        max_tokens = 10,
+                        temperature = 0
+                    };
+                    requestContent = new StringContent(JsonSerializer.Serialize(rb), Encoding.UTF8, "application/json");
+                }
                 client.DefaultRequestHeaders.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", node.ApiKey);
-                var requestBody = new
-                {
-                    model,
-                    messages = new[]
-                    {
-                        new { role = "user", content = prompt }
-                    },
-                    max_tokens = 10,
-                    temperature = 0
-                };
-                requestContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
             }
             else
             {
@@ -1635,6 +1724,8 @@ namespace VPetLLM.Services
                 "Diagnostic.NoModelsFound" => _language.StartsWith("zh") ? "未获取到模型列表" : "No models found",
                 "Diagnostic.NoGeminiModels" => _language.StartsWith("zh") ? "未找到 Gemini 模型" : "No Gemini models found",
                 "Diagnostic.LLMResponseOk" => _language.StartsWith("zh") ? "LLM 响应正常" : "LLM response OK",
+                "Diagnostic.LLMResponseFail" => _language.StartsWith("zh") ? "LLM 测试失败（Chat Completions 和 Responses API 均不可用）" : "LLM test failed (both Chat Completions and Responses API unavailable)",
+                "Diagnostic.OpenAIFallbackFormat" => _language.StartsWith("zh") ? "（注意：URL 配置的格式不可用，通过 {0} 格式成功连接，建议检查 URL 配置）" : " (Note: configured URL format unavailable, succeeded via {0} format, consider checking URL config)",
                 "Diagnostic.ReportTitle" => _language.StartsWith("zh") ? "VPetLLM 诊断报告" : "VPetLLM Diagnostic Report",
                 "Diagnostic.SectionNetwork" => _language.StartsWith("zh") ? "网络连接" : "Network",
                 "Diagnostic.SectionProxy" => _language.StartsWith("zh") ? "代理设置" : "Proxy",

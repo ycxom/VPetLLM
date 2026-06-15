@@ -112,6 +112,44 @@ namespace VPetLLM.Core.Providers.Chat
             _currentNodeContext = null;
         }
 
+        /// <summary>
+        /// 检测是否使用 Responses API（新 API）格式
+        /// 根据 URL 是否包含 /responses 自动判断
+        /// </summary>
+        private static bool IsResponsesApi(string url)
+        {
+            return url.IndexOf("/responses", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>
+        /// 从 Responses API 的响应中提取文本内容
+        /// Responses API 返回 output[] 数组，需遍历 type:"message" 项的 content[].text
+        /// </summary>
+        private static string ExtractTextFromResponsesOutput(JObject responseObject)
+        {
+            var output = responseObject["output"] as JArray;
+            if (output == null) return "";
+
+            foreach (var item in output)
+            {
+                if (item["type"]?.ToString() == "message")
+                {
+                    var content = item["content"] as JArray;
+                    if (content != null)
+                    {
+                        foreach (var part in content)
+                        {
+                            if (part["type"]?.ToString() == "output_text")
+                            {
+                                return part["text"]?.ToString() ?? "";
+                            }
+                        }
+                    }
+                }
+            }
+            return "";
+        }
+
         protected override Setting.ChannelProxyMode GetChannelProxyMode()
         {
             var node = GetCurrentNode();
@@ -154,7 +192,12 @@ namespace VPetLLM.Core.Providers.Chat
             var currentApiKey = GetCurrentApiKey(currentNode);
 
             string apiUrl = currentNode.Url;
-            if (!apiUrl.Contains("/chat/completions"))
+            // 如果 URL 已包含具体端点路径（/chat/completions 或 /responses），直接使用
+            if (apiUrl.Contains("/chat/completions") || apiUrl.Contains("/responses"))
+            {
+                // 已是完整端点 URL，无需拼接
+            }
+            else
             {
                 var baseUrl = apiUrl.TrimEnd('/');
                 if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
@@ -235,26 +278,54 @@ namespace VPetLLM.Core.Providers.Chat
             requestMessages.Add(new { role = "user", content = userContent });
 
             object data;
+            bool useResponses = IsResponsesApi(apiUrl);
             if (_openAISetting.EnableAdvanced)
             {
-                data = new
+                if (useResponses)
                 {
-                    model = currentNode.Model,
-                    messages = requestMessages,
-                    temperature = _openAISetting.Temperature,
-                    max_tokens = _openAISetting.MaxTokens,
-                    stream = currentNode.EnableStreaming
-                };
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        input = requestMessages,
+                        temperature = _openAISetting.Temperature,
+                        max_output_tokens = _openAISetting.MaxTokens,
+                        stream = currentNode.EnableStreaming
+                    };
+                }
+                else
+                {
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        messages = requestMessages,
+                        temperature = _openAISetting.Temperature,
+                        max_tokens = _openAISetting.MaxTokens,
+                        stream = currentNode.EnableStreaming
+                    };
+                }
             }
             else
             {
-                data = new
+                if (useResponses)
                 {
-                    model = currentNode.Model,
-                    messages = requestMessages,
-                    max_tokens = 4096,
-                    stream = currentNode.EnableStreaming
-                };
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        input = requestMessages,
+                        max_output_tokens = 4096,
+                        stream = currentNode.EnableStreaming
+                    };
+                }
+                else
+                {
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        messages = requestMessages,
+                        max_tokens = 4096,
+                        stream = currentNode.EnableStreaming
+                    };
+                }
             }
 
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -306,7 +377,20 @@ namespace VPetLLM.Core.Providers.Chat
                                 try
                                 {
                                     var chunk = JObject.Parse(jsonData);
-                                    var delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    string? delta = null;
+                                    if (useResponses)
+                                    {
+                                        // Responses API: event type "response.output_text.delta", delta in "delta" field
+                                        if (chunk["type"]?.ToString() == "response.output_text.delta")
+                                        {
+                                            delta = chunk["delta"]?.ToString();
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Chat Completions API: delta in choices[0].delta.content
+                                        delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    }
                                     if (!string.IsNullOrEmpty(delta))
                                     {
                                         fullMessage.Append(delta);
@@ -333,7 +417,14 @@ namespace VPetLLM.Core.Providers.Chat
 
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
-                        message = responseObject["choices"][0]["message"]["content"].ToString();
+                        if (useResponses)
+                        {
+                            message = ExtractTextFromResponsesOutput(responseObject);
+                        }
+                        else
+                        {
+                            message = responseObject["choices"][0]["message"]["content"].ToString();
+                        }
                         ResponseHandler?.Invoke(message);
                     }
                 }
@@ -415,25 +506,52 @@ namespace VPetLLM.Core.Providers.Chat
             history = InjectRecordsIntoHistory(history);
 
             object data;
+            bool useResponses = IsResponsesApi(apiUrl);
             if (_openAISetting.EnableAdvanced)
             {
-                data = new
+                if (useResponses)
                 {
-                    model = currentNode.Model,
-                    messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
-                    temperature = _openAISetting.Temperature,
-                    max_tokens = _openAISetting.MaxTokens,
-                    stream = currentNode.EnableStreaming
-                };
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        input = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
+                        temperature = _openAISetting.Temperature,
+                        max_output_tokens = _openAISetting.MaxTokens,
+                        stream = currentNode.EnableStreaming
+                    };
+                }
+                else
+                {
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
+                        temperature = _openAISetting.Temperature,
+                        max_tokens = _openAISetting.MaxTokens,
+                        stream = currentNode.EnableStreaming
+                    };
+                }
             }
             else
             {
-                data = new
+                if (useResponses)
                 {
-                    model = currentNode.Model,
-                    messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
-                    stream = currentNode.EnableStreaming
-                };
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        input = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
+                        stream = currentNode.EnableStreaming
+                    };
+                }
+                else
+                {
+                    data = new
+                    {
+                        model = currentNode.Model,
+                        messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
+                        stream = currentNode.EnableStreaming
+                    };
+                }
             }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
@@ -492,7 +610,20 @@ namespace VPetLLM.Core.Providers.Chat
                                 try
                                 {
                                     var chunk = JObject.Parse(jsonData);
-                                    var delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    string? delta = null;
+                                    if (useResponses)
+                                    {
+                                        // Responses API: event type "response.output_text.delta"
+                                        if (chunk["type"]?.ToString() == "response.output_text.delta")
+                                        {
+                                            delta = chunk["delta"]?.ToString();
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Chat Completions API: delta in choices[0].delta.content
+                                        delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
+                                    }
                                     if (!string.IsNullOrEmpty(delta))
                                     {
                                         fullMessage.Append(delta);
@@ -531,8 +662,16 @@ namespace VPetLLM.Core.Providers.Chat
 
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
-                        message = responseObject["choices"][0]["message"]["content"].ToString();
-                        var tokenUsage = responseObject["usage"]["total_tokens"].ToString();
+                        if (useResponses)
+                        {
+                            message = ExtractTextFromResponsesOutput(responseObject);
+                            var tokenUsage = responseObject["usage"]?["total_tokens"]?.ToString() ?? "0";
+                        }
+                        else
+                        {
+                            message = responseObject["choices"][0]["message"]["content"].ToString();
+                            var tokenUsage = responseObject["usage"]["total_tokens"].ToString();
+                        }
                         // 非流式模式下，一次性处理完整消息
                         ResponseHandler?.Invoke(message);
                     }
@@ -592,23 +731,48 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 object data;
+                bool useResponses = IsResponsesApi(apiUrl);
                 if (_openAISetting.EnableAdvanced)
                 {
-                    data = new
+                    if (useResponses)
                     {
-                        model = currentNode.Model,
-                        messages = messages,
-                        temperature = _openAISetting.Temperature,
-                        max_tokens = _openAISetting.MaxTokens
-                    };
+                        data = new
+                        {
+                            model = currentNode.Model,
+                            input = messages,
+                            temperature = _openAISetting.Temperature,
+                            max_output_tokens = _openAISetting.MaxTokens
+                        };
+                    }
+                    else
+                    {
+                        data = new
+                        {
+                            model = currentNode.Model,
+                            messages = messages,
+                            temperature = _openAISetting.Temperature,
+                            max_tokens = _openAISetting.MaxTokens
+                        };
+                    }
                 }
                 else
                 {
-                    data = new
+                    if (useResponses)
                     {
-                        model = currentNode.Model,
-                        messages = messages
-                    };
+                        data = new
+                        {
+                            model = currentNode.Model,
+                            input = messages
+                        };
+                    }
+                    else
+                    {
+                        data = new
+                        {
+                            model = currentNode.Model,
+                            messages = messages
+                        };
+                    }
                 }
 
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -630,7 +794,14 @@ namespace VPetLLM.Core.Providers.Chat
 
                     var responseString = await response.Content.ReadAsStringAsync();
                     var responseObject = JObject.Parse(responseString);
-                    return responseObject["choices"][0]["message"]["content"].ToString();
+                    if (useResponses)
+                    {
+                        return ExtractTextFromResponsesOutput(responseObject);
+                    }
+                    else
+                    {
+                        return responseObject["choices"][0]["message"]["content"].ToString();
+                    }
                 }
             }
             catch (Exception ex)
@@ -673,6 +844,10 @@ namespace VPetLLM.Core.Providers.Chat
                 if (modelsUrl.Contains("/chat/completions"))
                 {
                     modelsUrl = modelsUrl.Replace("/chat/completions", "/models");
+                }
+                else if (modelsUrl.Contains("/responses"))
+                {
+                    modelsUrl = modelsUrl.Replace("/responses", "/models");
                 }
                 else
                 {
