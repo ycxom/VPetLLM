@@ -309,6 +309,21 @@ namespace VPetLLM.Utils.UI
 
             try
             {
+                // 关键守卫：ShowTimer.Enabled == true 表示非流式 Say 正文打字机正在逐字打印
+                // （MessageBar.Show(name, text) 是唯一会启动 ShowTimer 的入口；
+                //  思考气泡 ShowBubbleQuick 与流式 Show 都会 Stop 掉 ShowTimer）。
+                // 此时 outputtext/outputtextsample 正承载着正在显示的正文，绝不能清空，
+                // 否则会把打字机掐断，气泡冻结在已显示的前几个字（如 "哎呀，YC"）。
+                if (_showTimerField is not null)
+                {
+                    var showTimer = _showTimerField.GetValue(msgBar) as SystemTimers.Timer;
+                    if (showTimer?.Enabled == true)
+                    {
+                        VPetLLMUtils.Logger.Log("MessageBarHelper.ClearStreamBuffersOnly: 检测到正文打字机正在播放(ShowTimer.Enabled)，跳过清空以保护气泡");
+                        return;
+                    }
+                }
+
                 // 清空 outputtext（流式输出字符缓冲区）
                 if (_outputtextField is not null)
                 {
