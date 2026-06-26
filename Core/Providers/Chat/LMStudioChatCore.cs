@@ -70,11 +70,6 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 OnConversationTurn();
 
-                if (!Settings.KeepContext)
-                {
-                    ClearContext();
-                }
-
                 var tempUserMessage = CreateUserMessage(prompt);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 if (tempUserMessage is not null)
@@ -188,7 +183,7 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                 }
 
-                if (Settings.KeepContext)
+                if (Settings?.KeepContext ?? true)
                 {
                     if (tempUserMessage is not null)
                     {
@@ -239,11 +234,6 @@ namespace VPetLLM.Core.Providers.Chat
             try
             {
                 OnConversationTurn();
-
-                if (!Settings.KeepContext)
-                {
-                    ClearContext();
-                }
 
                 var base64Image = Convert.ToBase64String(imageData);
                 var userContent = new object[]
@@ -369,7 +359,7 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                 }
 
-                if (Settings.KeepContext)
+                if (Settings?.KeepContext ?? true)
                 {
                     if (tempUserMessage is not null)
                     {

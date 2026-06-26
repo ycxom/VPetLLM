@@ -172,7 +172,6 @@ namespace VPetLLM.Infrastructure.Configuration
             config.Role = GetStringValue(legacyConfig, "Role", "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回应我。");
             config.FollowVPetName = GetBoolValue(legacyConfig, "FollowVPetName", true);
             config.KeepContext = GetBoolValue(legacyConfig, "KeepContext", true);
-            config.EnableChatHistory = GetBoolValue(legacyConfig, "EnableChatHistory", true);
             config.SeparateChatByProvider = GetBoolValue(legacyConfig, "SeparateChatByProvider", false);
             config.ReduceInputTokenUsage = GetBoolValue(legacyConfig, "ReduceInputTokenUsage", false);
 

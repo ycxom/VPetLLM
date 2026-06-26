@@ -53,11 +53,6 @@ namespace VPetLLM.Core.Providers.Chat
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
 
-                if (!Settings.KeepContext)
-                {
-                    ClearContext();
-                }
-
                 // 检查视觉能力是否启用
                 if (!_ollamaSetting.EnableVision)
                 {
@@ -207,7 +202,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 // API调用成功后，才将用户消息和助手回复保存到历史记录
-                if (Settings.KeepContext)
+                if (Settings?.KeepContext ?? true)
                 {
                     // 先保存用户消息（包含图像数据）
                     if (tempUserMessage is not null)
@@ -253,11 +248,6 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
-
-                if (!Settings.KeepContext)
-                {
-                    ClearContext();
-                }
 
                 // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
                 // 使用 CreateUserMessage 自动设置时间戳和状态信息
@@ -361,7 +351,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 // API调用成功后，才将用户消息和助手回复保存到历史记录
-                if (Settings.KeepContext)
+                if (Settings?.KeepContext ?? true)
                 {
                     // 先保存用户消息
                     if (tempUserMessage is not null)

@@ -16,6 +16,8 @@ namespace VPetLLM.Core.Providers.Chat
         private readonly Random _random = new Random();
         // 单次请求上下文缓存：避免同一请求中多次随机选择不同节点
         private Setting.OpenAINodeSetting? _currentNodeContext;
+        // 节点级错误转移：记录本次请求已尝试失败的节点索引
+        private HashSet<int> _triedNodeIndices = new HashSet<int>();
 
         public OpenAIChatCore(Setting.OpenAINodeSetting openAINodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
@@ -110,6 +112,28 @@ namespace VPetLLM.Core.Providers.Chat
         private void ClearNodeContext()
         {
             _currentNodeContext = null;
+        }
+
+        /// <summary>
+        /// 获取下一个未尝试的节点用于错误转移（仅在启用负载均衡时）
+        /// </summary>
+        private Setting.OpenAINodeSetting? GetNextNodeForFailover(string? purpose = null)
+        {
+            if (!_openAISetting.EnableLoadBalancing)
+                return null; // 负载均衡禁用，不进行错误转移
+
+            // 获取当前节点的原始索引
+            if (_currentNodeContext == null)
+                return null;
+
+            var currentIndex = _openAISetting.OpenAINodes.IndexOf(_currentNodeContext);
+            if (currentIndex >= 0)
+            {
+                _triedNodeIndices.Add(currentIndex);
+            }
+
+            // 尝试获取下一个未尝试的节点
+            return _openAISetting.GetCurrentOpenAISetting(purpose, _triedNodeIndices);
         }
 
         /// <summary>
@@ -225,11 +249,6 @@ namespace VPetLLM.Core.Providers.Chat
         {
             // Handle conversation turn for record weight decrement
             OnConversationTurn();
-
-            if (!Settings.KeepContext)
-            {
-                ClearContext();
-            }
 
             // 清除上一次请求的节点缓存
             ClearNodeContext();
@@ -438,7 +457,7 @@ namespace VPetLLM.Core.Providers.Chat
             }
 
             // 保存历史记录（包含图像数据用于上下文编辑器显示）
-            if (Settings.KeepContext)
+            if (Settings?.KeepContext ?? true)
             {
                 var userMessage = CreateUserMessage($"[图像] {prompt}");
                 if (userMessage is not null)
@@ -460,10 +479,10 @@ namespace VPetLLM.Core.Providers.Chat
             // Handle conversation turn for record weight decrement
             OnConversationTurn();
 
-
-            if (!Settings.KeepContext)
+            // 初始化已尝试节点列表（仅在首次调用时）
+            if (_currentNodeContext == null)
             {
-                ClearContext();
+                _triedNodeIndices.Clear();
             }
 
             // 清除上一次请求的节点缓存，确保每次新请求都重新选择节点
@@ -679,14 +698,29 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 错误转移：当启用负载均衡时，尝试下一个节点
+                var nextNode = GetNextNodeForFailover("Chat");
+                if (nextNode is not null)
+                {
+                    SystemLogger.Log($"OpenAI 节点 {_currentNodeContext?.Name} 失败，正在转移到 {nextNode.Name}...");
+                    ClearNodeContext(); // 清除缓存，允许选择新节点
+
+                    // 重新调用 Chat 方法（会递归重试）
+                    // 注意：为了避免无限递归，_triedNodeIndices 已记录失败节点
+                    return await Chat(prompt, isFunctionCall);
+                }
+
                 var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
                 SystemLogger.Log($"OpenAI Chat 异常: {ex.Message}");
                 ResponseHandler?.Invoke(errorMessage);
+
+                // 重置已尝试节点列表
+                _triedNodeIndices.Clear();
                 return "";
             }
 
             // API调用成功后，才将用户消息和助手回复保存到历史记录
-            if (Settings.KeepContext)
+            if (Settings?.KeepContext ?? true)
             {
                 // 先保存用户消息
                 if (tempUserMessage is not null)
@@ -699,6 +733,7 @@ namespace VPetLLM.Core.Providers.Chat
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
+
             return "";
         }
 

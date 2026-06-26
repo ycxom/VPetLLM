@@ -268,32 +268,36 @@ namespace VPetLLM.Core.Abstractions.Base
                 new Message { Role = "system", Content = GetSystemMessage() }
             };
 
-            if (Settings?.OverflowMode == Setting.ContextOverflowMode.Overflow)
+            // 当 KeepContext = true 时才包含历史消息，false 时只使用系统消息
+            if (Settings?.KeepContext ?? true)
             {
-                // Overflow mode: include ALL history, inject summary if exists
-                var fullHistory = HistoryManager.GetHistory();
-
-                // Inject overflow summary as a system message if it exists
-                if (OverflowManager?.LatestSummary is string summary && summary.Length > 0)
+                if (Settings?.OverflowMode == Setting.ContextOverflowMode.Overflow)
                 {
-                    history.Add(new Message
+                    // Overflow mode: include ALL history, inject summary if exists
+                    var fullHistory = HistoryManager.GetHistory();
+
+                    // Inject overflow summary as a system message if it exists
+                    if (OverflowManager?.LatestSummary is string summary && summary.Length > 0)
                     {
-                        Role = "system",
-                        Content = $"[Previous Conversation Summary]\n{summary}\n[/Previous Conversation Summary]"
-                    });
+                        history.Add(new Message
+                        {
+                            Role = "system",
+                            Content = $"[Previous Conversation Summary]\n{summary}\n[/Previous Conversation Summary]"
+                        });
+                    }
+
+                    history.AddRange(fullHistory);
+
+                    // 记录快照用于后续溢出检查（由各 Provider 在 API 成功后显式触发）
+                    result.OverflowCheckHistory = fullHistory;
+                    result.OverflowCheckSnapshotCount = fullHistory.Count;
                 }
-
-                history.AddRange(fullHistory);
-
-                // 记录快照用于后续溢出检查（由各 Provider 在 API 成功后显式触发）
-                result.OverflowCheckHistory = fullHistory;
-                result.OverflowCheckSnapshotCount = fullHistory.Count;
-            }
-            else
-            {
-                // Compression/legacy mode: use naive truncation
-                var threshold = Settings?.HistoryCompressionThreshold ?? 20;
-                history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - threshold)));
+                else
+                {
+                    // Compression/legacy mode: use naive truncation
+                    var threshold = Settings?.HistoryCompressionThreshold ?? 20;
+                    history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - threshold)));
+                }
             }
 
             // Inject important records into history (only when explicitly requested)

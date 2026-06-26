@@ -507,7 +507,6 @@ namespace VPetLLM.UI.Windows
 
 
             ((CheckBox)this.FindName("CheckBox_KeepContext")).Click += Control_Click;
-            ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableRecords")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_WeightDecayTurns")).TextChanged += Control_TextChanged;
@@ -973,7 +972,6 @@ namespace VPetLLM.UI.Windows
             await Task.Yield();
 
             ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked = _plugin.Settings.KeepContext;
-            ((CheckBox)this.FindName("CheckBox_EnableChatHistory")).IsChecked = _plugin.Settings.EnableChatHistory;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked = _plugin.Settings.SeparateChatByProvider;
             ((CheckBox)this.FindName("CheckBox_EnableRecords")).IsChecked = _plugin.Settings.Records?.EnableRecords ?? true;
             ((TextBox)this.FindName("TextBox_LLM_RequestTimeout")).Text = _plugin.Settings.LLMRequestTimeoutSeconds.ToString();
@@ -1419,7 +1417,6 @@ namespace VPetLLM.UI.Windows
 
 
             var keepContextCheckBox = (CheckBox)this.FindName("CheckBox_KeepContext");
-            var enableChatHistoryCheckBox = (CheckBox)this.FindName("CheckBox_EnableChatHistory");
             var separateChatByProviderCheckBox = (CheckBox)this.FindName("CheckBox_SeparateChatByProvider");
             var enableRecordsCheckBox = (CheckBox)this.FindName("CheckBox_EnableRecords");
             var enableActionCheckBox = (CheckBox)this.FindName("CheckBox_EnableAction");
@@ -1478,7 +1475,6 @@ namespace VPetLLM.UI.Windows
 
 
             _plugin.Settings.KeepContext = keepContextCheckBox.IsChecked ?? true;
-            _plugin.Settings.EnableChatHistory = enableChatHistoryCheckBox.IsChecked ?? true;
             _plugin.Settings.SeparateChatByProvider = separateChatByProviderCheckBox.IsChecked ?? true;
             if (_plugin.Settings.Records is null) _plugin.Settings.Records = new Setting.RecordSettings();
             _plugin.Settings.Records.EnableRecords = enableRecordsCheckBox.IsChecked ?? true;
@@ -3203,7 +3199,6 @@ namespace VPetLLM.UI.Windows
             if (FindName("Label_Role") is Label labelRole) labelRole.Content = LanguageHelper.Get("LLM_Settings.Role", langCode);
             if (FindName("Label_ContextControl") is Label labelContextControl) labelContextControl.Content = LanguageHelper.Get("LLM_Settings.ContextControl", langCode);
             if (FindName("CheckBox_KeepContext") is CheckBox checkBoxKeepContext) checkBoxKeepContext.Content = LanguageHelper.Get("LLM_Settings.KeepContext", langCode);
-            if (FindName("CheckBox_EnableChatHistory") is CheckBox checkBoxEnableChatHistory) checkBoxEnableChatHistory.Content = LanguageHelper.Get("LLM_Settings.EnableChatHistory", langCode);
             if (FindName("CheckBox_SeparateChatByProvider") is CheckBox checkBoxSeparateChatByProvider) checkBoxSeparateChatByProvider.Content = LanguageHelper.Get("LLM_Settings.SeparateChatByProvider", langCode);
             if (FindName("CheckBox_EnableRecords") is CheckBox checkBoxEnableRecords) checkBoxEnableRecords.Content = LanguageHelper.Get("LLM_Settings.EnableRecords", langCode);
             if (FindName("Button_ClearContext") is Button buttonClearContext) buttonClearContext.Content = LanguageHelper.Get("LLM_Settings.ClearContext", langCode);

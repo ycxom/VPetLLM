@@ -41,11 +41,6 @@ namespace VPetLLM.Configuration
         public bool KeepContext { get; set; } = true;
 
         /// <summary>
-        /// 是否启用聊天历史
-        /// </summary>
-        public bool EnableChatHistory { get; set; } = true;
-
-        /// <summary>
         /// 是否按提供商分离聊天记录
         /// </summary>
         public bool SeparateChatByProvider { get; set; } = false;

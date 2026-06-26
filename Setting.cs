@@ -20,7 +20,6 @@ namespace VPetLLM
         public string Role { get; set; } = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回应我。";
         public bool FollowVPetName { get; set; } = true;
         public bool KeepContext { get; set; } = true;
-        public bool EnableChatHistory { get; set; } = true;
         public bool SeparateChatByProvider { get; set; } = false;
         public bool LogAutoScroll { get; set; } = true;
         public int MaxLogCount { get; set; } = 1000;
@@ -951,7 +950,7 @@ namespace VPetLLM
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
 
-            public OllamaNodeSetting? GetCurrentOllamaSetting(string? purpose = null)
+            public OllamaNodeSetting? GetCurrentOllamaSetting(string? purpose = null, HashSet<int>? excludeIndices = null)
             {
                 if (OllamaNodes.Count == 0)
                 {
@@ -971,6 +970,14 @@ namespace VPetLLM
                 var enabledNodes = OllamaNodes.Where(n => n.Enabled).ToList();
                 if (enabledNodes.Count == 0)
                     return null;
+
+                // 排除已失败的节点（用于负载均衡错误转移）
+                if (excludeIndices is not null && excludeIndices.Count > 0)
+                {
+                    enabledNodes = enabledNodes.Where((node, idx) => !excludeIndices.Contains(OllamaNodes.IndexOf(node))).ToList();
+                    if (enabledNodes.Count == 0)
+                        return null; // 所有节点都已尝试失败
+                }
 
                 if (!string.IsNullOrEmpty(purpose))
                 {
@@ -1074,7 +1081,7 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
 
-            public OpenAINodeSetting? GetCurrentOpenAISetting(string? purpose = null)
+            public OpenAINodeSetting? GetCurrentOpenAISetting(string? purpose = null, HashSet<int>? excludeIndices = null)
             {
                 // 无节点时回退到兼容配置生成的默认节点（仅当启用时）
                 if (OpenAINodes.Count == 0)
@@ -1103,6 +1110,14 @@ namespace VPetLLM
                 {
                     // 若没有启用的节点，返回 null 而不是回退到禁用节点
                     return null;
+                }
+
+                // 排除已失败的节点（用于负载均衡错误转移）
+                if (excludeIndices is not null && excludeIndices.Count > 0)
+                {
+                    enabledNodes = enabledNodes.Where((node, idx) => !excludeIndices.Contains(OpenAINodes.IndexOf(node))).ToList();
+                    if (enabledNodes.Count == 0)
+                        return null; // 所有节点都已尝试失败
                 }
 
                 // Mode 过滤：三级回退策略
@@ -1208,7 +1223,7 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
 
-            public GeminiNodeSetting? GetCurrentGeminiSetting(string? purpose = null)
+            public GeminiNodeSetting? GetCurrentGeminiSetting(string? purpose = null, HashSet<int>? excludeIndices = null)
             {
                 // 无节点时回退到兼容配置生成的默认节点
                 if (GeminiNodes.Count == 0)
@@ -1233,6 +1248,14 @@ namespace VPetLLM
                 {
                     // 若没有启用的节点，返回 null 而不是回退到禁用节点
                     return null;
+                }
+
+                // 排除已失败的节点（用于负载均衡错误转移）
+                if (excludeIndices is not null && excludeIndices.Count > 0)
+                {
+                    enabledNodes = enabledNodes.Where((node, idx) => !excludeIndices.Contains(GeminiNodes.IndexOf(node))).ToList();
+                    if (enabledNodes.Count == 0)
+                        return null; // 所有节点都已尝试失败
                 }
 
                 // Mode 过滤：三级回退策略
@@ -1361,7 +1384,7 @@ namespace VPetLLM
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
 
-            public LMStudioNodeSetting? GetCurrentLMStudioSetting(string? purpose = null)
+            public LMStudioNodeSetting? GetCurrentLMStudioSetting(string? purpose = null, HashSet<int>? excludeIndices = null)
             {
                 if (LMStudioNodes.Count == 0)
                 {
@@ -1381,6 +1404,14 @@ namespace VPetLLM
                 var enabledNodes = LMStudioNodes.Where(n => n.Enabled).ToList();
                 if (enabledNodes.Count == 0)
                     return null;
+
+                // 排除已失败的节点（用于负载均衡错误转移）
+                if (excludeIndices is not null && excludeIndices.Count > 0)
+                {
+                    enabledNodes = enabledNodes.Where((node, idx) => !excludeIndices.Contains(LMStudioNodes.IndexOf(node))).ToList();
+                    if (enabledNodes.Count == 0)
+                        return null; // 所有节点都已尝试失败
+                }
 
                 if (!string.IsNullOrEmpty(purpose))
                 {

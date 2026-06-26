@@ -38,11 +38,6 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
         public bool KeepContext { get; set; } = true;
 
         /// <summary>
-        /// 是否启用聊天历史
-        /// </summary>
-        public bool EnableChatHistory { get; set; } = true;
-
-        /// <summary>
         /// 是否按提供商分离聊天记录
         /// </summary>
         public bool SeparateChatByProvider { get; set; } = false;
@@ -176,7 +171,6 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
                 Role = Role,
                 FollowVPetName = FollowVPetName,
                 KeepContext = KeepContext,
-                EnableChatHistory = EnableChatHistory,
                 SeparateChatByProvider = SeparateChatByProvider,
                 ReduceInputTokenUsage = ReduceInputTokenUsage,
                 EnableHistoryCompression = EnableHistoryCompression,
@@ -202,7 +196,6 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
                 Role = otherLLM.Role;
                 FollowVPetName = otherLLM.FollowVPetName;
                 KeepContext = otherLLM.KeepContext;
-                EnableChatHistory = otherLLM.EnableChatHistory;
                 SeparateChatByProvider = otherLLM.SeparateChatByProvider;
                 ReduceInputTokenUsage = otherLLM.ReduceInputTokenUsage;
                 EnableHistoryCompression = otherLLM.EnableHistoryCompression;
@@ -227,7 +220,6 @@ namespace VPetLLM.Infrastructure.Configuration.Configurations
             Role = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回应我。";
             FollowVPetName = true;
             KeepContext = true;
-            EnableChatHistory = true;
             SeparateChatByProvider = false;
             ReduceInputTokenUsage = false;
             EnableHistoryCompression = false;

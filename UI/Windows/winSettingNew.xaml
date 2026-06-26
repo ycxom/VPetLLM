@@ -333,11 +333,6 @@
                                         Margin="0,0,0,8"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
-                                <CheckBox x:Name="CheckBox_EnableChatHistory"
-                                        Content="{utils:Localize KeyPath=LLM_Settings.EnableChatHistory}"
-                                        Margin="0,0,0,8"
-                                        IsChecked="True"
-                                        Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_SeparateChatByProvider"
                                         Content="{utils:Localize KeyPath=LLM_Settings.SeparateChatByProvider}"
                                         Margin="0,0,0,8"

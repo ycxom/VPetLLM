@@ -64,11 +64,6 @@ namespace VPetLLM.Core.Providers.Chat
         {
             OnConversationTurn();
 
-            if (!Settings.KeepContext)
-            {
-                ClearContext();
-            }
-
             var node = _geminiSetting.GetCurrentGeminiSetting("Chat");
             if (node is null)
             {
@@ -226,7 +221,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            if (Settings.KeepContext)
+            if (Settings?.KeepContext ?? true)
             {
                 var userMessage = CreateUserMessage($"[图像] {prompt}");
                 if (userMessage is not null)
@@ -238,6 +233,7 @@ namespace VPetLLM.Core.Providers.Chat
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
+
             return "";
         }
 
@@ -358,7 +354,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            if (Settings.KeepContext)
+            if (Settings?.KeepContext ?? true)
             {
                 var userMessage = CreateUserMessage($"[图像] {prompt}");
                 if (userMessage is not null)
@@ -370,18 +366,13 @@ namespace VPetLLM.Core.Providers.Chat
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
+
             return "";
         }
 
         public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
         {
             OnConversationTurn();
-
-
-            if (!Settings.KeepContext)
-            {
-                ClearContext();
-            }
 
             var tempUserMessage = CreateUserMessage(prompt);
 
@@ -539,7 +530,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            if (Settings.KeepContext)
+            if (Settings?.KeepContext ?? true)
             {
                 if (tempUserMessage is not null)
                 {
@@ -549,6 +540,7 @@ namespace VPetLLM.Core.Providers.Chat
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
+
             return "";
         }
 
@@ -655,7 +647,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            if (Settings.KeepContext)
+            if (Settings?.KeepContext ?? true)
             {
                 if (tempUserMessage is not null)
                 {
@@ -665,6 +657,7 @@ namespace VPetLLM.Core.Providers.Chat
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
+
             return "";
         }
 

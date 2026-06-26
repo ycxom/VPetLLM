@@ -140,11 +140,6 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                 }
 
-                if (!Settings.KeepContext)
-                {
-                    ClearContext();
-                }
-
                 Logger.Log($"Free ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
 
                 // 构建多模态消息内容
@@ -266,7 +261,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 // 保存历史记录（包含图像数据用于上下文编辑器显示）
-                if (Settings.KeepContext)
+                if (Settings?.KeepContext ?? true)
                 {
                     var userMessage = CreateUserMessage($"[图像] {prompt}");
                     if (userMessage is not null)
@@ -333,11 +328,6 @@ namespace VPetLLM.Core.Providers.Chat
                         Logger.Log($"Free Chat: MaxTokens ({_freeSetting.MaxTokens}) 超过限制 ({_maxTokensLimit})，自动启用上下文压缩模式");
                         Settings.EnableHistoryCompression = true;
                     }
-                }
-
-                if (!Settings.KeepContext)
-                {
-                    ClearContext();
                 }
 
                 // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
@@ -428,7 +418,7 @@ namespace VPetLLM.Core.Providers.Chat
                         }
 
                         // API调用成功后，才将用户消息和助手回复保存到历史记录
-                        if (Settings.KeepContext)
+                        if (Settings?.KeepContext ?? true)
                         {
                             if (tempUserMessage is not null)
                             {
@@ -496,7 +486,7 @@ namespace VPetLLM.Core.Providers.Chat
                         ResponseHandler?.Invoke(message);
 
                         // API调用成功后，才将用户消息和助手回复保存到历史记录
-                        if (Settings.KeepContext)
+                        if (Settings?.KeepContext ?? true)
                         {
                             if (tempUserMessage is not null)
                             {
