@@ -204,6 +204,22 @@ namespace VPetLLM.Handlers.Core
                 // 只在首次响应时清理状态
                 if (!skipInitialization)
                 {
+                    // 若 VPet 正在播放触摸/提起动画，跳过 Clear 和思考动画停止，
+                    // 避免打断用户与 VPet 的交互动画
+                    bool isInUserInteractionAnim = IsInTouchOrRaisedAnimation();
+                    if (isInUserInteractionAnim)
+                    {
+                        Logger.Log("SmartMessageProcessor: 跳过Clear - 触摸/提起动画进行中，等待完成");
+                        // 等待触摸动画结束（最多2秒）
+                        int waited = 0;
+                        while (waited < 2000 && IsInTouchOrRaisedAnimation())
+                        {
+                            await Task.Delay(50).ConfigureAwait(false);
+                            waited += 50;
+                        }
+                        Logger.Log($"SmartMessageProcessor: 触摸/提起动画等待结束，实际等待 {waited}ms");
+                    }
+
                     // 使用统一的BubbleFacade清理状态
                     _unifiedBubbleFacade.Clear();
                     Logger.Log("SmartMessageProcessor: 使用UnifiedBubbleFacade清理状态");
@@ -218,7 +234,7 @@ namespace VPetLLM.Handlers.Core
                     {
                         Logger.Log($"SmartMessageProcessor: 停止思考动画失败: {ex.Message}");
                     }
-                    
+
                     // 添加性能自适应延迟，确保思考动画循环完全退出
                     // 使用 BubbleDelayController 根据设备性能决定延迟时间
                     var delayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
@@ -1754,6 +1770,27 @@ namespace VPetLLM.Handlers.Core
         private int CalculateDisplayTime(string text)
         {
             return Math.Max(text.Length * _plugin.Settings.SayTimeMultiplier, _plugin.Settings.SayTimeMin);
+        }
+
+        /// <summary>
+        /// 检查 VPet 当前是否在播放触摸或提起动画（这类动画不应被插件清理操作打断）
+        /// </summary>
+        private bool IsInTouchOrRaisedAnimation()
+        {
+            try
+            {
+                var displayType = _plugin.MW?.Main?.DisplayType;
+                if (displayType is null) return false;
+                var t = displayType.Type;
+                if (t == VPet_Simulator.Core.GraphInfo.GraphType.Touch_Head
+                    || t == VPet_Simulator.Core.GraphInfo.GraphType.Touch_Body
+                    || t == VPet_Simulator.Core.GraphInfo.GraphType.Raised_Dynamic
+                    || t == VPet_Simulator.Core.GraphInfo.GraphType.Raised_Static)
+                    return true;
+                var name = displayType.Name?.ToLower();
+                return name?.Contains("touch") == true || name?.Contains("pinch") == true;
+            }
+            catch { return false; }
         }
 
         /// <summary>

@@ -158,6 +158,8 @@ namespace VPetLLM.Handlers.UI
                 }
 
                 // 使用定时器定期检查Main.DisplayType来检测捏脸动画
+                // 同时检测拖动状态，通知AnimationCoordinator暂停队列处理以减少拖动卡顿
+                bool _wasRaised = false;
                 var checkTimer = new System.Timers.Timer(100); // 每100ms检查一次
                 checkTimer.Elapsed += (s, e) =>
                 {
@@ -167,6 +169,18 @@ namespace VPetLLM.Handlers.UI
                             return;
 
                         var displayType = _plugin.MW.Main.DisplayType;
+
+                        // 检测拖动状态（Raised动画），通知AnimationCoordinator
+                        bool isRaised = displayType.Type == VPet_Simulator.Core.GraphInfo.GraphType.Raised_Dynamic
+                                     || displayType.Type == VPet_Simulator.Core.GraphInfo.GraphType.Raised_Static;
+                        if (isRaised != _wasRaised)
+                        {
+                            _wasRaised = isRaised;
+                            Handlers.Animation.AnimationHelper.SetUserInteracting(isRaised);
+                            Logger.Log(isRaised
+                                ? "TouchInteractionHandler: 检测到拖动开始，暂停动画队列处理"
+                                : "TouchInteractionHandler: 拖动结束，恢复动画队列处理");
+                        }
 
                         // 检查是否正在播放捏脸动画
                         if (displayType.Name == "pinch" &&

@@ -365,7 +365,7 @@ namespace VPetLLM.Handlers.Animation
         }
 
         /// <summary>
-        /// 执行回退动画
+        /// 执行回退动画（仅在非触摸/提起动画状态下才调用，避免打断用户交互和扰乱随机移动调度）
         /// </summary>
         private async Task ExecuteFallbackAsync()
         {
@@ -375,7 +375,22 @@ namespace VPetLLM.Handlers.Animation
             {
                 try
                 {
-                    _mainWindow?.Main?.DisplayToNomal();
+                    var displayType = _mainWindow?.Main?.DisplayType;
+                    bool isSafeToReset = displayType == null
+                        || (displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Touch_Head
+                            && displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Touch_Body
+                            && displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Raised_Dynamic
+                            && displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Raised_Static
+                            && displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Move);
+
+                    if (isSafeToReset)
+                    {
+                        _mainWindow?.Main?.DisplayToNomal();
+                    }
+                    else
+                    {
+                        Logger.Log($"AnimationCoordinator: Fallback skipped - VPet in protected animation ({displayType?.Type})");
+                    }
                     tcs.TrySetResult(true);
                 }
                 catch (Exception ex)
