@@ -21,9 +21,15 @@ namespace VPetLLM.Handlers.Core
         private readonly VPetTTSIntegrationManager? _vpetTTSIntegration;
         private bool _isProcessing = false;
         private readonly object _processingLock = new object();
-        
+
         // 气泡显示状态跟踪（用于智能过渡逻辑）
         private bool _isBubbleDisplayed = false;
+
+        // VPet 随机移动计数器(CountNomal)基线快照
+        // 用于在一次完整响应结束后还原 CountNomal，避免 VPetLLM 的 DisplayToNomal 级联
+        // 累加该计数器，导致 VPet 原生随机移动概率异常升高
+        private int _countNomalBaseline = 0;
+        private bool _countNomalBaselineCaptured = false;
 
         public SmartMessageProcessor(VPetLLM plugin)
         {
@@ -191,6 +197,25 @@ namespace VPetLLM.Handlers.Core
             {
                 Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}, 跳过初始化: {skipInitialization}");
 
+                // 仅在首次响应时记录 VPet 原生 CountNomal 基线，
+                // 处理结束后将其还原，确保 VPetLLM 不影响 VPet 自身随机移动概率
+                if (!skipInitialization)
+                {
+                    try
+                    {
+                        if (_plugin?.MW?.Main is not null)
+                        {
+                            _countNomalBaseline = _plugin.MW.Main.CountNomal;
+                            _countNomalBaselineCaptured = true;
+                            Logger.Log($"SmartMessageProcessor: 记录 CountNomal 基线 = {_countNomalBaseline}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"SmartMessageProcessor: 记录 CountNomal 基线失败: {ex.Message}");
+                    }
+                }
+
                 // 设置状态灯为输出中（无论是首次响应还是后续命令）
                 try
                 {
@@ -299,6 +324,32 @@ namespace VPetLLM.Handlers.Core
                 lock (_processingLock)
                 {
                     _isProcessing = false;
+                }
+
+                // 还原 VPet 随机移动计数器(CountNomal)到处理前的基线，
+                // 抵消本次响应期间 DisplayToNomal 级联造成的累加，
+                // 确保 VPetLLM 不会推高 VPet 自身随机移动概率
+                // 注意：流式响应会多次调用本方法（后续子调用 skipInitialization=true），
+                //       基线在首次响应捕获后跨子调用保持，每次结束都还原，
+                //       下一次新响应的首次调用会重新捕获最新基线
+                if (_countNomalBaselineCaptured)
+                {
+                    try
+                    {
+                        if (_plugin?.MW?.Main is not null)
+                        {
+                            var current = _plugin.MW.Main.CountNomal;
+                            if (current != _countNomalBaseline)
+                            {
+                                _plugin.MW.Main.CountNomal = _countNomalBaseline;
+                                Logger.Log($"SmartMessageProcessor: 还原 CountNomal {current} -> {_countNomalBaseline}，避免随机移动概率异常");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"SmartMessageProcessor: 还原 CountNomal 失败: {ex.Message}");
+                    }
                 }
 
                 // 结束消息处理会话
