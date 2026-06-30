@@ -330,6 +330,22 @@ namespace VPetLLM.Core.Services
             return systemMessage;
         }
 
+        /// <summary>
+        /// 获取有效的强调文本。
+        /// null = 用户停用，返回 ""；"" = 跟随 Prompt.json 默认；非空 = 用户自定义。
+        /// </summary>
+        public string GetEmphasis()
+        {
+            if (_settings?.Emphasis is null)
+                return "";
+
+            if (_settings.Emphasis.Length > 0)
+                return _settings.Emphasis;
+
+            var lang = _settings.PromptLanguage ?? "zh";
+            return PromptHelper.Get("Emphasis", lang);
+        }
+
         public void AddPlugin(IVPetLLMPlugin plugin)
         {
             // No action needed here for now, as GetSystemMessage dynamically fetches the list

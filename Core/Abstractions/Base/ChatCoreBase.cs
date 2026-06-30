@@ -52,6 +52,13 @@ namespace VPetLLM.Core.Abstractions.Base
             if (string.IsNullOrEmpty(content))
                 return null;
 
+            if (messageType == "User" && SystemMessageProvider is not null)
+            {
+                var emphasis = SystemMessageProvider.GetEmphasis();
+                if (!string.IsNullOrEmpty(emphasis))
+                    content = content + $"[System: {emphasis}]";
+            }
+
             var message = new Message { Role = "user", Content = content, MessageType = messageType };
 
             // 如果允许获取当前时间，设置Unix时间戳

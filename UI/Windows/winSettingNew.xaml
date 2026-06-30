@@ -323,6 +323,15 @@
                                         Width="300"
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernTextBox}"/>
+                                <Label Content="{utils:Localize KeyPath=LLM_Settings.Emphasis}"
+                                        VerticalAlignment="Top"
+                                        Margin="0,0,0,0"
+                                        x:Name="Label_Emphasis"
+                                        Style="{StaticResource SettingLabel}"/>
+                                <TextBox x:Name="TextBox_Emphasis"
+                                        Width="300"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernTextBox}"/>
 
                                 <Label Content="{utils:Localize KeyPath=LLM_Settings.ContextControl}"
                                         Margin="0,0,0,0"

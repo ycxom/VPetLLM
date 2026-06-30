@@ -106,6 +106,12 @@
             "zh-hant": "角色設定",
             "jp": "役割設定"
         },
+        "Emphasis": {
+            "en": "Emphasis",
+            "zh-hans": "强调",
+            "zh-hant": "強調",
+            "jp": "強調"
+        },
         "ContextControl": {
             "en": "Context Control",
             "zh-hans": "上下文控制",

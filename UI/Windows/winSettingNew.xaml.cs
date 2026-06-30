@@ -12,6 +12,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using VPetLLM.Services;
 using VPetLLM.UI.Controls;
+using VPetLLM.Utils.Common;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 using VPetLLM.Utils.Plugin;
@@ -493,6 +494,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_UserName")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Role")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_Emphasis")).TextChanged += Control_TextChanged;
             // Ollama/Free/LMStudio/OpenAI/Gemini - 使用统一UI管理，暂不处理单一配置
             //((TextBox)this.FindName("TextBox_OllamaUrl")).TextChanged += Control_TextChanged;
             //((ComboBox)this.FindName("ComboBox_OllamaModel")).SelectionChanged += Control_SelectionChanged;
@@ -908,6 +910,13 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
             ((TextBox)this.FindName("TextBox_Role")).Text = _plugin.Settings.Role;
+            var emphasisValue = _plugin.Settings.Emphasis switch
+            {
+                null => "",  // 用户主动停用
+                "" => PromptHelper.Get("Emphasis", _plugin.Settings.PromptLanguage),  // 跟随默认
+                var v => v   // 用户自定义
+            };
+            ((TextBox)this.FindName("TextBox_Emphasis")).Text = emphasisValue;
 
             await Task.Yield();
 
@@ -1462,6 +1471,16 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.AiName = aiNameTextBox.Text;
             _plugin.Settings.UserName = userNameTextBox.Text;
             _plugin.Settings.Role = roleTextBox.Text;
+            var emphasisTextBox = (TextBox)this.FindName("TextBox_Emphasis");
+            var emphasisText = emphasisTextBox.Text.Trim();
+            var emphasisDefaultZh = PromptHelper.Get("Emphasis", "zh");
+            var emphasisDefaultEn = PromptHelper.Get("Emphasis", "en");
+            _plugin.Settings.Emphasis = emphasisText switch
+            {
+                "" => null,                                                        // 用户清空 → 停用
+                var t when t == emphasisDefaultZh || t == emphasisDefaultEn => "", // 匹配默认 → 跟随语言
+                var t => t                                                         // 自定义文本
+            };
             // Ollama/Free/LMStudio/OpenAI/Gemini - 使用统一UI管理，暂不处理单一配置
             //_plugin.Settings.Ollama.Url = ollamaUrlTextBox.Text;
             //_plugin.Settings.Ollama.Model = ollamaModelComboBox.Text;
@@ -3197,6 +3216,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("Label_UserName") is Label labelUserName) labelUserName.Content = LanguageHelper.Get("LLM_Settings.UserName", langCode);
             if (FindName("CheckBox_FollowVPetName") is CheckBox checkBoxFollowVPetName) checkBoxFollowVPetName.Content = LanguageHelper.Get("LLM_Settings.FollowVPetName", langCode);
             if (FindName("Label_Role") is Label labelRole) labelRole.Content = LanguageHelper.Get("LLM_Settings.Role", langCode);
+            if (FindName("Label_Emphasis") is Label labelEmphasis) labelEmphasis.Content = LanguageHelper.Get("LLM_Settings.Emphasis", langCode);
             if (FindName("Label_ContextControl") is Label labelContextControl) labelContextControl.Content = LanguageHelper.Get("LLM_Settings.ContextControl", langCode);
             if (FindName("CheckBox_KeepContext") is CheckBox checkBoxKeepContext) checkBoxKeepContext.Content = LanguageHelper.Get("LLM_Settings.KeepContext", langCode);
             if (FindName("CheckBox_SeparateChatByProvider") is CheckBox checkBoxSeparateChatByProvider) checkBoxSeparateChatByProvider.Content = LanguageHelper.Get("LLM_Settings.SeparateChatByProvider", langCode);

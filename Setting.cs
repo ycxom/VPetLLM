@@ -18,6 +18,11 @@ namespace VPetLLM
         public string AiName { get; set; } = "虚拟宠物";
         public string UserName { get; set; } = "主人";
         public string Role { get; set; } = "你是一个可爱的虚拟宠物助手，请用友好、可爱的语气回应我。";
+        /// <summary>
+        /// 强调文本，追加到用户消息末尾，格式为 [System: ...]。
+        /// "" = 跟随 Prompt.json 语言切换使用默认值；null = 用户主动清空停用；非空字符串 = 用户自定义。
+        /// </summary>
+        public string? Emphasis { get; set; } = "";
         public bool FollowVPetName { get; set; } = true;
         public bool KeepContext { get; set; } = true;
         public bool SeparateChatByProvider { get; set; } = false;
