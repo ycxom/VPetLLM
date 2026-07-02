@@ -30,6 +30,7 @@ namespace VPetLLM.Core.Data.Database
                 cmd.CommandText = @"
                     CREATE TABLE IF NOT EXISTS overflow_summaries (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        provider TEXT NOT NULL DEFAULT '',
                         summary_text TEXT NOT NULL,
                         segment_start_index INTEGER NOT NULL,
                         segment_end_index INTEGER NOT NULL,
@@ -37,6 +38,9 @@ namespace VPetLLM.Core.Data.Database
                         threshold INTEGER NOT NULL DEFAULT 0,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     );
+
+                    CREATE INDEX IF NOT EXISTS idx_overflow_summaries_provider
+                        ON overflow_summaries(provider);
 
                     CREATE INDEX IF NOT EXISTS idx_overflow_summaries_created
                         ON overflow_summaries(created_at);
@@ -72,6 +76,19 @@ namespace VPetLLM.Core.Data.Database
                     // 列已存在，忽略
                 }
 
+                // 兼容旧表：尝试添加 provider 列（已存在则忽略）。
+                // 旧数据 provider 为 ''，与"不按提供商分开聊天"模式的键一致
+                try
+                {
+                    var alterCmd = connection.CreateCommand();
+                    alterCmd.CommandText = "ALTER TABLE overflow_summaries ADD COLUMN provider TEXT NOT NULL DEFAULT ''";
+                    alterCmd.ExecuteNonQuery();
+                }
+                catch (SqliteException)
+                {
+                    // 列已存在，忽略
+                }
+
                 Logger.Log("Overflow database tables initialized successfully");
             }
             catch (Exception ex)
@@ -83,7 +100,7 @@ namespace VPetLLM.Core.Data.Database
         /// <summary>
         /// Create an overflow summary record.
         /// </summary>
-        public int CreateSummary(string summaryText, int segmentStartIndex, int segmentEndIndex, int tokenCount, int threshold = 0)
+        public int CreateSummary(string provider, string summaryText, int segmentStartIndex, int segmentEndIndex, int tokenCount, int threshold = 0)
         {
             try
             {
@@ -92,10 +109,11 @@ namespace VPetLLM.Core.Data.Database
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    INSERT INTO overflow_summaries (summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at)
-                    VALUES (@text, @start, @end, @tokens, @threshold, @time);
+                    INSERT INTO overflow_summaries (provider, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at)
+                    VALUES (@provider, @text, @start, @end, @tokens, @threshold, @time);
                     SELECT last_insert_rowid();
                 ";
+                cmd.Parameters.AddWithValue("@provider", provider ?? "");
                 cmd.Parameters.AddWithValue("@text", summaryText);
                 cmd.Parameters.AddWithValue("@start", segmentStartIndex);
                 cmd.Parameters.AddWithValue("@end", segmentEndIndex);
@@ -161,8 +179,9 @@ namespace VPetLLM.Core.Data.Database
 
         /// <summary>
         /// Search overflow summaries by keyword (searches summary_text).
+        /// Excludes legacy threshold-marker rows.
         /// </summary>
-        public List<OverflowSummaryRecord> SearchSummaries(string keyword, int limit = 10)
+        public List<OverflowSummaryRecord> SearchSummaries(string provider, string keyword, int limit = 10)
         {
             var results = new List<OverflowSummaryRecord>();
             try
@@ -174,10 +193,13 @@ namespace VPetLLM.Core.Data.Database
                 cmd.CommandText = @"
                     SELECT id, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at
                     FROM overflow_summaries
-                    WHERE summary_text LIKE @kw
-                    ORDER BY created_at DESC
+                    WHERE provider = @provider
+                      AND summary_text LIKE @kw
+                      AND summary_text NOT LIKE '[threshold marker:%'
+                    ORDER BY id DESC
                     LIMIT @limit
                 ";
+                cmd.Parameters.AddWithValue("@provider", provider ?? "");
                 cmd.Parameters.AddWithValue("@kw", $"%{keyword}%");
                 cmd.Parameters.AddWithValue("@limit", limit);
 
@@ -247,6 +269,29 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
+        /// Update the text of an existing summary (user edit from the record editor).
+        /// </summary>
+        public void UpdateSummaryText(int summaryId, string summaryText)
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE overflow_summaries SET summary_text = @text WHERE id = @id";
+                cmd.Parameters.AddWithValue("@text", summaryText ?? "");
+                cmd.Parameters.AddWithValue("@id", summaryId);
+                cmd.ExecuteNonQuery();
+                Logger.Log($"Updated overflow summary #{summaryId} text");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to update summary #{summaryId}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Delete a summary and its associated segments by ID.
         /// </summary>
         public void DeleteSummary(int summaryId)
@@ -275,9 +320,9 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
-        /// Get the total count of overflowed tokens across all summaries.
+        /// Get the total count of overflowed tokens across a provider's summaries.
         /// </summary>
-        public int GetTotalOverflowedTokens()
+        public int GetTotalOverflowedTokens(string provider)
         {
             try
             {
@@ -285,7 +330,8 @@ namespace VPetLLM.Core.Data.Database
                 connection.Open();
 
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT COALESCE(SUM(token_count), 0) FROM overflow_summaries";
+                cmd.CommandText = "SELECT COALESCE(SUM(token_count), 0) FROM overflow_summaries WHERE provider = @provider";
+                cmd.Parameters.AddWithValue("@provider", provider ?? "");
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
             catch (Exception ex)
@@ -296,16 +342,20 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
-        /// Get the maximum segment_end_index across all summaries (for restoring _lastSummarizedIndex).
+        /// Get the maximum segment_end_index for a provider (for restoring _lastSummarizedIndex).
         /// </summary>
-        public int GetMaxSegmentEndIndex()
+        public int GetMaxSegmentEndIndex(string provider)
         {
             try
             {
                 using var connection = new SqliteConnection(_connectionString);
                 connection.Open();
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT COALESCE(MAX(segment_end_index), 0) FROM overflow_summaries";
+                cmd.CommandText = @"
+                    SELECT COALESCE(MAX(segment_end_index), 0) FROM overflow_summaries
+                    WHERE provider = @provider
+                      AND summary_text NOT LIKE '[threshold marker:%'";
+                cmd.Parameters.AddWithValue("@provider", provider ?? "");
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
             catch (Exception ex)
@@ -316,85 +366,50 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
-        /// Get the threshold from the most recent summary (for restoring _lastSummarizedThreshold).
+        /// Get the latest summary text for a provider (for restoring the rolling summary).
+        /// Each summary row supersedes the previous ones, so only the newest is needed.
         /// </summary>
-        public int GetMaxSegmentThreshold()
+        public string? GetLatestSummaryText(string provider)
         {
             try
             {
                 using var connection = new SqliteConnection(_connectionString);
                 connection.Open();
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT COALESCE(threshold, 0) FROM overflow_summaries ORDER BY created_at DESC LIMIT 1";
-                var result = cmd.ExecuteScalar();
-                return result is not null ? Convert.ToInt32(result) : 0;
+                cmd.CommandText = @"
+                    SELECT summary_text FROM overflow_summaries
+                    WHERE provider = @provider
+                      AND summary_text NOT LIKE '[threshold marker:%'
+                    ORDER BY id DESC
+                    LIMIT 1";
+                cmd.Parameters.AddWithValue("@provider", provider ?? "");
+                return cmd.ExecuteScalar() as string;
             }
             catch (Exception ex)
             {
-                Logger.Log($"Failed to get max segment threshold: {ex.Message}");
-                return 0;
+                Logger.Log($"Failed to get latest summary text: {ex.Message}");
+                return null;
             }
         }
 
         /// <summary>
-        /// Store just the threshold marker (for tracking config changes without creating a summary).
+        /// Clear all overflow data for a provider.
         /// </summary>
-        public void StoreThresholdMarker(int threshold)
+        public void ClearAll(string provider)
         {
             try
             {
                 using var connection = new SqliteConnection(_connectionString);
                 connection.Open();
+
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = "INSERT INTO overflow_summaries (summary_text, segment_start_index, segment_end_index, token_count, threshold) VALUES (@text, 0, 0, 0, @th)";
-                cmd.Parameters.AddWithValue("@text", $"[threshold marker: {threshold}]");
-                cmd.Parameters.AddWithValue("@th", threshold);
+                cmd.CommandText = @"
+                    DELETE FROM overflow_segments WHERE summary_id IN
+                        (SELECT id FROM overflow_summaries WHERE provider = @provider);
+                    DELETE FROM overflow_summaries WHERE provider = @provider;";
+                cmd.Parameters.AddWithValue("@provider", provider ?? "");
                 cmd.ExecuteNonQuery();
-                Logger.Log($"Stored threshold marker: {threshold}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Failed to store threshold marker: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Get all summary texts ordered by creation (for restoring _summaryChunks).
-        /// </summary>
-        public List<string> GetAllSummaryTexts()
-        {
-            var results = new List<string>();
-            try
-            {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
-                var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT summary_text FROM overflow_summaries ORDER BY created_at ASC";
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                    results.Add(reader.GetString(0));
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Failed to get all summary texts: {ex.Message}");
-            }
-            return results;
-        }
-
-        /// <summary>
-        /// Clear all overflow data.
-        /// </summary>
-        public void ClearAll()
-        {
-            try
-            {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
-
-                var cmd = connection.CreateCommand();
-                cmd.CommandText = "DELETE FROM overflow_segments; DELETE FROM overflow_summaries;";
-                cmd.ExecuteNonQuery();
-                Logger.Log("Cleared all overflow data");
+                Logger.Log($"Cleared all overflow data for provider '{provider}'");
             }
             catch (Exception ex)
             {

@@ -258,7 +258,9 @@ namespace VPetLLM.Core.Abstractions.Base
 
         /// <summary>
         /// Builds the core history list for prompt construction.
-        /// In overflow mode, uses a sliding window based on token limit.
+        /// In overflow mode, uses summary + sliding window: the rolling summary
+        /// covers messages before the overflow checkpoint, and only messages
+        /// after the checkpoint are included verbatim.
         /// In compression mode, uses the legacy truncation approach.
         /// </summary>
         /// <param name="injectRecords">Whether to inject important records into the history.</param>
@@ -280,7 +282,8 @@ namespace VPetLLM.Core.Abstractions.Base
             {
                 if (Settings?.OverflowMode == Setting.ContextOverflowMode.Overflow)
                 {
-                    // Overflow mode: include ALL history, inject summary if exists
+                    // Overflow mode（总结+滑动窗口）：已总结的消息不再进入 prompt，
+                    // 由 [Previous Conversation Summary] 承载其信息
                     var fullHistory = HistoryManager.GetHistory();
 
                     // Inject overflow summary as a system message if it exists
@@ -293,11 +296,15 @@ namespace VPetLLM.Core.Abstractions.Base
                         });
                     }
 
-                    history.AddRange(fullHistory);
+                    // 只发送检查点之后的消息（检查点可能因外部编辑超出当前历史，需钳制）
+                    var windowStart = Math.Min(OverflowManager?.LastSummarizedIndex ?? 0, fullHistory.Count);
+                    history.AddRange(fullHistory.Skip(windowStart));
 
-                    // 记录快照用于后续溢出检查（由各 Provider 在 API 成功后显式触发）
-                    result.OverflowCheckHistory = fullHistory;
-                    result.OverflowCheckSnapshotCount = fullHistory.Count;
+                    // 记录快照拷贝用于后续溢出检查（由各 Provider 在 API 成功后显式触发）；
+                    // 拷贝使火抛的检查任务不受活列表后续变更影响
+                    var snapshot = fullHistory.ToList();
+                    result.OverflowCheckHistory = snapshot;
+                    result.OverflowCheckSnapshotCount = snapshot.Count;
                 }
                 else
                 {
@@ -380,6 +387,7 @@ namespace VPetLLM.Core.Abstractions.Base
         {
             HistoryManager.GetHistory().Clear();
             HistoryManager.GetHistory().AddRange(editedHistory);
+            OverflowManager?.NotifyHistoryReplaced(editedHistory.Count);
 
             // 更新到数据库
             try
@@ -413,6 +421,7 @@ namespace VPetLLM.Core.Abstractions.Base
         {
             HistoryManager.GetHistory().Clear();
             HistoryManager.GetHistory().AddRange(history);
+            OverflowManager?.NotifyHistoryReplaced(history.Count);
 
             // 更新到数据库
             try
