@@ -30,6 +30,8 @@ namespace VPetLLM.UI.Windows
     {
         public int Id { get; set; }
         public string SummaryText { get; set; } = "";
+        /// <summary>加载时的原始文本，保存时用于判断是否被编辑过</summary>
+        public string OriginalSummaryText { get; set; } = "";
         public int SegmentStartIndex { get; set; }
         public int SegmentEndIndex { get; set; }
         public int TokenCount { get; set; }
@@ -60,6 +62,7 @@ namespace VPetLLM.UI.Windows
             {
                 Id = s.Id,
                 SummaryText = s.SummaryText,
+                OriginalSummaryText = s.SummaryText,
                 SegmentStartIndex = s.SegmentStartIndex,
                 SegmentEndIndex = s.SegmentEndIndex,
                 TokenCount = s.TokenCount,
@@ -76,12 +79,35 @@ namespace VPetLLM.UI.Windows
         {
             try
             {
+                // 提交尚未结束编辑状态的单元格，否则正在编辑的内容不会写入绑定对象
+                DataGrid_Records.CommitEdit(DataGridEditingUnit.Row, true);
+                DataGrid_Overflow.CommitEdit(DataGridEditingUnit.Row, true);
+
                 foreach (var item in DisplayRecords)
                 {
                     item.Weight = Math.Clamp(item.Weight, 0, 10);
                     item.OriginalRecord.Content = item.Content;
                     item.OriginalRecord.Weight = item.Weight;
                     _plugin.ChatCore?.RecordManager?.UpdateRecord(item.OriginalRecord);
+                }
+
+                // 持久化被编辑过的溢出总结（经 OverflowManager 同步内存中的滚动总结）
+                var overflowMgr = (_plugin.ChatCore as ChatCoreBase)?.OverflowManager;
+                foreach (var item in DisplayOverflowSummaries)
+                {
+                    if (item.SummaryText == item.OriginalSummaryText)
+                        continue;
+
+                    if (overflowMgr is not null)
+                    {
+                        overflowMgr.UpdateSummaryText(item.Id, item.SummaryText);
+                    }
+                    else
+                    {
+                        using var overflowDb = new OverflowDatabase(GetDatabasePath());
+                        overflowDb.UpdateSummaryText(item.Id, item.SummaryText);
+                    }
+                    item.OriginalSummaryText = item.SummaryText;
                 }
 
                 MessageBox.Show(
@@ -135,9 +161,17 @@ namespace VPetLLM.UI.Windows
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    var overflowDb = new OverflowDatabase(GetDatabasePath());
-                    // Delete segments first then summary
-                    overflowDb.DeleteSummary(selected.Id);
+                    // 经 OverflowManager 删除，同步回滚内存中的滚动总结和检查点
+                    var overflowMgr = (_plugin.ChatCore as ChatCoreBase)?.OverflowManager;
+                    if (overflowMgr is not null)
+                    {
+                        overflowMgr.DeleteSummary(selected.Id);
+                    }
+                    else
+                    {
+                        using var overflowDb = new OverflowDatabase(GetDatabasePath());
+                        overflowDb.DeleteSummary(selected.Id);
+                    }
                     DisplayOverflowSummaries.Remove(selected);
                 }
             }

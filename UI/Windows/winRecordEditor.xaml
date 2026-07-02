@@ -152,8 +152,15 @@
                                             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
+                                    <DataGridTextColumn.EditingElementStyle>
+                                        <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+                                            <Setter Property="TextWrapping" Value="Wrap"/>
+                                            <Setter Property="AcceptsReturn" Value="True"/>
+                                            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+                                        </Style>
+                                    </DataGridTextColumn.EditingElementStyle>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Header="消息范围" Width="120" IsReadOnly="True" x:Name="Column_Overflow_Range">
+                                <DataGridTextColumn Header="消息范围" Binding="{Binding RangeDisplay}" Width="120" IsReadOnly="True" x:Name="Column_Overflow_Range">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Padding" Value="12,8"/>

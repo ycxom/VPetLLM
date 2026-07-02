@@ -337,6 +337,36 @@ namespace VPetLLM.Core.Data.Managers
             => _database.GetSegmentsForSummary(summaryId);
 
         /// <summary>
+        /// Update a summary's text (user edit) and refresh in-memory state so the
+        /// injected rolling summary reflects the edit immediately.
+        /// </summary>
+        public void UpdateSummaryText(int summaryId, string newText)
+        {
+            _database.UpdateSummaryText(summaryId, newText);
+            RefreshFromDatabase();
+        }
+
+        /// <summary>
+        /// Delete a summary and roll in-memory state back to what the database
+        /// still holds (deleting the latest row falls back to the previous version).
+        /// </summary>
+        public void DeleteSummary(int summaryId)
+        {
+            _database.DeleteSummary(summaryId);
+            RefreshFromDatabase();
+        }
+
+        /// <summary>
+        /// Re-derive the rolling summary and checkpoint from the database.
+        /// </summary>
+        private void RefreshFromDatabase()
+        {
+            _lastSummarizedIndex = 0;
+            _currentSummary = null;
+            RestoreFromDatabase();
+        }
+
+        /// <summary>
         /// Clear all overflow data for the current provider.
         /// </summary>
         public void ClearAll()
