@@ -337,8 +337,16 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
 
         private async void OnScreenshotHotkeyPressed()
         {
-            LogInformation("Screenshot hotkey pressed");
-            await StartCaptureAsync();
+            // async void：异常外泄会崩掉宿主进程，必须兜底
+            try
+            {
+                LogInformation("Screenshot hotkey pressed");
+                await StartCaptureAsync();
+            }
+            catch (Exception ex)
+            {
+                LogError("Error handling screenshot hotkey", ex);
+            }
         }
 
         private async void OnScreenshotCapturedInternal(object? sender, byte[] imageData)

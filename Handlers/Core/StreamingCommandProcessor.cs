@@ -76,6 +76,19 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         public async void AddChunk(string chunk)
         {
+            try
+            {
+                await AddChunkCoreAsync(chunk);
+            }
+            catch (Exception ex)
+            {
+                // async void：异常外泄会击穿线程池崩掉宿主进程，必须就地兜底
+                Logger.Log($"StreamingCommandProcessor: AddChunk error: {ex.Message}");
+            }
+        }
+
+        private async Task AddChunkCoreAsync(string chunk)
+        {
             if (string.IsNullOrEmpty(chunk))
                 return;
 

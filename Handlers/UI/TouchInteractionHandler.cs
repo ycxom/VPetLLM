@@ -21,6 +21,10 @@ namespace VPetLLM.Handlers.UI
         private int _consecutiveTouchCount = 0;
         private DateTime _lastTouchTime = DateTime.MinValue;
 
+        // 捏脸/拖动检测定时器（须在 Dispose 中停止，否则插件卸载后仍以 10Hz 轮询宿主）
+        private System.Timers.Timer _pinchCheckTimer;
+        private volatile bool _disposed;
+
         // 智能过滤系统 - 跟踪VPetLLM动作执行状态
         private static bool _isVPetLLMActionInProgress = false;
         private static DateTime _lastVPetLLMActionTime = DateTime.MinValue;
@@ -69,6 +73,11 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
+                if (_disposed)
+                {
+                    return;
+                }
+
                 if (_plugin?.MW?.Main is not null)
                 {
                     RegisterTouchEvents();
@@ -161,11 +170,12 @@ namespace VPetLLM.Handlers.UI
                 // 同时检测拖动状态，通知AnimationCoordinator暂停队列处理以减少拖动卡顿
                 bool _wasRaised = false;
                 var checkTimer = new System.Timers.Timer(100); // 每100ms检查一次
+                _pinchCheckTimer = checkTimer;
                 checkTimer.Elapsed += (s, e) =>
                 {
                     try
                     {
-                        if (_plugin?.MW?.Main?.DisplayType is null)
+                        if (_disposed || _plugin?.MW?.Main?.DisplayType is null)
                             return;
 
                         var displayType = _plugin.MW.Main.DisplayType;
@@ -543,6 +553,13 @@ namespace VPetLLM.Handlers.UI
         {
             try
             {
+                _disposed = true;
+
+                // 停止捏脸/拖动检测定时器
+                _pinchCheckTimer?.Stop();
+                _pinchCheckTimer?.Dispose();
+                _pinchCheckTimer = null;
+
                 // 从全局实例列表中移除
                 lock (_actionStateLock)
                 {

@@ -67,7 +67,27 @@ namespace VPetLLM.Utils.UI
                     _outputtextsampleField = _msgBarType.GetField("outputtextsample", BindingFlags.NonPublic | BindingFlags.Instance);
 
                     _isInitialized = true;
-                    VPetLLMUtils.Logger.Log("MessageBarHelper: 缓存初始化成功");
+
+                    // 能力探测：任一关键成员缺失（宿主内部结构变化）即降级，
+                    // 只在初始化时报告一次，而不是每次调用静默失败
+                    var missing = new List<string>();
+                    if (_showTimerField is null) missing.Add("ShowTimer");
+                    if (_endTimerField is null) missing.Add("EndTimer");
+                    if (_closeTimerField is null) missing.Add("CloseTimer");
+                    if (_tTextField is null) missing.Add("TText");
+                    if (_lNameField is null) missing.Add("LName");
+                    if (_oldsaystreamField is null) missing.Add("oldsaystream");
+                    if (_outputtextField is null) missing.Add("outputtext");
+                    if (_outputtextsampleField is null) missing.Add("outputtextsample");
+
+                    if (missing.Count > 0)
+                    {
+                        VPetLLMUtils.Logger.Log($"MessageBarHelper: 宿主 MessageBar 缺少成员 [{string.Join(", ", missing)}]，流式微控不可用，气泡将走公共 Show API 降级");
+                    }
+                    else
+                    {
+                        VPetLLMUtils.Logger.Log("MessageBarHelper: 缓存初始化成功");
+                    }
                     return true;
                 }
                 catch (Exception ex)
@@ -83,6 +103,21 @@ namespace VPetLLM.Utils.UI
         /// 检查是否已初始化
         /// </summary>
         public static bool IsInitialized => _isInitialized;
+
+        /// <summary>
+        /// 流式微控所需的 MessageBar 私有成员是否全部命中。
+        /// false 表示宿主内部结构已变化（如字段改名），调用方须走公共 Show API。
+        /// </summary>
+        public static bool SupportsStreamControl =>
+            _isInitialized
+            && _showTimerField is not null
+            && _endTimerField is not null
+            && _closeTimerField is not null
+            && _tTextField is not null
+            && _lNameField is not null
+            && _oldsaystreamField is not null
+            && _outputtextField is not null
+            && _outputtextsampleField is not null;
 
         /// <summary>
         /// 预初始化（在应用启动时调用，提前缓存反射引用）
@@ -558,6 +593,28 @@ namespace VPetLLM.Utils.UI
             if (!_isInitialized)
             {
                 Initialize(msgBar);
+            }
+
+            // 宿主内部结构变化时降级为公共 Show API（带打字机效果，但保证有气泡）
+            if (!SupportsStreamControl)
+            {
+                try
+                {
+                    // 公共 Show 的打字机结束时会对正在播放的 Say 动画执行 C_End 收尾，
+                    // 说话动画播放中直接跳过，避免思考气泡掐断说话动画
+                    var main = VPetLLM.Instance?.MW?.Main;
+                    if (main?.DisplayType?.Type == VPet_Simulator.Core.GraphInfo.GraphType.Say)
+                    {
+                        VPetLLMUtils.Logger.Log("MessageBarHelper.ShowBubbleQuick: Say 动画播放中，降级路径跳过显示");
+                        return;
+                    }
+                    (msgBar as VPet_Simulator.Core.IMassageBar)?.Show(speakerName, text);
+                }
+                catch (Exception ex)
+                {
+                    VPetLLMUtils.Logger.Log($"MessageBarHelper.ShowBubbleQuick: 公共 API 降级失败: {ex.Message}");
+                }
+                return;
             }
 
             try

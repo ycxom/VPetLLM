@@ -209,9 +209,18 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
             {
                 LogDebug($"Voice input hotkey pressed, current state: {_currentState}");
 
+                // 注意：async lambda 传给 InvokeAsync(Action) 会成为 async void，
+                // await 之后的异常不会传回外层 try，必须在 lambda 内部兜底
                 await Application.Current.Dispatcher.InvokeAsync(async () =>
                 {
-                    await HandleHotkeyPressedAsync();
+                    try
+                    {
+                        await HandleHotkeyPressedAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError("Error handling voice input hotkey", ex);
+                    }
                 });
             }
             catch (Exception ex)
@@ -388,26 +397,34 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
 
         private async void OnWindowTranscriptionCompleted(object? sender, string transcription)
         {
-            LogInformation($"Transcription completed, text length: {transcription?.Length ?? 0}");
-
-            if (!string.IsNullOrWhiteSpace(transcription))
+            // async void：异常外泄会崩掉宿主进程，必须整体兜底
+            try
             {
-                LogInformation("Transcription received, raising events");
-                await SetStateAsync(VoiceInputState.Idle);
+                LogInformation($"Transcription completed, text length: {transcription?.Length ?? 0}");
 
-                // 发布转录完成事件
-                await PublishEventAsync(new VoiceInputTranscriptionCompletedEvent
+                if (!string.IsNullOrWhiteSpace(transcription))
                 {
-                    Transcription = transcription
-                });
+                    LogInformation("Transcription received, raising events");
+                    await SetStateAsync(VoiceInputState.Idle);
 
-                // 触发传统事件（向后兼容）
-                TranscriptionCompleted?.Invoke(this, transcription);
+                    // 发布转录完成事件
+                    await PublishEventAsync(new VoiceInputTranscriptionCompletedEvent
+                    {
+                        Transcription = transcription
+                    });
+
+                    // 触发传统事件（向后兼容）
+                    TranscriptionCompleted?.Invoke(this, transcription);
+                }
+                else
+                {
+                    LogInformation("Empty transcription, resetting to Idle");
+                    await SetStateAsync(VoiceInputState.Idle);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                LogInformation("Empty transcription, resetting to Idle");
-                await SetStateAsync(VoiceInputState.Idle);
+                LogError("Error handling transcription completion", ex);
             }
         }
 

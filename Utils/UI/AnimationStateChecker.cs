@@ -1,4 +1,5 @@
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Core.Services;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Utils.UI
@@ -185,14 +186,13 @@ namespace VPetLLM.Utils.UI
                 return true;
             }
 
-            // 获取当前状态
+            // 获取当前状态（经适配层；旧实现 GetProperty("State") 因 State 是字段而恒为 null）
             try
             {
-                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                if (stateProperty is not null)
+                var currentState = VPetHostAdapter.GetState(mainWindow);
+                if (currentState is not null)
                 {
-                    var currentState = stateProperty.GetValue(mainWindow.Main);
-                    string currentStateName = currentState?.ToString() ?? "Unknown";
+                    string currentStateName = currentState.ToString() ?? "Unknown";
                     string targetStateName = targetState?.ToString() ?? "Unknown";
 
                     // 检查是否是相同状态（幂等性检查）
@@ -228,12 +228,11 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                if (stateProperty is null)
+                var currentState = VPetHostAdapter.GetState(mainWindow);
+                if (currentState is null)
                     return true;
 
-                var currentState = stateProperty.GetValue(mainWindow.Main);
-                string currentStateName = currentState?.ToString() ?? "Unknown";
+                string currentStateName = currentState.ToString() ?? "Unknown";
 
                 // 检查是否是不应该被中断的状态
                 switch (currentStateName)
@@ -275,11 +274,10 @@ namespace VPetLLM.Utils.UI
 
             try
             {
-                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                if (stateProperty is null)
-                    return "Unknown (State property not found)";
+                if (!VPetHostAdapter.CanAccessState(mainWindow))
+                    return "Unknown (State member not found)";
 
-                var currentState = stateProperty.GetValue(mainWindow.Main);
+                var currentState = VPetHostAdapter.GetState(mainWindow);
                 string stateName = currentState?.ToString() ?? "null";
 
                 var animationDesc = GetCurrentAnimationDescription(mainWindow);

@@ -1,7 +1,6 @@
-using System.Reflection;
 using LinePutScript.Localization.WPF;
 using VPet_Simulator.Windows.Interface;
-using VPetLLM.Handlers.State;
+using VPetLLM.Core.Services;
 
 namespace VPetLLM.Handlers.Actions
 {
@@ -68,23 +67,17 @@ namespace VPetLLM.Handlers.Actions
 
         internal static void SetExpDirect(IMainWindow mainWindow, double value)
         {
-            var save = mainWindow.Core.Save;
-            var expField = save.GetType().GetField("exp", BindingFlags.NonPublic | BindingFlags.Instance);
-            expField?.SetValue(save, value);
+            VPetHostAdapter.TrySetExpRaw(mainWindow, value);
         }
 
         internal static void SetLevelDirect(IMainWindow mainWindow, int level)
         {
-            var save = mainWindow.Core.Save;
-            var levelProp = save.GetType().GetProperty("Level");
-            levelProp?.SetValue(save, level);
+            VPetHostAdapter.TrySetLevel(mainWindow, level);
         }
 
         internal static void SetLevelMaxDirect(IMainWindow mainWindow, int levelMax)
         {
-            var save = mainWindow.Core.Save;
-            var levelMaxProp = save.GetType().GetProperty("LevelMax");
-            levelMaxProp?.SetValue(save, levelMax);
+            VPetHostAdapter.TrySetLevelMax(mainWindow, levelMax);
         }
     }
 }

@@ -1,4 +1,3 @@
-using LinePutScript.Localization.WPF;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.State;
 
@@ -19,15 +18,7 @@ namespace VPetLLM.Handlers.Actions
                 return Task.CompletedTask;
             }
 
-            // 如果启用了状态限制，应用限制逻辑
-            if (VPetLLM.Instance.Settings.LimitStateChanges)
-            {
-                double currentValue = mainWindow.Core.Save.Feeling;
-                value = StateChangeLimiter.LimitStateChange(value, currentValue);
-            }
-
-            mainWindow.Core.Save.FeelingChange(value);
-            mainWindow.Main.LabelDisplayShowChangeNumber("心情 ".Translate() + (value > 0 ? "+" : "") + "{0:f0}", value);
+            PetStateService.ChangeFeeling(mainWindow, value);
             return Task.CompletedTask;
         }
         public Task Execute(string value, IMainWindow mainWindow)

@@ -97,32 +97,41 @@ namespace VPetLLM.UI.Windows
         /// </summary>
         public async void HandleResponse(string response)
         {
-            Logger.Log($"HandleResponse: 收到AI回复: {response}");
-
-            // 使用状态机管理流式处理
+            // async void（由流式回调线程调用）：前奏异常必须兜住，否则直接崩掉宿主进程
             bool isFirstResponse;
-            lock (_stateLock)
+            try
             {
-                isFirstResponse = _streamingState == StreamingState.Idle;
-                if (isFirstResponse)
-                    _streamingState = StreamingState.FirstResponse;
-                else if (_streamingState == StreamingState.FirstResponse)
-                    _streamingState = StreamingState.Streaming;
-            }
+                Logger.Log($"HandleResponse: 收到AI回复: {response}");
 
-            // 首次响应：快速停止思考动画，更新状态灯为输出中
-            if (isFirstResponse)
-            {
-                _isThinking = false;
-                var cts = _thinkingCancellationTokenSource;
-                if (cts is not null)
+                // 使用状态机管理流式处理
+                lock (_stateLock)
                 {
-                    _thinkingCancellationTokenSource = null;
-                    try { cts.Cancel(); cts.Dispose(); } catch { }
+                    isFirstResponse = _streamingState == StreamingState.Idle;
+                    if (isFirstResponse)
+                        _streamingState = StreamingState.FirstResponse;
+                    else if (_streamingState == StreamingState.FirstResponse)
+                        _streamingState = StreamingState.Streaming;
                 }
 
-                // 更新状态灯为输出中
-                _plugin.FloatingSidebarManager?.SetOutputtingStatus();
+                // 首次响应：快速停止思考动画，更新状态灯为输出中
+                if (isFirstResponse)
+                {
+                    _isThinking = false;
+                    var cts = _thinkingCancellationTokenSource;
+                    if (cts is not null)
+                    {
+                        _thinkingCancellationTokenSource = null;
+                        try { cts.Cancel(); cts.Dispose(); } catch { }
+                    }
+
+                    // 更新状态灯为输出中
+                    _plugin.FloatingSidebarManager?.SetOutputtingStatus();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"HandleResponse: 前置处理错误: {ex.Message}");
+                return;
             }
 
             // 统一处理：无论流式还是非流式，都使用StreamingCommandProcessor
@@ -175,7 +184,15 @@ namespace VPetLLM.UI.Windows
                 return;
             }
 
-            OnSendMessage?.Invoke(text);
+            // async void（宿主直接调用）：订阅方异常必须兜住，不能带崩宿主
+            try
+            {
+                OnSendMessage?.Invoke(text);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"OnSendMessage subscriber failed: {ex.Message}");
+            }
             Logger.Log($"Responded called with text: {text}");
 
             // 通知生命周期插件：处理开始
@@ -190,10 +207,17 @@ namespace VPetLLM.UI.Windows
 
             // 更新状态灯为处理中
             // 注意：不在这里调用 BeginActiveSession()，会话跟踪由 StreamingCommandProcessor 和 ResultAggregator 管理
-            _plugin.FloatingSidebarManager?.SetProcessingStatus();
+            try
+            {
+                _plugin.FloatingSidebarManager?.SetProcessingStatus();
 
-            // 重置流式处理状态，为新对话做准备
-            ResetStreamingState();
+                // 重置流式处理状态，为新对话做准备
+                ResetStreamingState();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Responded: 状态重置失败: {ex.Message}");
+            }
 
             try
             {

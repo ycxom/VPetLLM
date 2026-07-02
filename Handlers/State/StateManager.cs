@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Core.Services;
 using VPetLLM.Handlers.Infrastructure;
 
 namespace VPetLLM.Handlers.State
@@ -39,72 +40,16 @@ namespace VPetLLM.Handlers.State
         }
 
         /// <summary>
-        /// Helper method to get State (tries field first, then property)
+        /// State 访问统一走 VPetHostAdapter（缓存反射引用，避免每次转换 6 次反射查找）
         /// </summary>
         private static object GetState(IMainWindow mainWindow)
-        {
-            // Try field first (VPet uses field)
-            var stateField = mainWindow.Main.GetType().GetField("State");
-            if (stateField is not null)
-            {
-                return stateField.GetValue(mainWindow.Main);
-            }
+            => VPetHostAdapter.GetState(mainWindow);
 
-            // Fallback to property
-            var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-            if (stateProperty is not null)
-            {
-                return stateProperty.GetValue(mainWindow.Main);
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Helper method to set State (tries field first, then property)
-        /// </summary>
         private static bool SetState(IMainWindow mainWindow, object newState)
-        {
-            // Try field first (VPet uses field)
-            var stateField = mainWindow.Main.GetType().GetField("State");
-            if (stateField is not null)
-            {
-                stateField.SetValue(mainWindow.Main, newState);
-                return true;
-            }
+            => VPetHostAdapter.SetState(mainWindow, newState);
 
-            // Fallback to property
-            var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-            if (stateProperty is not null)
-            {
-                stateProperty.SetValue(mainWindow.Main, newState);
-                return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Helper method to get State type (tries field first, then property)
-        /// </summary>
         private static Type GetStateType(IMainWindow mainWindow)
-        {
-            // Try field first (VPet uses field)
-            var stateField = mainWindow.Main.GetType().GetField("State");
-            if (stateField is not null)
-            {
-                return stateField.FieldType;
-            }
-
-            // Fallback to property
-            var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-            if (stateProperty is not null)
-            {
-                return stateProperty.PropertyType;
-            }
-
-            return null;
-        }
+            => VPetHostAdapter.GetStateType(mainWindow);
         /// <summary>
         /// Transitions the VPet to a new state with proper error handling and rollback
         /// This method queues the state transition to handle concurrent requests
@@ -172,6 +117,11 @@ namespace VPetLLM.Handlers.State
                 }
 
                 Logger.Log("StateManager: Queue processing completed - all pending state transitions executed");
+            }
+            catch (Exception ex)
+            {
+                // async void：异常外泄会击穿线程池，直接崩掉宿主进程，必须就地吞掉
+                Logger.Log($"StateManager: Queue processing error: {ex.Message}");
             }
             finally
             {
