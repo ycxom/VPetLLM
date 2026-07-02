@@ -1,6 +1,7 @@
 using System.Windows;
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Core.Services;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Animation
@@ -207,12 +208,7 @@ namespace VPetLLM.Handlers.Animation
             {
                 try
                 {
-                    // 获取 VoicePlayer 字段
-                    var voicePlayerField = mainWindow.Main.GetType().GetField("VoicePlayer",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    if (voicePlayerField is null) return 0;
-
-                    var voicePlayer = voicePlayerField.GetValue(mainWindow.Main) as System.Windows.Media.MediaPlayer;
+                    var voicePlayer = VPetHostAdapter.GetVoicePlayer(mainWindow) as System.Windows.Media.MediaPlayer;
                     if (voicePlayer?.Clock?.NaturalDuration.HasTimeSpan == true)
                     {
                         var remaining = voicePlayer.Clock.NaturalDuration.TimeSpan - (voicePlayer.Clock.CurrentTime ?? TimeSpan.Zero);
@@ -367,16 +363,7 @@ namespace VPetLLM.Handlers.Animation
         {
             if (mainWindow?.Main is null) return true;
 
-            return ExecuteOnUIThread(() =>
-            {
-                var field = mainWindow.Main.GetType().GetField("petgridcrlf",
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (field is not null)
-                {
-                    return (bool)field.GetValue(mainWindow.Main);
-                }
-                return true;
-            });
+            return ExecuteOnUIThread(() => VPetHostAdapter.GetPetGridCrlf(mainWindow) ?? true);
         }
 
         /// <summary>
@@ -431,15 +418,11 @@ namespace VPetLLM.Handlers.Animation
                 try
                 {
                     // 获取 PetGrid 和 PetGrid2 的 Tag（当前动画）
-                    var petGridField = mainWindow.Main.GetType().GetField("PetGrid",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    var petGrid2Field = mainWindow.Main.GetType().GetField("PetGrid2",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (!VPetHostAdapter.TryGetPetGrids(mainWindow, out var petGridObj, out var petGrid2Obj))
+                        return false;
 
-                    if (petGridField is null || petGrid2Field is null) return false;
-
-                    var petGrid = petGridField.GetValue(mainWindow.Main) as System.Windows.Controls.Decorator;
-                    var petGrid2 = petGrid2Field.GetValue(mainWindow.Main) as System.Windows.Controls.Decorator;
+                    var petGrid = petGridObj as System.Windows.Controls.Decorator;
+                    var petGrid2 = petGrid2Obj as System.Windows.Controls.Decorator;
 
                     if (petGrid is null || petGrid2 is null) return false;
 
@@ -479,15 +462,11 @@ namespace VPetLLM.Handlers.Animation
             {
                 try
                 {
-                    var petGridField = mainWindow.Main.GetType().GetField("PetGrid",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    var petGrid2Field = mainWindow.Main.GetType().GetField("PetGrid2",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (!VPetHostAdapter.TryGetPetGrids(mainWindow, out var petGridObj, out var petGrid2Obj))
+                        return false;
 
-                    if (petGridField is null || petGrid2Field is null) return false;
-
-                    var petGrid = petGridField.GetValue(mainWindow.Main) as System.Windows.Controls.Decorator;
-                    var petGrid2 = petGrid2Field.GetValue(mainWindow.Main) as System.Windows.Controls.Decorator;
+                    var petGrid = petGridObj as System.Windows.Controls.Decorator;
+                    var petGrid2 = petGrid2Obj as System.Windows.Controls.Decorator;
 
                     // 检查当前可见的 Grid 的动画状态
                     if (petGrid?.Visibility == System.Windows.Visibility.Visible && petGrid.Tag is IGraph ig1)
@@ -519,12 +498,7 @@ namespace VPetLLM.Handlers.Animation
             {
                 try
                 {
-                    var looptimesField = mainWindow.Main.GetType().GetField("looptimes",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    if (looptimesField is not null)
-                    {
-                        return (int)looptimesField.GetValue(mainWindow.Main);
-                    }
+                    return VPetHostAdapter.GetLoopTimes(mainWindow) ?? 0;
                 }
                 catch (Exception ex)
                 {

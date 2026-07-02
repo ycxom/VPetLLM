@@ -1,17 +1,18 @@
 using VPet_Simulator.Windows.Interface;
-using System.Reflection;
+using VPetLLM.Core.Services;
 
 namespace VPetLLM.Utils.Audio;
 
 /// <summary>
 /// VPetTTS 协调器（VPetLLM 侧）
-/// 用于与 VPetTTS 插件的协调器接口交互
-/// 使用反射调用，避免直接引用 VPetTTS 程序集
+/// 用于与 VPetTTS 插件的协调器接口交互。
+/// 对 VPetTTS 内部成员的访问统一经 VPetTTSPluginAdapter（缓存反射、能力探测），
+/// 避免直接引用 VPetTTS 程序集。
 /// </summary>
 public class VPetTTSCoordinator : IDisposable
 {
     private readonly IMainWindow _mainWindow;
-    private object? _ttsCoordinator; // 使用 object 而不是接口类型
+    private object? _ttsCoordinator;
     private bool _isInitialized;
     private string? _currentSessionId;
     private readonly string _callerId = "VPetLLM";
@@ -36,45 +37,20 @@ public class VPetTTSCoordinator : IDisposable
                 return false;
             }
 
-            Logger.Log($"VPetTTSCoordinator.Initialize: 找到 VPetTTS 插件，类型: {vpetTTSPlugin.GetType().FullName}");
-
-            // 获取协调器接口
-            var coordinatorProperty = vpetTTSPlugin.GetType().GetProperty("TTSCoordinator");
-            if (coordinatorProperty == null)
-            {
-                Logger.Log("VPetTTSCoordinator.Initialize: VPetTTS 插件未提供 TTSCoordinator 属性");
-                
-                // 列出所有可用属性
-                var properties = vpetTTSPlugin.GetType().GetProperties();
-                Logger.Log($"VPetTTSCoordinator.Initialize: 可用属性列表:");
-                foreach (var prop in properties)
-                {
-                    Logger.Log($"  - {prop.Name} ({prop.PropertyType.Name})");
-                }
-                
-                return false;
-            }
-
-            Logger.Log($"VPetTTSCoordinator.Initialize: 找到 TTSCoordinator 属性，类型: {coordinatorProperty.PropertyType.FullName}");
-
-            _ttsCoordinator = coordinatorProperty.GetValue(vpetTTSPlugin);
+            _ttsCoordinator = VPetTTSPluginAdapter.GetCoordinator(vpetTTSPlugin);
             if (_ttsCoordinator == null)
             {
-                Logger.Log("VPetTTSCoordinator.Initialize: 无法获取 VPetTTS 协调器接口（返回值为 null）");
-                Logger.Log("VPetTTSCoordinator.Initialize: 这可能是因为 VPetTTS 插件还未完成初始化");
+                Logger.Log("VPetTTSCoordinator.Initialize: 无法获取 VPetTTS 协调器接口（属性缺失或插件尚未完成初始化）");
                 return false;
             }
 
-            Logger.Log($"VPetTTSCoordinator.Initialize: 成功获取协调器实例，类型: {_ttsCoordinator.GetType().FullName}");
-
             _isInitialized = true;
-            Logger.Log("VPetTTSCoordinator.Initialize: 协调器初始化成功");
+            Logger.Log($"VPetTTSCoordinator.Initialize: 协调器初始化成功，类型: {_ttsCoordinator.GetType().FullName}");
             return true;
         }
         catch (Exception ex)
         {
             Logger.Log($"VPetTTSCoordinator.Initialize: 初始化失败: {ex.Message}");
-            Logger.Log($"VPetTTSCoordinator.Initialize: 堆栈跟踪: {ex.StackTrace}");
             return false;
         }
     }
@@ -104,13 +80,7 @@ public class VPetTTSCoordinator : IDisposable
 
         try
         {
-            var method = _ttsCoordinator.GetType().GetMethod("PreloadAsync");
-            if (method == null)
-            {
-                return false;
-            }
-
-            var task = method.Invoke(_ttsCoordinator, new object[] { text, _currentSessionId }) as Task<bool>;
+            var task = VPetTTSPluginAdapter.Preload(_ttsCoordinator, text, _currentSessionId);
             if (task == null)
             {
                 return false;
@@ -145,17 +115,10 @@ public class VPetTTSCoordinator : IDisposable
 
         try
         {
-            // 使用反射调用 StartExclusiveSessionAsync
-            var method = _ttsCoordinator.GetType().GetMethod("StartExclusiveSessionAsync");
-            if (method == null)
-            {
-                throw new InvalidOperationException("未找到 StartExclusiveSessionAsync 方法");
-            }
-
-            var task = method.Invoke(_ttsCoordinator, new object[] { _callerId }) as Task<string>;
+            var task = VPetTTSPluginAdapter.StartExclusiveSession(_ttsCoordinator, _callerId);
             if (task == null)
             {
-                throw new InvalidOperationException("StartExclusiveSessionAsync 返回值无效");
+                throw new InvalidOperationException("VPetTTS 协调器不支持 StartExclusiveSessionAsync");
             }
 
             _currentSessionId = await task;
@@ -187,17 +150,10 @@ public class VPetTTSCoordinator : IDisposable
 
         try
         {
-            // 使用反射调用 EndExclusiveSessionAsync
-            var method = _ttsCoordinator.GetType().GetMethod("EndExclusiveSessionAsync");
-            if (method == null)
-            {
-                throw new InvalidOperationException("未找到 EndExclusiveSessionAsync 方法");
-            }
-
-            var task = method.Invoke(_ttsCoordinator, new object[] { _callerId, _currentSessionId }) as Task;
+            var task = VPetTTSPluginAdapter.EndExclusiveSession(_ttsCoordinator, _callerId, _currentSessionId);
             if (task == null)
             {
-                throw new InvalidOperationException("EndExclusiveSessionAsync 返回值无效");
+                throw new InvalidOperationException("VPetTTS 协调器不支持 EndExclusiveSessionAsync");
             }
 
             await task;
@@ -229,28 +185,18 @@ public class VPetTTSCoordinator : IDisposable
         try
         {
             // 预加载
-            var preloadMethod = _ttsCoordinator.GetType().GetMethod("PreloadAsync");
-            if (preloadMethod != null)
+            var preloadTask = VPetTTSPluginAdapter.Preload(_ttsCoordinator, text, _currentSessionId);
+            if (preloadTask != null)
             {
-                var preloadTask = preloadMethod.Invoke(_ttsCoordinator, new object[] { text, _currentSessionId }) as Task<bool>;
-                if (preloadTask != null)
-                {
-                    await preloadTask;
-                    Logger.Log("VPetTTSCoordinator: 预加载成功");
-                }
+                await preloadTask;
+                Logger.Log("VPetTTSCoordinator: 预加载成功");
             }
 
             // 提交请求
-            var submitMethod = _ttsCoordinator.GetType().GetMethod("SubmitTTSAsync");
-            if (submitMethod == null)
-            {
-                throw new InvalidOperationException("未找到 SubmitTTSAsync 方法");
-            }
-
-            var submitTask = submitMethod.Invoke(_ttsCoordinator, new object[] { text, _currentSessionId }) as Task<string>;
+            var submitTask = VPetTTSPluginAdapter.SubmitTTS(_ttsCoordinator, text, _currentSessionId);
             if (submitTask == null)
             {
-                throw new InvalidOperationException("SubmitTTSAsync 返回值无效");
+                throw new InvalidOperationException("VPetTTS 协调器不支持 SubmitTTSAsync");
             }
 
             var requestId = await submitTask;
@@ -276,17 +222,16 @@ public class VPetTTSCoordinator : IDisposable
 
         try
         {
-            var method = _ttsCoordinator.GetType().GetMethod("IsRequestCompleteAsync");
-            if (method == null)
-            {
-                throw new InvalidOperationException("未找到 IsRequestCompleteAsync 方法");
-            }
-
             var startTime = DateTime.Now;
             while ((DateTime.Now - startTime).TotalSeconds < timeoutSeconds)
             {
-                var task = method.Invoke(_ttsCoordinator, new object[] { requestId }) as Task<bool>;
-                if (task != null && await task)
+                var task = VPetTTSPluginAdapter.IsRequestComplete(_ttsCoordinator, requestId);
+                if (task == null)
+                {
+                    throw new InvalidOperationException("VPetTTS 协调器不支持 IsRequestCompleteAsync");
+                }
+
+                if (await task)
                 {
                     return true;
                 }
@@ -316,14 +261,7 @@ public class VPetTTSCoordinator : IDisposable
 
         try
         {
-            var method = _ttsCoordinator.GetType().GetMethod("IsProcessing");
-            if (method == null)
-            {
-                return false;
-            }
-
-            var result = method.Invoke(_ttsCoordinator, null);
-            return result is bool isProcessing && isProcessing;
+            return VPetTTSPluginAdapter.IsProcessing(_ttsCoordinator);
         }
         catch
         {
@@ -337,7 +275,8 @@ public class VPetTTSCoordinator : IDisposable
         {
             try
             {
-                EndExclusiveSessionAsync().Wait();
+                // 有界等待：Dispose 在插件卸载线程上执行，不能无限阻塞卸载流程
+                EndExclusiveSessionAsync().Wait(TimeSpan.FromSeconds(3));
             }
             catch
             {

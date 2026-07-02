@@ -1,5 +1,6 @@
 using VPet_Simulator.Core;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Core.Services;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Animation
@@ -297,17 +298,13 @@ namespace VPetLLM.Handlers.Animation
                             var targetStateName = request.TargetState.ToString();
                             Logger.Log($"TransitionController: Executing state change to {targetStateName}");
 
-                            // 获取状态字段
-                            var stateField = mainWindow.Main.GetType().GetField("State");
-                            if (stateField is null)
+                            // State 访问经适配层（缓存反射）
+                            if (!VPetHostAdapter.CanAccessState(mainWindow))
                             {
-                                Logger.Log("TransitionController: State field not found");
+                                Logger.Log("TransitionController: State member not found");
                                 tcs.TrySetResult(false);
                                 return;
                             }
-
-                            var workingStateType = stateField.FieldType;
-                            var targetState = Enum.Parse(workingStateType, targetStateName, ignoreCase: true);
 
                             // 原子更新状态和动画
                             switch (targetStateName)
@@ -315,12 +312,8 @@ namespace VPetLLM.Handlers.Animation
                                 case "Sleep":
                                     mainWindow.Main.DisplaySleep(force: true);
                                     break;
-                                case "Nomal":
-                                    stateField.SetValue(mainWindow.Main, targetState);
-                                    mainWindow.Main.DisplayToNomal();
-                                    break;
                                 default:
-                                    stateField.SetValue(mainWindow.Main, targetState);
+                                    VPetHostAdapter.TrySetStateByName(mainWindow, targetStateName);
                                     mainWindow.Main.DisplayToNomal();
                                     break;
                             }

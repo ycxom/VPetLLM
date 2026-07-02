@@ -115,16 +115,17 @@ namespace VPetLLM
         public Services.ProcessingLifecycleManager? ProcessingLifecycleManager => _processingLifecycleManager;
 
         /// <summary>
-        /// VPet TTS 插件是否被检测到（实时检测）
+        /// VPet TTS 插件是否被检测到（带 TTL 缓存的准实时检测）
         /// </summary>
         public bool IsVPetTTSPluginDetected
         {
             get
             {
-                // 实时检测，确保能检测到后加载的插件
+                // 走 TTL 缓存：本属性在消息处理管线中每条回复被读取数十次，
+                // 不能每次都全量扫插件列表+反射；缓存过期后自动重新检测
                 try
                 {
-                    var result = TTSPluginDetector.DetectAllOtherTTSPlugins(MW);
+                    var result = TTSPluginDetector.DetectAllOtherTTSPluginsWithCache(MW, TTS_DETECT_CACHE_BATCH);
                     var hasEnabledPlugin = result.HasOtherEnabledTTSPlugin;
                     
                     // 如果检测结果与缓存不同，更新缓存并记录日志
@@ -176,6 +177,10 @@ namespace VPetLLM
 
         // 已注册 Hook 的物品类型列表
         private readonly string[] _hookedItemTypes = { "Food", "Toy", "Tool", "Mail", "Item" };
+
+        // TTS 插件探测的缓存批次键：热路径（消息管线每条回复读取数十次）走
+        // TTSPluginDetector 的 TTL 缓存（默认 5 秒），插件开关切换最多延迟 5 秒被感知
+        private const string TTS_DETECT_CACHE_BATCH = "realtime";
 
         private int _consecutiveAIFailureCount = 0;
         private readonly object _failureCountLock = new object();
@@ -816,7 +821,7 @@ namespace VPetLLM
         {
             try
             {
-                var result = TTSPluginDetector.DetectAllOtherTTSPlugins(MW);
+                var result = TTSPluginDetector.DetectAllOtherTTSPluginsWithCache(MW, TTS_DETECT_CACHE_BATCH);
                 var hasEnabledPlugin = result.HasOtherEnabledTTSPlugin;
 
                 // 如果检测结果与上次不同，更新状态并通知UI
@@ -1671,7 +1676,9 @@ namespace VPetLLM
 
             Logger.Log($"Chat history already loaded by HistoryManager (SeparateChatByProvider={Settings.SeparateChatByProvider})");
 
-            Application.Current.Dispatcher.InvokeAsync(() =>
+            // 不能用 InvokeAsync(...).Wait()：从 UI 线程（设置窗口切换提供商）调用时
+            // 会触发 PushFrame 重入；UI 线程直接执行，其他线程用同步 Invoke
+            void SwapTalkBox()
             {
                 if (TalkBox is not null)
                 {
@@ -1683,7 +1690,17 @@ namespace VPetLLM
                 Logger.Log("New TalkBox added to TalkAPI");
 
                 Logger.Log($"New TalkBox should use ChatCore: {ChatCore?.GetType().Name}");
-            }).Wait();
+            }
+
+            var dispatcher = Application.Current.Dispatcher;
+            if (dispatcher.CheckAccess())
+            {
+                SwapTalkBox();
+            }
+            else
+            {
+                dispatcher.Invoke(SwapTalkBox);
+            }
 
             _logger.LogInformation("ChatCore updated");
         }

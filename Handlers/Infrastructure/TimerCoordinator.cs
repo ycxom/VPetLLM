@@ -235,15 +235,13 @@ namespace VPetLLM.Handlers.Infrastructure
         }
 
         /// <summary>
-        /// 获取定时器实例
+        /// 获取定时器实例（经 MessageBarHelper 的缓存反射，不再每次 GetField）
         /// </summary>
         private System.Timers.Timer GetTimer(object msgBar, string timerName)
         {
             try
             {
-                var field = msgBar.GetType().GetField(timerName,
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                return field?.GetValue(msgBar) as System.Timers.Timer;
+                return Utils.UI.MessageBarHelper.GetFieldValue<System.Timers.Timer>(msgBar, timerName);
             }
             catch
             {

@@ -1,5 +1,6 @@
 using System.Windows;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Core.Services;
 using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Actions
@@ -10,6 +11,34 @@ namespace VPetLLM.Handlers.Actions
         public ActionType ActionType => ActionType.Body;
         public ActionCategory Category => ActionCategory.Interactive;
         public string Description => PromptHelper.Get("Handler_Move_Description", VPetLLM.Instance.Settings.PromptLanguage);
+
+        /// <summary>
+        /// 读取移动区域：自定义区域（经适配层）优先，否则回退主屏。
+        /// </summary>
+        private static void GetMoveArea(IMainWindow mainWindow, out double screenX, out double screenY, out double screenWidth, out double screenHeight)
+        {
+            screenX = 0;
+            screenY = 0;
+            try
+            {
+                if (VPetHostAdapter.TryGetCustomMoveArea(mainWindow, out var x, out var y, out var w, out var h))
+                {
+                    screenX = x;
+                    screenY = y;
+                    screenWidth = w;
+                    screenHeight = h;
+                    Logger.Log($"MoveHandler: Using custom area ({screenX:F0},{screenY:F0},{screenWidth:F0}x{screenHeight:F0})");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MoveHandler: Error getting screen border: {ex.Message}, using primary screen");
+            }
+
+            screenWidth = SystemParameters.PrimaryScreenWidth;
+            screenHeight = SystemParameters.PrimaryScreenHeight;
+        }
 
         public Task Execute(string value, IMainWindow mainWindow)
         {
@@ -44,45 +73,7 @@ namespace VPetLLM.Handlers.Actions
                 if (flash)
                 {
                     // 闪现模式：计算随机位置并瞬移
-                    // 使用反射获取移动区域设置
-                    double screenX = 0, screenY = 0, screenWidth, screenHeight;
-
-                    try
-                    {
-                        var controllerType = mainWindow.Core.Controller.GetType();
-                        var isPrimaryScreenProp = controllerType.GetProperty("IsPrimaryScreen");
-                        var screenBorderProp = controllerType.GetProperty("ScreenBorder");
-
-                        if (isPrimaryScreenProp is not null && screenBorderProp is not null)
-                        {
-                            bool isPrimaryScreen = (bool)isPrimaryScreenProp.GetValue(mainWindow.Core.Controller);
-
-                            if (isPrimaryScreen)
-                            {
-                                screenWidth = SystemParameters.PrimaryScreenWidth;
-                                screenHeight = SystemParameters.PrimaryScreenHeight;
-                            }
-                            else
-                            {
-                                var border = screenBorderProp.GetValue(mainWindow.Core.Controller);
-                                var borderType = border.GetType();
-                                screenX = (int)borderType.GetProperty("X").GetValue(border);
-                                screenY = (int)borderType.GetProperty("Y").GetValue(border);
-                                screenWidth = (int)borderType.GetProperty("Width").GetValue(border);
-                                screenHeight = (int)borderType.GetProperty("Height").GetValue(border);
-                            }
-                        }
-                        else
-                        {
-                            screenWidth = SystemParameters.PrimaryScreenWidth;
-                            screenHeight = SystemParameters.PrimaryScreenHeight;
-                        }
-                    }
-                    catch
-                    {
-                        screenWidth = SystemParameters.PrimaryScreenWidth;
-                        screenHeight = SystemParameters.PrimaryScreenHeight;
-                    }
+                    GetMoveArea(mainWindow, out double screenX, out double screenY, out double screenWidth, out double screenHeight);
 
                     var petWidth = mainWindow.PetGrid.ActualWidth > 0 ? mainWindow.PetGrid.ActualWidth : 200;
                     var petHeight = mainWindow.PetGrid.ActualHeight > 0 ? mainWindow.PetGrid.ActualHeight : 200;
@@ -120,15 +111,7 @@ namespace VPetLLM.Handlers.Actions
                     Logger.Log("MoveHandler: Calling DisplayToMove");
                     try
                     {
-                        var mainType = mainWindow.Main.GetType();
-                        var displayToMoveMethod = mainType.GetMethod("DisplayToMove",
-                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-
-                        if (displayToMoveMethod is not null)
-                        {
-                            displayToMoveMethod.Invoke(mainWindow.Main, null);
-                        }
-                        else
+                        if (!VPetHostAdapter.TryDisplayToMove(mainWindow))
                         {
                             mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
                         }
@@ -142,53 +125,7 @@ namespace VPetLLM.Handlers.Actions
             }
             else if (double.TryParse(parts[0], out double targetX) && double.TryParse(parts[1], out double targetY))
             {
-                // 使用反射获取移动区域设置
-                double screenX = 0, screenY = 0, screenWidth, screenHeight;
-
-                try
-                {
-                    var controllerType = mainWindow.Core.Controller.GetType();
-                    var isPrimaryScreenProp = controllerType.GetProperty("IsPrimaryScreen");
-                    var screenBorderProp = controllerType.GetProperty("ScreenBorder");
-
-                    if (isPrimaryScreenProp is not null && screenBorderProp is not null)
-                    {
-                        bool isPrimaryScreen = (bool)isPrimaryScreenProp.GetValue(mainWindow.Core.Controller);
-
-                        if (isPrimaryScreen)
-                        {
-                            // 使用主屏幕
-                            screenWidth = SystemParameters.PrimaryScreenWidth;
-                            screenHeight = SystemParameters.PrimaryScreenHeight;
-                            Logger.Log($"MoveHandler: Using primary screen ({screenWidth:F0}x{screenHeight:F0})");
-                        }
-                        else
-                        {
-                            // 使用自定义移动区域
-                            var border = screenBorderProp.GetValue(mainWindow.Core.Controller);
-                            var borderType = border.GetType();
-                            screenX = (int)borderType.GetProperty("X").GetValue(border);
-                            screenY = (int)borderType.GetProperty("Y").GetValue(border);
-                            screenWidth = (int)borderType.GetProperty("Width").GetValue(border);
-                            screenHeight = (int)borderType.GetProperty("Height").GetValue(border);
-                            Logger.Log($"MoveHandler: Using custom area ({screenX:F0},{screenY:F0},{screenWidth:F0}x{screenHeight:F0})");
-                        }
-                    }
-                    else
-                    {
-                        // 回退到主屏幕
-                        screenWidth = SystemParameters.PrimaryScreenWidth;
-                        screenHeight = SystemParameters.PrimaryScreenHeight;
-                        Logger.Log("MoveHandler: Reflection failed, using primary screen");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // 回退到主屏幕
-                    screenWidth = SystemParameters.PrimaryScreenWidth;
-                    screenHeight = SystemParameters.PrimaryScreenHeight;
-                    Logger.Log($"MoveHandler: Error getting screen border: {ex.Message}, using primary screen");
-                }
+                GetMoveArea(mainWindow, out double screenX, out double screenY, out double screenWidth, out double screenHeight);
 
                 var petWidth = mainWindow.PetGrid.ActualWidth > 0 ? mainWindow.PetGrid.ActualWidth : 200;
                 var petHeight = mainWindow.PetGrid.ActualHeight > 0 ? mainWindow.PetGrid.ActualHeight : 200;

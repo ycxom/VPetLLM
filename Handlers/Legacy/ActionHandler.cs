@@ -1,4 +1,5 @@
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Core.Services;
 using VPetLLM.Handlers.Animation;
 using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Handlers.State;
@@ -81,24 +82,18 @@ namespace VPetLLM.Handlers.Legacy
                 {
                     try
                     {
-                        // Get current state first to determine proper stop method
+                        // Get current state first to determine proper stop method (经适配层，缓存反射)
                         string stateName = "Unknown";
-                        object currentStateValue = null;
-                        System.Reflection.FieldInfo stateField = null;
+                        var currentStateValue = VPetHostAdapter.GetState(mainWindow);
 
-                        // Get State field (VPet uses field, not property)
-                        var mainType = mainWindow.Main.GetType();
-                        stateField = mainType.GetField("State");
-
-                        if (stateField is not null)
+                        if (currentStateValue is not null)
                         {
-                            currentStateValue = stateField.GetValue(mainWindow.Main);
-                            stateName = currentStateValue?.ToString() ?? "Unknown";
+                            stateName = currentStateValue.ToString() ?? "Unknown";
                             Logger.Log($"ActionHandler: Current state is {stateName}");
                         }
                         else
                         {
-                            Logger.Log("ActionHandler: State field not found");
+                            Logger.Log("ActionHandler: State member not found");
                         }
 
                         // Handle different states with appropriate animations
@@ -150,21 +145,14 @@ namespace VPetLLM.Handlers.Legacy
                                 Logger.Log("ActionHandler: Stopping sleep state");
 
                                 // Set state to Nomal first
-                                if (stateField is not null)
-                                {
-                                    var workingStateType = stateField.FieldType;
-                                    var nomalState = Enum.Parse(workingStateType, "Nomal");
-                                    stateField.SetValue(mainWindow.Main, nomalState);
-                                }
+                                VPetHostAdapter.TrySetStateByName(mainWindow, "Nomal");
 
                                 // Play sleep end animation (C_End) then transition to normal
                                 try
                                 {
-                                    // Get DisplayNomal property
-                                    var displayNomalProp = mainWindow.Main.GetType().GetProperty("DisplayNomal");
-                                    if (displayNomalProp is not null)
+                                    var displayNomalAction = VPetHostAdapter.GetDisplayNomalAction(mainWindow);
+                                    if (displayNomalAction is not null)
                                     {
-                                        var displayNomalAction = displayNomalProp.GetValue(mainWindow.Main) as Action;
                                         mainWindow.Main.Display(VPet_Simulator.Core.GraphInfo.GraphType.Sleep,
                                                                VPet_Simulator.Core.GraphInfo.AnimatType.C_End,
                                                                displayNomalAction);
@@ -350,10 +338,8 @@ namespace VPetLLM.Handlers.Legacy
                             // 调用VPet的DisplayPinch方法（如果可用）
                             try
                             {
-                                var displayPinchMethod = mainWindow.GetType().GetMethod("DisplayPinch");
-                                if (displayPinchMethod is not null)
+                                if (VPetHostAdapter.TryDisplayPinch(mainWindow))
                                 {
-                                    displayPinchMethod.Invoke(mainWindow, null);
                                     actionTriggered = true;
                                     Logger.Log("ActionHandler: Interactive action 'pinch' completed");
                                 }
@@ -405,62 +391,31 @@ namespace VPetLLM.Handlers.Legacy
                         case "sideleft":
                             Logger.Log("ActionHandler: Attempting to set 'sideleft' state");
                             // 贴墙状态（左边）- VPet 11057+ 通过设置 State 实现
-                            try
+                            // 经适配层：旧实现 GetProperty("State") 因 State 是字段而恒为 null，贴墙从未生效
+                            if (VPetHostAdapter.TrySetStateByName(mainWindow, "SideLeft"))
                             {
-                                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                                if (stateProperty is not null)
-                                {
-                                    var workingStateType = stateProperty.PropertyType;
-                                    var sideLeftValue = System.Enum.Parse(workingStateType, "SideLeft");
-                                    stateProperty.SetValue(mainWindow.Main, sideLeftValue);
-                                    Logger.Log("ActionHandler: Successfully set state to SideLeft");
-                                    actionTriggered = true;
-                                }
-                                else
-                                {
-                                    Logger.Log("ActionHandler: State property not found, falling back to idel");
-                                    mainWindow.Main.DisplayToNomal();
-                                    actionTriggered = true;
-                                }
+                                Logger.Log("ActionHandler: Successfully set state to SideLeft");
                             }
-                            catch (System.Exception ex)
+                            else
                             {
-                                Logger.Log($"ActionHandler: Failed to set SideLeft state: {ex.GetType().Name}");
-                                Logger.Log($"ActionHandler: Exception message: {ex.Message}");
-                                Logger.Log("ActionHandler: Falling back to idel");
+                                Logger.Log("ActionHandler: SideLeft state unavailable, falling back to idel");
                                 mainWindow.Main.DisplayToNomal();
-                                actionTriggered = true;
                             }
+                            actionTriggered = true;
                             break;
                         case "sideright":
                             Logger.Log("ActionHandler: Attempting to set 'sideright' state");
                             // 贴墙状态（右边）- VPet 11057+ 通过设置 State 实现
-                            try
+                            if (VPetHostAdapter.TrySetStateByName(mainWindow, "SideRight"))
                             {
-                                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                                if (stateProperty is not null)
-                                {
-                                    var workingStateType = stateProperty.PropertyType;
-                                    var sideRightValue = System.Enum.Parse(workingStateType, "SideRight");
-                                    stateProperty.SetValue(mainWindow.Main, sideRightValue);
-                                    Logger.Log("ActionHandler: Successfully set state to SideRight");
-                                    actionTriggered = true;
-                                }
-                                else
-                                {
-                                    Logger.Log("ActionHandler: State property not found, falling back to idel");
-                                    mainWindow.Main.DisplayToNomal();
-                                    actionTriggered = true;
-                                }
+                                Logger.Log("ActionHandler: Successfully set state to SideRight");
                             }
-                            catch (System.Exception ex)
+                            else
                             {
-                                Logger.Log($"ActionHandler: Failed to set SideRight state: {ex.GetType().Name}");
-                                Logger.Log($"ActionHandler: Exception message: {ex.Message}");
-                                Logger.Log("ActionHandler: Falling back to idel");
+                                Logger.Log("ActionHandler: SideRight state unavailable, falling back to idel");
                                 mainWindow.Main.DisplayToNomal();
-                                actionTriggered = true;
                             }
+                            actionTriggered = true;
                             break;
                         default:
                             Logger.Log($"ActionHandler: Executing generic animation '{action}' via AnimationHelper");

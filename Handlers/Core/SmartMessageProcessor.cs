@@ -1199,15 +1199,10 @@ namespace VPetLLM.Handlers.Core
                 int checkInterval = 100; // 每100ms检查一次
                 int elapsedMs = 0;
 
-                // 通过反射获取Timer状态
-                var msgBarType = msgBar.GetType();
-                var showTimerField = msgBarType.GetField("ShowTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                var endTimerField = msgBarType.GetField("EndTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                var closeTimerField = msgBarType.GetField("CloseTimer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-
-                if (showTimerField == null || endTimerField == null || closeTimerField == null)
+                // Timer 状态经 MessageBarHelper 的缓存反射获取
+                if (Utils.UI.MessageBarHelper.GetFieldValue<System.Timers.Timer>(msgBar, "ShowTimer") is null)
                 {
-                    Logger.Log("SmartMessageProcessor: 无法通过反射获取MessageBar Timer字段，使用固定等待时间");
+                    Logger.Log("SmartMessageProcessor: 无法获取MessageBar Timer字段，使用固定等待时间");
                     int fallbackWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(text);
                     await Task.Delay(fallbackWaitMs).ConfigureAwait(false);
                     return;
@@ -1224,9 +1219,9 @@ namespace VPetLLM.Handlers.Core
                     {
                         try
                         {
-                            var showTimer = showTimerField.GetValue(msgBar) as System.Timers.Timer;
-                            var endTimer = endTimerField.GetValue(msgBar) as System.Timers.Timer;
-                            var closeTimer = closeTimerField.GetValue(msgBar) as System.Timers.Timer;
+                            var showTimer = Utils.UI.MessageBarHelper.GetFieldValue<System.Timers.Timer>(msgBar, "ShowTimer");
+                            var endTimer = Utils.UI.MessageBarHelper.GetFieldValue<System.Timers.Timer>(msgBar, "EndTimer");
+                            var closeTimer = Utils.UI.MessageBarHelper.GetFieldValue<System.Timers.Timer>(msgBar, "CloseTimer");
 
                             bool showEnabled = showTimer?.Enabled ?? false;
                             bool endEnabled = endTimer?.Enabled ?? false;

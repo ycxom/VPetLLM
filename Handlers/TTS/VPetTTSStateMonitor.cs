@@ -1,9 +1,13 @@
+using VPetLLM.Core.Services;
+
 namespace VPetLLM.Handlers.TTS
 {
     /// <summary>
     /// VPetTTS状态监控器，提供按需状态检测
     /// 解决VPetLLM与VPetTTS协作时的状态同步问题
-    /// 注意：按需检查模式，不启动后台定时器或监控线程
+    /// 注意：按需检查模式，不启动后台定时器或监控线程。
+    /// 对 VPetTTS 内部成员的访问统一经 VPetTTSPluginAdapter（缓存反射引用，
+    /// 本类的 IsPlaying 处于 50-200ms 轮询热路径上）。
     /// </summary>
     public class VPetTTSStateMonitor : IDisposable
     {
@@ -27,21 +31,8 @@ namespace VPetLLM.Handlers.TTS
 
                 try
                 {
-                    // 直接从VPetTTS获取最新状态，不使用缓存
-                    var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                    if (ttsStateProperty is not null)
-                    {
-                        var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
-                        if (ttsState is not null)
-                        {
-                            var isPlayingProperty = ttsState.GetType().GetProperty("IsPlaying");
-                            if (isPlayingProperty is not null)
-                            {
-                                return (bool)isPlayingProperty.GetValue(ttsState);
-                            }
-                        }
-                    }
-                    return false;
+                    var ttsState = VPetTTSPluginAdapter.GetTTSState(_vpetTTSPlugin);
+                    return VPetTTSPluginAdapter.GetStateValue(ttsState, "IsPlaying") is true;
                 }
                 catch (Exception ex)
                 {
@@ -87,14 +78,11 @@ namespace VPetLLM.Handlers.TTS
         {
             try
             {
-                var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (ttsStateProperty is null) return null;
-
-                var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
+                var ttsState = VPetTTSPluginAdapter.GetTTSState(_vpetTTSPlugin);
                 if (ttsState is null) return null;
 
                 // 获取PlaybackCompleted事件
-                var playbackCompletedEvent = ttsState.GetType().GetEvent("PlaybackCompleted");
+                var playbackCompletedEvent = VPetTTSPluginAdapter.GetPlaybackCompletedEvent(ttsState);
                 if (playbackCompletedEvent is null) return null;
 
                 Logger.Log($"VPetTTSStateMonitor: 使用事件驱动方式，订阅PlaybackCompleted事件");
@@ -260,18 +248,11 @@ namespace VPetLLM.Handlers.TTS
 
             try
             {
-                var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (ttsStateProperty is not null)
+                var ttsState = VPetTTSPluginAdapter.GetTTSState(_vpetTTSPlugin);
+                var value = VPetTTSPluginAdapter.GetStateValue(ttsState, "IsPlaybackComplete");
+                if (value is bool complete)
                 {
-                    var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
-                    if (ttsState is not null)
-                    {
-                        var isPlaybackCompleteProperty = ttsState.GetType().GetProperty("IsPlaybackComplete");
-                        if (isPlaybackCompleteProperty is not null)
-                        {
-                            return (bool)isPlaybackCompleteProperty.GetValue(ttsState);
-                        }
-                    }
+                    return complete;
                 }
                 // 如果没有 IsPlaybackComplete 属性，回退到 !IsPlaying
                 return !IsPlaying;
@@ -292,20 +273,10 @@ namespace VPetLLM.Handlers.TTS
 
             try
             {
-                var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (ttsStateProperty is not null)
-                {
-                    var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
-                    if (ttsState is not null)
-                    {
-                        var lastHeartbeatProperty = ttsState.GetType().GetProperty("LastHeartbeatTime");
-                        if (lastHeartbeatProperty is not null)
-                        {
-                            return (DateTime)lastHeartbeatProperty.GetValue(ttsState);
-                        }
-                    }
-                }
-                return DateTime.MinValue;
+                var ttsState = VPetTTSPluginAdapter.GetTTSState(_vpetTTSPlugin);
+                return VPetTTSPluginAdapter.GetStateValue(ttsState, "LastHeartbeatTime") is DateTime time
+                    ? time
+                    : DateTime.MinValue;
             }
             catch
             {
@@ -322,50 +293,25 @@ namespace VPetLLM.Handlers.TTS
 
             try
             {
-                var ttsStateProperty = _vpetTTSPlugin.GetType().GetProperty("TTSState");
-                if (ttsStateProperty is not null)
+                var ttsState = VPetTTSPluginAdapter.GetTTSState(_vpetTTSPlugin);
+                if (ttsState is not null)
                 {
-                    var ttsState = ttsStateProperty.GetValue(_vpetTTSPlugin);
-                    if (ttsState is not null)
-                    {
-                        var info = new PlaybackProgressInfo();
+                    var info = new PlaybackProgressInfo();
 
-                        // 获取各个属性
-                        var props = new[] { "PlaybackProgress", "PlaybackPositionMs", "AudioDurationMs",
-                                           "PlaybackStartTime", "EstimatedPlaybackEndTime", "IsPlaybackComplete" };
+                    if (VPetTTSPluginAdapter.GetStateValue(ttsState, "PlaybackProgress") is double progress)
+                        info.Progress = progress;
+                    if (VPetTTSPluginAdapter.GetStateValue(ttsState, "PlaybackPositionMs") is long positionMs)
+                        info.PositionMs = positionMs;
+                    if (VPetTTSPluginAdapter.GetStateValue(ttsState, "AudioDurationMs") is long durationMs)
+                        info.DurationMs = durationMs;
+                    if (VPetTTSPluginAdapter.GetStateValue(ttsState, "PlaybackStartTime") is DateTime startTime)
+                        info.StartTime = startTime;
+                    if (VPetTTSPluginAdapter.GetStateValue(ttsState, "EstimatedPlaybackEndTime") is DateTime endTime)
+                        info.EstimatedEndTime = endTime;
+                    if (VPetTTSPluginAdapter.GetStateValue(ttsState, "IsPlaybackComplete") is bool isComplete)
+                        info.IsComplete = isComplete;
 
-                        foreach (var propName in props)
-                        {
-                            var prop = ttsState.GetType().GetProperty(propName);
-                            if (prop is not null)
-                            {
-                                var value = prop.GetValue(ttsState);
-                                switch (propName)
-                                {
-                                    case "PlaybackProgress":
-                                        info.Progress = (double)value;
-                                        break;
-                                    case "PlaybackPositionMs":
-                                        info.PositionMs = (long)value;
-                                        break;
-                                    case "AudioDurationMs":
-                                        info.DurationMs = (long)value;
-                                        break;
-                                    case "PlaybackStartTime":
-                                        info.StartTime = (DateTime)value;
-                                        break;
-                                    case "EstimatedPlaybackEndTime":
-                                        info.EstimatedEndTime = (DateTime)value;
-                                        break;
-                                    case "IsPlaybackComplete":
-                                        info.IsComplete = (bool)value;
-                                        break;
-                                }
-                            }
-                        }
-
-                        return info;
-                    }
+                    return info;
                 }
             }
             catch (Exception ex)

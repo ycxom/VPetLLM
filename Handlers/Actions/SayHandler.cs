@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Core.Services;
 using VPetLLM.Handlers.Animation;
 using static VPet_Simulator.Core.GraphInfo;
 
@@ -96,10 +97,8 @@ namespace VPetLLM.Handlers.Actions
                             // 调用VPet的DisplayPinch方法（如果可用）
                             try
                             {
-                                var displayPinchMethod = mainWindow.GetType().GetMethod("DisplayPinch");
-                                if (displayPinchMethod is not null)
+                                if (VPetHostAdapter.TryDisplayPinch(mainWindow))
                                 {
-                                    displayPinchMethod.Invoke(mainWindow, null);
                                     actionTriggered = true;
                                 }
                                 else
@@ -128,57 +127,30 @@ namespace VPetLLM.Handlers.Actions
                             break;
                         case "sideleft":
                             // 贴墙状态（左边）- VPet 11057+ 通过设置 State 实现
-                            try
+                            // 经适配层：旧实现 GetProperty("State") 因 State 是字段而恒为 null，贴墙从未生效
+                            if (VPetHostAdapter.TrySetStateByName(mainWindow, "SideLeft"))
                             {
-                                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                                if (stateProperty is not null)
-                                {
-                                    var workingStateType = stateProperty.PropertyType;
-                                    var sideLeftValue = System.Enum.Parse(workingStateType, "SideLeft");
-                                    stateProperty.SetValue(mainWindow.Main, sideLeftValue);
-                                    Logger.Log("SayHandler: Set state to SideLeft");
-                                    actionTriggered = true;
-                                }
-                                else
-                                {
-                                    Logger.Log("SayHandler: State property not found, falling back to idel");
-                                    mainWindow.Main.DisplayToNomal();
-                                    actionTriggered = true;
-                                }
+                                Logger.Log("SayHandler: Set state to SideLeft");
                             }
-                            catch (System.Exception ex)
+                            else
                             {
-                                Logger.Log($"SayHandler: Failed to set SideLeft state: {ex.Message}, falling back to idel");
+                                Logger.Log("SayHandler: SideLeft state unavailable, falling back to idel");
                                 mainWindow.Main.DisplayToNomal();
-                                actionTriggered = true;
                             }
+                            actionTriggered = true;
                             break;
                         case "sideright":
                             // 贴墙状态（右边）- VPet 11057+ 通过设置 State 实现
-                            try
+                            if (VPetHostAdapter.TrySetStateByName(mainWindow, "SideRight"))
                             {
-                                var stateProperty = mainWindow.Main.GetType().GetProperty("State");
-                                if (stateProperty is not null)
-                                {
-                                    var workingStateType = stateProperty.PropertyType;
-                                    var sideRightValue = System.Enum.Parse(workingStateType, "SideRight");
-                                    stateProperty.SetValue(mainWindow.Main, sideRightValue);
-                                    Logger.Log("SayHandler: Set state to SideRight");
-                                    actionTriggered = true;
-                                }
-                                else
-                                {
-                                    Logger.Log("SayHandler: State property not found, falling back to idel");
-                                    mainWindow.Main.DisplayToNomal();
-                                    actionTriggered = true;
-                                }
+                                Logger.Log("SayHandler: Set state to SideRight");
                             }
-                            catch (System.Exception ex)
+                            else
                             {
-                                Logger.Log($"SayHandler: Failed to set SideRight state: {ex.Message}, falling back to idel");
+                                Logger.Log("SayHandler: SideRight state unavailable, falling back to idel");
                                 mainWindow.Main.DisplayToNomal();
-                                actionTriggered = true;
                             }
+                            actionTriggered = true;
                             break;
                         default:
                             mainWindow.Main.Display(action, AnimatType.Single, mainWindow.Main.DisplayToNomal);
