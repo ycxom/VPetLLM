@@ -40,12 +40,14 @@ namespace VPetLLM.Core.Services
                 _stateField = type.GetField("State");
                 _stateProperty = _stateField is null ? type.GetProperty("State") : null;
 
-                const BindingFlags priv = BindingFlags.NonPublic | BindingFlags.Instance;
-                _voicePlayerField = type.GetField("VoicePlayer", priv);
-                _petGridCrlfField = type.GetField("petgridcrlf", priv);
-                _petGridField = type.GetField("PetGrid", priv);
-                _petGrid2Field = type.GetField("PetGrid2", priv);
-                _loopTimesField = type.GetField("looptimes", priv);
+                // VoicePlayer/PetGrid(2) 在 XAML 里是 x:FieldModifier="public"，
+                // petgridcrlf/looptimes 是 code-behind 私有字段——统一两种可见性都查
+                const BindingFlags any = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+                _voicePlayerField = type.GetField("VoicePlayer", any);
+                _petGridCrlfField = type.GetField("petgridcrlf", any);
+                _petGridField = type.GetField("PetGrid", any);
+                _petGrid2Field = type.GetField("PetGrid2", any);
+                _loopTimesField = type.GetField("looptimes", any);
                 _displayToMoveMethod = type.GetMethod("DisplayToMove", BindingFlags.Public | BindingFlags.Instance);
                 _displayNomalProperty = type.GetProperty("DisplayNomal");
 

@@ -115,21 +115,25 @@ namespace VPetLLM.Utils.Audio
 
         private void InitializePlayer()
         {
-            // 使用与 Language.json 相同的方式获取插件目录
-            var dllPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            // VPetLLMUtils.Logger.Log($"TTS: DLL 目录: {dllPath}");
-
-            var mpvDir = Path.Combine(dllPath, "mpv");
-
-            if (Directory.Exists(mpvDir))
+            // 用户显式选择宿主播放器：走 Main.PlayVoice，宿主自动保持说话动画到语音结束
+            if (_ttsSettings.UseHostPlayer && TryCreateHostPlayer("设置启用"))
             {
-                var files = Directory.GetFiles(mpvDir);
+                return;
             }
 
-            var mpvExePath = Path.Combine(mpvDir, "mpv.exe");
+            // 使用与 Language.json 相同的方式获取插件目录
+            var dllPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            var mpvExePath = Path.Combine(dllPath, "mpv", "mpv.exe");
 
             if (!File.Exists(mpvExePath))
             {
+                // mpv 缺失时降级到宿主播放器，而不是让整个 TTS 不可用
+                if (TryCreateHostPlayer("mpv.exe 未找到"))
+                {
+                    return;
+                }
+
                 var errorMsg = $"mpv.exe 未找到！\n请将 mpv 文件夹放到插件目录: {dllPath}\n下载: https://mpv.io/installation/";
                 VPetLLMUtils.Logger.Log($"TTS: {errorMsg}");
                 throw new FileNotFoundException(errorMsg);
@@ -142,8 +146,29 @@ namespace VPetLLM.Utils.Audio
             }
             catch (Exception ex)
             {
+                if (TryCreateHostPlayer($"mpv 初始化失败: {ex.Message}"))
+                {
+                    return;
+                }
                 throw new InvalidOperationException($"无法初始化 mpv 播放器: {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// 尝试创建宿主播放器（Main.PlayVoice）。宿主不可用时返回 false。
+        /// </summary>
+        private bool TryCreateHostPlayer(string reason)
+        {
+            var mainWindow = VPetLLM.Instance?.MW;
+            if (mainWindow?.Main is null)
+            {
+                VPetLLMUtils.Logger.Log($"TTS: 无法使用宿主播放器（宿主不可用），原因: {reason}");
+                return false;
+            }
+
+            _mediaPlayer = new HostVoicePlayer(mainWindow);
+            VPetLLMUtils.Logger.Log($"TTS: 使用 VPet 宿主播放器（{reason}），语音期间宿主将自动保持说话动画");
+            return true;
         }
 
         /// <summary>
@@ -592,8 +617,23 @@ namespace VPetLLM.Utils.Audio
 
                 VPetLLMUtils.Logger.Log($"TTS: 开始播放音频: {filePath}");
 
-                // 使用播放器播放
-                await _mediaPlayer.PlayAsync(filePath);
+                // mpv 播放时用静音占位驱动宿主保持说话动画（宿主播放器自身播放无需占位）
+                // 该能力恒开启，无需设置开关：纯增强，无实质代价
+                var holdAnimation = _mediaPlayer is not HostVoicePlayer
+                    && SilentVoiceAnimationHold.Begin();
+
+                try
+                {
+                    // 使用播放器播放
+                    await _mediaPlayer.PlayAsync(filePath);
+                }
+                finally
+                {
+                    if (holdAnimation)
+                    {
+                        SilentVoiceAnimationHold.End();
+                    }
+                }
 
                 lock (_playbackLock)
                 {
@@ -689,6 +729,25 @@ namespace VPetLLM.Utils.Audio
 
             _ttsSettings = settings;
             _proxySettings = proxySettings;
+
+            // 播放器选择变化：重建播放器（宿主播放器 ↔ mpv）。
+            // 注意不能比较新旧设置对象——设置是就地修改的（同一引用），
+            // 只能对比"目标状态 vs 实际播放器类型"
+            var isHostPlayerActive = _mediaPlayer is HostVoicePlayer;
+            if (settings.UseHostPlayer != isHostPlayerActive && !_useUnifiedSystem)
+            {
+                try
+                {
+                    var oldPlayer = _mediaPlayer;
+                    InitializePlayer();
+                    oldPlayer?.Dispose();
+                    VPetLLMUtils.Logger.Log($"TTS: 播放器已切换为 {_mediaPlayer?.Name}");
+                }
+                catch (Exception ex)
+                {
+                    VPetLLMUtils.Logger.Log($"TTS: 切换播放器失败: {ex.Message}");
+                }
+            }
 
             // 如果音量设置发生变化，立即应用到当前播放器
             if (Math.Abs(oldVolume - settings.Volume) > 0.01 || Math.Abs(oldVolumeGain - settings.VolumeGain) > 0.01)

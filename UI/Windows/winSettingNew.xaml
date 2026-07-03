@@ -769,6 +769,13 @@
                                             IsChecked="False"
                                             Style="{StaticResource ModernCheckBox}"/>
 
+                                            <CheckBox x:Name="CheckBox_TTS_UseHostPlayer"
+                                            Content="{utils:Localize KeyPath=TTS.UseHostPlayer, Default=使用宿主播放器（语音期间自动保持说话动画）}"
+                                            ToolTip="{utils:Localize KeyPath=TTS.UseHostPlayerTip, Default=音频交给 VPet 的 Main.PlayVoice 播放，宿主会保持说话动画和气泡直到语音结束（与 EdgeTTS 插件同机制）。关闭则使用 mpv 播放器（支持音量增益）。}"
+                                            Margin="0,0,0,16"
+                                            IsChecked="False"
+                                            Style="{StaticResource ModernCheckBox}"/>
+
                                             <Label Content="{utils:Localize KeyPath=TTS.RequestTimeout}"
                                                     Style="{StaticResource SettingLabel}"/>
                                             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">

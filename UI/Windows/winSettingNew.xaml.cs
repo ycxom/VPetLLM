@@ -579,6 +579,7 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_TTS_Provider")).SelectionChanged += Control_SelectionChanged;
             ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_TTS_UseQueueDownload")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_TTS_UseHostPlayer")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_TTS_URL_BaseUrl")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_TTS_URL_Voice")).TextChanged += Control_TextChanged;
             ((ComboBox)this.FindName("ComboBox_TTS_URL_RequestMethod")).SelectionChanged += Control_SelectionChanged;
@@ -1151,6 +1152,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).IsChecked = _plugin.Settings.TTS.IsEnabled;
             ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked = _plugin.Settings.TTS.OnlyPlayAIResponse;
             ((CheckBox)this.FindName("CheckBox_TTS_UseQueueDownload")).IsChecked = _plugin.Settings.TTS.UseQueueDownload;
+            ((CheckBox)this.FindName("CheckBox_TTS_UseHostPlayer")).IsChecked = _plugin.Settings.TTS.UseHostPlayer;
             ((TextBox)this.FindName("TextBox_TTS_RequestTimeout")).Text = _plugin.Settings.TTS.RequestTimeoutSeconds.ToString();
             ((Slider)this.FindName("Slider_TTS_Volume")).Value = _plugin.Settings.TTS.Volume;
             ((TextBlock)this.FindName("TextBlock_TTS_VolumeValue")).Text = _plugin.Settings.TTS.Volume.ToString("F0") + "%";
@@ -1654,6 +1656,7 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.TTS.IsEnabled = ((CheckBox)this.FindName("CheckBox_TTS_IsEnabled")).IsChecked ?? false;
             _plugin.Settings.TTS.OnlyPlayAIResponse = ((CheckBox)this.FindName("CheckBox_TTS_OnlyPlayAIResponse")).IsChecked ?? true;
             _plugin.Settings.TTS.UseQueueDownload = ((CheckBox)this.FindName("CheckBox_TTS_UseQueueDownload")).IsChecked ?? false;
+            _plugin.Settings.TTS.UseHostPlayer = ((CheckBox)this.FindName("CheckBox_TTS_UseHostPlayer")).IsChecked ?? false;
 
             // 保存 TTS 请求超时
             if (int.TryParse(((TextBox)this.FindName("TextBox_TTS_RequestTimeout")).Text, out int ttsTimeout))

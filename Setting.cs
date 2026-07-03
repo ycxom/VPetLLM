@@ -1573,6 +1573,13 @@ namespace VPetLLM
             public bool UseQueueDownload { get; set; } = false; // 是否使用队列下载模式（适用于无法并发请求的接口）
 
             /// <summary>
+            /// 使用 VPet 宿主播放器（Main.PlayVoice）播放 TTS。
+            /// 宿主会在语音播放期间自动保持说话动画和气泡（与 EdgeTTS 插件同机制）；
+            /// 代价：不支持音量增益，单通道播放。false = 使用 mpv。
+            /// </summary>
+            public bool UseHostPlayer { get; set; } = false;
+
+            /// <summary>
             /// TTS 请求超时时间（秒），0 表示使用默认值（30秒）
             /// </summary>
             public int RequestTimeoutSeconds { get; set; } = 30;

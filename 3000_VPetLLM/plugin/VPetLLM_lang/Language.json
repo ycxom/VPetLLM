@@ -1718,6 +1718,18 @@
             "zh-hant": "使用隊列下載模式（適用於無法並發請求的接口）",
             "jp": "キューダウンロードモードを使用（同時リクエストをサポートしないAPIに適用）"
         },
+        "UseHostPlayer": {
+            "en": "Use Host Player (auto-hold talking animation during speech)",
+            "zh-hans": "使用宿主播放器（语音期间自动保持说话动画）",
+            "zh-hant": "使用宿主播放器（語音期間自動保持說話動畫）",
+            "jp": "ホストプレーヤーを使用（音声再生中は話しているアニメーションを自動維持）"
+        },
+        "UseHostPlayerTip": {
+            "en": "Audio is played through VPet's Main.PlayVoice; the host keeps the talking animation and speech bubble until playback ends (same mechanism as the EdgeTTS plugin). Disable to use the mpv player instead (supports volume gain).",
+            "zh-hans": "音频交给 VPet 的 Main.PlayVoice 播放，宿主会保持说话动画和气泡直到语音结束（与 EdgeTTS 插件同机制）。关闭则使用 mpv 播放器（支持音量增益）。",
+            "zh-hant": "音頻交給 VPet 的 Main.PlayVoice 播放，宿主會保持說話動畫和氣泡直到語音結束（與 EdgeTTS 插件同機制）。關閉則使用 mpv 播放器（支持音量增益）。",
+            "jp": "音声は VPet の Main.PlayVoice で再生され、ホストは音声終了まで話しているアニメーションと吹き出しを維持します（EdgeTTS プラグインと同じ仕組み）。オフにすると mpv プレーヤーを使用します（音量ゲイン対応）。"
+        },
         "RequestTimeout": {
             "en": "Request Timeout (seconds, 0=default)",
             "zh-hans": "请求超时时间（秒，0=默认）",
