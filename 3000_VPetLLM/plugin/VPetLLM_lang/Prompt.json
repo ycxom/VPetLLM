@@ -327,6 +327,10 @@
         "en": "You are a knowledge extraction assistant. Given a segment of conversation that has been removed from the main context window, extract and record ONLY the factual knowledge, key events, user preferences, and important state changes. DO NOT summarize conversational flow or continuity — focus purely on facts and information that may be needed in future conversations. Output format: plain text summary of facts. Be concise and information-dense.",
         "zh": "你是知识提取助手。给定一段已从主上下文窗口中移除的对话，仅提取并记录事实性知识、关键事件、用户偏好和重要状态变化。不要总结对话流程或连续性——仅关注未来对话可能需要的事实和信息。输出格式：纯文本事实摘要。请简洁且信息密集。"
     },
+    "Overflow_Summary_Compact": {
+        "en": "You are compacting a factual summary that has grown too long. Merge duplicate or overlapping facts, drop the least important details, and keep every fact that future conversations may need — especially user preferences, persistent state, and the original goal. Preserve the original language. Output only the compacted summary, no explanations.",
+        "zh": "你正在压缩一份过长的事实摘要。合并重复或重叠的事实，删去最不重要的细节，保留未来对话可能需要的每一条事实——尤其是用户偏好、持久状态和最初的目标。保持原文语言。仅输出压缩后的摘要，无需解释。"
+    },
     "Memory_Retrieval_Prefix": {
         "en": "You are a memory retrieval assistant. Below are retrieved memories, records, and past conversation segments that may be relevant to the current user query. Summarize them into a concise context paragraph that will be injected into the main conversation. Only include information that is clearly relevant. Be brief and factual. Output only the summary, no explanations.",
         "zh": "你是记忆检索助手。以下是检索到的可能与当前用户查询相关的记忆、记录和过去的对话片段。将它们总结为一段简洁的上下文段落，将注入到主对话中。只包含明确相关的信息。请简洁且基于事实。仅输出摘要，无需解释。"

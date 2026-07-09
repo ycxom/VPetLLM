@@ -16,6 +16,24 @@ namespace VPetLLM.Core.Providers.Chat
         private string _model;
         private int _maxTokensLimit = 3000;
 
+        /// <summary>
+        /// Free 通道对 messages 数组条数的硬限制（API 返回 "Too many messages (N), max 1000 allowed"）。
+        /// 云端可通过 MaxMessagesLimit 字段修正。缓存配置陈旧或离线时回落到这个保守值 ——
+        /// 这里绝不能像全局 MaxContextMessages 那样以 0（不限制）兜底，否则「云端修正」
+        /// 恰好在最需要它的老客户端上失效。
+        /// </summary>
+        private const int DEFAULT_MESSAGES_LIMIT = 1000;
+
+        /// <summary>
+        /// 预算裁剪之后仍会追加的消息条数余量（ChatWithImage 在裁剪后才追加图像消息）。
+        /// </summary>
+        private const int MESSAGES_LIMIT_RESERVE = 4;
+
+        private int _maxMessagesLimit = DEFAULT_MESSAGES_LIMIT;
+
+        /// <inheritdoc />
+        protected override int MaxContextMessages => Math.Max(1, _maxMessagesLimit - MESSAGES_LIMIT_RESERVE);
+
         // 保留硬编码的User-Agent
         private const string ENCODED_UA = "566c426c6445784d54563947636d566c58304a3558304a5a54513d3d";
 
@@ -64,6 +82,12 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         _maxTokensLimit = cloudLimit;
                     }
+                    // 读取云端下发的 messages 条数上限，未下发则保持保守默认值
+                    if (config["MaxMessagesLimit"] is not null && int.TryParse(config["MaxMessagesLimit"]?.ToString(), out int cloudMsgLimit) && cloudMsgLimit > 0)
+                    {
+                        _maxMessagesLimit = cloudMsgLimit;
+                    }
+                    Logger.Log($"FreeChatCore: messages 条数上限={_maxMessagesLimit}（实际裁剪至 {MaxContextMessages}）");
                     // 读取云端下发的记忆检索开关
                     if (config["EnableMemoryRetrieval"] is not null && bool.TryParse(config["EnableMemoryRetrieval"]?.ToString(), out bool enableRetrieval))
                     {

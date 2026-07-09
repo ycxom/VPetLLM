@@ -83,6 +83,21 @@ namespace VPetLLM.Core.Data.Managers
         /// </summary>
         private string EffectiveProvider => _settings?.SeparateChatByProvider == true ? _providerName : "";
 
+        /// <summary>
+        /// 滚动总结自身的 token 预算，0 表示不限制。
+        /// 未显式配置时取上下文预算的 15%，与 prompt 里保留给近期消息的窗口大致平衡。
+        /// </summary>
+        private int SummaryTokenBudget
+        {
+            get
+            {
+                if (_settings is null) return 0;
+                if (_settings.MaxSummaryTokens > 0) return _settings.MaxSummaryTokens;
+                var ctx = _settings.MaxContextTokens;
+                return ctx > 0 ? Math.Max(256, (int)(ctx * 0.15)) : 0;
+            }
+        }
+
         public OverflowManager(Setting settings, string providerName, ChatCoreBase chatCore, RecordManager? recordManager)
         {
             _settings = settings;
@@ -270,6 +285,11 @@ namespace VPetLLM.Core.Data.Managers
                 {
                     systemPrompt += "\n\nPrevious summary context:\n" + _currentSummary;
                     systemPrompt += "\n\nThe above is the existing summary. Please EXTEND it with the new information below, keeping all prior facts. Output the COMPLETE updated summary.";
+
+                    // 没有上限时滚动总结会单调增长，最终成为 prompt 里最大的一块
+                    var budget = SummaryTokenBudget;
+                    if (budget > 0)
+                        systemPrompt += $"\nKeep the complete summary under roughly {budget} tokens. If it would exceed that, merge or drop the least important facts rather than growing.";
                 }
 
                 if (_settings.EnableCompressionRecords && _recordManager is not null)
@@ -293,6 +313,8 @@ namespace VPetLLM.Core.Data.Managers
                 // Extract record commands
                 if (_settings.EnableCompressionRecords && _recordManager is not null)
                     summary = ExtractAndExecuteRecordCommands(summary);
+
+                summary = await CompactSummaryIfNeededAsync(summary);
 
                 // Store in database
                 var tokenCount = TokenCounter.EstimateMessagesTokenCount(overflowedMessages);
@@ -322,6 +344,78 @@ namespace VPetLLM.Core.Data.Managers
             {
                 Logger.Log($"OverflowManager: Failed to trigger overflow summary: {ex.Message}");
             }
+        }
+
+        private const string CompactPromptFallback =
+            "You are compacting a factual summary that has grown too long. Merge duplicates, drop the least " +
+            "important details, and keep every fact that future conversations may need. Preserve the original " +
+            "language. Output only the compacted summary.";
+
+        /// <summary>
+        /// 若滚动总结超出 token 预算，先请 LLM 压缩一次；压缩失败或仍然超标时按字符硬截断。
+        /// </summary>
+        private async Task<string> CompactSummaryIfNeededAsync(string summary)
+        {
+            var budget = SummaryTokenBudget;
+            if (budget <= 0 || string.IsNullOrWhiteSpace(summary))
+                return summary;
+
+            if (TokenCounter.EstimateTokenCount(summary) <= budget)
+                return summary;
+
+            var before = TokenCounter.EstimateTokenCount(summary);
+            Logger.Log($"OverflowManager: 滚动总结 {before} tokens 超出预算 {budget}，开始压缩");
+
+            try
+            {
+                var compactPrompt = PromptHelper.Get("Overflow_Summary_Compact", _settings.PromptLanguage);
+                if (compactPrompt.StartsWith("[Prompt Missing"))
+                    compactPrompt = CompactPromptFallback;
+                compactPrompt += $"\nThe result must stay under roughly {budget} tokens.";
+
+                var compacted = await _chatCore.Summarize(compactPrompt, summary);
+                if (!string.IsNullOrWhiteSpace(compacted))
+                    summary = compacted;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"OverflowManager: 总结压缩失败，改用硬截断: {ex.Message}");
+            }
+
+            // 压缩后仍超标（或压缩失败）时硬截断。保留开头：近期事实本来就还在滑动窗口里
+            // 逐字保存着，总结的独有价值在于更早的那部分。
+            if (TokenCounter.EstimateTokenCount(summary) > budget)
+                summary = TruncateToTokenBudget(summary, budget);
+
+            Logger.Log($"OverflowManager: 总结压缩完成 {before} → {TokenCounter.EstimateTokenCount(summary)} tokens");
+            return summary;
+        }
+
+        private const string TruncationMarker = "\n…[summary truncated]";
+
+        /// <summary>
+        /// 按字符裁剪文本直到估算 token 数落入预算内。TokenCounter 没有反函数，
+        /// 因此先按比例估一个长度，再逐步收缩。
+        /// </summary>
+        private static string TruncateToTokenBudget(string text, int budget)
+        {
+            var markerTokens = TokenCounter.EstimateTokenCount(TruncationMarker);
+            var target = Math.Max(1, budget - markerTokens);
+
+            var length = text.Length;
+            for (int pass = 0; pass < 12 && length > 0; pass++)
+            {
+                var tokens = TokenCounter.EstimateTokenCount(text.Substring(0, length));
+                if (tokens <= target)
+                    break;
+
+                // 按当前超标比例收缩，再多砍 5% 保证收敛
+                var ratio = (double)target / tokens;
+                var next = (int)(length * ratio * 0.95);
+                length = next < length ? Math.Max(1, next) : length - 1;
+            }
+
+            return text.Substring(0, length).TrimEnd() + TruncationMarker;
         }
 
         /// <summary>

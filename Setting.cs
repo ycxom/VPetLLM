@@ -46,6 +46,23 @@ namespace VPetLLM
         public bool EnableAIRetainCount { get; set; } = false;
         public bool EnableCompressionRecords { get; set; } = false;
 
+        /// <summary>
+        /// 模型上下文窗口的 token 上限。组装好的 prompt 超过其 82% 时会丢弃窗口中最旧的一半消息。
+        /// 0 或负数表示不设上限（此时 prompt 大小无保证）。
+        /// </summary>
+        public int MaxContextTokens { get; set; } = 0;
+
+        /// <summary>
+        /// 滚动总结自身的 token 上限。0 表示自动取 MaxContextTokens 的 15%（MaxContextTokens 未设置时不限制）。
+        /// </summary>
+        public int MaxSummaryTokens { get; set; } = 0;
+
+        /// <summary>
+        /// 单次请求 messages 数组的条数上限。0 或负数表示不限制。
+        /// 部分 API 限制的是条数而非 token（Free 通道上限 1000 条）。
+        /// </summary>
+        public int MaxContextMessages { get; set; } = 0;
+
         // 上下文溢出模式（新机制：不压缩，溢出超出阈值的聊天内容）
         public ContextOverflowMode OverflowMode { get; set; } = ContextOverflowMode.Overflow;
         public bool EnableExpertMemoryRetrieval { get; set; } = false;

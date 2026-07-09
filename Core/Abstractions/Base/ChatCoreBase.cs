@@ -43,6 +43,161 @@ namespace VPetLLM.Core.Abstractions.Base
         }
 
         /// <summary>
+        /// 组装好的 prompt 达到预算的这个占比时开始裁剪，留出输出 token 的余量。
+        /// </summary>
+        private const double ContextBudgetTriggerRatio = 0.82;
+
+        /// <summary>
+        /// 裁剪循环的次数上限，防御性保护，正常情况下 1-2 轮就能收敛。
+        /// </summary>
+        private const int MaxBudgetTrimPasses = 8;
+
+        /// <summary>
+        /// 当前模型上下文窗口的 token 预算，&lt;= 0 表示不限制。
+        /// 各 Provider 可覆盖以按模型给出不同预算。
+        /// </summary>
+        protected virtual int MaxContextTokens => Settings?.MaxContextTokens ?? 0;
+
+        /// <summary>
+        /// 单次请求 messages 数组的条数上限，&lt;= 0 表示不限制。
+        /// 部分 API（如 Free 通道）限制的是条数而非 token
+        /// （"Too many messages (1255), max 1000 allowed"）。
+        /// 各 Provider 可覆盖。
+        /// </summary>
+        protected virtual int MaxContextMessages => Settings?.MaxContextMessages ?? 0;
+
+        /// <summary>
+        /// 返回 <paramref name="start"/> 及其之后第一条 user 消息的下标。
+        /// 找不到时返回 messages.Count。
+        /// </summary>
+        private static int FindRoundStart(IReadOnlyList<Message> messages, int start)
+        {
+            for (int i = Math.Max(0, start); i < messages.Count; i++)
+            {
+                if (string.Equals(messages[i].NormalizedRole, "user", StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+            return messages.Count;
+        }
+
+        /// <summary>
+        /// 前导 system 消息的数量。这段前缀在裁剪时永不丢弃。
+        /// </summary>
+        private static int CountLeadingSystemMessages(IReadOnlyList<Message> messages)
+        {
+            int i = 0;
+            while (i < messages.Count && string.Equals(messages[i].NormalizedRole, "system", StringComparison.OrdinalIgnoreCase))
+                i++;
+            return i;
+        }
+
+        /// <summary>
+        /// 组装好的 prompt 的最后一道防线：先保证 messages 条数不超过
+        /// <see cref="MaxContextMessages"/>，再保证 token 数不超过 <see cref="MaxContextTokens"/>。
+        ///
+        /// 独立于溢出总结机制 —— 即便 OverflowManager 初始化失败或总结一直失败导致
+        /// 检查点不推进（窗口退化为全量历史），也能保证发出去的 prompt 收敛。
+        /// 存储的历史不受影响。
+        /// </summary>
+        protected List<Message> EnforceContextBudget(List<Message> history)
+        {
+            if (history is null || history.Count == 0)
+                return history;
+
+            return EnforceTokenBudget(EnforceMessageCountLimit(history));
+        }
+
+        /// <summary>
+        /// 把 messages 条数压到 <see cref="MaxContextMessages"/> 以内：保留 system 前缀和
+        /// 最新的若干条，再把窗口对齐到轮边界。
+        /// </summary>
+        private List<Message> EnforceMessageCountLimit(List<Message> history)
+        {
+            var max = MaxContextMessages;
+            if (max <= 0 || history.Count <= max)
+                return history;
+
+            var systemCount = CountLeadingSystemMessages(history);
+
+            // system 前缀本身就撑满配额时无解，至少给窗口留一条消息（当前这轮提问）
+            var keep = Math.Max(1, max - systemCount);
+            var window = history.Skip(history.Count - keep).ToList();
+
+            // 与 token 裁剪同样的轮边界规则：窗口必须以 user 开头；
+            // 整段没有 user 说明这一截里没有提问，丢掉即可。
+            var alignedStart = FindRoundStart(window, 0);
+            window = alignedStart < window.Count
+                ? window.Skip(alignedStart).ToList()
+                : new List<Message>();
+
+            var result = history.Take(systemCount).Concat(window).ToList();
+            Logger.Log($"EnforceContextBudget: messages 条数 {history.Count} 超出上限 {max}，" +
+                       $"已裁剪至 {result.Count} 条（system 前缀 {systemCount} 条）");
+            return result;
+        }
+
+        /// <summary>
+        /// 超出 token 预算时反复丢弃窗口（非 system 部分）中最旧的一半消息，
+        /// 并把新窗口对齐到轮边界。
+        /// </summary>
+        private List<Message> EnforceTokenBudget(List<Message> history)
+        {
+            var budget = MaxContextTokens;
+            if (budget <= 0 || history.Count == 0)
+                return history;
+
+            var limit = (int)(budget * ContextBudgetTriggerRatio);
+            var tokensBefore = TokenCounter.EstimateMessagesTokenCount(history);
+            if (tokensBefore <= limit)
+                return history;
+
+            var systemCount = CountLeadingSystemMessages(history);
+            var result = history;
+            var tokens = tokensBefore;
+
+            for (int pass = 0; pass < MaxBudgetTrimPasses; pass++)
+            {
+                var windowSize = result.Count - systemCount;
+                if (windowSize == 0)
+                    break;
+
+                // 窗口只剩一条 user 消息时停手：再裁就把当前这轮提问本身丢了，
+                // 单条消息过长不是丢消息能解决的问题。
+                if (windowSize == 1 &&
+                    string.Equals(result[systemCount].NormalizedRole, "user", StringComparison.OrdinalIgnoreCase))
+                    break;
+
+                // 丢弃窗口中最旧的一半，保留较新的一半
+                var dropCount = Math.Max(1, windowSize / 2);
+                var window = result.Skip(systemCount + dropCount).ToList();
+
+                // 对齐到轮边界：窗口必须以 user 消息开头（部分 API 拒绝 system 后紧跟 assistant）。
+                // 剩下的全是 assistant 说明这半截里没有任何提问，整段丢弃即可 —— 此规则
+                // 永远不会丢掉 user 消息，因为 user 消息一定会被 FindRoundStart 找到。
+                var alignedStart = FindRoundStart(window, 0);
+                window = alignedStart < window.Count
+                    ? window.Skip(alignedStart).ToList()
+                    : new List<Message>();
+
+                result = result.Take(systemCount).Concat(window).ToList();
+
+                tokens = TokenCounter.EstimateMessagesTokenCount(result);
+                if (tokens <= limit)
+                    break;
+            }
+
+            if (ReferenceEquals(result, history))
+                Logger.Log($"EnforceContextBudget: prompt {tokensBefore} tokens 超出触发线 {limit}，但窗口已无可裁剪的消息");
+            else if (tokens > limit)
+                Logger.Log($"EnforceContextBudget: 裁剪 {history.Count}→{result.Count} 条消息后仍超标 " +
+                           $"（{tokensBefore}→{tokens} tokens，触发线 {limit}），单条消息可能过长");
+            else
+                Logger.Log($"EnforceContextBudget: prompt 超出预算，已裁剪 {history.Count}→{result.Count} 条消息，" +
+                           $"{tokensBefore}→{tokens} tokens（预算 {budget}，触发线 {limit}）");
+            return result;
+        }
+
+        /// <summary>
         /// 创建用户消息，自动设置时间戳和状态信息
         /// </summary>
         /// <param name="content">消息内容</param>
@@ -129,7 +284,10 @@ namespace VPetLLM.Core.Abstractions.Base
                 Logger.Log($"Error injecting skills into history: {ex.Message}");
             }
 
-            return history;
+            // 各 Provider 在追加当前用户消息后才调用本方法，因此这里是唯一能看到
+            // 完整 prompt 的位置。裁剪是单调的，与 GetCoreHistoryCommonAsync 中的
+            // 那次调用重复执行也无副作用。
+            return EnforceContextBudget(history);
         }
 
         protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
@@ -298,6 +456,13 @@ namespace VPetLLM.Core.Abstractions.Base
 
                     // 只发送检查点之后的消息（检查点可能因外部编辑超出当前历史，需钳制）
                     var windowStart = Math.Min(OverflowManager?.LastSummarizedIndex ?? 0, fullHistory.Count);
+
+                    // 检查点落在一轮中间时，窗口会以 assistant 消息开头，部分 API（智谱、Gemini）
+                    // 会拒绝 system 后紧跟 assistant。前推到下一条 user 消息。
+                    var alignedStart = FindRoundStart(fullHistory, windowStart);
+                    if (alignedStart < fullHistory.Count)
+                        windowStart = alignedStart;
+
                     history.AddRange(fullHistory.Skip(windowStart));
 
                     // 记录快照拷贝用于后续溢出检查（由各 Provider 在 API 成功后显式触发）；
@@ -310,7 +475,14 @@ namespace VPetLLM.Core.Abstractions.Base
                 {
                     // Compression/legacy mode: use naive truncation
                     var threshold = Settings?.HistoryCompressionThreshold ?? 20;
-                    history.AddRange(HistoryManager.GetHistory().Skip(Math.Max(0, HistoryManager.GetHistory().Count - threshold)));
+                    var fullHistory = HistoryManager.GetHistory();
+                    var windowStart = Math.Max(0, fullHistory.Count - threshold);
+
+                    var alignedStart = FindRoundStart(fullHistory, windowStart);
+                    if (alignedStart < fullHistory.Count)
+                        windowStart = alignedStart;
+
+                    history.AddRange(fullHistory.Skip(windowStart));
                 }
             }
 
@@ -318,6 +490,12 @@ namespace VPetLLM.Core.Abstractions.Base
             if (injectRecords)
             {
                 history = InjectRecordsIntoHistory(history);
+            }
+            else
+            {
+                // InjectRecordsIntoHistory 内部已含预算裁剪；未注入时在此补上，
+                // 覆盖那些不调用注入方法的 Provider 路径。
+                history = EnforceContextBudget(history);
             }
 
             result.History = history;
