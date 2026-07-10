@@ -10,7 +10,12 @@ namespace VPetLLM.Utils.Data
     /// </summary>
     public class FreeConfigManager
     {
-        private const string CONFIG_BASE_URL = "https://vpetllm.ycxom.com/api";
+        // 主地址在前，备用地址在后；主地址失败或CDN缓存导致内容不一致时依次尝试后续地址
+        private static readonly string[] CONFIG_BASE_URLS =
+        {
+            "https://vpetllm.ycxom.top/api",
+            "https://vpetllm.ycxom.com/api"
+        };
         private const string VERSION_FILE = "vpetllm.json";
         private static readonly string ConfigDirectory;
 
@@ -68,33 +73,36 @@ namespace VPetLLM.Utils.Data
         }
 
         /// <summary>
-        /// 下载版本信息
+        /// 下载版本信息 - 依次尝试主/备用地址
         /// </summary>
         private static async Task<JObject> DownloadVersionInfoAsync()
         {
-            try
+            foreach (var baseUrl in CONFIG_BASE_URLS)
             {
-                using var client = new HttpClient();
-                client.Timeout = TimeSpan.FromSeconds(10);
-                var url = $"{CONFIG_BASE_URL}/{VERSION_FILE}";
-                var response = await client.GetStringAsync(url);
-                return JObject.Parse(response);
+                try
+                {
+                    using var client = new HttpClient();
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                    var url = $"{baseUrl}/{VERSION_FILE}";
+                    var response = await client.GetStringAsync(url);
+                    return JObject.Parse(response);
+                }
+                catch (TaskCanceledException ex)
+                {
+                    Logger.Log($"FreeConfigManager: [{baseUrl}] 下载版本信息超时: {ex.Message}");
+                }
+                catch (HttpRequestException ex)
+                {
+                    Logger.Log($"FreeConfigManager: [{baseUrl}] 下载版本信息网络错误: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"FreeConfigManager: [{baseUrl}] 下载版本信息异常: {ex.GetType().Name} - {ex.Message}");
+                }
             }
-            catch (TaskCanceledException ex)
-            {
-                Logger.Log($"FreeConfigManager: 下载版本信息超时: {ex.Message}");
-                return null;
-            }
-            catch (HttpRequestException ex)
-            {
-                Logger.Log($"FreeConfigManager: 下载版本信息网络错误: {ex.Message}");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"FreeConfigManager: 下载版本信息异常: {ex.GetType().Name} - {ex.Message}");
-                return null;
-            }
+
+            Logger.Log("FreeConfigManager: 所有地址均无法下载版本信息");
+            return null;
         }
 
         /// <summary>
@@ -118,17 +126,10 @@ namespace VPetLLM.Utils.Data
                     return true;
                 }
 
-                var configContent = await DownloadConfigAsync(configName);
+                var configContent = await DownloadConfigWithVerificationAsync(configName, expectedMd5);
                 if (string.IsNullOrEmpty(configContent))
                 {
-                    Logger.Log($"FreeConfigManager: {configName} 下载失败或内容为空");
-                    return false;
-                }
-
-                var actualMd5 = CalculateMD5(configContent);
-                if (actualMd5 != expectedMd5)
-                {
-                    Logger.Log($"FreeConfigManager: {configName} MD5校验不一致 (期望:{expectedMd5}, 实际:{actualMd5})，可能是服务器内容被更新但版本文件未同步，或下载内容被截断/损坏");
+                    Logger.Log($"FreeConfigManager: {configName} 在所有地址均下载失败或MD5校验未通过");
                     return false;
                 }
 
@@ -149,32 +150,49 @@ namespace VPetLLM.Utils.Data
         }
 
         /// <summary>
-        /// 下载配置文件
+        /// 下载配置文件并校验MD5 - 依次尝试主/备用地址；某地址返回内容但MD5不匹配（如CDN缓存了旧内容）时自动尝试下一个地址
         /// </summary>
-        private static async Task<string> DownloadConfigAsync(string configName)
+        private static async Task<string> DownloadConfigWithVerificationAsync(string configName, string expectedMd5)
         {
-            try
+            foreach (var baseUrl in CONFIG_BASE_URLS)
             {
-                using var client = new HttpClient();
-                client.Timeout = TimeSpan.FromSeconds(10);
-                var url = $"{CONFIG_BASE_URL}/{configName}";
-                return await client.GetStringAsync(url);
+                try
+                {
+                    using var client = new HttpClient();
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                    var url = $"{baseUrl}/{configName}";
+                    var content = await client.GetStringAsync(url);
+
+                    if (string.IsNullOrEmpty(content))
+                    {
+                        Logger.Log($"FreeConfigManager: [{baseUrl}] {configName} 下载内容为空");
+                        continue;
+                    }
+
+                    var actualMd5 = CalculateMD5(content);
+                    if (actualMd5 != expectedMd5)
+                    {
+                        Logger.Log($"FreeConfigManager: [{baseUrl}] {configName} MD5校验不一致 (期望:{expectedMd5}, 实际:{actualMd5})，可能是CDN缓存了旧内容，尝试下一个地址");
+                        continue;
+                    }
+
+                    return content;
+                }
+                catch (TaskCanceledException ex)
+                {
+                    Logger.Log($"FreeConfigManager: [{baseUrl}] 下载 {configName} 超时: {ex.Message}");
+                }
+                catch (HttpRequestException ex)
+                {
+                    Logger.Log($"FreeConfigManager: [{baseUrl}] 下载 {configName} 网络错误: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"FreeConfigManager: [{baseUrl}] 下载 {configName} 异常: {ex.GetType().Name} - {ex.Message}");
+                }
             }
-            catch (TaskCanceledException ex)
-            {
-                Logger.Log($"FreeConfigManager: 下载 {configName} 超时: {ex.Message}");
-                return null;
-            }
-            catch (HttpRequestException ex)
-            {
-                Logger.Log($"FreeConfigManager: 下载 {configName} 网络错误: {ex.Message}");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"FreeConfigManager: 下载 {configName} 异常: {ex.GetType().Name} - {ex.Message}");
-                return null;
-            }
+
+            return null;
         }
 
         /// <summary>
