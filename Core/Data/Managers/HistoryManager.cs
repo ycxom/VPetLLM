@@ -290,7 +290,11 @@ namespace VPetLLM.Core.Data.Managers
             }
         }
 
-        private string GetDatabasePath()
+        /// <summary>
+        /// 聊天库路径。chat_history / important_records / overflow_summaries / embeddings
+        /// 共用这一个文件。
+        /// </summary>
+        public static string GetDatabasePath()
         {
             var docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var dataPath = Path.Combine(docPath, "VPetLLM", "Chat");

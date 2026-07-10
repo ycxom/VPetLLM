@@ -159,6 +159,7 @@ namespace VPetLLM
         #region Private Fields
 
         private System.Timers.Timer _syncTimer;
+        private System.Timers.Timer _freeConfigTimer;
         private IntelligentConfigurationOptimizer? _configurationOptimizer;
         private Infrastructure.Services.ApplicationServices.VoiceInputService? _voiceInputService;
         private Services.IScreenshotService? _screenshotService;
@@ -315,10 +316,45 @@ namespace VPetLLM
 
                 // 初始化 Free ASR/TTS 认证委托
                 InitializeFreeAuthProviders();
+
+                // 启动Free配置自动检测更新定时器（每5分钟检查一次）
+                InitializeFreeConfigTimer();
             }
             catch (Exception ex)
             {
                 Logger.Log($"初始化Free配置失败: {ex.Message}");
+            }
+        }
+
+        private void InitializeFreeConfigTimer()
+        {
+            try
+            {
+                _freeConfigTimer = new System.Timers.Timer(5 * 60 * 1000); // 5 分钟
+                _freeConfigTimer.Elapsed += async (s, e) => await CheckFreeConfigUpdateAsync();
+                _freeConfigTimer.AutoReset = true;
+                _freeConfigTimer.Enabled = true;
+                _logger.LogInformation("Free config auto-update timer initialized (5 min interval)");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to initialize Free config timer", ex);
+            }
+        }
+
+        /// <summary>
+        /// 立即检查Free配置更新（供定时器和设置UI打开时调用）
+        /// </summary>
+        public async Task CheckFreeConfigUpdateAsync()
+        {
+            try
+            {
+                var result = await FreeConfigManager.InitializeConfigsAsync();
+                Logger.Log($"Free配置更新检查完成: {result}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Free配置更新检查失败: {ex.Message}");
             }
         }
 

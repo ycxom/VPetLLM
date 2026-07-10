@@ -68,6 +68,9 @@ namespace VPetLLM
         public bool EnableExpertMemoryRetrieval { get; set; } = false;
         public int ExpertMemoryContextLength { get; set; } = 500;
 
+        /// <summary>记忆检索的向量（语义）检索配置。</summary>
+        public EmbeddingSetting Embedding { get; set; } = new EmbeddingSetting();
+
         public bool EnablePlugin { get; set; } = true;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         public bool ShowUninstallWarning { get; set; } = true;
@@ -1520,6 +1523,35 @@ namespace VPetLLM
         /// <summary>
         /// 上下文溢出模式
         /// </summary>
+        /// <summary>
+        /// 向量检索配置。作为记忆检索 RRF 融合的第三路，与 BM25、覆盖率并列。
+        /// 关闭或后端不可用时该路自动退出，检索仍然工作（只是没有语义召回）。
+        /// </summary>
+        public class EmbeddingSetting
+        {
+            /// <summary>默认关闭：需要一个可用的 embedding 端点，且会产生 API 调用。</summary>
+            public bool Enable { get; set; } = false;
+
+            /// <summary>OpenAI 兼容的 base url，如 https://api.openai.com/v1 或本地 Ollama。</summary>
+            public string Url { get; set; } = "";
+
+            public string? ApiKey { get; set; }
+
+            /// <summary>Qwen3-Embedding-0.6B 输出 1024 维。</summary>
+            public string Model { get; set; } = "Qwen3-Embedding-0.6B";
+
+            /// <summary>单次请求最多嵌入多少条文本。</summary>
+            public int MaxBatchSize { get; set; } = 32;
+
+            /// <summary>
+            /// 每轮检索后最多为多少条缺向量的文档补齐向量。控制冷启动时的 API 用量：
+            /// 不做启动时全量回填，而是让常被检索到的文档先获得向量。
+            /// </summary>
+            public int MaxBackfillPerRound { get; set; } = 64;
+
+            public int TimeoutSeconds { get; set; } = 10;
+        }
+
         public enum ContextOverflowMode
         {
             Compression,  // 有损压缩（旧机制，默认）
@@ -1813,6 +1845,22 @@ namespace VPetLLM
             /// Example: 3 means weight decreases by 1/3 every conversation (takes 3 conversations to lose 1 weight)
             /// </summary>
             public int WeightDecayTurns { get; set; } = 1;
+
+            /// <summary>
+            /// 召回强化：被记忆检索命中过的记录，权重衰减最多减半。
+            /// 关闭后所有记录以相同速度衰减（改动前的行为）。
+            /// </summary>
+            public bool ReinforceOnRecall { get; set; } = true;
+
+            /// <summary>
+            /// 「最近被召回」的判定窗口（天）。窗口内召回过的记录抗衰减效果翻倍。
+            /// </summary>
+            public double AccessWindowDays { get; set; } = 30.0;
+
+            /// <summary>
+            /// access_count 的饱和点：召回次数达到该值后不再进一步减缓衰减。
+            /// </summary>
+            public double AccessSaturationCount { get; set; } = 10.0;
 
             /// <summary>
             /// Maximum number of records to keep in database

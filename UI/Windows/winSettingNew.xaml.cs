@@ -426,6 +426,9 @@ namespace VPetLLM.UI.Windows
             {
                 _isLoadingSettings = true;
 
+                // 打开设置窗口时立即检查Free配置更新（后台执行，不阻塞UI加载）
+                _ = _plugin.CheckFreeConfigUpdateAsync();
+
                 await LoadSettingsAsync();
 
                 LanguageHelper.ReloadLanguages();

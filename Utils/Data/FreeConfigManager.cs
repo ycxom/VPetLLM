@@ -1,6 +1,7 @@
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
+using Logger = VPetLLM.Utils.System.Logger;
 
 namespace VPetLLM.Utils.Data
 {
@@ -41,19 +42,27 @@ namespace VPetLLM.Utils.Data
                 var versionInfo = await DownloadVersionInfoAsync();
                 if (versionInfo is null)
                 {
-                    return File.Exists(GetConfigPath(ASR_CONFIG_NAME)) &&
+                    var hasCached = File.Exists(GetConfigPath(ASR_CONFIG_NAME)) &&
                            File.Exists(GetConfigPath(CHAT_CONFIG_NAME)) &&
                            File.Exists(GetConfigPath(TTS_CONFIG_NAME));
+                    Logger.Log($"FreeConfigManager: 版本信息下载失败，使用本地缓存: {hasCached}");
+                    return hasCached;
                 }
 
                 bool asrOk = await CheckAndUpdateConfigAsync(ASR_CONFIG_NAME, versionInfo);
                 bool chatOk = await CheckAndUpdateConfigAsync(CHAT_CONFIG_NAME, versionInfo);
                 bool ttsOk = await CheckAndUpdateConfigAsync(TTS_CONFIG_NAME, versionInfo);
 
+                if (!asrOk || !chatOk || !ttsOk)
+                {
+                    Logger.Log($"FreeConfigManager: 配置检查结果 - ASR:{asrOk}, Chat:{chatOk}, TTS:{ttsOk}");
+                }
+
                 return asrOk && chatOk && ttsOk;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Logger.Log($"FreeConfigManager: InitializeConfigsAsync 异常: {ex.GetType().Name} - {ex.Message}");
                 return false;
             }
         }
@@ -71,8 +80,19 @@ namespace VPetLLM.Utils.Data
                 var response = await client.GetStringAsync(url);
                 return JObject.Parse(response);
             }
-            catch (Exception)
+            catch (TaskCanceledException ex)
             {
+                Logger.Log($"FreeConfigManager: 下载版本信息超时: {ex.Message}");
+                return null;
+            }
+            catch (HttpRequestException ex)
+            {
+                Logger.Log($"FreeConfigManager: 下载版本信息网络错误: {ex.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"FreeConfigManager: 下载版本信息异常: {ex.GetType().Name} - {ex.Message}");
                 return null;
             }
         }
@@ -87,6 +107,7 @@ namespace VPetLLM.Utils.Data
                 var expectedMd5 = versionInfo["vpetllm"]?[configName.Replace(".json", "")]?.ToString();
                 if (string.IsNullOrEmpty(expectedMd5))
                 {
+                    Logger.Log($"FreeConfigManager: 版本信息中缺少 {configName} 的MD5，服务器下发的 vpetllm.json 可能未包含该字段");
                     return false;
                 }
 
@@ -100,12 +121,14 @@ namespace VPetLLM.Utils.Data
                 var configContent = await DownloadConfigAsync(configName);
                 if (string.IsNullOrEmpty(configContent))
                 {
+                    Logger.Log($"FreeConfigManager: {configName} 下载失败或内容为空");
                     return false;
                 }
 
                 var actualMd5 = CalculateMD5(configContent);
                 if (actualMd5 != expectedMd5)
                 {
+                    Logger.Log($"FreeConfigManager: {configName} MD5校验不一致 (期望:{expectedMd5}, 实际:{actualMd5})，可能是服务器内容被更新但版本文件未同步，或下载内容被截断/损坏");
                     return false;
                 }
 
@@ -118,8 +141,9 @@ namespace VPetLLM.Utils.Data
 
                 return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Logger.Log($"FreeConfigManager: 更新配置 {configName} 异常: {ex.GetType().Name} - {ex.Message}");
                 return false;
             }
         }
@@ -136,8 +160,19 @@ namespace VPetLLM.Utils.Data
                 var url = $"{CONFIG_BASE_URL}/{configName}";
                 return await client.GetStringAsync(url);
             }
-            catch (Exception)
+            catch (TaskCanceledException ex)
             {
+                Logger.Log($"FreeConfigManager: 下载 {configName} 超时: {ex.Message}");
+                return null;
+            }
+            catch (HttpRequestException ex)
+            {
+                Logger.Log($"FreeConfigManager: 下载 {configName} 网络错误: {ex.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"FreeConfigManager: 下载 {configName} 异常: {ex.GetType().Name} - {ex.Message}");
                 return null;
             }
         }

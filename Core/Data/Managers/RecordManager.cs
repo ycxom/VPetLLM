@@ -111,7 +111,11 @@ namespace VPetLLM.Core.Data.Managers
                 var decayTurns = Math.Max(1, _settings.Records.WeightDecayTurns);
                 var decrementAmount = 1.0 / decayTurns;
 
-                var decremented = _database.DecrementAllRecords(decrementAmount);
+                var decremented = _database.DecrementAllRecords(
+                    decrementAmount,
+                    reinforceOnRecall: _settings.Records.ReinforceOnRecall,
+                    accessWindowDays: _settings.Records.AccessWindowDays,
+                    maxAccessCount: _settings.Records.AccessSaturationCount);
 
                 if (decremented > 0)
                 {
@@ -121,6 +125,27 @@ namespace VPetLLM.Core.Data.Managers
             catch (Exception ex)
             {
                 Logger.Log($"RecordManager: Failed to decrement records on conversation turn: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 记录一批记忆被检索命中，用于召回强化（衰减更慢）。
+        /// 由 MemoryRetrievalService 在返回检索结果后调用。
+        /// </summary>
+        public void RecordAccess(IEnumerable<int> recordIds)
+        {
+            try
+            {
+                if (_settings.Records?.ReinforceOnRecall != true)
+                    return;
+
+                var updated = _database.RecordAccess(recordIds);
+                if (updated > 0)
+                    Logger.Log($"RecordManager: 召回强化，更新 {updated} 条记录的访问计数");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"RecordManager: Failed to record access: {ex.Message}");
             }
         }
 

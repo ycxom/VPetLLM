@@ -42,12 +42,103 @@ namespace VPetLLM.Core.Data.Database
                 ";
                 createTableCommand.ExecuteNonQuery();
 
+                MigrateAccessColumns(connection);
+
                 Logger.Log("Important records table initialized successfully");
             }
             catch (Exception ex)
             {
                 Logger.Log($"Failed to initialize important records table: {ex.Message}");
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// 为召回强化补上 access_count / last_access_at 两列（旧库升级路径）。
+        /// SQLite 没有 ADD COLUMN IF NOT EXISTS，先查 table_info 再决定是否 ALTER。
+        /// </summary>
+        private static void MigrateAccessColumns(SqliteConnection connection)
+        {
+            var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var pragma = connection.CreateCommand())
+            {
+                pragma.CommandText = "PRAGMA table_info(important_records)";
+                using var reader = pragma.ExecuteReader();
+                while (reader.Read())
+                    existing.Add(reader.GetString(1));   // 1 = name
+            }
+
+            void AddColumn(string name, string definition)
+            {
+                if (existing.Contains(name))
+                    return;
+
+                using var alter = connection.CreateCommand();
+                alter.CommandText = $"ALTER TABLE important_records ADD COLUMN {name} {definition}";
+                alter.ExecuteNonQuery();
+                Logger.Log($"important_records: 已添加列 {name}");
+            }
+
+            // 累计被检索命中的次数
+            AddColumn("access_count", "INTEGER NOT NULL DEFAULT 0");
+            // 最后一次被检索命中的时间；NULL 表示从未被召回过
+            AddColumn("last_access_at", "DATETIME");
+        }
+
+        /// <summary>所有 SELECT 共用的列清单，与 <see cref="ReadRecord"/> 的下标一一对应。</summary>
+        private const string RecordColumns = "id, content, weight, created_at, updated_at, access_count, last_access_at";
+
+        private static ImportantRecord ReadRecord(SqliteDataReader reader) => new()
+        {
+            Id = reader.GetInt32(0),
+            Content = reader.GetString(1),
+            Weight = reader.GetDouble(2),
+            CreatedAt = reader.GetDateTime(3),
+            UpdatedAt = reader.GetDateTime(4),
+            AccessCount = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+            LastAccessAt = reader.IsDBNull(6) ? null : reader.GetDateTime(6)
+        };
+
+        /// <summary>
+        /// 记录一批记忆被检索命中：累加 access_count、刷新 last_access_at。
+        /// 不直接提升 weight —— 强化体现为 <see cref="DecrementAllRecords"/> 里更慢的衰减，
+        /// 这样反复召回不会把权重顶到上限后失去区分度。
+        /// </summary>
+        /// <returns>实际更新的行数。</returns>
+        public int RecordAccess(IEnumerable<int> ids)
+        {
+            var idList = ids?.Distinct().ToList();
+            if (idList is null || idList.Count == 0)
+                return 0;
+
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+                using var transaction = connection.BeginTransaction();
+
+                var updated = 0;
+                foreach (var id in idList)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = @"
+                        UPDATE important_records
+                        SET access_count = MIN(access_count + 1, 1000000),
+                            last_access_at = @now
+                        WHERE id = @id
+                    ";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AddWithValue("@now", DateTime.UtcNow);
+                    updated += cmd.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                return updated;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to record access for {idList.Count} records: {ex.Message}");
+                return 0;
             }
         }
 
@@ -113,8 +204,8 @@ namespace VPetLLM.Core.Data.Database
                 connection.Open();
 
                 var command = connection.CreateCommand();
-                command.CommandText = @"
-                    SELECT id, content, weight, created_at, updated_at
+                command.CommandText = $@"
+                    SELECT {RecordColumns}
                     FROM important_records
                     WHERE id = @id
                 ";
@@ -122,16 +213,7 @@ namespace VPetLLM.Core.Data.Database
 
                 using var reader = command.ExecuteReader();
                 if (reader.Read())
-                {
-                    return new ImportantRecord
-                    {
-                        Id = reader.GetInt32(0),
-                        Content = reader.GetString(1),
-                        Weight = reader.GetDouble(2),
-                        CreatedAt = reader.GetDateTime(3),
-                        UpdatedAt = reader.GetDateTime(4)
-                    };
-                }
+                    return ReadRecord(reader);
 
                 return null;
             }
@@ -156,8 +238,8 @@ namespace VPetLLM.Core.Data.Database
                 connection.Open();
 
                 var command = connection.CreateCommand();
-                command.CommandText = @"
-                    SELECT id, content, weight, created_at, updated_at
+                command.CommandText = $@"
+                    SELECT {RecordColumns}
                     FROM important_records
                     WHERE weight > 0
                     ORDER BY weight DESC, created_at DESC
@@ -165,16 +247,7 @@ namespace VPetLLM.Core.Data.Database
 
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
-                {
-                    records.Add(new ImportantRecord
-                    {
-                        Id = reader.GetInt32(0),
-                        Content = reader.GetString(1),
-                        Weight = reader.GetDouble(2),
-                        CreatedAt = reader.GetDateTime(3),
-                        UpdatedAt = reader.GetDateTime(4)
-                    });
-                }
+                    records.Add(ReadRecord(reader));
 
                 Logger.Log($"Retrieved {records.Count} active records");
             }
@@ -361,7 +434,19 @@ namespace VPetLLM.Core.Data.Database
         /// </summary>
         /// <param name="decrementAmount">Amount to decrease weight by (default 1.0)</param>
         /// <returns>Number of records decremented</returns>
-        public int DecrementAllRecords(double decrementAmount = 1.0)
+        /// <param name="decrementAmount">基础衰减量。</param>
+        /// <param name="reinforceOnRecall">
+        /// 是否启用召回强化。false 时所有记录以相同速度衰减（本次改动前的行为）。
+        /// </param>
+        /// <param name="accessWindowDays">
+        /// 「最近被召回」的时间窗口。窗口内被召回过的记录额外减半衰减。
+        /// </param>
+        /// <param name="maxAccessCount">access_count 的饱和点，超过它不再增加抗衰减效果。</param>
+        public int DecrementAllRecords(
+            double decrementAmount = 1.0,
+            bool reinforceOnRecall = true,
+            double accessWindowDays = 30.0,
+            double maxAccessCount = 10.0)
         {
             try
             {
@@ -370,15 +455,40 @@ namespace VPetLLM.Core.Data.Database
 
                 using var transaction = connection.BeginTransaction();
 
-                // Decrement all weights
+                // 召回强化：被检索命中过的记录衰减更慢，最多降到基础衰减的 50%。
+                //   effective = decrement * (1 - 0.5 * access_factor * recent_factor)
+                //   access_factor = min(1, access_count / maxAccessCount)
+                //   recent_factor = 1.0 若最近窗口内被召回过，否则 0.5
+                // 从未被召回的记录 access_factor = 0，衰减与改动前完全一致。
+                // 必须用 MAX(0.0, ...) 钳住下界：weight 列带 CHECK(weight >= 0)，
+                // 一条 weight=0.4 的记录减 1.0 会变成 -0.6 而触发约束失败，
+                // 使整条 UPDATE 回滚 —— 所有记录都停止衰减。钳到 0 后由下面的
+                // DELETE 负责清理。
                 var decrementCommand = connection.CreateCommand();
-                decrementCommand.CommandText = @"
+                decrementCommand.CommandText = reinforceOnRecall
+                    ? @"
                     UPDATE important_records
-                    SET weight = weight - @decrement, updated_at = @updated_at
+                    SET weight = MAX(0.0, weight - @decrement * (
+                            1.0 - 0.5
+                                * MIN(1.0, CAST(access_count AS REAL) / @maxAccess)
+                                * (CASE WHEN last_access_at IS NOT NULL AND last_access_at >= @window
+                                        THEN 1.0 ELSE 0.5 END)
+                        )),
+                        updated_at = @updated_at
                     WHERE weight > 0
-                ";
+                    "
+                    : @"
+                    UPDATE important_records
+                    SET weight = MAX(0.0, weight - @decrement), updated_at = @updated_at
+                    WHERE weight > 0
+                    ";
                 decrementCommand.Parameters.AddWithValue("@decrement", decrementAmount);
                 decrementCommand.Parameters.AddWithValue("@updated_at", DateTime.UtcNow);
+                if (reinforceOnRecall)
+                {
+                    decrementCommand.Parameters.AddWithValue("@maxAccess", Math.Max(1.0, maxAccessCount));
+                    decrementCommand.Parameters.AddWithValue("@window", DateTime.UtcNow.AddDays(-Math.Max(1.0, accessWindowDays)));
+                }
                 var decremented = decrementCommand.ExecuteNonQuery();
 
                 // Delete records with weight 0 or less
@@ -500,8 +610,8 @@ namespace VPetLLM.Core.Data.Database
                 connection.Open();
 
                 var command = connection.CreateCommand();
-                command.CommandText = @"
-                    SELECT id, content, weight, created_at, updated_at
+                command.CommandText = $@"
+                    SELECT {RecordColumns}
                     FROM important_records
                     ORDER BY id DESC
                 ";
@@ -509,14 +619,7 @@ namespace VPetLLM.Core.Data.Database
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
                 {
-                    records.Add(new ImportantRecord
-                    {
-                        Id = reader.GetInt32(0),
-                        Content = reader.GetString(1),
-                        Weight = reader.GetDouble(2),
-                        CreatedAt = reader.GetDateTime(3),
-                        UpdatedAt = reader.GetDateTime(4)
-                    });
+                    records.Add(ReadRecord(reader));
                 }
 
                 Logger.Log($"Retrieved {records.Count} total records");

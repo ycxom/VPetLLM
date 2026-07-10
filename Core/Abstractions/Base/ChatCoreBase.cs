@@ -2,6 +2,7 @@ using VPet_Simulator.Windows.Interface;
 using System.Net;
 using System.Net.Http;
 using VPetLLM.Core.Data.Managers;
+using VPetLLM.Core.Services.Embedding;
 
 namespace VPetLLM.Core.Abstractions.Base
 {
@@ -359,7 +360,8 @@ namespace VPetLLM.Core.Abstractions.Base
             try
             {
                 var retrievalService = new MemoryRetrievalService(
-                    settings, this, HistoryManager, OverflowManager, RecordManager);
+                    settings, this, HistoryManager, OverflowManager, RecordManager,
+                    CreateEmbeddingService(settings));
 
                 // Register MemoryRetrievalService with ActionProcessor for the retrieval tool handler
                 if (actionProcessor is not null)
@@ -372,6 +374,42 @@ namespace VPetLLM.Core.Abstractions.Base
             catch (Exception ex)
             {
                 Logger.Log($"Failed to initialize MemoryRetrievalService: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 构造向量检索后端。未启用、缺 URL、或构造失败时返回 null ——
+        /// 检索会退化成 BM25 + 覆盖率两路，功能不受影响。
+        /// </summary>
+        private EmbeddingService? CreateEmbeddingService(Setting? settings)
+        {
+            var config = settings?.Embedding;
+            if (config is null || !config.Enable || string.IsNullOrWhiteSpace(config.Url))
+                return null;
+
+            try
+            {
+                var http = new HttpClient(CreateHttpClientHandler())
+                {
+                    Timeout = TimeSpan.FromSeconds(Math.Max(1, config.TimeoutSeconds))
+                };
+
+                var provider = new OpenAiCompatibleEmbeddingProvider(
+                    http, config.Url, config.ApiKey, config.Model);
+
+                var store = new EmbeddingStore(HistoryManager.GetDatabasePath());
+
+                Logger.Log($"EmbeddingService initialized for {Name} (model={provider.ModelKey})");
+                return new EmbeddingService(
+                    provider, store,
+                    maxBatchSize: config.MaxBatchSize,
+                    maxBackfillPerRound: config.MaxBackfillPerRound,
+                    timeoutSeconds: config.TimeoutSeconds);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to initialize EmbeddingService: {ex.Message}");
+                return null;
             }
         }
 
