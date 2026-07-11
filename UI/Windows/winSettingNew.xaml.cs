@@ -541,6 +541,17 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableAIRetainCount")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableCompressionRecords")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_ExpertMemoryContextLength")).TextChanged += Control_TextChanged;
+            // 向量检索（Embedding）控件：任一改动都需重建 ChatCore 才能让新的
+            // EmbeddingService 生效，故都接 Control_* 以置 _uiSettingsChanged
+            if (this.FindName("CheckBox_EmbeddingEnable") is CheckBox cbEmbEnableBind) cbEmbEnableBind.Click += Control_Click;
+            if (this.FindName("ComboBox_EmbeddingSource") is ComboBox cbEmbSrcBind) cbEmbSrcBind.SelectionChanged += Control_SelectionChanged;
+            if (this.FindName("ComboBox_EmbeddingProtocol") is ComboBox cbEmbProtoBind) cbEmbProtoBind.SelectionChanged += Control_SelectionChanged;
+            if (this.FindName("TextBox_EmbeddingUrl") is TextBox tbEmbUrlBind) tbEmbUrlBind.TextChanged += Control_TextChanged;
+            if (this.FindName("TextBox_EmbeddingApiKey") is TextBox tbEmbKeyBind) tbEmbKeyBind.TextChanged += Control_TextChanged;
+            if (this.FindName("TextBox_EmbeddingModel") is TextBox tbEmbModelBind) tbEmbModelBind.TextChanged += Control_TextChanged;
+            if (this.FindName("TextBox_EmbeddingMaxBatchSize") is TextBox tbEmbBatchBind) tbEmbBatchBind.TextChanged += Control_TextChanged;
+            if (this.FindName("TextBox_EmbeddingMaxBackfill") is TextBox tbEmbBackfillBind) tbEmbBackfillBind.TextChanged += Control_TextChanged;
+            if (this.FindName("TextBox_EmbeddingTimeout") is TextBox tbEmbTimeoutBind) tbEmbTimeoutBind.TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_LogAutoScroll")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_MaxLogCount")).TextChanged += Control_TextChanged;
             // Ollama/Free/LMStudio - 使用统一UI管理，暂不处理单一配置
@@ -793,6 +804,50 @@ namespace VPetLLM.UI.Windows
                 Logger.Log($"UpdateOverflowCounts failed: {ex.Message}");
             }
         }
+        /// <summary>按 Tag 选中 ComboBox 项；找不到则选第一项。</summary>
+        private static void SelectComboByTag(ComboBox combo, string tag)
+        {
+            foreach (var obj in combo.Items)
+            {
+                if (obj is ComboBoxItem item && item.Tag?.ToString() == tag)
+                {
+                    combo.SelectedItem = item;
+                    return;
+                }
+            }
+            if (combo.Items.Count > 0)
+                combo.SelectedIndex = 0;
+        }
+
+        /// <summary>把 ComboBox 各项的 Content 刷成 "{keyPrefix}{Tag}" 对应的本地化文本。</summary>
+        private static void RefreshComboItemsByTag(ComboBox? combo, string keyPrefix, string langCode)
+        {
+            if (combo is null) return;
+            foreach (var obj in combo.Items)
+            {
+                if (obj is ComboBoxItem item && item.Tag?.ToString() is string tag)
+                    item.Content = LanguageHelper.Get($"{keyPrefix}{tag}", langCode);
+            }
+        }
+
+        /// <summary>免费来源隐藏协议/端点等自定义字段，只留说明；自定义来源相反。</summary>
+        private void UpdateEmbeddingSourceVisibility(Setting.EmbeddingSourceMode source)
+        {
+            var isFree = source == Setting.EmbeddingSourceMode.Free;
+            if (FindName("Panel_EmbeddingCustom") is StackPanel panelCustom)
+                panelCustom.Visibility = isFree ? Visibility.Collapsed : Visibility.Visible;
+            if (FindName("TextBlock_EmbeddingFreeHint") is TextBlock tbFreeHint)
+                tbFreeHint.Visibility = isFree ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void ComboBox_EmbeddingSource_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            if (sender is not ComboBox cmb || cmb.SelectedItem is not ComboBoxItem item) return;
+            if (Enum.TryParse<Setting.EmbeddingSourceMode>(item.Tag?.ToString(), out var mode))
+                UpdateEmbeddingSourceVisibility(mode);
+        }
+
         private void ComboBox_ContextMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_isLoadingSettings) return;
@@ -1049,6 +1104,28 @@ namespace VPetLLM.UI.Windows
             if (this.FindName("Panel_ExpertMemoryContextLength") is StackPanel panelExpertCtx)
                 panelExpertCtx.Visibility = _plugin.Settings.OverflowMode == Setting.ContextOverflowMode.Overflow
                     ? Visibility.Visible : Visibility.Collapsed;
+
+            // 向量检索（Embedding）设置
+            var embedding = _plugin.Settings.Embedding ?? new Setting.EmbeddingSetting();
+            if (this.FindName("CheckBox_EmbeddingEnable") is CheckBox cbEmbEnable)
+                cbEmbEnable.IsChecked = embedding.Enable;
+            if (this.FindName("ComboBox_EmbeddingSource") is ComboBox cbEmbSource)
+                SelectComboByTag(cbEmbSource, embedding.Source.ToString());
+            if (this.FindName("ComboBox_EmbeddingProtocol") is ComboBox cbEmbProto)
+                SelectComboByTag(cbEmbProto, embedding.Protocol.ToString());
+            UpdateEmbeddingSourceVisibility(embedding.Source);
+            if (this.FindName("TextBox_EmbeddingUrl") is TextBox tbEmbUrl)
+                tbEmbUrl.Text = embedding.Url;
+            if (this.FindName("TextBox_EmbeddingApiKey") is TextBox tbEmbKey)
+                tbEmbKey.Text = embedding.ApiKey ?? "";
+            if (this.FindName("TextBox_EmbeddingModel") is TextBox tbEmbModel)
+                tbEmbModel.Text = embedding.Model;
+            if (this.FindName("TextBox_EmbeddingMaxBatchSize") is TextBox tbEmbBatch)
+                tbEmbBatch.Text = embedding.MaxBatchSize.ToString();
+            if (this.FindName("TextBox_EmbeddingMaxBackfill") is TextBox tbEmbBackfill)
+                tbEmbBackfill.Text = embedding.MaxBackfillPerRound.ToString();
+            if (this.FindName("TextBox_EmbeddingTimeout") is TextBox tbEmbTimeout)
+                tbEmbTimeout.Text = embedding.TimeoutSeconds.ToString();
 
             // 加载时的标签切换与溢出计数显隐
             var isOverflowOnLoad = _plugin.Settings.OverflowMode == Setting.ContextOverflowMode.Overflow;
@@ -1577,6 +1654,38 @@ namespace VPetLLM.UI.Windows
 
             if (int.TryParse(((TextBox)this.FindName("TextBox_ExpertMemoryContextLength")).Text, out int expertMemCtxLen))
                 _plugin.Settings.ExpertMemoryContextLength = expertMemCtxLen;
+
+            // 向量检索（Embedding）设置
+            _plugin.Settings.Embedding ??= new Setting.EmbeddingSetting();
+            var embeddingSave = _plugin.Settings.Embedding;
+            if (this.FindName("CheckBox_EmbeddingEnable") is CheckBox cbEmbEnableSave)
+                embeddingSave.Enable = cbEmbEnableSave.IsChecked ?? false;
+            if (this.FindName("ComboBox_EmbeddingSource") is ComboBox cbEmbSourceSave
+                && cbEmbSourceSave.SelectedItem is ComboBoxItem embSrcItem
+                && Enum.TryParse<Setting.EmbeddingSourceMode>(embSrcItem.Tag?.ToString(), out var embSrc))
+                embeddingSave.Source = embSrc;
+            if (this.FindName("ComboBox_EmbeddingProtocol") is ComboBox cbEmbProtoSave
+                && cbEmbProtoSave.SelectedItem is ComboBoxItem embProtoItem
+                && Enum.TryParse<Setting.EmbeddingProtocol>(embProtoItem.Tag?.ToString(), out var embProto))
+                embeddingSave.Protocol = embProto;
+            if (this.FindName("TextBox_EmbeddingUrl") is TextBox tbEmbUrlSave)
+                embeddingSave.Url = tbEmbUrlSave.Text.Trim();
+            if (this.FindName("TextBox_EmbeddingApiKey") is TextBox tbEmbKeySave)
+            {
+                var key = tbEmbKeySave.Text.Trim();
+                embeddingSave.ApiKey = string.IsNullOrEmpty(key) ? null : key;
+            }
+            if (this.FindName("TextBox_EmbeddingModel") is TextBox tbEmbModelSave && !string.IsNullOrWhiteSpace(tbEmbModelSave.Text))
+                embeddingSave.Model = tbEmbModelSave.Text.Trim();
+            if (this.FindName("TextBox_EmbeddingMaxBatchSize") is TextBox tbEmbBatchSave
+                && int.TryParse(tbEmbBatchSave.Text, out int embBatch) && embBatch > 0)
+                embeddingSave.MaxBatchSize = embBatch;
+            if (this.FindName("TextBox_EmbeddingMaxBackfill") is TextBox tbEmbBackfillSave
+                && int.TryParse(tbEmbBackfillSave.Text, out int embBackfill) && embBackfill >= 0)
+                embeddingSave.MaxBackfillPerRound = embBackfill;
+            if (this.FindName("TextBox_EmbeddingTimeout") is TextBox tbEmbTimeoutSave
+                && int.TryParse(tbEmbTimeoutSave.Text, out int embTimeout) && embTimeout > 0)
+                embeddingSave.TimeoutSeconds = embTimeout;
 
             _plugin.Settings.LogAutoScroll = logAutoScrollCheckBox.IsChecked ?? true;
             if (int.TryParse(maxLogCountTextBox.Text, out int maxLogCount))
@@ -2417,6 +2526,36 @@ namespace VPetLLM.UI.Windows
         {
             var recordEditor = new winRecordEditor(_plugin);
             recordEditor.Show();
+        }
+
+        private void Button_ClearEmbeddingCache_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                LanguageHelper.Get("Embedding.ClearCacheConfirm", _plugin.Settings.Language),
+                LanguageHelper.Get("Embedding.ClearCache", _plugin.Settings.Language),
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                // 向量缓存与聊天历史同库；清空所有 model_key 的缓存以强制重建
+                var store = new EmbeddingStore(HistoryManager.GetDatabasePath());
+                var cleared = store.Clear();
+                MessageBox.Show(
+                    string.Format(LanguageHelper.Get("Embedding.ClearCacheSuccess", _plugin.Settings.Language), cleared),
+                    LanguageHelper.Get("Embedding.ClearCache", _plugin.Settings.Language),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"{ex.Message}",
+                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
         private async void Button_CopyLog_Click(object sender, RoutedEventArgs e)
         {
@@ -3386,6 +3525,27 @@ namespace VPetLLM.UI.Windows
                 tbOvMsgLabel.Text = LanguageHelper.Get("Advanced_Options.OverflowCount", langCode);
             if (FindName("TextBlock_OverflowTokenCountLabel") is TextBlock tbOvTokLabel)
                 tbOvTokLabel.Text = LanguageHelper.Get("Advanced_Options.OverflowTokenCount", langCode);
+
+            // 向量检索（Embedding）标签本地化
+            if (FindName("Tab_Embedding") is TabItem tabEmbedding) tabEmbedding.Header = LanguageHelper.Get("Embedding.Tab", langCode);
+            if (FindName("Label_Embedding") is Label lblEmbedding) lblEmbedding.Content = LanguageHelper.Get("Embedding.Tab", langCode);
+            if (FindName("TextBlock_EmbeddingHint") is TextBlock tbEmbHint) tbEmbHint.Text = LanguageHelper.Get("Embedding.Hint", langCode);
+            if (FindName("CheckBox_EmbeddingEnable") is CheckBox cbEmbEnableL) cbEmbEnableL.Content = LanguageHelper.Get("Embedding.Enable", langCode);
+            if (FindName("TextBlock_EmbeddingSource") is TextBlock tbEmbSrcL) tbEmbSrcL.Text = LanguageHelper.Get("Embedding.Source", langCode);
+            if (FindName("TextBlock_EmbeddingFreeHint") is TextBlock tbEmbFreeHintL) tbEmbFreeHintL.Text = LanguageHelper.Get("Embedding.FreeHint", langCode);
+            if (FindName("TextBlock_EmbeddingProtocol") is TextBlock tbEmbProtoL) tbEmbProtoL.Text = LanguageHelper.Get("Embedding.Protocol", langCode);
+            RefreshComboItemsByTag(FindName("ComboBox_EmbeddingSource") as ComboBox, "Embedding.Source_", langCode);
+            RefreshComboItemsByTag(FindName("ComboBox_EmbeddingProtocol") as ComboBox, "Embedding.Protocol_", langCode);
+            if (FindName("TextBlock_EmbeddingUrl") is TextBlock tbEmbUrlL) tbEmbUrlL.Text = LanguageHelper.Get("Embedding.Url", langCode);
+            if (FindName("TextBlock_EmbeddingUrlHint") is TextBlock tbEmbUrlHintL) tbEmbUrlHintL.Text = LanguageHelper.Get("Embedding.UrlHint", langCode);
+            if (FindName("TextBlock_EmbeddingApiKey") is TextBlock tbEmbKeyL) tbEmbKeyL.Text = LanguageHelper.Get("Embedding.ApiKey", langCode);
+            if (FindName("TextBlock_EmbeddingModel") is TextBlock tbEmbModelL) tbEmbModelL.Text = LanguageHelper.Get("Embedding.Model", langCode);
+            if (FindName("TextBlock_EmbeddingMaxBatchSize") is TextBlock tbEmbBatchL) tbEmbBatchL.Text = LanguageHelper.Get("Embedding.MaxBatchSize", langCode);
+            if (FindName("TextBlock_EmbeddingMaxBackfill") is TextBlock tbEmbBackfillL) tbEmbBackfillL.Text = LanguageHelper.Get("Embedding.MaxBackfill", langCode);
+            if (FindName("TextBlock_EmbeddingMaxBackfillHint") is TextBlock tbEmbBackfillHintL) tbEmbBackfillHintL.Text = LanguageHelper.Get("Embedding.MaxBackfillHint", langCode);
+            if (FindName("TextBlock_EmbeddingTimeout") is TextBlock tbEmbTimeoutL) tbEmbTimeoutL.Text = LanguageHelper.Get("Embedding.Timeout", langCode);
+            if (FindName("Button_ClearEmbeddingCache") is Button btnEmbClear) btnEmbClear.Content = LanguageHelper.Get("Embedding.ClearCache", langCode);
+            if (FindName("TextBlock_EmbeddingClearHint") is TextBlock tbEmbClearHintL) tbEmbClearHintL.Text = LanguageHelper.Get("Embedding.ClearCacheHint", langCode);
 
             // 记录器高级设置本地化
             if (FindName("TextBlock_RecordsAdvancedTitle") is TextBlock textBlockRecordsAdvancedTitle) textBlockRecordsAdvancedTitle.Text = LanguageHelper.Get("Advanced_Options.RecordsAdvancedTitle", langCode);

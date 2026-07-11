@@ -2567,6 +2567,180 @@
                     </Border>
                 </ScrollViewer>
             </TabItem>
+
+            <TabItem Header="{utils:Localize KeyPath=Embedding.Tab, Default=向量检索}"
+                    x:Name="Tab_Embedding"
+                    Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Style="{StaticResource CardContainer}">
+                        <StackPanel Style="{StaticResource SettingGroup}">
+                            <Label Content="{utils:Localize KeyPath=Embedding.Tab, Default=向量检索}"
+                                    x:Name="Label_Embedding"
+                                    Style="{StaticResource SettingLabel}"/>
+                            <TextBlock x:Name="TextBlock_EmbeddingHint"
+                                    Text="{utils:Localize KeyPath=Embedding.Hint, Default=配置一个 OpenAI 兼容的 embedding 端点后，记忆检索会额外启用语义召回（能找回措辞不同但意思相近的记忆）。关闭或未配置时，检索仍以关键词方式工作。}"
+                                    TextWrapping="Wrap"
+                                    Foreground="{StaticResource SecondaryTextBrush}"
+                                    FontSize="12"
+                                    Margin="0,0,0,16"/>
+
+                            <CheckBox x:Name="CheckBox_EmbeddingEnable"
+                                    Content="{utils:Localize KeyPath=Embedding.Enable, Default=启用向量检索}"
+                                    Margin="0,0,0,16"
+                                    Style="{StaticResource ModernCheckBox}">
+                                <CheckBox.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock Text="{utils:Localize KeyPath=Embedding.EnableTooltip, Default=需要一个可用的 embedding 端点，并会产生额外的 API 调用。}"/>
+                                    </ToolTip>
+                                </CheckBox.ToolTip>
+                            </CheckBox>
+
+                            <!-- 来源：免费 vs 自定义 -->
+                            <StackPanel Orientation="Horizontal"
+                                    Margin="20,0,0,12"
+                                    IsEnabled="{Binding IsChecked, ElementName=CheckBox_EmbeddingEnable}">
+                                <TextBlock Text="{utils:Localize KeyPath=Embedding.Source, Default=向量来源:}"
+                                        x:Name="TextBlock_EmbeddingSource"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"
+                                        Width="120"/>
+                                <ComboBox x:Name="ComboBox_EmbeddingSource"
+                                        Width="220"
+                                        SelectionChanged="ComboBox_EmbeddingSource_SelectionChanged"
+                                        Style="{StaticResource ModernComboBox}">
+                                    <ComboBoxItem Content="{utils:Localize KeyPath=Embedding.Source_Free, Default=免费（云端提供）}" Tag="Free"/>
+                                    <ComboBoxItem Content="{utils:Localize KeyPath=Embedding.Source_Custom, Default=自定义端点}" Tag="Custom"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <TextBlock x:Name="TextBlock_EmbeddingFreeHint"
+                                    Text="{utils:Localize KeyPath=Embedding.FreeHint, Default=免费向量端点由云端下发；若暂未提供，向量检索会自动不启用（可切换到自定义端点）。}"
+                                    TextWrapping="Wrap"
+                                    Foreground="{StaticResource SecondaryTextBrush}"
+                                    FontSize="12"
+                                    Margin="20,0,0,12"/>
+
+                            <StackPanel x:Name="Panel_EmbeddingCustom"
+                                    Margin="20,0,0,0"
+                                    IsEnabled="{Binding IsChecked, ElementName=CheckBox_EmbeddingEnable}">
+                                <!-- 协议 -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                    <TextBlock Text="{utils:Localize KeyPath=Embedding.Protocol, Default=协议:}"
+                                            x:Name="TextBlock_EmbeddingProtocol"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="120"/>
+                                    <ComboBox x:Name="ComboBox_EmbeddingProtocol"
+                                            Width="220"
+                                            Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Embedding.Protocol_OpenAI, Default=OpenAI 兼容}" Tag="OpenAI"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Embedding.Protocol_Ollama, Default=Ollama 原生}" Tag="Ollama"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=Embedding.Protocol_Gemini, Default=Gemini}" Tag="Gemini"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <!-- 端点 URL -->
+                                <TextBlock Text="{utils:Localize KeyPath=Embedding.Url, Default=端点地址 (OpenAI 兼容):}"
+                                        x:Name="TextBlock_EmbeddingUrl"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"
+                                        Margin="0,0,0,4"/>
+                                <TextBox x:Name="TextBox_EmbeddingUrl"
+                                        Margin="0,0,0,4"
+                                        Style="{StaticResource ModernTextBox}"/>
+                                <TextBlock x:Name="TextBlock_EmbeddingUrlHint"
+                                        Text="{utils:Localize KeyPath=Embedding.UrlHint, Default=例如 https://api.openai.com/v1 或本地 http://localhost:11434/v1，可填到 /v1 或 /v1/embeddings。}"
+                                        TextWrapping="Wrap"
+                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                        FontSize="12"
+                                        Margin="0,0,0,12"/>
+
+                                <!-- API Key -->
+                                <TextBlock Text="{utils:Localize KeyPath=Embedding.ApiKey, Default=API Key (可选):}"
+                                        x:Name="TextBlock_EmbeddingApiKey"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"
+                                        Margin="0,0,0,4"/>
+                                <TextBox x:Name="TextBox_EmbeddingApiKey"
+                                        Margin="0,0,0,12"
+                                        FontFamily="Consolas"
+                                        Style="{StaticResource ModernTextBox}"/>
+
+                                <!-- 模型 -->
+                                <TextBlock Text="{utils:Localize KeyPath=Embedding.Model, Default=模型名称:}"
+                                        x:Name="TextBlock_EmbeddingModel"
+                                        Foreground="{StaticResource PrimaryTextBrush}"
+                                        FontSize="14"
+                                        Margin="0,0,0,4"/>
+                                <TextBox x:Name="TextBox_EmbeddingModel"
+                                        Margin="0,0,0,12"
+                                        Style="{StaticResource ModernTextBox}"/>
+
+                                <!-- 批大小 -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBlock Text="{utils:Localize KeyPath=Embedding.MaxBatchSize, Default=单次请求批大小:}"
+                                            x:Name="TextBlock_EmbeddingMaxBatchSize"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="180"/>
+                                    <TextBox x:Name="TextBox_EmbeddingMaxBatchSize"
+                                            Width="90"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+
+                                <!-- 每轮回填上限 -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="{utils:Localize KeyPath=Embedding.MaxBackfill, Default=每轮检索回填上限:}"
+                                            x:Name="TextBlock_EmbeddingMaxBackfill"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="180"/>
+                                    <TextBox x:Name="TextBox_EmbeddingMaxBackfill"
+                                            Width="90"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+                                <TextBlock x:Name="TextBlock_EmbeddingMaxBackfillHint"
+                                        Text="{utils:Localize KeyPath=Embedding.MaxBackfillHint, Default=为控制冷启动的 API 用量，不做全量预嵌入：每次检索后只为最多这么多条尚无向量的记忆补齐向量，常被检索到的记忆会优先获得向量。}"
+                                        TextWrapping="Wrap"
+                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                        FontSize="12"
+                                        Margin="0,0,0,12"/>
+
+                                <!-- 超时 -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                    <TextBlock Text="{utils:Localize KeyPath=Embedding.Timeout, Default=请求超时 (秒):}"
+                                            x:Name="TextBlock_EmbeddingTimeout"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource PrimaryTextBrush}"
+                                            FontSize="14"
+                                            Width="180"/>
+                                    <TextBox x:Name="TextBox_EmbeddingTimeout"
+                                            Width="90"
+                                            Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+
+                                <!-- 清空向量缓存 -->
+                                <Button x:Name="Button_ClearEmbeddingCache"
+                                        Content="{utils:Localize KeyPath=Embedding.ClearCache, Default=清空向量缓存}"
+                                        HorizontalAlignment="Left"
+                                        Click="Button_ClearEmbeddingCache_Click"
+                                        Style="{StaticResource SecondaryButton}"/>
+                                <TextBlock x:Name="TextBlock_EmbeddingClearHint"
+                                        Text="{utils:Localize KeyPath=Embedding.ClearCacheHint, Default=换用不同的 embedding 模型或端点后，旧向量会自动失效；此按钮可手动清除已缓存的向量以立即重建。}"
+                                        TextWrapping="Wrap"
+                                        Foreground="{StaticResource SecondaryTextBrush}"
+                                        FontSize="12"
+                                        Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </TabItem>
+
             <TabItem Header="{utils:Localize KeyPath=Tools.Tab}"
                     x:Name="Tab_Tools"
                     Style="{StaticResource ModernTabItem}">

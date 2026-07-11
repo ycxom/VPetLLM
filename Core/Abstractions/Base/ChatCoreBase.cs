@@ -378,28 +378,31 @@ namespace VPetLLM.Core.Abstractions.Base
         }
 
         /// <summary>
-        /// 构造向量检索后端。未启用、缺 URL、或构造失败时返回 null ——
+        /// 构造向量检索后端。未启用、来源不可用、或构造失败时返回 null ——
         /// 检索会退化成 BM25 + 覆盖率两路，功能不受影响。
+        ///
+        /// 两种来源：
+        ///   Free   —— 读云端下发的 embedding 配置（服务端未提供时优雅返回 null）
+        ///   Custom —— 用户自配端点，协议由 config.Protocol 决定
         /// </summary>
         private EmbeddingService? CreateEmbeddingService(Setting? settings)
         {
             var config = settings?.Embedding;
-            if (config is null || !config.Enable || string.IsNullOrWhiteSpace(config.Url))
+            if (config is null || !config.Enable)
                 return null;
 
             try
             {
-                var http = new HttpClient(CreateHttpClientHandler())
-                {
-                    Timeout = TimeSpan.FromSeconds(Math.Max(1, config.TimeoutSeconds))
-                };
+                var provider = config.Source == Setting.EmbeddingSourceMode.Free
+                    ? CreateFreeEmbeddingProvider(config)
+                    : CreateCustomEmbeddingProvider(config);
 
-                var provider = new OpenAiCompatibleEmbeddingProvider(
-                    http, config.Url, config.ApiKey, config.Model);
+                if (provider is null)
+                    return null;
 
                 var store = new EmbeddingStore(HistoryManager.GetDatabasePath());
 
-                Logger.Log($"EmbeddingService initialized for {Name} (model={provider.ModelKey})");
+                Logger.Log($"EmbeddingService initialized for {Name} (source={config.Source}, model={provider.ModelKey})");
                 return new EmbeddingService(
                     provider, store,
                     maxBatchSize: config.MaxBatchSize,
@@ -411,6 +414,76 @@ namespace VPetLLM.Core.Abstractions.Base
                 Logger.Log($"Failed to initialize EmbeddingService: {ex.Message}");
                 return null;
             }
+        }
+
+        private HttpClient NewEmbeddingHttpClient(int timeoutSeconds)
+            => new HttpClient(CreateHttpClientHandler())
+            {
+                Timeout = TimeSpan.FromSeconds(Math.Max(1, timeoutSeconds))
+            };
+
+        private IEmbeddingProvider? CreateCustomEmbeddingProvider(Setting.EmbeddingSetting config)
+        {
+            if (string.IsNullOrWhiteSpace(config.Url))
+            {
+                Logger.Log("EmbeddingService: 自定义来源缺少端点地址，向量检索未启用");
+                return null;
+            }
+
+            return EmbeddingProviderFactory.Create(
+                config.Protocol,
+                NewEmbeddingHttpClient(config.TimeoutSeconds),
+                config.Url, config.ApiKey, config.Model);
+        }
+
+        /// <summary>
+        /// 构造 Free embedding provider。地址/密钥/模型全部来自云端下发的
+        /// <c>Free_Embedding_Config.json</c>（由 VPetLLM_Web 管理，可随时更新而无需重编客户端）——
+        /// 绝不在客户端硬编码端点。服务端尚未下发该配置时返回 null，向量路优雅缺席。
+        ///
+        /// 鉴权靠签名头（<see cref="Utils.Common.RequestSignatureHelper"/>，与 Free ASR/TTS 一致）：
+        /// embedding 请求体无 prompt 指纹，走不通 Chat 的关键词鉴权，只能签名。
+        /// 协议默认 OpenAI 兼容，可由配置里可选的 Protocol 字段覆盖。
+        /// </summary>
+        private IEmbeddingProvider? CreateFreeEmbeddingProvider(Setting.EmbeddingSetting config)
+        {
+            var cloud = Utils.Data.FreeConfigManager.GetEmbeddingConfig();
+            if (cloud is null)
+            {
+                Logger.Log("EmbeddingService: Free embedding 配置暂未下发，向量检索未启用（可切换到自定义端点）");
+                return null;
+            }
+
+            var url = Utils.Data.FreeConfigManager.DecodeConfigValue(cloud["API_URL"]?.ToString());
+            var key = Utils.Data.FreeConfigManager.DecodeConfigValue(cloud["API_KEY"]?.ToString());
+            var model = cloud["Model"]?.ToString() ?? "";
+            if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(model))
+            {
+                Logger.Log("EmbeddingService: Free embedding 配置字段不完整，向量检索未启用");
+                return null;
+            }
+
+            var protocol = Setting.EmbeddingProtocol.OpenAI;
+            if (cloud["Protocol"]?.ToString() is string p &&
+                Enum.TryParse<Setting.EmbeddingProtocol>(p, ignoreCase: true, out var parsed))
+                protocol = parsed;
+
+            // 每请求挂签名头。RequestSignatureHelper 已由主程序初始化（Free ASR/TTS 共用）。
+            // 目前仅 OpenAI 兼容协议接签名钩子；Free 端点即 OpenAI 兼容。
+            if (protocol == Setting.EmbeddingProtocol.OpenAI)
+            {
+                Func<HttpRequestMessage, CancellationToken, Task> sign =
+                    (req, _) => Utils.Common.RequestSignatureHelper.AddSignatureAsync(req);
+
+                return new OpenAiCompatibleEmbeddingProvider(
+                    NewEmbeddingHttpClient(config.TimeoutSeconds),
+                    url, string.IsNullOrEmpty(key) ? null : key, model, onBeforeSend: sign);
+            }
+
+            return EmbeddingProviderFactory.Create(
+                protocol,
+                NewEmbeddingHttpClient(config.TimeoutSeconds),
+                url, string.IsNullOrEmpty(key) ? null : key, model);
         }
 
         /// <summary>

@@ -26,6 +26,10 @@ namespace VPetLLM.Core.Data.Database
                 using var connection = new SqliteConnection(_connectionString);
                 connection.Open();
 
+                // 步骤1：只建表（含不引用 provider 的索引）。
+                // 注意：引用 provider / threshold 的索引不能放这里 —— 旧库的
+                // overflow_summaries 没有这些列，在补列之前建索引会抛
+                // "no such column: provider" 使整批回滚，后面的迁移也就跑不到。
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
                     CREATE TABLE IF NOT EXISTS overflow_summaries (
@@ -38,9 +42,6 @@ namespace VPetLLM.Core.Data.Database
                         threshold INTEGER NOT NULL DEFAULT 0,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     );
-
-                    CREATE INDEX IF NOT EXISTS idx_overflow_summaries_provider
-                        ON overflow_summaries(provider);
 
                     CREATE INDEX IF NOT EXISTS idx_overflow_summaries_created
                         ON overflow_summaries(created_at);
@@ -64,29 +65,37 @@ namespace VPetLLM.Core.Data.Database
                 ";
                 cmd.ExecuteNonQuery();
 
-                // 兼容旧表：尝试添加 threshold 列（已存在则忽略）
-                try
+                // 步骤2：补列（旧库升级路径）。用 PRAGMA 查列后再 ALTER，
+                // 比 try/catch 吞 SqliteException 更精确（不会掩盖其它错误）。
+                var existingCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var pragma = connection.CreateCommand())
                 {
-                    var alterCmd = connection.CreateCommand();
-                    alterCmd.CommandText = "ALTER TABLE overflow_summaries ADD COLUMN threshold INTEGER NOT NULL DEFAULT 0";
-                    alterCmd.ExecuteNonQuery();
-                }
-                catch (SqliteException)
-                {
-                    // 列已存在，忽略
+                    pragma.CommandText = "PRAGMA table_info(overflow_summaries)";
+                    using var reader = pragma.ExecuteReader();
+                    while (reader.Read())
+                        existingCols.Add(reader.GetString(1));   // 1 = name
                 }
 
-                // 兼容旧表：尝试添加 provider 列（已存在则忽略）。
-                // 旧数据 provider 为 ''，与"不按提供商分开聊天"模式的键一致
-                try
+                void AddColumn(string name, string definition)
                 {
-                    var alterCmd = connection.CreateCommand();
-                    alterCmd.CommandText = "ALTER TABLE overflow_summaries ADD COLUMN provider TEXT NOT NULL DEFAULT ''";
-                    alterCmd.ExecuteNonQuery();
+                    if (existingCols.Contains(name)) return;
+                    using var alter = connection.CreateCommand();
+                    alter.CommandText = $"ALTER TABLE overflow_summaries ADD COLUMN {name} {definition}";
+                    alter.ExecuteNonQuery();
+                    Logger.Log($"overflow_summaries: 已添加列 {name}");
                 }
-                catch (SqliteException)
+
+                AddColumn("threshold", "INTEGER NOT NULL DEFAULT 0");
+                // 旧数据 provider 为 ''，与"不按提供商分开聊天"模式的键一致
+                AddColumn("provider", "TEXT NOT NULL DEFAULT ''");
+
+                // 步骤3：补列之后再建引用这些列的索引
+                using (var idxCmd = connection.CreateCommand())
                 {
-                    // 列已存在，忽略
+                    idxCmd.CommandText = @"
+                        CREATE INDEX IF NOT EXISTS idx_overflow_summaries_provider
+                            ON overflow_summaries(provider);";
+                    idxCmd.ExecuteNonQuery();
                 }
 
                 Logger.Log("Overflow database tables initialized successfully");

@@ -1527,12 +1527,36 @@ namespace VPetLLM
         /// 向量检索配置。作为记忆检索 RRF 融合的第三路，与 BM25、覆盖率并列。
         /// 关闭或后端不可用时该路自动退出，检索仍然工作（只是没有语义召回）。
         /// </summary>
+        /// <summary>向量来源：用云端免费 embedding 端点，还是用户自配端点。</summary>
+        public enum EmbeddingSourceMode
+        {
+            Free,    // 云端下发的免费 embedding 端点（协议/地址/模型由云配置决定）
+            Custom   // 用户自配端点
+        }
+
+        /// <summary>自配端点的协议。Free 来源的协议由云配置内部决定，不看此项。</summary>
+        public enum EmbeddingProtocol
+        {
+            OpenAI,  // OpenAI 兼容 /embeddings（OpenAI、DashScope 兼容模式、vLLM、LM Studio、各类网关）
+            Ollama,  // Ollama 原生 /api/embed
+            Gemini   // Google Generative Language :batchEmbedContents
+        }
+
         public class EmbeddingSetting
         {
             /// <summary>默认关闭：需要一个可用的 embedding 端点，且会产生 API 调用。</summary>
             public bool Enable { get; set; } = false;
 
-            /// <summary>OpenAI 兼容的 base url，如 https://api.openai.com/v1 或本地 Ollama。</summary>
+            /// <summary>
+            /// 向量来源。默认 Free：优先用云端下发的免费端点；云端未提供该配置时优雅降级
+            /// （向量路缺席，检索退化为关键词两路）。用户可切到 Custom 用自己的端点。
+            /// </summary>
+            public EmbeddingSourceMode Source { get; set; } = EmbeddingSourceMode.Free;
+
+            /// <summary>自配端点使用的协议（Source=Custom 时生效）。</summary>
+            public EmbeddingProtocol Protocol { get; set; } = EmbeddingProtocol.OpenAI;
+
+            /// <summary>自配端点 base url。含义随协议而变，见各 Provider 注释。</summary>
             public string Url { get; set; } = "";
 
             public string? ApiKey { get; set; }

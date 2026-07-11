@@ -14,15 +14,24 @@ namespace VPetLLM.Core.Services.Embedding
         private readonly HttpClient _http;
         private readonly string _endpoint;
         private readonly string _model;
+        private readonly Func<HttpRequestMessage, CancellationToken, Task>? _onBeforeSend;
 
         public string ModelKey { get; }
 
         /// <param name="baseUrl">形如 https://host/v1，末尾有无斜杠均可。</param>
-        public OpenAiCompatibleEmbeddingProvider(HttpClient http, string baseUrl, string? apiKey, string model)
+        /// <param name="onBeforeSend">
+        /// 发送前的请求装饰钩子。Free 通道用它挂签名头（<see cref="Utils.Common"/> 的签名机制）——
+        /// 免费网关对无 prompt 指纹的 embedding 请求走签名鉴权，仅 Bearer 不够。
+        /// 自配通道传 null。
+        /// </param>
+        public OpenAiCompatibleEmbeddingProvider(
+            HttpClient http, string baseUrl, string? apiKey, string model,
+            Func<HttpRequestMessage, CancellationToken, Task>? onBeforeSend = null)
         {
             _http = http;
             _model = model;
             _endpoint = BuildEndpoint(baseUrl);
+            _onBeforeSend = onBeforeSend;
 
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
@@ -59,9 +68,17 @@ namespace VPetLLM.Core.Services.Embedding
                 encoding_format = "float"
             };
 
-            using var content = new StringContent(
-                JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json");
-            using var response = await _http.PostAsync(_endpoint, content, ct);
+            using var request = new HttpRequestMessage(HttpMethod.Post, _endpoint)
+            {
+                Content = new StringContent(
+                    JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json")
+            };
+
+            // Free 通道在此挂签名头；自配通道无钩子
+            if (_onBeforeSend is not null)
+                await _onBeforeSend(request, ct);
+
+            using var response = await _http.SendAsync(request, ct);
 
             var payload = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode)

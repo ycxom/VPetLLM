@@ -23,6 +23,21 @@ namespace VPetLLM.Utils.Data
         private const string ASR_CONFIG_NAME = "Free_ASR_Config.json";
         private const string CHAT_CONFIG_NAME = "Free_Chat_Config.json";
         private const string TTS_CONFIG_NAME = "Free_TTS_Config.json";
+        private const string EMBEDDING_CONFIG_NAME = "Free_Embedding_Config.json";
+
+        /// <summary>
+        /// 本地持久化的版本清单（vpetllm.json 内容）。用于按 configName→MD5 直接定位
+        /// 已缓存的加密配置文件，从而不必在客户端硬编码任何「模型判别值」。
+        ///
+        /// 存在 meta 子目录里：FreeConfigCleaner 会删掉配置根目录下所有 .json 及
+        /// 非 32 位文件（安全清理），而它用的 Directory.GetFiles 不递归，子目录得以幸存 ——
+        /// 否则离线启动清单被删又无法重建，缓存配置就读不到了。
+        /// </summary>
+        private const string MANIFEST_SUBDIR = "meta";
+        private const string MANIFEST_CACHE_NAME = "manifest.cache.json";
+
+        private static string GetManifestPath()
+            => Path.Combine(ConfigDirectory, MANIFEST_SUBDIR, MANIFEST_CACHE_NAME);
 
         static FreeConfigManager()
         {
@@ -54,15 +69,41 @@ namespace VPetLLM.Utils.Data
                     return hasCached;
                 }
 
+                // 持久化版本清单，供读取时按 configName→MD5 直接定位配置文件
+                // （无需硬编码模型判别值）。清单只含 MD5，无敏感信息，明文保存即可。
+                try
+                {
+                    var manifestPath = GetManifestPath();
+                    Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
+                    File.WriteAllText(manifestPath, versionInfo.ToString());
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"FreeConfigManager: 持久化版本清单失败: {ex.Message}");
+                }
+
                 bool asrOk = await CheckAndUpdateConfigAsync(ASR_CONFIG_NAME, versionInfo);
                 bool chatOk = await CheckAndUpdateConfigAsync(CHAT_CONFIG_NAME, versionInfo);
                 bool ttsOk = await CheckAndUpdateConfigAsync(TTS_CONFIG_NAME, versionInfo);
 
-                if (!asrOk || !chatOk || !ttsOk)
+                // Embedding 配置是可选的：服务端尚未提供时不应让整体初始化失败。
+                // 版本文件里没有对应条目就直接跳过（CheckAndUpdateConfigAsync 返回 false）。
+                bool embeddingOk = false;
+                try
                 {
-                    Logger.Log($"FreeConfigManager: 配置检查结果 - ASR:{asrOk}, Chat:{chatOk}, TTS:{ttsOk}");
+                    embeddingOk = await CheckAndUpdateConfigAsync(EMBEDDING_CONFIG_NAME, versionInfo);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"FreeConfigManager: Embedding 配置获取失败（可选，忽略）: {ex.Message}");
                 }
 
+                if (!asrOk || !chatOk || !ttsOk)
+                {
+                    Logger.Log($"FreeConfigManager: 配置检查结果 - ASR:{asrOk}, Chat:{chatOk}, TTS:{ttsOk}, Embedding:{embeddingOk}(可选)");
+                }
+
+                // Embedding 不计入成功判定，缺失不影响其余功能
                 return asrOk && chatOk && ttsOk;
             }
             catch (Exception ex)
@@ -136,9 +177,17 @@ namespace VPetLLM.Utils.Data
                 var encryptedContent = EncryptConfig(configContent);
                 File.WriteAllText(encryptedPath, encryptedContent);
 
-                var configType = configName.Contains("ASR") ? "ASR" :
-                                configName.Contains("Chat") ? "Chat" : "TTS";
-                CleanOldEncryptedFiles(expectedMd5, configType);
+                // Embedding 走 manifest 定位、不参与 model 判别式清理，因此不归入这里的类型分支
+                if (!configName.Contains("Embedding"))
+                {
+                    var configType = configName.Contains("ASR") ? "ASR" :
+                                    configName.Contains("Chat") ? "Chat" : "TTS";
+                    CleanOldEncryptedFiles(expectedMd5, configType);
+                }
+                else
+                {
+                    CleanStaleFilesByManifest(versionInfo);
+                }
 
                 return true;
             }
@@ -391,6 +440,119 @@ namespace VPetLLM.Utils.Data
         /// 获取TTS配置
         /// </summary>
         public static JObject GetTTSConfig() => ReadConfig(TTS_CONFIG_NAME);
+
+        /// <summary>
+        /// 获取 Free Embedding 配置。通过本地版本清单按 configName→MD5 定位加密文件，
+        /// 不依赖任何硬编码的模型判别值 —— 服务端改模型名无需更新客户端。
+        /// 服务端未下发或本地无清单时返回 null（可选功能，调用方据此降级）。
+        /// </summary>
+        public static JObject GetEmbeddingConfig() => ReadConfigByManifest(EMBEDDING_CONFIG_NAME);
+
+        /// <summary>
+        /// 借助本地持久化的版本清单读取配置：configName → MD5 → 加密文件（以 MD5 命名）。
+        /// </summary>
+        private static JObject ReadConfigByManifest(string configName)
+        {
+            try
+            {
+                var md5 = GetManifestMd5(configName);
+                if (string.IsNullOrEmpty(md5))
+                    return null;
+
+                var encryptedPath = Path.Combine(ConfigDirectory, md5);
+                if (!File.Exists(encryptedPath))
+                    return null;
+
+                var decrypted = DecryptConfig(File.ReadAllText(encryptedPath));
+                return string.IsNullOrEmpty(decrypted) ? null : JObject.Parse(decrypted);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"FreeConfigManager: 按清单读取 {configName} 失败: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>从本地版本清单查某配置的 MD5。无清单或无该条目返回 null。</summary>
+        private static string GetManifestMd5(string configName)
+        {
+            try
+            {
+                var manifestPath = GetManifestPath();
+                if (!File.Exists(manifestPath))
+                    return null;
+
+                var manifest = JObject.Parse(File.ReadAllText(manifestPath));
+                return manifest["vpetllm"]?[configName.Replace(".json", "")]?.ToString();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 清理不再出现在版本清单中的旧加密文件（MD5 命名者）。替代按硬编码模型判别值
+        /// 的旧清理逻辑，对所有以 MD5 命名的缓存文件通用。
+        /// </summary>
+        private static void CleanStaleFilesByManifest(JObject versionInfo)
+        {
+            try
+            {
+                var valid = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (versionInfo["vpetllm"] is JObject map)
+                {
+                    foreach (var kv in map)
+                    {
+                        var md5 = kv.Value?.ToString();
+                        if (!string.IsNullOrEmpty(md5))
+                            valid.Add(md5);
+                    }
+                }
+                if (valid.Count == 0)
+                    return;
+
+                foreach (var file in Directory.GetFiles(ConfigDirectory))
+                {
+                    var name = Path.GetFileName(file);
+                    // 只处理 32 位 MD5 命名的加密文件，跳过清单等有扩展名的文件
+                    if (name.Length == 32 && !name.Contains(".") && !valid.Contains(name))
+                    {
+                        try { File.Delete(file); }
+                        catch { }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"FreeConfigManager: 按清单清理旧文件失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 解码 Free 配置里的字段值（API_URL / API_KEY 等）：Hex → Base64 → UTF-8。
+        /// 与 FreeChatCore 内部实现一致，供其它读取 Free 配置的地方复用。
+        /// </summary>
+        public static string DecodeConfigValue(string? encodedString)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(encodedString))
+                    return "";
+
+                var hexBytes = new byte[encodedString.Length / 2];
+                for (int i = 0; i < hexBytes.Length; i++)
+                    hexBytes[i] = Convert.ToByte(encodedString.Substring(i * 2, 2), 16);
+
+                var base64String = Encoding.UTF8.GetString(hexBytes);
+                var finalBytes = Convert.FromBase64String(base64String);
+                return Encoding.UTF8.GetString(finalBytes);
+            }
+            catch (Exception)
+            {
+                return "";
+            }
+        }
 
         /// <summary>
         /// 获取配置中的提供者信息（根据当前语言）
