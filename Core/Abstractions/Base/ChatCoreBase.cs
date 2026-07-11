@@ -13,6 +13,8 @@ namespace VPetLLM.Core.Abstractions.Base
         public RecordManager RecordManager { get; }
         public SkillManager SkillManager { get; }
         public OverflowManager? OverflowManager { get; private set; }
+        /// <summary>向量化服务，未启用/构造失败时为 null。供插件通过 EmbedTextAsync 复用。</summary>
+        public EmbeddingService? EmbeddingService { get; private set; }
         protected Setting? Settings { get; }
         protected IMainWindow? MainWindow { get; }
         protected ActionProcessor? ActionProcessor { get; }
@@ -27,6 +29,17 @@ namespace VPetLLM.Core.Abstractions.Base
         public abstract Task<string> Chat(string prompt);
         public abstract Task<string> Chat(string prompt, bool isFunctionCall);
         public abstract Task<string> Summarize(string systemPrompt, string userContent);
+
+        /// <summary>
+        /// 对单条文本取 L2 归一化向量，供插件做向量索引/检索。
+        /// 向量化未启用或后端不可用时返回 null（调用方据此退回关键词检索）。
+        /// </summary>
+        public async Task<float[]?> EmbedTextAsync(string text)
+        {
+            if (EmbeddingService is null || string.IsNullOrWhiteSpace(text))
+                return null;
+            return await EmbeddingService.EmbedQueryAsync(text);
+        }
 
         /// <summary>
         /// 发送带图像的多模态消息（默认实现：不支持）
@@ -359,9 +372,10 @@ namespace VPetLLM.Core.Abstractions.Base
             // Initialize MemoryRetrievalService (always created; activates only when enabled)
             try
             {
+                EmbeddingService = CreateEmbeddingService(settings);
                 var retrievalService = new MemoryRetrievalService(
                     settings, this, HistoryManager, OverflowManager, RecordManager,
-                    CreateEmbeddingService(settings));
+                    EmbeddingService);
 
                 // Register MemoryRetrievalService with ActionProcessor for the retrieval tool handler
                 if (actionProcessor is not null)

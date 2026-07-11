@@ -234,8 +234,72 @@ namespace VPetLLM.Utils.Plugin
             }
 
             // Retry deleting the original plugin file
-            return await DeletePluginFile(filePath);
+            var fileDeleted = await DeletePluginFile(filePath);
+
+            // 卸载后可选清除插件数据：仅当插件用到了 PluginData 且目录非空时询问
+            TryPromptDeletePluginData(plugin);
+
+            return fileDeleted;
         }
+
+        /// <summary>
+        /// 卸载插件后，若该插件在 PluginData 下存有数据，弹窗询问用户是否一并删除。
+        /// 对所有 IPluginWithData 插件通用。删除失败不影响卸载结果。
+        /// </summary>
+        private static void TryPromptDeletePluginData(IVPetLLMPlugin plugin)
+        {
+            try
+            {
+                if (plugin is not IPluginWithData)
+                    return;
+
+                var dataDir = Path.Combine(PluginPath, "PluginData", plugin.Name);
+                if (!Directory.Exists(dataDir))
+                    return;
+                // 目录为空则无需询问，直接静默删除空壳
+                if (!Directory.EnumerateFileSystemEntries(dataDir).Any())
+                {
+                    try { Directory.Delete(dataDir, true); } catch { }
+                    return;
+                }
+
+                var dispatcher = global::System.Windows.Application.Current?.Dispatcher;
+                Action prompt = () =>
+                {
+                    var result = global::System.Windows.MessageBox.Show(
+                        $"插件 \"{plugin.Name}\" 已卸载。是否同时删除它保存的数据？\n\n路径: {dataDir}\n\n选择\"否\"将保留数据，重新安装该插件后可继续使用。",
+                        "删除插件数据",
+                        global::System.Windows.MessageBoxButton.YesNo,
+                        global::System.Windows.MessageBoxImage.Question);
+
+                    if (result == global::System.Windows.MessageBoxResult.Yes)
+                    {
+                        try
+                        {
+                            Directory.Delete(dataDir, true);
+                            VPetLLMUtils.Logger.Log($"Deleted plugin data directory for {plugin.Name}: {dataDir}");
+                        }
+                        catch (Exception ex)
+                        {
+                            VPetLLMUtils.Logger.Log($"Failed to delete plugin data for {plugin.Name}: {ex.Message}");
+                            global::System.Windows.MessageBox.Show(
+                                $"删除数据失败: {ex.Message}\n可稍后手动删除该文件夹。",
+                                "删除插件数据", global::System.Windows.MessageBoxButton.OK, global::System.Windows.MessageBoxImage.Warning);
+                        }
+                    }
+                };
+
+                if (dispatcher is not null && !dispatcher.CheckAccess())
+                    dispatcher.Invoke(prompt);
+                else
+                    prompt();
+            }
+            catch (Exception ex)
+            {
+                VPetLLMUtils.Logger.Log($"TryPromptDeletePluginData error for {plugin.Name}: {ex.Message}");
+            }
+        }
+
         public static void UnloadAllPlugins(IChatCore chatCore)
         {
             if (chatCore is not null)

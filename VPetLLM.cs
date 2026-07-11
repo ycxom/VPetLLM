@@ -1759,6 +1759,15 @@ namespace VPetLLM
         }
 
         /// <summary>
+        /// 对单条文本取 L2 归一化向量，供插件做向量索引/检索。
+        /// 向量化未启用、后端不可用或 ChatCore 未就绪时返回 null。
+        /// </summary>
+        public Task<float[]?> EmbedTextAsync(string text)
+        {
+            return ChatCore is not null ? ChatCore.EmbedTextAsync(text) : Task.FromResult<float[]?>(null);
+        }
+
+        /// <summary>
         /// 设置聊天历史
         /// </summary>
         public void SetChatHistory(List<Message> history)

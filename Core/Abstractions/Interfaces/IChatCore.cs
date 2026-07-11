@@ -11,6 +11,12 @@ namespace VPetLLM.Core.Abstractions.Interfaces
         Task<string> Summarize(string systemPrompt, string userContent);
 
         /// <summary>
+        /// 对单条文本取 L2 归一化向量，供插件做向量索引/检索。
+        /// 向量化未启用或后端不可用时返回 null。
+        /// </summary>
+        Task<float[]?> EmbedTextAsync(string text);
+
+        /// <summary>
         /// 发送带图像的多模态消息
         /// </summary>
         /// <param name="prompt">文本提示</param>
