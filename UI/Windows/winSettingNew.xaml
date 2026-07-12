@@ -3327,6 +3327,25 @@
                     </Grid>
                 </Border>
             </TabItem>
+            <TabItem Header="{utils:Localize KeyPath=PluginPanels.Tab, Default=插件面板}"
+                    x:Name="Tab_PluginPanels"
+                    Style="{StaticResource ModernTabItem}">
+                <Border Style="{StaticResource CardContainer}">
+                    <Grid>
+                        <TabControl x:Name="PluginPanelTabs"
+                                    TabStripPlacement="Left"
+                                    Background="Transparent"
+                                    BorderThickness="0"/>
+                        <TextBlock x:Name="PluginPanelsEmptyHint"
+                                   Visibility="Collapsed"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   FontSize="14"
+                                   TextWrapping="Wrap" MaxWidth="400" TextAlignment="Center"
+                                   Text="{utils:Localize KeyPath=PluginPanels.EmptyHint, Default=暂无提供面板的插件。启用带界面的插件后会显示在这里。}"/>
+                    </Grid>
+                </Border>
+            </TabItem>
             <TabItem Header="{utils:Localize KeyPath=Skills.Tab}"
                     x:Name="Tab_Skills"
                     Style="{StaticResource ModernTabItem}">

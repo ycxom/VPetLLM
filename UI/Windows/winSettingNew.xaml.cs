@@ -449,6 +449,8 @@ namespace VPetLLM.UI.Windows
                 };
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
 
+                PopulatePluginPanels();
+
                 _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
                     LoadMultimodalProviderSettings();
@@ -2744,6 +2746,65 @@ namespace VPetLLM.UI.Windows
         public void RefreshPluginList()
         {
             Button_RefreshPlugins_Click(this, new RoutedEventArgs());
+        }
+
+        /// <summary>
+        /// 枚举实现 IPluginTab 的已启用插件，把各自的 UserControl 挂进「插件面板」Tab 下的子 Tab。
+        /// 每个面板 try/catch 包裹，单个插件出错只影响它自己的子 Tab，不拖垮整窗。
+        /// </summary>
+        private void PopulatePluginPanels()
+        {
+            try
+            {
+                if (PluginPanelTabs is null) return;
+                PluginPanelTabs.Items.Clear();
+
+                var tabPlugins = PluginManager.Plugins
+                    .Where(p => p.Enabled)
+                    .OfType<IPluginTab>()
+                    .ToList();
+
+                foreach (var p in tabPlugins)
+                {
+                    TabItem item;
+                    try
+                    {
+                        var panel = p.CreatePanel();
+                        item = new TabItem { Header = p.TabTitle, Content = panel };
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"PopulatePluginPanels: 插件 {p.Name} 面板创建失败: {ex.Message}");
+                        item = new TabItem
+                        {
+                            Header = p.TabTitle,
+                            Content = new TextBlock
+                            {
+                                Margin = new Thickness(16),
+                                TextWrapping = TextWrapping.Wrap,
+                                Text = $"面板加载失败：{ex.Message}"
+                            }
+                        };
+                    }
+                    PluginPanelTabs.Items.Add(item);
+                }
+
+                if (PluginPanelTabs.Items.Count > 0)
+                {
+                    PluginPanelTabs.SelectedIndex = 0;
+                    PluginPanelTabs.Visibility = Visibility.Visible;
+                    if (PluginPanelsEmptyHint is not null) PluginPanelsEmptyHint.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    PluginPanelTabs.Visibility = Visibility.Collapsed;
+                    if (PluginPanelsEmptyHint is not null) PluginPanelsEmptyHint.Visibility = Visibility.Visible;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"PopulatePluginPanels 失败: {ex.Message}");
+            }
         }
 
         /// <summary>

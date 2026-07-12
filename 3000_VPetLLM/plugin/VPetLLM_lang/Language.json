@@ -1007,6 +1007,20 @@
       "jp": "自動診断を有効にする（5回連続でAIリクエストが失敗した場合に自動実行）"
     }
   },
+  "PluginPanels": {
+    "Tab": {
+      "en": "Plugin Panels",
+      "zh-hans": "插件面板",
+      "zh-hant": "外掛面板",
+      "jp": "プラグインパネル"
+    },
+    "EmptyHint": {
+      "en": "No plugins provide a panel yet. Enable a plugin with a UI and it will appear here.",
+      "zh-hans": "暂无提供面板的插件。启用带界面的插件后会显示在这里。",
+      "zh-hant": "暫無提供面板的外掛。啟用帶介面的外掛後會顯示在這裡。",
+      "jp": "パネルを提供するプラグインはまだありません。UI付きプラグインを有効にするとここに表示されます。"
+    }
+  },
   "Skills": {
     "Tab": {
       "en": "Skills",
