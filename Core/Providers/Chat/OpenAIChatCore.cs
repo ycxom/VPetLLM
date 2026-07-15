@@ -18,6 +18,8 @@ namespace VPetLLM.Core.Providers.Chat
         private Setting.OpenAINodeSetting? _currentNodeContext;
         // 节点级错误转移：记录本次请求已尝试失败的节点索引
         private HashSet<int> _triedNodeIndices = new HashSet<int>();
+        // 标记当前 Chat 调用是否为容灾重试（此时应固定使用已选定的转移节点，而非重新轮选）
+        private bool _isFailoverRetry;
 
         public OpenAIChatCore(Setting.OpenAINodeSetting openAINodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
@@ -479,14 +481,17 @@ namespace VPetLLM.Core.Providers.Chat
             // Handle conversation turn for record weight decrement
             OnConversationTurn();
 
-            // 初始化已尝试节点列表（仅在首次调用时）
-            if (_currentNodeContext == null)
+            // 容灾重试时保持已选定的转移节点与已尝试节点列表，避免重新轮选导致再次命中失败节点（死循环）
+            if (_isFailoverRetry)
             {
-                _triedNodeIndices.Clear();
+                _isFailoverRetry = false; // 消费标记，本次请求内后续逻辑按正常流程走
             }
-
-            // 清除上一次请求的节点缓存，确保每次新请求都重新选择节点
-            ClearNodeContext();
+            else
+            {
+                // 首次调用：重置已尝试节点列表并清除上一次请求的节点缓存，确保重新选择节点
+                _triedNodeIndices.Clear();
+                ClearNodeContext();
+            }
 
             // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
             // 使用 CreateUserMessage 自动设置时间戳和状态信息
@@ -703,10 +708,12 @@ namespace VPetLLM.Core.Providers.Chat
                 if (nextNode is not null)
                 {
                     SystemLogger.Log($"OpenAI 节点 {_currentNodeContext?.Name} 失败，正在转移到 {nextNode.Name}...");
-                    ClearNodeContext(); // 清除缓存，允许选择新节点
+                    // 固定使用已选定的转移节点（而非清空后重新轮选，否则可能再次命中已失败节点造成死循环）
+                    _currentNodeContext = nextNode;
+                    _isFailoverRetry = true;
 
                     // 重新调用 Chat 方法（会递归重试）
-                    // 注意：为了避免无限递归，_triedNodeIndices 已记录失败节点
+                    // 注意：_triedNodeIndices 已记录失败节点，且 _isFailoverRetry 保证不会重新轮选
                     return await Chat(prompt, isFunctionCall);
                 }
 

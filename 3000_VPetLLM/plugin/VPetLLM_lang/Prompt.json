@@ -87,6 +87,10 @@
         "en": "Increase or decrease experience points with the 'exp' command. Format: <|exp_begin|> 10 <|exp_end|>. This command can only affect and act upon itself; it cannot influence the user.",
         "zh": "通过 'exp' 指令增加或减少经验值。格式：<|exp_begin|> 10 <|exp_end|>。该命令只能影响并作用与自身，无法影响用户。"
     },
+    "Handler_ExpSet_Description": {
+        "en": "Directly set level, level cap or experience with the 'exp_set' command. Format: <|exp_set_begin|> level:5 <|exp_set_end|>, <|exp_set_begin|> levelmax:100 <|exp_set_end|> or <|exp_set_begin|> exp:200 <|exp_set_end|>. This command can only affect and act upon itself; it cannot influence the user.",
+        "zh": "通过 'exp_set' 指令直接设置等级、等级上限或经验值。格式：<|exp_set_begin|> level:5 <|exp_set_end|>、<|exp_set_begin|> levelmax:100 <|exp_set_end|> 或 <|exp_set_begin|> exp:200 <|exp_set_end|>。该命令只能影响并作用与自身，无法影响用户。"
+    },
     "Handler_Happy_Description": {
         "en": "Increase or decrease mood with the 'happy' command.\nFormat: <|happy_begin|> 10 <|happy_end|> or <|happy_begin|> <|happy_end|> (no parameters)\nThis command can only affect and act upon itself; it cannot influence the user.",
         "zh": "通过 'happy' 指令增加或减少心情值。\n格式：<|happy_begin|> 10 <|happy_end|> 或 <|happy_begin|> <|happy_end|>（无参数）\n该命令只能影响并作用与自身，无法影响用户。"
