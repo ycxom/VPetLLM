@@ -46,7 +46,14 @@ namespace VPetLLM.Utils.Plugin
                 }
             }
 
-            foreach (var file in dllFiles)
+            // 优化：并行加载插件，减少启动时间
+            // 使用 Parallel.ForEach + 线程安全的锁，支持多个插件同时加载
+            var parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Min(dllFiles.Length, Environment.ProcessorCount)
+            };
+
+            Parallel.ForEach(dllFiles, parallelOptions, file =>
             {
                 try
                 {
@@ -56,7 +63,11 @@ namespace VPetLLM.Utils.Plugin
                     Directory.CreateDirectory(shadowCopyDir);
                     var shadowCopiedFile = Path.Combine(shadowCopyDir, Path.GetFileName(file));
                     File.Copy(file, shadowCopiedFile, true);
-                    _shadowCopyDirectories[file] = shadowCopyDir;
+
+                    lock (_pluginContexts)  // 线程安全：保护字典访问
+                    {
+                        _shadowCopyDirectories[file] = shadowCopyDir;
+                    }
 
                     var pdbFile = Path.ChangeExtension(file, ".pdb");
                     if (File.Exists(pdbFile))
@@ -66,7 +77,11 @@ namespace VPetLLM.Utils.Plugin
                     }
 
                     var assembly = context.LoadFromAssemblyPath(shadowCopiedFile);
-                    _pluginContexts[file] = context;
+
+                    lock (_pluginContexts)  // 线程安全：保护字典访问
+                    {
+                        _pluginContexts[file] = context;
+                    }
 
                     var types = assembly.GetTypes();
 
@@ -78,10 +93,13 @@ namespace VPetLLM.Utils.Plugin
                             var plugin = (IVPetLLMPlugin)Activator.CreateInstance(type);
                             plugin.FilePath = file;
 
-                            var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
-                            if (existingPlugin is not null)
+                            lock (Plugins)  // 线程安全：检查重复
                             {
-                                continue;
+                                var existingPlugin = Plugins.FirstOrDefault(p => p.Name == plugin.Name);
+                                if (existingPlugin is not null)
+                                {
+                                    continue;
+                                }
                             }
 
                             if (plugin is IPluginWithData pluginWithData)
@@ -91,7 +109,12 @@ namespace VPetLLM.Utils.Plugin
                                 pluginWithData.PluginDataDir = pluginDataDir;
                             }
                             plugin.Enabled = pluginStates.TryGetValue(plugin.Name, out var enabled) ? enabled : true;
-                            Plugins.Add(plugin);
+
+                            lock (Plugins)  // 线程安全：添加到列表
+                            {
+                                Plugins.Add(plugin);
+                            }
+
                             if (plugin.Enabled)
                             {
                                 plugin.Initialize(VPetLLM.Instance);
@@ -107,26 +130,32 @@ namespace VPetLLM.Utils.Plugin
 
                     if (!foundCompatiblePlugin)
                     {
-                        FailedPlugins.Add(new FailedPlugin
+                        lock (FailedPlugins)  // 线程安全：记录失败的插件
                         {
-                            Name = Path.GetFileNameWithoutExtension(file),
-                            FilePath = file,
-                            Error = new InvalidOperationException("插件使用旧版接口，需要更新"),
-                            Description = "此插件使用旧版接口编译，与当前版本不兼容。请更新插件。"
-                        });
+                            FailedPlugins.Add(new FailedPlugin
+                            {
+                                Name = Path.GetFileNameWithoutExtension(file),
+                                FilePath = file,
+                                Error = new InvalidOperationException("插件使用旧版接口，需要更新"),
+                                Description = "此插件使用旧版接口编译，与当前版本不兼容。请更新插件。"
+                            });
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    FailedPlugins.Add(new FailedPlugin
+                    lock (FailedPlugins)  // 线程安全：记录异常
                     {
-                        Name = Path.GetFileNameWithoutExtension(file),
-                        FilePath = file,
-                        Error = ex,
-                        Description = ex.Message
-                    });
+                        FailedPlugins.Add(new FailedPlugin
+                        {
+                            Name = Path.GetFileNameWithoutExtension(file),
+                            FilePath = file,
+                            Error = ex,
+                            Description = ex.Message
+                        });
+                    }
                 }
-            }
+            });
         }
 
         public static void SavePluginStates()

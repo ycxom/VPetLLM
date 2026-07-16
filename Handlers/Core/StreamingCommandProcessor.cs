@@ -427,8 +427,8 @@ namespace VPetLLM.Handlers.Core
             if (commandType == "plugin" || commandType == "tool")
             {
                 Logger.Log($"StreamingCommandProcessor: 检测到{commandType}命令，使用特殊等待逻辑");
-                await Task.Delay(50).ConfigureAwait(false);
-                await Task.Delay(1500).ConfigureAwait(false);
+                // 优化：移除不必要的双重延迟，用单一动态超时替代
+                await WaitForPluginCommandAsync().ConfigureAwait(false);
                 Logger.Log($"StreamingCommandProcessor: {commandType}命令等待完成");
                 return;
             }
@@ -436,18 +436,16 @@ namespace VPetLLM.Handlers.Core
             // 等待 SmartMessageProcessor 完成当前命令的处理
             if (pluginInstance?.TalkBox?.MessageProcessor is not null)
             {
-                await Task.Delay(20).ConfigureAwait(false);
-
                 int maxWaitTime = 30000;
-                int checkInterval = 100;
+                int checkInterval = 150;  // 优化：增加轮询间隔从 50ms 改到 150ms，减少 CPU 唤醒
                 int elapsedTime = 0;
                 int startWaitTime = 0;
 
                 // 等待消息开始处理
                 while (!pluginInstance.TalkBox.MessageProcessor.IsProcessing && startWaitTime < 1000)
                 {
-                    await Task.Delay(50).ConfigureAwait(false);
-                    startWaitTime += 50;
+                    await Task.Delay(100).ConfigureAwait(false);  // 优化：50ms → 100ms
+                    startWaitTime += 100;
                 }
 
                 // 等待 FloatingSidebarManager 的活动会话结束（包括音频播放）
@@ -486,6 +484,30 @@ namespace VPetLLM.Handlers.Core
                         await Task.Delay(30).ConfigureAwait(false);
                         break;
                 }
+            }
+        }
+
+        /// <summary>
+        /// 智能等待 plugin/tool 命令完成（替代硬编码延迟）
+        /// </summary>
+        private async Task WaitForPluginCommandAsync()
+        {
+            var pluginInstance = _plugin ?? VPetLLM.Instance;
+            int elapsedTime = 0;
+            int maxWaitTime = 3000;
+            int pollInterval = 100;  // 增加轮询间隔，减少 CPU 唤醒
+
+            // 等待 ActiveSessionCount 变为 0（命令完成）
+            while (pluginInstance?.FloatingSidebarManager?.ActiveSessionCount > 0 && elapsedTime < maxWaitTime)
+            {
+                await Task.Delay(pollInterval).ConfigureAwait(false);
+                elapsedTime += pollInterval;
+            }
+
+            // 如果无法访问 SessionCount，用保守的固定延迟
+            if (pluginInstance?.FloatingSidebarManager == null)
+            {
+                await Task.Delay(800).ConfigureAwait(false);
             }
         }
 

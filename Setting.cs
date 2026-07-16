@@ -111,6 +111,12 @@ namespace VPetLLM
         public bool EnableAutoDiagnostic { get; set; } = true;
 
         /// <summary>
+        /// 是否启用启动时的代理自动优化（检测中国大陆网络环境并弹窗建议启用插件商店镜像、
+        /// 主动测试各渠道直连/代理连通性并推荐代理模式；仅在检测到可优化项时弹窗，用户确认后才应用）
+        /// </summary>
+        public bool EnableStartupProxyOptimization { get; set; } = true;
+
+        /// <summary>
         /// 降级提供商配置列表
         /// </summary>
         public List<ProviderFallbackConfig> FallbackProviders { get; set; } = new();
@@ -1632,6 +1638,12 @@ namespace VPetLLM
         {
             public bool UseProxy { get; set; } = true;
             public string ProxyUrl { get; set; } = "https://ghfast.top";
+
+            /// <summary>
+            /// 用户是否手动关闭过插件商店代理。为 true 时启动优化不再自动建议开启代理，
+            /// 以尊重用户的显式选择（"用户主动关闭即不启动"）。
+            /// </summary>
+            public bool UserProxyOverride { get; set; } = false;
         }
 
         public class TTSSetting

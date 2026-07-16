@@ -331,8 +331,8 @@ namespace VPetLLM.Handlers.Infrastructure
             catch (Exception ex)
             {
                 Logger.Log($"AnimationTimingCoordinator: 等待外置 TTS 失败: {ex.Message}");
-                // 发生异常时也添加等待时间，确保安全
-                await Task.Delay(2000);
+                // 优化：异常时使用保守的固定延迟而非硬编码 2 秒
+                await Task.Delay(1000).ConfigureAwait(false);
             }
         }
 
@@ -383,11 +383,12 @@ namespace VPetLLM.Handlers.Infrastructure
                     throw new TimeoutException($"VPet语音播放超时 ({maxWaitTime}ms)");
                 }
 
-                // 如果检测到VPetTTS插件，增加额外等待时间
+                // 优化：移除不必要的固定延迟，只在需要时添加缓冲
                 if (_plugin.IsVPetTTSPluginDetected && elapsedTime > 0)
                 {
-                    Logger.Log("AnimationTimingCoordinator: 检测到VPetTTS插件，添加额外等待时间");
-                    await Task.Delay(1000);
+                    Logger.Log("AnimationTimingCoordinator: 检测到VPetTTS插件，添加缓冲延迟");
+                    // 优化：外置 TTS 缓冲时间从 1000ms 改成 300ms（已有轮询确保完成）
+                    await Task.Delay(300).ConfigureAwait(false);
                 }
                 else if (elapsedTime > 0)
                 {
@@ -397,9 +398,6 @@ namespace VPetLLM.Handlers.Infrastructure
                 {
                     Logger.Log("AnimationTimingCoordinator: VPet 无语音播放，继续执行");
                 }
-
-                // 为外置TTS添加额外等待时间，确保播放完全
-                await Task.Delay(1000);
             }
             catch (TimeoutException)
             {
@@ -408,8 +406,8 @@ namespace VPetLLM.Handlers.Infrastructure
             catch (Exception ex)
             {
                 Logger.Log($"AnimationTimingCoordinator: 等待 VPet 语音失败: {ex.Message}");
-                // 发生异常时也添加等待时间，确保安全
-                await Task.Delay(2000);
+                // 优化：异常时使用保守的缓冲延迟（减少不必要的等待）
+                await Task.Delay(500).ConfigureAwait(false);
             }
         }
 

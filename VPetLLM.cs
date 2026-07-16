@@ -187,6 +187,9 @@ namespace VPetLLM
         private readonly object _failureCountLock = new object();
         private const int MAX_CONSECUTIVE_FAILURES = 5;
 
+        // 启动代理自动优化：每次进程仅运行一次
+        private bool _startupProxyOptimizationRan = false;
+
         public int ConsecutiveAIFailureCount
         {
             get { lock (_failureCountLock) { return _consecutiveAIFailureCount; } }
@@ -757,6 +760,9 @@ namespace VPetLLM
                     Logger.Log("Dispatcher.Invoke finished.");
                 });
 
+                // 启动时的代理自动优化（后台运行，检测到可优化项时弹窗，用户确认后应用）
+                _ = RunStartupProxyOptimizationAsync();
+
                 Logger.Log("LoadPlugin finished.");
             }
             catch (Exception ex)
@@ -1151,9 +1157,16 @@ namespace VPetLLM
             ChatCore?.SaveHistory();
             SavePluginStates();
 
+            // 后台异步保存配置，不阻塞（避免 Windows 关闭超时）
+            _ = SaveConfigurationsAsync();
+        }
+
+        private async Task SaveConfigurationsAsync()
+        {
             try
             {
-                _configurationManager.SaveAllAsync().Wait();
+                await _configurationManager.SaveAllAsync();
+                Logger.Log("Configurations saved successfully");
             }
             catch (Exception ex)
             {
@@ -1632,6 +1645,84 @@ namespace VPetLLM
             catch (Exception ex)
             {
                 Logger.Log($"Diagnostic error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 启动时的代理自动优化：
+        /// 1) 检测是否处于中国大陆网络环境；
+        /// 2) 主动测试各渠道直连/代理连通性、插件商店连通性；
+        /// 3) 汇总"仅代理相关"的推荐项（中国大陆→启用插件商店镜像、代理失效→关闭全局代理、
+        ///    渠道→强制直连/强制代理）；
+        /// 4) 仅在存在可优化项时弹窗，用户确认后才应用。尊重用户手动关闭插件商店代理的选择。
+        /// 每次进程仅运行一次。
+        /// </summary>
+        public async Task RunStartupProxyOptimizationAsync()
+        {
+            try
+            {
+                if (!(Settings?.EnableStartupProxyOptimization ?? true))
+                    return;
+
+                lock (_failureCountLock)
+                {
+                    if (_startupProxyOptimizationRan)
+                        return;
+                    _startupProxyOptimizationRan = true;
+                }
+
+                var lang = Settings?.Language ?? "zh-hans";
+
+                // 1) 地区检测（外部 IP 接口 + 本地兜底）
+                bool isChina = await Services.GeoService.IsLikelyChinaAsync();
+
+                // 2) 运行完整诊断（内部会对每个渠道分别测试直连与代理）
+                var diagService = new Services.DiagnosticService(Settings, lang);
+                var result = await diagService.RunFullDiagnosticAsync();
+
+                // 3) 仅生成代理相关推荐项
+                var recommendations = diagService.GenerateProxyRecommendations(result, isChina);
+                if (recommendations.Count == 0)
+                {
+                    Logger.Log("StartupProxyOptimization: 未发现需要调整的代理相关项。");
+                    return;
+                }
+
+                Logger.Log($"StartupProxyOptimization: 发现 {recommendations.Count} 项代理相关建议，弹窗等待用户确认。");
+
+                // 4) 弹窗确认后应用
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var title = lang.StartsWith("zh") ? "代理自动优化建议" : "Proxy Optimization Suggestions";
+                    var status = lang.StartsWith("zh")
+                        ? "检测到可优化的代理设置，确认后应用"
+                        : "Detected proxy settings that can be optimized";
+                    var report = diagService.FormatRecommendationsReport(recommendations);
+
+                    UI.Windows.winDiagnosticReport? diagWindow = null;
+                    diagWindow = new UI.Windows.winDiagnosticReport(title, report, status);
+                    diagWindow.Loaded += (_, _) =>
+                    {
+                        diagWindow.ShowRecommendations(recommendations, accepted =>
+                        {
+                            if (accepted)
+                            {
+                                diagService.ApplyRecommendedSettings(recommendations);
+                                diagWindow.OnRecommendationsApplied();
+                                Logger.Log("StartupProxyOptimization: 已应用代理相关推荐设置。");
+                            }
+                            else
+                            {
+                                diagWindow.Close();
+                            }
+                        });
+                    };
+                    diagWindow.ShowDialog();
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"StartupProxyOptimization error: {ex.Message}");
             }
         }
 

@@ -1480,7 +1480,8 @@ namespace VPetLLM.Services
 
             var ps = result.PluginStoreResult;
             if (ps != null && !ps.DirectOk && ps.ProxyOk &&
-                (_settings.PluginStore?.UseProxy != true))
+                (_settings.PluginStore?.UseProxy != true) &&
+                (_settings.PluginStore?.UserProxyOverride != true))
             {
                 recommendations.Add(new RecommendedSetting
                 {
@@ -1507,6 +1508,80 @@ namespace VPetLLM.Services
             }
 
             return recommendations;
+        }
+
+        /// <summary>
+        /// 仅生成与代理相关的推荐项（供启动时的代理自动优化使用），不包含切换提供商、启用降级等更大范围的改动。
+        /// 包含：全局代理连通失败时关闭代理、渠道强制直连/强制代理修正、以及中国大陆环境下启用插件商店镜像代理。
+        /// </summary>
+        /// <param name="result">完整诊断结果</param>
+        /// <param name="isChina">当前是否很可能处于中国大陆网络环境</param>
+        public List<RecommendedSetting> GenerateProxyRecommendations(DiagnosticResult result, bool isChina)
+        {
+            var recs = new List<RecommendedSetting>();
+
+            // 1. 全局代理已启用但代理连通性失败，而网络本身正常 → 建议关闭全局代理，恢复直连
+            if (result.ProxyEnabled && !result.ProxyOk && result.NetworkConnectivityOk)
+            {
+                recs.Add(new RecommendedSetting
+                {
+                    Key = "Proxy.IsEnabled",
+                    DisplayName = GetLocalizedText("Diagnostic.RecDisableProxy"),
+                    CurrentValue = "true",
+                    RecommendedValue = "false",
+                    Reason = GetLocalizedText("Diagnostic.RecDisableProxyReason"),
+                    Category = "critical"
+                });
+            }
+
+            // 2. 渠道级代理模式修正：仅在明确建议强制直连或强制代理时才纳入
+            var channelsWithProxyIssue = result.ChannelResults
+                .Where(cr => cr.Enabled && cr.ProxyTried && cr.DirectTried
+                    && cr.RecommendedProxyMode != cr.ProxyMode
+                    && (cr.RecommendedProxyMode == Setting.ChannelProxyMode.Direct
+                        || cr.RecommendedProxyMode == Setting.ChannelProxyMode.ForceProxy))
+                .ToList();
+
+            foreach (var ch in channelsWithProxyIssue)
+            {
+                var recValue = ch.RecommendedProxyMode == Setting.ChannelProxyMode.Direct
+                    ? "Direct" : "ForceProxy";
+                recs.Add(new RecommendedSetting
+                {
+                    Key = $"Channel.{ch.ChannelType}.{ch.ChannelName}.ProxyMode",
+                    DisplayName = string.Format(GetLocalizedText("Diagnostic.RecChannelProxyFix"),
+                        ch.ChannelType, ch.ChannelName),
+                    CurrentValue = ch.ProxyMode.ToString(),
+                    RecommendedValue = recValue,
+                    Reason = ch.RecommendedProxyReason,
+                    Category = "critical"
+                });
+            }
+
+            // 3. 插件商店镜像代理：中国大陆环境，或直连失败而镜像可用时建议开启；尊重用户手动关闭
+            var storeOverridden = _settings.PluginStore?.UserProxyOverride == true;
+            var storeProxyOn = _settings.PluginStore?.UseProxy == true;
+            if (!storeOverridden && !storeProxyOn)
+            {
+                var ps = result.PluginStoreResult;
+                bool directFailsProxyOk = ps != null && !ps.DirectOk && ps.ProxyOk;
+                if (isChina || directFailsProxyOk)
+                {
+                    recs.Add(new RecommendedSetting
+                    {
+                        Key = "PluginStore.UseProxy",
+                        DisplayName = GetLocalizedText("Diagnostic.RecPluginStoreEnableProxy"),
+                        CurrentValue = "false",
+                        RecommendedValue = "true",
+                        Reason = isChina
+                            ? GetLocalizedText("Diagnostic.RecPluginStoreCnReason")
+                            : GetLocalizedText("Diagnostic.RecPluginStoreEnableProxyReason"),
+                        Category = "recommended"
+                    });
+                }
+            }
+
+            return recs;
         }
 
         public void ApplyRecommendedSettings(List<RecommendedSetting> recommendations)
@@ -1774,6 +1849,7 @@ namespace VPetLLM.Services
                 "Diagnostic.RecVerify" => _language.StartsWith("zh") ? "请手动验证" : "Verify manually",
                 "Diagnostic.RecPluginStoreEnableProxy" => _language.StartsWith("zh") ? "启用插件商店代理" : "Enable plugin store proxy",
                 "Diagnostic.RecPluginStoreEnableProxyReason" => _language.StartsWith("zh") ? "无法直连插件商店，启用代理可恢复插件商店访问。" : "Cannot access plugin store directly. Enabling proxy will restore plugin store access.",
+                "Diagnostic.RecPluginStoreCnReason" => _language.StartsWith("zh") ? "检测到中国大陆网络环境，启用 GitHub 镜像代理可显著提升插件商店的访问速度与成功率。" : "Detected a mainland-China network. Enabling the GitHub mirror proxy greatly improves plugin store access speed and reliability.",
                 "Diagnostic.CheckingPluginStore" => _language.StartsWith("zh") ? "正在检查插件商店连接..." : "Checking plugin store connectivity...",
                 "Diagnostic.DirectTest" => _language.StartsWith("zh") ? "直连" : "Direct",
                 "Diagnostic.ProxyTest" => _language.StartsWith("zh") ? "代理" : "Proxy",

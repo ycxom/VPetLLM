@@ -1763,7 +1763,12 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.Proxy.ForPlugin = ((CheckBox)this.FindName("CheckBox_Proxy_ForPlugin")).IsChecked ?? true;
 
             // Plugin Store Proxy settings
-            _plugin.Settings.PluginStore.UseProxy = ((CheckBox)this.FindName("CheckBox_PluginStore_UseProxy")).IsChecked ?? true;
+            var pluginStoreUseProxy = ((CheckBox)this.FindName("CheckBox_PluginStore_UseProxy")).IsChecked ?? true;
+            // 用户在设置中手动关闭插件商店代理时，记录为显式覆盖，启动优化将不再自动建议开启
+            // （"用户主动关闭即不启动"）
+            if (!pluginStoreUseProxy)
+                _plugin.Settings.PluginStore.UserProxyOverride = true;
+            _plugin.Settings.PluginStore.UseProxy = pluginStoreUseProxy;
             _plugin.Settings.PluginStore.ProxyUrl = ((TextBox)this.FindName("TextBox_PluginStore_ProxyUrl")).Text;
 
             // TTS settings

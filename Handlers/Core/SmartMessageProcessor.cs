@@ -1033,8 +1033,10 @@ namespace VPetLLM.Handlers.Core
                 catch (Exception fallbackEx)
                 {
                     Logger.Log($"SmartMessageProcessor: 传统等待也失败: {fallbackEx.Message}");
-                    // 最后的回退：固定等待时间
-                    await Task.Delay(2000).ConfigureAwait(false);
+                    // 最后的回退：动态计算等待时间而非硬编码
+                    int fallbackWaitMs = CalculateDynamicWaitTime(text, baseMs: 1000);
+                    Logger.Log($"SmartMessageProcessor: 使用动态回退延迟: {fallbackWaitMs}ms");
+                    await Task.Delay(fallbackWaitMs).ConfigureAwait(false);
                 }
             }
             finally
@@ -1106,10 +1108,12 @@ namespace VPetLLM.Handlers.Core
                                 Logger.Log("SmartMessageProcessor: 未找到思考结束动画，直接显示气泡");
                             }
 
-                            // 启动超时保护机制（2秒）
+                            // 启动超时保护机制（动态超时，避免硬编码延迟）
                             Task.Run(async () =>
                             {
-                                await Task.Delay(2000);
+                                int timeoutMs = CalculateDynamicWaitTime(text, baseMs: 2000);
+                                Logger.Log($"SmartMessageProcessor: 启动超时保护，超时时间: {timeoutMs}ms");
+                                await Task.Delay(timeoutMs);
                                 if (!_isBubbleDisplayed)
                                 {
                                     Logger.Log("SmartMessageProcessor: 超时保护触发，强制显示气泡");
@@ -1855,6 +1859,24 @@ namespace VPetLLM.Handlers.Core
         internal async Task WaitForExternalTTSInternalAsync(string text)
         {
             await WaitForExternalTTSCompleteAsync(text).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 根据文本长度动态计算等待时间，替代硬编码延迟
+        /// 避免：文本短时过度等待，文本长时等待不足
+        /// </summary>
+        private int CalculateDynamicWaitTime(string text, int baseMs = 1000)
+        {
+            if (string.IsNullOrEmpty(text))
+                return baseMs;
+
+            // 根据文本长度和字符数估算合理的等待时间
+            // 每 10 个字符额外等待 100ms，但有最小/最大限制
+            int extraMs = (text.Length / 10) * 100;
+            int totalMs = baseMs + Math.Min(extraMs, 2000);  // 最多加 2 秒
+            int minMs = Math.Max(baseMs / 2, 500);           // 最少等待 0.5 秒
+
+            return Math.Clamp(totalMs, minMs, 5000);  // 总超时 0.5-5 秒
         }
     }
 
