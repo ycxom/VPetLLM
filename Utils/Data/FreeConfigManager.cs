@@ -122,7 +122,9 @@ namespace VPetLLM.Utils.Data
             {
                 try
                 {
-                    using var client = new HttpClient();
+                    // 优化：显式禁用代理以直连下载公开配置（不应走用户的代理设置）
+                    var handler = new HttpClientHandler { UseProxy = false };
+                    using var client = new HttpClient(handler);
                     client.Timeout = TimeSpan.FromSeconds(10);
                     var url = $"{baseUrl}/{VERSION_FILE}";
                     var response = await client.GetStringAsync(url);
@@ -207,7 +209,9 @@ namespace VPetLLM.Utils.Data
             {
                 try
                 {
-                    using var client = new HttpClient();
+                    // 优化：显式禁用代理以直连下载公开配置（不应走用户的代理设置）
+                    var handler = new HttpClientHandler { UseProxy = false };
+                    using var client = new HttpClient(handler);
                     client.Timeout = TimeSpan.FromSeconds(10);
                     var url = $"{baseUrl}/{configName}";
                     var content = await client.GetStringAsync(url);

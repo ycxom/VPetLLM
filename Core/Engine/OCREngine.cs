@@ -31,6 +31,30 @@ namespace VPetLLM.Core.Engine
             };
         }
 
+        /// <summary>
+        /// 创建 OCR 请求用的 HttpClient：仅在全局代理启用且 ForAllAPI 时走代理，
+        /// 否则显式禁用（HttpClientHandler 默认会静默使用系统代理）
+        /// </summary>
+        private HttpClient CreateOcrHttpClient()
+        {
+            var handler = new HttpClientHandler { UseProxy = false, Proxy = null };
+            var proxy = _settings.Proxy;
+            if (proxy?.IsEnabled == true && proxy.ForAllAPI)
+            {
+                if (proxy.FollowSystemProxy)
+                {
+                    handler.Proxy = System.Net.WebRequest.GetSystemWebProxy();
+                }
+                else if (!string.IsNullOrWhiteSpace(proxy.Address))
+                {
+                    var protocol = proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                    handler.Proxy = new System.Net.WebProxy(new Uri($"{protocol}://{proxy.Address}"));
+                }
+                handler.UseProxy = handler.Proxy is not null;
+            }
+            return new HttpClient(handler);
+        }
+
         private async Task<string> RecognizeWithOpenAI(byte[] imageData)
         {
             var ocrSettings = _settings.Screenshot.OCR;
@@ -68,7 +92,7 @@ namespace VPetLLM.Core.Engine
 
             var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
 
-            using var client = new HttpClient();
+            using var client = CreateOcrHttpClient();
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ocrSettings.ApiKey}");
             client.Timeout = TimeSpan.FromSeconds(60);
 

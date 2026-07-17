@@ -96,7 +96,9 @@ namespace VPetLLM.Utils.Data
         {
             try
             {
-                using var client = new HttpClient();
+                // 优化：显式禁用代理以直连下载公开配置
+                var handler = new HttpClientHandler { UseProxy = false };
+                using var client = new HttpClient(handler);
                 client.Timeout = TimeSpan.FromSeconds(10);
                 var versionJson = await client.GetStringAsync(VERSION_URL);
                 var versionInfo = JObject.Parse(versionJson);
@@ -154,7 +156,9 @@ namespace VPetLLM.Utils.Data
         {
             try
             {
-                using var client = new HttpClient();
+                // 显式禁用代理以直连下载公开配置
+                var handler = new HttpClientHandler { UseProxy = false, Proxy = null };
+                using var client = new HttpClient(handler);
                 client.Timeout = TimeSpan.FromSeconds(15);
                 var json = await client.GetStringAsync(PRESET_URL);
                 var data = JsonConvert.DeserializeObject<ApiPresetData>(json);

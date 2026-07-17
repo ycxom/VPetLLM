@@ -4966,7 +4966,24 @@ namespace VPetLLM.UI.Windows
                     return;
                 }
 
-                using (var client = new HttpClient())
+                // 与 TTSCoreBase 一致：仅在 TTS 代理启用时走代理，否则禁用系统代理
+                var ttsHandler = new HttpClientHandler { UseProxy = false, Proxy = null };
+                var ttsProxySettings = _plugin?.Settings?.Proxy;
+                if (ttsProxySettings?.IsEnabled == true && (ttsProxySettings.ForAllAPI || ttsProxySettings.ForTTS))
+                {
+                    if (ttsProxySettings.FollowSystemProxy)
+                    {
+                        ttsHandler.Proxy = WebRequest.GetSystemWebProxy();
+                    }
+                    else
+                    {
+                        var protocol = ttsProxySettings.Protocol?.ToLower() == "socks" ? "socks5" : "http";
+                        ttsHandler.Proxy = new WebProxy(new Uri($"{protocol}://{ttsProxySettings.Address}"));
+                    }
+                    ttsHandler.UseProxy = true;
+                }
+
+                using (var client = new HttpClient(ttsHandler))
                 {
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
@@ -6269,7 +6286,8 @@ namespace VPetLLM.UI.Windows
                 var handler = new HttpClientHandler();
                 if (proxyMode == Setting.ChannelProxyMode.Direct)
                 {
-                    // 直连，不使用代理
+                    // 直连，不使用代理（必须显式设置为 false，否则 HttpClientHandler 会默认使用系统代理）
+                    handler.UseProxy = false;
                 }
                 else if (proxyMode == Setting.ChannelProxyMode.ForceProxy && _plugin?.Settings?.Proxy != null)
                 {
@@ -6290,6 +6308,9 @@ namespace VPetLLM.UI.Windows
                         handler.Proxy = new WebProxy(new Uri(proxyUri));
                     }
                 }
+
+                // 兜底：未显式配置代理时禁用系统代理（HttpClientHandler 默认 UseProxy=true 会静默走系统代理）
+                handler.UseProxy = handler.Proxy is not null;
 
                 using var client = new HttpClient(handler);
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
@@ -6326,7 +6347,8 @@ namespace VPetLLM.UI.Windows
                 var handler = new HttpClientHandler();
                 if (proxyMode == Setting.ChannelProxyMode.Direct)
                 {
-                    // 直连，不使用代理
+                    // 直连，不使用代理（必须显式设置为 false，否则 HttpClientHandler 会默认使用系统代理）
+                    handler.UseProxy = false;
                 }
                 else if (proxyMode == Setting.ChannelProxyMode.ForceProxy && _plugin?.Settings?.Proxy != null)
                 {
@@ -6347,6 +6369,9 @@ namespace VPetLLM.UI.Windows
                         handler.Proxy = new WebProxy(new Uri(proxyUri));
                     }
                 }
+
+                // 兜底：未显式配置代理时禁用系统代理（HttpClientHandler 默认 UseProxy=true 会静默走系统代理）
+                handler.UseProxy = handler.Proxy is not null;
 
                 using var client = new HttpClient(handler);
                 var response = await client.GetAsync($"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}");
@@ -6397,6 +6422,9 @@ namespace VPetLLM.UI.Windows
                         handler.Proxy = new WebProxy(new Uri(proxyUri));
                     }
                 }
+
+                // 兜底：未显式配置代理时禁用系统代理（HttpClientHandler 默认 UseProxy=true 会静默走系统代理）
+                handler.UseProxy = handler.Proxy is not null;
 
                 using var client = new HttpClient(handler);
                 client.Timeout = TimeSpan.FromSeconds(10);
@@ -6458,6 +6486,9 @@ namespace VPetLLM.UI.Windows
                         handler.Proxy = new WebProxy(new Uri(proxyUri));
                     }
                 }
+
+                // 兜底：未显式配置代理时禁用系统代理（HttpClientHandler 默认 UseProxy=true 会静默走系统代理）
+                handler.UseProxy = handler.Proxy is not null;
 
                 using var client = new HttpClient(handler);
                 client.Timeout = TimeSpan.FromSeconds(10);
