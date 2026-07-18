@@ -605,7 +605,9 @@ namespace VPetLLM
                     MpvPath = mpvPath
                 };
                 _mediaPlaybackService = new Infrastructure.Services.ApplicationServices.MediaPlaybackService(mediaConfig, _logger, _eventBus);
-                ActionProcessor?.SetMediaPlaybackService(_mediaPlaybackService as Services.IMediaPlaybackService);
+                // 直接传递（编译期类型检查）；此前用 `as` 转换而服务未实现该接口，
+                // 结果恒为 null → PlayHandler 从未注册 → play 能力说明从未进入系统提示词
+                ActionProcessor?.SetMediaPlaybackService(_mediaPlaybackService);
             }
             catch (Exception ex)
             {

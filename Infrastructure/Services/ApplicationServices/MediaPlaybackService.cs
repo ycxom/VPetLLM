@@ -7,7 +7,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
     /// 媒体播放服务 - 使用新架构重�?
     /// 使用 mpv 播放器播放网络视频和音乐
     /// </summary>
-    public class MediaPlaybackService : ServiceBase<MediaPlaybackConfiguration>
+    public class MediaPlaybackService : ServiceBase<MediaPlaybackConfiguration>, global::VPetLLM.Services.IMediaPlaybackService
     {
         #region Windows API
 
@@ -59,7 +59,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
         /// <summary>
         /// 播放状态变更事�?
         /// </summary>
-        public event EventHandler<MediaPlaybackEventArgs>? PlaybackStateChanged;
+        public event EventHandler<global::VPetLLM.Services.MediaPlaybackEventArgs>? PlaybackStateChanged;
 
         public MediaPlaybackService(
             MediaPlaybackConfiguration configuration,
@@ -216,6 +216,11 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
         }
 
         /// <summary>
+        /// 停止播放（IMediaPlaybackService 接口实现）
+        /// </summary>
+        public void Stop() => StopPlayback();
+
+        /// <summary>
         /// 停止播放
         /// </summary>
         public void StopPlayback()
@@ -278,7 +283,7 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
 
         private void OnPlaybackStateChangedInternal(bool isPlaying, string? url, string? error)
         {
-            PlaybackStateChanged?.Invoke(this, new MediaPlaybackEventArgs
+            PlaybackStateChanged?.Invoke(this, new global::VPetLLM.Services.MediaPlaybackEventArgs
             {
                 IsPlaying = isPlaying,
                 CurrentUrl = url,
@@ -388,16 +393,6 @@ namespace VPetLLM.Infrastructure.Services.ApplicationServices
 
             // Disposed by base class
         }
-    }
-
-    /// <summary>
-    /// 媒体播放事件参数
-    /// </summary>
-    public class MediaPlaybackEventArgs : EventArgs
-    {
-        public bool IsPlaying { get; set; }
-        public string? CurrentUrl { get; set; }
-        public string? ErrorMessage { get; set; }
     }
 
     /// <summary>

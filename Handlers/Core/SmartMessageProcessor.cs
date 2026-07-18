@@ -18,7 +18,8 @@ namespace VPetLLM.Handlers.Core
         private readonly TTSRequestSerializer _ttsSerializer;
         private readonly UnifiedTTSProcessor? _unifiedTTSProcessor;
         private readonly TTSProviderFactory _ttsProviderFactory;
-        private readonly VPetTTSIntegrationManager? _vpetTTSIntegration;
+        // 非 readonly：VPetTTS 插件检测可能晚于本类构造完成，支持延迟初始化
+        private VPetTTSIntegrationManager? _vpetTTSIntegration;
         private bool _isProcessing = false;
         private readonly object _processingLock = new object();
 
@@ -131,6 +132,29 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         internal VPetTTSIntegrationManager? GetVPetTTSIntegration()
         {
+            return EnsureVPetTTSIntegration();
+        }
+
+        /// <summary>
+        /// 延迟初始化 VPetTTS 集成管理器。
+        /// 背景：本类构造时 VPetTTS 插件检测可能尚未完成（IsVPetTTSPluginDetected=false），
+        /// 导致 readonly 字段永远为 null → 精确的进度检测等待被跳过 →
+        /// 回退到轮询+文本估算 → 字幕与语音不同步。
+        /// </summary>
+        private VPetTTSIntegrationManager? EnsureVPetTTSIntegration()
+        {
+            if (_vpetTTSIntegration == null && _plugin.IsVPetTTSPluginDetected)
+            {
+                try
+                {
+                    _vpetTTSIntegration = new VPetTTSIntegrationManager(_plugin);
+                    Logger.Log("SmartMessageProcessor: VPetTTS 集成管理器已延迟初始化");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"SmartMessageProcessor: VPetTTS 集成管理器延迟初始化失败: {ex.Message}");
+                }
+            }
             return _vpetTTSIntegration;
         }
 
@@ -997,7 +1021,13 @@ namespace VPetLLM.Handlers.Core
                 Logger.Log("SmartMessageProcessor: 开始等待外置TTS播放完成...");
 
                 // 优先使用集成管理器的状态监控器（完全依赖进度检测，不传入超时参数）
-                if (_vpetTTSIntegration != null && TTSCoordinationSettings.Instance.EnableStateMonitor)
+                // 延迟初始化：插件检测可能晚于本类构造
+                // 必须确认 HasStateMonitor：管理器存在但监控器缺失时（如插件名不匹配），
+                // WaitForPlaybackCompleteAsync 会立即返回 false → 零等待 → 字幕直接切换
+                EnsureVPetTTSIntegration();
+                if (_vpetTTSIntegration != null
+                    && TTSCoordinationSettings.Instance.EnableStateMonitor
+                    && _vpetTTSIntegration.HasStateMonitor)
                 {
                     Logger.Log("SmartMessageProcessor: 使用VPetTTS集成管理器等待播放完成（基于进度检测）");
                     // 不传入超时参数，使用默认的5分钟最大超时作为安全保护
@@ -1320,35 +1350,54 @@ namespace VPetLLM.Handlers.Core
         {
             try
             {
-                // 等待 VPet 主程序的语音播放完成（优化：增加检查间隔到200ms，减少CPU占用）
+                // 等待 VPet 主程序的语音播放完成
                 int maxWaitTime = 30000; // 最多等待 30 秒
-                int checkInterval = 200; // 优化：从100ms增加到200ms
+                int checkInterval = 200;
                 int elapsedTime = 0;
 
                 Logger.Log("SmartMessageProcessor: 开始智能等待VPet语音播放完成");
 
-                // 第一阶段：等待VPet主程序的PlayingVoice状态
+                // 第零阶段：等待语音"开始"播放（外置 TTS 需先合成音频，PlayingVoice 变 true 有延迟）
+                // 不加这个宽限期会产生竞态：检查瞬间语音未起播 → 误判"无语音" → 只按文本估算 →
+                // 估算短于实际音频时，字幕提前切到下一条
+                // 仅在确认有外置 TTS 插件时给足合成宽限；否则短宽限，避免无语音场景白等
+                int startupGraceMs = _plugin.IsVPetTTSPluginDetected ? 4000 : 1000;
+                int startupWaited = 0;
+                while (!_plugin.MW.Main.PlayingVoice && startupWaited < startupGraceMs)
+                {
+                    await Task.Delay(checkInterval).ConfigureAwait(false);
+                    startupWaited += checkInterval;
+                }
+                bool voiceStarted = _plugin.MW.Main.PlayingVoice;
+                if (voiceStarted && startupWaited > 0)
+                {
+                    Logger.Log($"SmartMessageProcessor: 语音起播确认，等待起播耗时: {startupWaited}ms");
+                }
+
+                // 第一阶段：等待VPet主程序的PlayingVoice状态结束
                 while (_plugin.MW.Main.PlayingVoice && elapsedTime < maxWaitTime)
                 {
                     await Task.Delay(checkInterval).ConfigureAwait(false);
                     elapsedTime += checkInterval;
                 }
 
+                bool actualPlaybackTracked = voiceStarted || elapsedTime > 0;
+
                 if (elapsedTime >= maxWaitTime)
                 {
                     Logger.Log("SmartMessageProcessor: 等待 VPet 语音播放超时");
                 }
-                else if (elapsedTime > 0)
+                else if (actualPlaybackTracked)
                 {
                     Logger.Log($"SmartMessageProcessor: VPet 语音播放完成，等待时间: {elapsedTime}ms");
                 }
                 else
                 {
-                    Logger.Log("SmartMessageProcessor: VPet 无语音播放，继续执行");
+                    Logger.Log("SmartMessageProcessor: 宽限期内语音未起播，回退文本长度估算");
                 }
 
                 // 第二阶段：如果检测到VPetTTS插件，使用集成管理器进行精确检测
-                if (_plugin.IsVPetTTSPluginDetected && _vpetTTSIntegration != null)
+                if (_plugin.IsVPetTTSPluginDetected && EnsureVPetTTSIntegration() != null)
                 {
                     Logger.Log("SmartMessageProcessor: 检测到VPetTTS插件，使用集成管理器检测播放完成");
 
@@ -1366,17 +1415,22 @@ namespace VPetLLM.Handlers.Core
                     {
                         Logger.Log($"SmartMessageProcessor: VPetTTS播放完成，等待时间: {ttsWaitTime}ms");
                     }
-                    else
+                    else if (!actualPlaybackTracked)
                     {
-                        // 根据文本长度计算合理的等待时间（替代硬编码的1秒）
+                        // 仅在完全未观测到实际播放时才用文本长度估算
                         int calculatedWaitTime = CalculateTTSWaitTime(text);
                         Logger.Log($"SmartMessageProcessor: VPetTTS未在播放，根据文本长度计算等待时间: {calculatedWaitTime}ms");
                         await Task.Delay(calculatedWaitTime).ConfigureAwait(false);
                     }
                 }
+                else if (actualPlaybackTracked)
+                {
+                    // 已跟踪到实际播放结束：只加小缓冲吸收音频尾部，不再叠加完整估算（避免过度等待）
+                    await Task.Delay(300).ConfigureAwait(false);
+                }
                 else
                 {
-                    // 根据文本长度计算合理的等待时间（替代硬编码的1秒）
+                    // 完全未观测到播放（宽限期内未起播）：回退文本长度估算
                     int calculatedWaitTime = CalculateTTSWaitTime(text);
                     Logger.Log($"SmartMessageProcessor: 为外置TTS添加基于文本长度的等待时间: {calculatedWaitTime}ms");
                     await Task.Delay(calculatedWaitTime).ConfigureAwait(false);

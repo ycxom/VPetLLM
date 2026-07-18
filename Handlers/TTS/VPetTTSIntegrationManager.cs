@@ -10,15 +10,25 @@ namespace VPetLLM.Handlers.TTS;
 public class VPetTTSIntegrationManager
 {
     private readonly VPetLLM _plugin;
-    private readonly VPetTTSStateMonitor? _stateMonitor;
+    // 非 readonly：VPetTTS 插件可能晚于本类构造才出现在 MW.Plugins 中，支持延迟获取
+    private VPetTTSStateMonitor? _stateMonitor;
     private string? _currentSessionId;
 
     public VPetTTSIntegrationManager(VPetLLM plugin)
     {
         _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
-        
-        // 初始化状态监控器
-        if (plugin.IsVPetTTSPluginDetected)
+        EnsureStateMonitor();
+    }
+
+    /// <summary>
+    /// 延迟初始化状态监控器。
+    /// 注意：IsVPetTTSPluginDetected 检测的是"任意其它 TTS 插件"，
+    /// 而监控器需要名字恰为 "VPetTTS" 的插件实例——两者可能不一致，
+    /// 找不到时监控器保持 null，调用方必须回退到传统等待而非跳过等待。
+    /// </summary>
+    private VPetTTSStateMonitor? EnsureStateMonitor()
+    {
+        if (_stateMonitor == null && _plugin.IsVPetTTSPluginDetected)
         {
             var vpetTTSPlugin = GetVPetTTSPlugin();
             if (vpetTTSPlugin != null)
@@ -27,7 +37,13 @@ public class VPetTTSIntegrationManager
                 Logger.Log("VPetTTSIntegrationManager: 状态监控器已初始化");
             }
         }
+        return _stateMonitor;
     }
+
+    /// <summary>
+    /// 状态监控器是否可用（供调用方决定走精确等待还是传统等待）
+    /// </summary>
+    public bool HasStateMonitor => EnsureStateMonitor() != null;
 
     /// <summary>
     /// 获取协调器（动态获取，确保获取最新状态）
@@ -169,7 +185,8 @@ public class VPetTTSIntegrationManager
     /// </summary>
     public async Task<bool> WaitForPlaybackCompleteAsync(int maxWaitMs = 60000)
     {
-        if (_stateMonitor == null)
+        var monitor = EnsureStateMonitor();
+        if (monitor == null)
         {
             Logger.Log("VPetTTSIntegrationManager: 状态监控器未初始化，无法等待播放完成");
             return false;
@@ -181,7 +198,7 @@ public class VPetTTSIntegrationManager
             return false;
         }
 
-        return await _stateMonitor.WaitForPlaybackCompleteAsync(maxWaitMs);
+        return await monitor.WaitForPlaybackCompleteAsync(maxWaitMs);
     }
 
     /// <summary>
