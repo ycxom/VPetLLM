@@ -3815,6 +3815,11 @@ namespace VPetLLM.UI.Windows
             if (FindName("Label_PluginStore_ProxyUrl") is Label labelPluginStoreProxyUrl) labelPluginStoreProxyUrl.Content = LanguageHelper.Get("PluginStore.ProxyUrl", langCode);
             if (FindName("TextBlock_PluginStore_ProxyUrlNote") is TextBlock textBlockPluginStoreProxyUrlNote) textBlockPluginStoreProxyUrlNote.Text = LanguageHelper.Get("PluginStore.ProxyUrlNote", langCode);
 
+            if (FindName("TextBlock_About_LatestVersionLabel") is TextBlock latestVersionLabel)
+                latestVersionLabel.Text = langCode.StartsWith("zh") ? "最新版本:" : "Latest version:";
+            if (FindName("Button_About_CheckUpdate") is Button checkUpdateButton)
+                checkUpdateButton.Content = langCode.StartsWith("zh") ? "检查更新" : "Check for updates";
+
             // TTS UI - 更新的多语言支持
             if (FindName("Label_TTS_Provider") is Label labelTTSProvider) labelTTSProvider.Content = LanguageHelper.Get("TTS.Provider", langCode);
             if (FindName("TextBlock_TTS_Volume") is TextBlock textBlockTTSVolume) textBlockTTSVolume.Text = LanguageHelper.Get("TTS.Volume", langCode);
@@ -9327,6 +9332,7 @@ namespace VPetLLM.UI.Windows
 
                 // 加载版本信息
                 LoadVersionInfo();
+                _ = CheckLatestVersionForAboutAsync();
 
                 await Task.Run(async () =>
                 {
@@ -9380,60 +9386,69 @@ namespace VPetLLM.UI.Windows
         {
             try
             {
-                string infoFile = null;
+                var infoFile = VersionCheckService.FindLocalInfoFile();
+                var version = infoFile is not null
+                    ? VersionCheckService.ParseVersion(File.ReadAllText(infoFile))
+                    : null;
 
-                // 从 DLL 所在目录的上级目录查找 (VPet-Simulator 插件结构)
-                // DLL 在 3000_VPetLLM/plugin/ 目录下，info.lps 在 3000_VPetLLM/ 目录下
-                var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                if (!string.IsNullOrEmpty(assemblyLocation))
-                {
-                    var dllDir = Path.GetDirectoryName(assemblyLocation);
-                    if (!string.IsNullOrEmpty(dllDir))
-                    {
-                        // DLL 在 plugin 子目录下，需要向上两级找到 3000_VPetLLM 目录
-                        var pluginDir = Directory.GetParent(dllDir);
-                        if (pluginDir != null)
-                        {
-                            infoFile = Path.Combine(pluginDir.FullName, "info.lps");
-                        }
-                    }
-                }
-
-                if (infoFile != null && File.Exists(infoFile))
-                {
-                    var lines = File.ReadAllLines(infoFile);
-                    foreach (var line in lines)
-                    {
-                        // info.lps 格式: vupmod#VPetLLM:|author#ycxom:|gamever#11064:|ver#21164:|
-                        // 需要用 | 分隔后查找 ver# 开头的字段
-                        if (line.Contains("ver#"))
-                        {
-                            var parts = line.Split('|');
-                            foreach (var part in parts)
-                            {
-                                if (part.StartsWith("ver#"))
-                                {
-                                    var version = part.Substring(4).TrimEnd(':');
-                                    if (version.Length >= 4 && int.TryParse(version, out _))
-                                    {
-                                        version = $"{version[0]}.{version.Substring(1, 2)}.{version.Substring(3)}";
-                                    }
-                                    if (FindName("TextBlock_About_Version") is TextBlock versionBlock)
-                                    {
-                                        versionBlock.Text = version;
-                                    }
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
+                if (version is not null && FindName("TextBlock_About_Version") is TextBlock versionBlock)
+                    versionBlock.Text = version.DisplayText;
             }
             catch (Exception ex)
             {
                 Logger.Log($"About: 加载版本信息失败: {ex.Message}");
             }
+        }
+
+        private async Task CheckLatestVersionForAboutAsync(bool forceRefresh = false)
+        {
+            var lang = _plugin.Settings.Language ?? "zh-hans";
+            var statusBlock = FindName("TextBlock_About_UpdateStatus") as TextBlock;
+            var button = FindName("Button_About_CheckUpdate") as Button;
+
+            if (statusBlock is not null)
+            {
+                statusBlock.Text = lang.StartsWith("zh") ? "检查中..." : "Checking...";
+                statusBlock.Foreground = (Brush)FindResource("SecondaryTextBrush");
+            }
+            if (button is not null) button.IsEnabled = false;
+
+            try
+            {
+                var result = await _plugin.CheckLatestVersionAsync(forceRefresh);
+                if (statusBlock is null) return;
+
+                if (!result.Succeeded || result.LatestVersion is null)
+                {
+                    statusBlock.Text = lang.StartsWith("zh")
+                        ? $"检查失败：{result.ErrorMessage}"
+                        : $"Check failed: {result.ErrorMessage}";
+                    statusBlock.Foreground = Brushes.IndianRed;
+                }
+                else if (result.UpdateAvailable)
+                {
+                    statusBlock.Text = lang.StartsWith("zh")
+                        ? $"{result.LatestVersion.DisplayText}（有新版本）"
+                        : $"{result.LatestVersion.DisplayText} (update available)";
+                    statusBlock.Foreground = Brushes.DarkOrange;
+                }
+                else
+                {
+                    statusBlock.Text = lang.StartsWith("zh")
+                        ? $"{result.LatestVersion.DisplayText}（已是最新）"
+                        : $"{result.LatestVersion.DisplayText} (up to date)";
+                    statusBlock.Foreground = Brushes.SeaGreen;
+                }
+            }
+            finally
+            {
+                if (button is not null) button.IsEnabled = true;
+            }
+        }
+
+        private async void Button_About_CheckUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            await CheckLatestVersionForAboutAsync(forceRefresh: true);
         }
 
         private async void Button_RunDiagnostic_Click(object sender, RoutedEventArgs e)

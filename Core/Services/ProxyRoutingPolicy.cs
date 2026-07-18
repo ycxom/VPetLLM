@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 
 namespace VPetLLM.Core.Services
 {
@@ -56,6 +58,32 @@ namespace VPetLLM.Core.Services
             return new PluginStoreProxyDecision(
                 isRewriteService ? PluginStoreProxyMode.UrlRewrite : PluginStoreProxyMode.HttpProxy,
                 normalizedUrl);
+        }
+
+        internal static string BuildPluginStoreUrl(PluginStoreProxyDecision decision, string originalUrl)
+        {
+            if (decision.Mode != PluginStoreProxyMode.UrlRewrite || string.IsNullOrEmpty(decision.ProxyUrl))
+            {
+                return originalUrl;
+            }
+
+            var uri = new Uri(originalUrl);
+            var pathAndQuery = originalUrl.Substring(uri.Scheme.Length + 3);
+            return $"{decision.ProxyUrl.TrimEnd('/')}/{pathAndQuery}";
+        }
+
+        internal static HttpClientHandler CreatePluginStoreHandler(PluginStoreProxyDecision decision)
+        {
+            if (decision.Mode == PluginStoreProxyMode.HttpProxy && !string.IsNullOrEmpty(decision.ProxyUrl))
+            {
+                return new HttpClientHandler
+                {
+                    Proxy = new WebProxy(decision.ProxyUrl),
+                    UseProxy = true
+                };
+            }
+
+            return new HttpClientHandler { Proxy = null, UseProxy = false };
         }
     }
 

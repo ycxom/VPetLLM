@@ -189,6 +189,8 @@ namespace VPetLLM
 
         // 启动代理自动优化：每次进程仅运行一次
         private bool _startupProxyOptimizationRan = false;
+        private bool _startupVersionCheckRan = false;
+        private Task<VersionCheckResult>? _versionCheckTask;
 
         public int ConsecutiveAIFailureCount
         {
@@ -762,8 +764,8 @@ namespace VPetLLM
                     Logger.Log("Dispatcher.Invoke finished.");
                 });
 
-                // 启动时的代理自动优化（后台运行，检测到可优化项时弹窗，用户确认后应用）
-                _ = RunStartupProxyOptimizationAsync();
+                // 启动检查在后台串行执行，避免版本提示与代理优化窗口互相争抢焦点
+                _ = RunStartupChecksAsync();
 
                 Logger.Log("LoadPlugin finished.");
             }
@@ -1648,6 +1650,89 @@ namespace VPetLLM
             {
                 Logger.Log($"Diagnostic error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 获取本地与 GitHub main 分支 info.lps 中的最新版本信息。
+        /// 版本请求只使用插件商店专用代理设置。
+        /// </summary>
+        public Task<VersionCheckResult> CheckLatestVersionAsync(bool forceRefresh = false)
+        {
+            lock (_failureCountLock)
+            {
+                if (_versionCheckTask is null || (forceRefresh && _versionCheckTask.IsCompleted))
+                {
+                    _versionCheckTask = CheckLatestVersionCoreAsync();
+                }
+
+                return _versionCheckTask;
+            }
+        }
+
+        private async Task<VersionCheckResult> CheckLatestVersionCoreAsync()
+        {
+            var service = new VersionCheckService(Settings?.PluginStore);
+            var result = await service.CheckAsync();
+
+            if (result.Succeeded)
+            {
+                Logger.Log($"VersionCheck: current={result.CurrentVersion?.DisplayText}, latest={result.LatestVersion?.DisplayText}, update={result.UpdateAvailable}");
+            }
+            else
+            {
+                Logger.Log($"VersionCheck: failed: {result.ErrorMessage}");
+            }
+
+            return result;
+        }
+
+        private async Task RunStartupChecksAsync()
+        {
+            await RunStartupVersionCheckAsync();
+            await RunStartupProxyOptimizationAsync();
+        }
+
+        private async Task RunStartupVersionCheckAsync()
+        {
+            lock (_failureCountLock)
+            {
+                if (_startupVersionCheckRan)
+                    return;
+                _startupVersionCheckRan = true;
+            }
+
+            var result = await CheckLatestVersionAsync();
+            if (!result.Succeeded || !result.UpdateAvailable
+                || result.CurrentVersion is null || result.LatestVersion is null)
+            {
+                return;
+            }
+
+            var lang = Settings?.Language ?? "zh-hans";
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var title = lang.StartsWith("zh") ? "发现 VPetLLM 新版本" : "VPetLLM Update Available";
+                var message = lang.StartsWith("zh")
+                    ? $"发现新版本 {result.LatestVersion.DisplayText}（当前版本 {result.CurrentVersion.DisplayText}）。\n\n是否打开 GitHub 项目页面？"
+                    : $"Version {result.LatestVersion.DisplayText} is available (current: {result.CurrentVersion.DisplayText}).\n\nOpen the GitHub project page?";
+
+                if (MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Information)
+                    == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "https://github.com/ycxom/VPetLLM",
+                            UseShellExecute = true
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"VersionCheck: failed to open GitHub: {ex.Message}");
+                    }
+                }
+            });
         }
 
         /// <summary>
