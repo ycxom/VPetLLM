@@ -4,6 +4,7 @@ using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
+using VPetLLM.Core.Services;
 
 namespace VPetLLM.Services
 {
@@ -120,17 +121,25 @@ namespace VPetLLM.Services
             result.ProxyOk = proxyOk;
             result.ProxyEnabled = _settings.Proxy?.IsEnabled ?? false;
             result.GlobalApiProxyEnabled = _settings.Proxy?.ForAllAPI ?? false;
-            result.ProxyDetails = proxyOk
-                ? GetLocalizedText("Diagnostic.ProxyOk")
-                : (_settings.Proxy?.IsEnabled == true
-                    ? GetLocalizedText("Diagnostic.ProxyFail")
-                    : GetLocalizedText("Diagnostic.ProxyNotEnabled"));
-            sb.AppendLine(result.ProxyDetails);
+            result.ProxyDetails = !result.ProxyEnabled
+                ? GetLocalizedText("Diagnostic.ProxyNotEnabled")
+                : proxyOk
+                    ? GetLocalizedText("Diagnostic.ProxyOk")
+                    : GetLocalizedText("Diagnostic.ProxyFail");
 
             statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingChannels"));
 
             var channelResults = await CheckAllChannelsAsync(statusCallback);
             result.ChannelResults = channelResults;
+
+            if (!proxyOk && channelResults.Any(cr => cr.ProxyTried && cr.ProxyConnectionOk))
+            {
+                proxyOk = true;
+                result.ProxyOk = true;
+                result.ProxyDetails = GetLocalizedText("Diagnostic.ProxyOk");
+                Logger.Log("Diagnostic: Main proxy availability confirmed by a configured API channel.");
+            }
+            sb.AppendLine(result.ProxyDetails);
 
             statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingPluginStore"));
             result.PluginStoreResult = await CheckPluginStoreAsync();
@@ -212,28 +221,34 @@ namespace VPetLLM.Services
 
             try
             {
-                var handler = new HttpClientHandler();
-                if (proxy.FollowSystemProxy)
+                using var handler = CreateProxyHandler();
+                if (!handler.UseProxy)
                 {
-                    handler.Proxy = WebRequest.GetSystemWebProxy();
-                    handler.UseProxy = true;
-                }
-                else if (!string.IsNullOrEmpty(proxy.Address))
-                {
-                    var protocol = proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
-                    var proxyUri = $"{protocol}://{proxy.Address}";
-                    handler.Proxy = new WebProxy(new Uri(proxyUri));
-                    handler.UseProxy = true;
+                    Logger.Log("Diagnostic: Proxy is enabled but no valid system or custom proxy is configured.");
+                    return false;
                 }
 
-                using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
-                var response = await client.GetAsync("https://www.google.com/generate_204");
-                Logger.Log($"Diagnostic: Proxy check HTTP status: {response.StatusCode}");
-                return response.IsSuccessStatusCode;
+                using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(8) };
+                var probeTasks = ProxyHealthPolicy.ProbeEndpoints.Select(async endpoint =>
+                {
+                    try
+                    {
+                        using var response = await client.GetAsync(endpoint, HttpCompletionOption.ResponseHeadersRead);
+                        Logger.Log($"Diagnostic: Proxy probe {endpoint.Host} received HTTP {(int)response.StatusCode}.");
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Diagnostic: Proxy probe {endpoint.Host} failed: {ex.GetBaseException().Message}");
+                        return false;
+                    }
+                });
+
+                return ProxyHealthPolicy.IsAvailable(await Task.WhenAll(probeTasks));
             }
             catch (Exception ex)
             {
-                Logger.Log($"Diagnostic: Proxy check failed: {ex.Message}");
+                Logger.Log($"Diagnostic: Proxy check failed: {ex.GetBaseException().Message}");
                 return false;
             }
         }
@@ -374,6 +389,11 @@ namespace VPetLLM.Services
                 handler.Proxy = new WebProxy(new Uri($"{protocol}://{proxy.Address}"));
                 handler.UseProxy = true;
             }
+            else
+            {
+                handler.Proxy = null;
+                handler.UseProxy = false;
+            }
 
             return handler;
         }
@@ -450,6 +470,11 @@ namespace VPetLLM.Services
                 var protocol = proxy.Protocol?.ToLower() == "socks" ? "socks5" : "http";
                 handler.Proxy = new WebProxy(new Uri($"{protocol}://{proxy.Address}"));
                 handler.UseProxy = true;
+            }
+            else
+            {
+                handler.Proxy = null;
+                handler.UseProxy = false;
             }
 
             return handler;
@@ -788,9 +813,11 @@ namespace VPetLLM.Services
             var result = new PluginStoreDiagnosticResult();
 
             var storeUrl = _settings.PluginStore?.ProxyUrl ?? "https://ghfast.top";
-            var githubUrl = "https://raw.githubusercontent.com";
-
-            result.StoreUrl = _settings.PluginStore?.UseProxy == true ? storeUrl : githubUrl;
+            const string githubUrl = "https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json";
+            var activeDecision = ProxyRoutingPolicy.ResolvePluginStore(
+                _settings.PluginStore?.UseProxy == true,
+                storeUrl);
+            result.StoreUrl = BuildPluginStoreUrl(activeDecision, githubUrl);
 
             try
             {
@@ -810,10 +837,24 @@ namespace VPetLLM.Services
 
             try
             {
-                var proxyHandler = CreateProxyHandler();
-                if (proxyHandler.Proxy != null || proxyHandler.UseProxy)
+                var proxyDecision = ProxyRoutingPolicy.ResolvePluginStore(true, storeUrl);
+                if (proxyDecision.Mode == PluginStoreProxyMode.UrlRewrite)
                 {
-                    using var proxyClient = new HttpClient(proxyHandler) { Timeout = TimeSpan.FromSeconds(10) };
+                    using var proxyClient = new HttpClient(new HttpClientHandler { UseProxy = false, Proxy = null })
+                        { Timeout = TimeSpan.FromSeconds(10) };
+                    var proxyResponse = await proxyClient.GetAsync(BuildPluginStoreUrl(proxyDecision, githubUrl));
+                    result.ProxyOk = proxyResponse.IsSuccessStatusCode;
+                    result.ProxyMessage = proxyResponse.IsSuccessStatusCode
+                        ? GetLocalizedText("Diagnostic.StoreMirrorOk")
+                        : $"HTTP {(int)proxyResponse.StatusCode}";
+                }
+                else if (proxyDecision.Mode == PluginStoreProxyMode.HttpProxy)
+                {
+                    using var proxyClient = new HttpClient(new HttpClientHandler
+                    {
+                        Proxy = new WebProxy(proxyDecision.ProxyUrl!),
+                        UseProxy = true
+                    }) { Timeout = TimeSpan.FromSeconds(10) };
                     var proxyResponse = await proxyClient.GetAsync(githubUrl);
                     result.ProxyOk = proxyResponse.IsSuccessStatusCode;
                     result.ProxyMessage = proxyResponse.IsSuccessStatusCode
@@ -822,21 +863,8 @@ namespace VPetLLM.Services
                 }
                 else
                 {
-                    if (!string.IsNullOrEmpty(storeUrl) && storeUrl != githubUrl)
-                    {
-                        using var altClient = new HttpClient(new HttpClientHandler { UseProxy = false, Proxy = null })
-                            { Timeout = TimeSpan.FromSeconds(10) };
-                        var altResponse = await altClient.GetAsync(storeUrl);
-                        result.ProxyOk = altResponse.IsSuccessStatusCode;
-                        result.ProxyMessage = altResponse.IsSuccessStatusCode
-                            ? GetLocalizedText("Diagnostic.StoreMirrorOk")
-                            : $"HTTP {(int)altResponse.StatusCode}";
-                    }
-                    else
-                    {
-                        result.ProxyOk = false;
-                        result.ProxyMessage = GetLocalizedText("Diagnostic.StoreNoProxy");
-                    }
+                    result.ProxyOk = false;
+                    result.ProxyMessage = GetLocalizedText("Diagnostic.StoreNoProxy");
                 }
             }
             catch (Exception ex)
@@ -862,6 +890,18 @@ namespace VPetLLM.Services
             }
 
             return result;
+        }
+
+        private static string BuildPluginStoreUrl(PluginStoreProxyDecision decision, string originalUrl)
+        {
+            if (decision.Mode != PluginStoreProxyMode.UrlRewrite || string.IsNullOrEmpty(decision.ProxyUrl))
+            {
+                return originalUrl;
+            }
+
+            var uri = new Uri(originalUrl);
+            var pathAndQuery = originalUrl.Substring(uri.Scheme.Length + 3);
+            return $"{decision.ProxyUrl.TrimEnd('/')}/{pathAndQuery}";
         }
 
         public async Task<bool> CheckChannelLLMAsync(ChannelDiagnosticResult channelResult)

@@ -27,6 +27,8 @@
 	<ItemGroup>
 		<!-- 排除archive目录中的所有C#文件，防止编译冲突 -->
 		<Compile Remove="archive\**\*.cs" />
+		<!-- 独立回归检查项目不参与插件程序集编译 -->
+		<Compile Remove="Tests\**\*.cs" />
 	</ItemGroup>
 
 
@@ -47,7 +49,7 @@
 	  </None>
 	</ItemGroup>
 
-	<Target Name="CopyResources" AfterTargets="Build">
+	<Target Name="CopyResources" AfterTargets="Build" Condition="'$(SkipPluginCopy)' != 'true'">
 		<ItemGroup>
 			<!-- 只复制 Windows x64/x86 运行时，排除其他平台和 e_sqlite3.dll -->
 			<FilesToCopy Include="$(OutDir)**\*"

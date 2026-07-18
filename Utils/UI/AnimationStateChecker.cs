@@ -64,41 +64,13 @@ namespace VPetLLM.Utils.UI
             var displayType = mainWindow.Main.DisplayType;
             if (displayType is not null)
             {
-                // 首先检查是否是触摸类型的动画（Touch类型）
-                if (displayType.Type == GraphType.Touch_Head ||
-                    displayType.Type == GraphType.Touch_Body)
+                if (VPetMovementPolicy.IsAnimationProtected(displayType.Type))
                 {
-                    Logger.Log($"AnimationStateChecker: VPet正在被触摸 ({displayType.Type})，阻止VPetLLM思考动画和气泡");
+                    Logger.Log($"AnimationStateChecker: VPet is in protected host animation ({displayType.Type}), blocking plugin animation");
                     return true;
                 }
 
-                switch (displayType.Type)
-                {
-                    case GraphType.StartUP:
-                        // 开机动画 - 不应该被打断
-                        Logger.Log($"AnimationStateChecker: VPet正在开机 (StartUP)，阻止VPetLLM动作执行");
-                        return true;
-
-                    case GraphType.Shutdown:
-                        // 关机动画 - 不应该被打断
-                        Logger.Log($"AnimationStateChecker: VPet正在关机 (Shutdown)，阻止VPetLLM动作执行");
-                        return true;
-
-                    case GraphType.Raised_Dynamic:
-                    case GraphType.Raised_Static:
-                        // 被提起动画 - 不应该被打断
-                        Logger.Log($"AnimationStateChecker: VPet正在被提起 ({displayType.Type})，阻止VPetLLM动作执行");
-                        return true;
-
-                    case GraphType.Switch_Up:
-                    case GraphType.Switch_Down:
-                    case GraphType.Switch_Thirsty:
-                    case GraphType.Switch_Hunger:
-                        // 状态切换动画 - 不应该被打断
-                        Logger.Log($"AnimationStateChecker: VPet正在切换状态 ({displayType.Type})，阻止VPetLLM动作执行");
-                        return true;
-                }
-
+                // 首先检查是否是触摸类型的动画（Touch类型）
                 // 方法3：检查用户交互动画（捏脸、摸头、摸身体等）
                 // 这些动画名称通常包含特定关键字
                 if (displayType.Name is not null)
@@ -177,12 +149,18 @@ namespace VPetLLM.Utils.UI
                 return true;
             }
 
-            // 检查是否正在执行重要动画
+            var displayType = mainWindow.Main.DisplayType;
+            if (displayType is not null && VPetMovementPolicy.IsAnimationProtected(displayType.Type))
+            {
+                Logger.Log($"AnimationStateChecker: Protected host animation ({displayType.Type}) blocks state transition to {targetState}");
+                return false;
+            }
+
+            // Preserve the existing state-transition behavior for Work/Sleep/Travel.
+            // StateManager handles host-controlled display animations in its queue.
             if (IsPlayingImportantAnimation(mainWindow))
             {
                 Logger.Log($"AnimationStateChecker: Important animation is playing, state transition to {targetState} (action: {actionName}) should be queued or delayed");
-                // 注意：我们返回true因为StateManager的队列机制会处理延迟
-                // 如果返回false，调用者需要自己处理重试逻辑
                 return true;
             }
 

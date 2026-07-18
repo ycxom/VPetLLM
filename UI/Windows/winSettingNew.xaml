@@ -639,6 +639,7 @@
                                         Margin="0,0,0,16"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
+                            </StackPanel>
 
                                 <!-- 插件商店代理设置 - 独立区域 -->
                                 <Label Content="{utils:Localize KeyPath=PluginStore.ProxySettings}"
@@ -649,7 +650,6 @@
                                         Content="{utils:Localize KeyPath=PluginStore.EnableProxy}"
                                         Margin="0,0,0,12"
                                         IsChecked="True"
-                                        IsEnabled="{Binding ElementName=CheckBox_Proxy_IsEnabled, Path=IsChecked}"
                                         Style="{StaticResource ModernCheckBox}"/>
                                 <StackPanel Margin="20,0,0,0"
                                         IsEnabled="{Binding ElementName=CheckBox_PluginStore_UseProxy, Path=IsChecked}">
@@ -667,7 +667,6 @@
                                             Margin="0,0,0,0"/>
                                 </StackPanel>
                             </StackPanel>
-                        </StackPanel>
                     </Border>
                 </ScrollViewer>
             </TabItem>

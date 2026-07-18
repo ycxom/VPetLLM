@@ -183,8 +183,8 @@ namespace VPetLLM.Core.Services
             EnsureStateAccessor(mainWindow.Main);
             if (_displayToMoveMethod is null) return false;
 
-            _displayToMoveMethod.Invoke(mainWindow.Main, null);
-            return true;
+            var result = _displayToMoveMethod.Invoke(mainWindow.Main, null);
+            return result is not bool started || started;
         }
 
         /// <summary>

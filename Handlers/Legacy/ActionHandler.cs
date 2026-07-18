@@ -363,17 +363,18 @@ namespace VPetLLM.Handlers.Legacy
                     switch (action.ToLower())
                     {
                         case "move":
-                            Logger.Log("ActionHandler: Executing 'move' animation via AnimationHelper");
-                            if (AnimationHelper.IsInitialized)
+                            Logger.Log("ActionHandler: Executing native VPet move");
+                            if (VPetLLM.Instance?.Settings?.EnableMove == true
+                                && mainWindow.Set?.AllowMove == true
+                                && VPetHostAdapter.TryDisplayToMove(mainWindow))
                             {
-                                await AnimationHelper.RequestDisplayAsync("ActionHandler", GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                                actionTriggered = true;
+                                Logger.Log("ActionHandler: Native move started");
                             }
                             else
                             {
-                                mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
+                                Logger.Log("ActionHandler: Native movement is disabled or no eligible move is available");
                             }
-                            actionTriggered = true;
-                            Logger.Log("ActionHandler: 'move' animation completed");
                             break;
                         case "idel":
                             Logger.Log("ActionHandler: Executing 'idel' via AnimationHelper");

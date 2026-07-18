@@ -561,10 +561,15 @@ namespace VPetLLM.Handlers.UI
                 _pinchCheckTimer = null;
 
                 // 从全局实例列表中移除
+                bool noRemainingInstances;
                 lock (_actionStateLock)
                 {
                     _allInstances.Remove(this);
+                    noRemainingInstances = _allInstances.Count == 0;
                 }
+
+                if (noRemainingInstances)
+                    Handlers.Animation.AnimationHelper.SetUserInteracting(false);
 
                 if (_plugin?.MW?.Main is not null)
                 {

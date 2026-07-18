@@ -17,6 +17,7 @@ using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 using VPetLLM.Utils.Plugin;
 using VPetLLM.Core.Data.Models;
+using VPetLLM.Core.Services;
 using NewPlugin = VPetLLM.Core.Abstractions.Interfaces.Plugin;
 
 namespace VPetLLM.UI.Windows
@@ -5049,76 +5050,22 @@ namespace VPetLLM.UI.Windows
         /// <summary>
         /// 获取插件商店代理配置信息
         /// </summary>
-        private (bool useUrlRewrite, System.Net.IWebProxy proxy) GetPluginStoreProxyInfo()
+        private (bool useUrlRewrite, System.Net.IWebProxy? proxy) GetPluginStoreProxyInfo()
         {
-            // 优先检查插件商店专用代理设置
             var pluginStoreSettings = _plugin.Settings.PluginStore;
-            if (pluginStoreSettings is not null && pluginStoreSettings.UseProxy && !string.IsNullOrEmpty(pluginStoreSettings.ProxyUrl))
+            var decision = ProxyRoutingPolicy.ResolvePluginStore(
+                pluginStoreSettings?.UseProxy == true,
+                pluginStoreSettings?.ProxyUrl);
+
+            return decision.Mode switch
             {
-                var proxyUrl = pluginStoreSettings.ProxyUrl.Trim();
-
-                // 如果是URL拼接类型的代理（如ghfast.top），使用URL重写方式
-                if (proxyUrl.StartsWith("http://") || proxyUrl.StartsWith("https://"))
-                {
-                    // 检查是否是GitHub加速服务（URL拼接类型）
-                    if (proxyUrl.Contains("ghfast.top") || proxyUrl.Contains("github") || proxyUrl.Contains("raw.githubusercontent"))
-                    {
-                        return (true, null); // 使用URL拼接方式，不使用HttpClient代理
-                    }
-
-                    // 其他HTTP/HTTPS代理，使用传统代理方式
-                    return (false, new System.Net.WebProxy(proxyUrl));
-                }
-                else
-                {
-                    // 假设是 IP:Port 格式的代理
-                    return (false, new System.Net.WebProxy($"http://{proxyUrl}"));
-                }
-            }
-
-            // 如果插件商店专用代理未设置，则检查通用代理设置
-            var proxySettings = _plugin.Settings.Proxy;
-
-            // 如果通用代理未启用，不使用代理
-            if (proxySettings is null || !proxySettings.IsEnabled)
-            {
-                return (false, null);
-            }
-
-            bool useProxy = false;
-
-            // 如果ForAllAPI为true，则对所有API使用代理
-            if (proxySettings.ForAllAPI)
-            {
-                useProxy = true;
-            }
-            else
-            {
-                // 如果ForAllAPI为false，则根据ForPlugin设置决定
-                useProxy = proxySettings.ForPlugin;
-            }
-
-            if (useProxy)
-            {
-                if (proxySettings.FollowSystemProxy)
-                {
-                    return (false, System.Net.WebRequest.GetSystemWebProxy());
-                }
-                else if (!string.IsNullOrEmpty(proxySettings.Address))
-                {
-                    if (string.IsNullOrEmpty(proxySettings.Protocol))
-                    {
-                        proxySettings.Protocol = "http";
-                    }
-                    var protocol = proxySettings.Protocol.ToLower() == "socks" ? "socks5" : "http";
-                    return (false, new System.Net.WebProxy(new Uri($"{protocol}://{proxySettings.Address}")));
-                }
-            }
-
-            return (false, null);
+                PluginStoreProxyMode.UrlRewrite => (true, null),
+                PluginStoreProxyMode.HttpProxy => (false, new System.Net.WebProxy(decision.ProxyUrl!)),
+                _ => (false, null)
+            };
         }
 
-        private System.Net.IWebProxy GetPluginStoreProxy()
+        private System.Net.IWebProxy? GetPluginStoreProxy()
         {
             var (useUrlRewrite, proxy) = GetPluginStoreProxyInfo();
             return proxy;

@@ -1,7 +1,7 @@
+using System.Globalization;
 using System.Windows;
 using VPet_Simulator.Windows.Interface;
 using VPetLLM.Core.Services;
-using static VPet_Simulator.Core.GraphInfo;
 
 namespace VPetLLM.Handlers.Actions
 {
@@ -12,192 +12,217 @@ namespace VPetLLM.Handlers.Actions
         public ActionCategory Category => ActionCategory.Interactive;
         public string Description => PromptHelper.Get("Handler_Move_Description", VPetLLM.Instance.Settings.PromptLanguage);
 
-        /// <summary>
-        /// 读取移动区域：自定义区域（经适配层）优先，否则回退主屏。
-        /// </summary>
-        private static void GetMoveArea(IMainWindow mainWindow, out double screenX, out double screenY, out double screenWidth, out double screenHeight)
+        private static void GetMoveArea(
+            IMainWindow mainWindow,
+            out double screenX,
+            out double screenY,
+            out double screenWidth,
+            out double screenHeight)
         {
             screenX = 0;
             screenY = 0;
+
             try
             {
-                if (VPetHostAdapter.TryGetCustomMoveArea(mainWindow, out var x, out var y, out var w, out var h))
+                if (VPetHostAdapter.TryGetCustomMoveArea(mainWindow, out var x, out var y, out var width, out var height))
                 {
                     screenX = x;
                     screenY = y;
-                    screenWidth = w;
-                    screenHeight = h;
+                    screenWidth = width;
+                    screenHeight = height;
                     Logger.Log($"MoveHandler: Using custom area ({screenX:F0},{screenY:F0},{screenWidth:F0}x{screenHeight:F0})");
                     return;
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"MoveHandler: Error getting screen border: {ex.Message}, using primary screen");
+                Logger.Log($"MoveHandler: Error getting move area: {ex.Message}; using primary screen");
             }
 
             screenWidth = SystemParameters.PrimaryScreenWidth;
             screenHeight = SystemParameters.PrimaryScreenHeight;
         }
 
-        public Task Execute(string value, IMainWindow mainWindow)
+        private static bool CanMove(IMainWindow mainWindow)
         {
-            // 检查是否为默认插件
             if (VPetLLM.Instance?.IsVPetLLMDefaultPlugin() != true)
             {
-                Logger.Log("MoveHandler: VPetLLM不是默认插件，忽略移动请求");
-                return Task.CompletedTask;
+                Logger.Log("MoveHandler: VPetLLM is not the default plugin; ignoring move request");
+                return false;
             }
 
+            if (mainWindow?.Main is null || mainWindow.Core?.Controller is null)
+            {
+                Logger.Log("MoveHandler: VPet main window is not ready");
+                return false;
+            }
+
+            if (mainWindow.Set?.AllowMove != true)
+            {
+                Logger.Log("MoveHandler: VPet host movement is disabled; ignoring move request");
+                return false;
+            }
+
+            var displayType = mainWindow.Main.DisplayType;
+            if (displayType is not null && VPetMovementPolicy.IsAnimationProtected(displayType.Type))
+            {
+                Logger.Log($"MoveHandler: VPet is in protected host animation ({displayType.Type}); ignoring move request");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryGetWindowMetrics(
+            IMainWindow mainWindow,
+            out double left,
+            out double top,
+            out double width,
+            out double height)
+        {
+            left = top = width = height = 0;
+            if (mainWindow is not Window window)
+            {
+                Logger.Log("MoveHandler: Main window does not derive from System.Windows.Window");
+                return false;
+            }
+
+            double currentLeft = 0;
+            double currentTop = 0;
+            double actualWidth = 0;
+            double actualHeight = 0;
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                currentLeft = window.Left;
+                currentTop = window.Top;
+                actualWidth = window.ActualWidth;
+                actualHeight = window.ActualHeight;
+            });
+
+            left = currentLeft;
+            top = currentTop;
+            width = actualWidth;
+            height = actualHeight;
+
+            var zoom = Math.Max(0.01, mainWindow.Core.Controller.ZoomRatio);
+            if (width <= 0) width = 500 * zoom;
+            if (height <= 0) height = 500 * zoom;
+            return true;
+        }
+
+        private static bool TryStartNativeMove(IMainWindow mainWindow)
+        {
+            if (!CanMove(mainWindow)) return false;
+
+            try
+            {
+                var started = VPetHostAdapter.TryDisplayToMove(mainWindow);
+                Logger.Log(started
+                    ? "MoveHandler: Native VPet move started"
+                    : "MoveHandler: No eligible native VPet move is available");
+                return started;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MoveHandler: Native move failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static bool TryMoveWindowTo(IMainWindow mainWindow, double targetX, double targetY)
+        {
+            if (!CanMove(mainWindow)) return false;
+            if (!TryGetWindowMetrics(mainWindow, out var currentLeft, out var currentTop, out var windowWidth, out var windowHeight))
+                return false;
+
+            GetMoveArea(mainWindow, out var areaX, out var areaY, out var areaWidth, out var areaHeight);
+            targetX = VPetMovementPolicy.ClampWindowCoordinate(targetX, areaX, areaWidth, windowWidth);
+            targetY = VPetMovementPolicy.ClampWindowCoordinate(targetY, areaY, areaHeight, windowHeight);
+
+            var zoom = Math.Max(0.01, mainWindow.Core.Controller.ZoomRatio);
+            var deltaX = (targetX - currentLeft) / zoom;
+            var deltaY = (targetY - currentTop) / zoom;
+
+            Logger.Log($"MoveHandler: Current=({currentLeft:F0},{currentTop:F0}), Target=({targetX:F0},{targetY:F0}), Delta=({deltaX:F0},{deltaY:F0})");
+            mainWindow.Core.Controller.MoveWindows(deltaX, deltaY);
+
+            // Keep the host as the final authority in case its active screen changed
+            // between reading the metrics and applying the displacement.
+            if (mainWindow.Core.Controller.CheckPosition())
+            {
+                Logger.Log("MoveHandler: Host reported an out-of-bounds position; resetting once");
+                mainWindow.Core.Controller.ResetPosition();
+            }
+
+            return true;
+        }
+
+        private static bool TryParseCoordinate(string value, out double coordinate)
+        {
+            return double.TryParse(value, NumberStyles.Float, CultureInfo.CurrentCulture, out coordinate)
+                || double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out coordinate);
+        }
+
+        public Task Execute(string value, IMainWindow mainWindow)
+        {
             Logger.Log($"MoveHandler executed with value: {value}");
             if (string.IsNullOrWhiteSpace(value))
             {
-                // 直接调用Display方法显示移动动画，绕过可能失效的委托属性
-                try
-                {
-                    mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                    Logger.Log("MoveHandler: Move animation triggered successfully");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"MoveHandler: Failed to trigger move animation: {ex.Message}");
-                }
+                TryStartNativeMove(mainWindow);
                 return Task.CompletedTask;
             }
 
-            var parts = value.Split(',');
-            bool flash = parts.Contains("flash");
+            var parts = value.Split(',').Select(part => part.Trim()).ToArray();
+            var flash = parts.Any(part => part.Equals("flash", StringComparison.OrdinalIgnoreCase));
 
-            if (parts[0].ToLower() == "random")
+            if (parts[0].Equals("random", StringComparison.OrdinalIgnoreCase))
             {
-                if (flash)
+                if (!flash)
                 {
-                    // 闪现模式：计算随机位置并瞬移
-                    GetMoveArea(mainWindow, out double screenX, out double screenY, out double screenWidth, out double screenHeight);
-
-                    var petWidth = mainWindow.PetGrid.ActualWidth > 0 ? mainWindow.PetGrid.ActualWidth : 200;
-                    var petHeight = mainWindow.PetGrid.ActualHeight > 0 ? mainWindow.PetGrid.ActualHeight : 200;
-
-                    var random = new Random();
-                    var targetX = screenX + random.NextDouble() * (screenWidth - petWidth);
-                    var targetY = screenY + random.NextDouble() * (screenHeight - petHeight);
-
-                    // 获取当前位置
-                    double currentLeft = 0;
-                    double currentTop = 0;
-                    mainWindow.Dispatcher.Invoke(() =>
-                    {
-                        currentLeft = ((System.Windows.Window)mainWindow).Left;
-                        currentTop = ((System.Windows.Window)mainWindow).Top;
-                    });
-
-                    var deltaX = (targetX - currentLeft) / mainWindow.Core.Controller.ZoomRatio;
-                    var deltaY = (targetY - currentTop) / mainWindow.Core.Controller.ZoomRatio;
-
-                    Logger.Log($"MoveHandler: Random flash to ({targetX:F0}, {targetY:F0})");
-
-                    // 直接移动
-                    mainWindow.Core.Controller.MoveWindows(deltaX, deltaY);
-
-                    // 检查并修正位置
-                    if (mainWindow.Core.Controller.CheckPosition())
-                    {
-                        mainWindow.Core.Controller.ResetPosition();
-                    }
+                    TryStartNativeMove(mainWindow);
+                    return Task.CompletedTask;
                 }
-                else
+
+                if (!CanMove(mainWindow)
+                    || !TryGetWindowMetrics(mainWindow, out _, out _, out var windowWidth, out var windowHeight))
                 {
-                    // 使用 VPet 内置的 DisplayToMove 方法
-                    Logger.Log("MoveHandler: Calling DisplayToMove");
-                    try
-                    {
-                        if (!VPetHostAdapter.TryDisplayToMove(mainWindow))
-                        {
-                            mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"MoveHandler: Error: {ex.Message}");
-                        mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                    }
+                    return Task.CompletedTask;
                 }
+
+                GetMoveArea(mainWindow, out var areaX, out var areaY, out var areaWidth, out var areaHeight);
+                var usableWidth = Math.Max(0, areaWidth - windowWidth);
+                var usableHeight = Math.Max(0, areaHeight - windowHeight);
+                var targetX = areaX + Random.Shared.NextDouble() * usableWidth;
+                var targetY = areaY + Random.Shared.NextDouble() * usableHeight;
+                TryMoveWindowTo(mainWindow, targetX, targetY);
             }
-            else if (double.TryParse(parts[0], out double targetX) && double.TryParse(parts[1], out double targetY))
+            else if (parts.Length >= 2
+                && TryParseCoordinate(parts[0], out var targetX)
+                && TryParseCoordinate(parts[1], out var targetY))
             {
-                GetMoveArea(mainWindow, out double screenX, out double screenY, out double screenWidth, out double screenHeight);
-
-                var petWidth = mainWindow.PetGrid.ActualWidth > 0 ? mainWindow.PetGrid.ActualWidth : 200;
-                var petHeight = mainWindow.PetGrid.ActualHeight > 0 ? mainWindow.PetGrid.ActualHeight : 200;
-
-                // 限制目标位置在移动区域范围内
-                targetX = Math.Max(screenX, Math.Min(targetX, screenX + screenWidth - petWidth));
-                targetY = Math.Max(screenY, Math.Min(targetY, screenY + screenHeight - petHeight));
-
-                Logger.Log($"MoveHandler: Moving to position ({targetX:F0}, {targetY:F0})");
-
-                // 获取当前位置
-                double currentLeft = 0;
-                double currentTop = 0;
-                mainWindow.Dispatcher.Invoke(() =>
-                {
-                    currentLeft = ((System.Windows.Window)mainWindow).Left;
-                    currentTop = ((System.Windows.Window)mainWindow).Top;
-                });
-
-                // 计算移动距离（考虑缩放比例）
-                var deltaX = (targetX - currentLeft) / mainWindow.Core.Controller.ZoomRatio;
-                var deltaY = (targetY - currentTop) / mainWindow.Core.Controller.ZoomRatio;
-
-                Logger.Log($"MoveHandler: Current=({currentLeft:F0}, {currentTop:F0}), Delta=({deltaX:F0}, {deltaY:F0})");
-
-                // 直接调用 MoveWindows 移动
-                mainWindow.Core.Controller.MoveWindows(deltaX, deltaY);
-
-                Logger.Log("MoveHandler: Move completed");
-
-                // 移动后检查并修正位置
-                if (mainWindow.Core.Controller.CheckPosition())
-                {
-                    Logger.Log("MoveHandler: Position out of bounds, resetting");
-                    mainWindow.Core.Controller.ResetPosition();
-                }
+                TryMoveWindowTo(mainWindow, targetX, targetY);
             }
             else
             {
-                try
-                {
-                    mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                    Logger.Log("MoveHandler: Move animation triggered successfully");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"MoveHandler: Failed to trigger move animation: {ex.Message}");
-                }
+                Logger.Log($"MoveHandler: Invalid move parameters '{value}'; starting a native move instead");
+                TryStartNativeMove(mainWindow);
             }
+
             return Task.CompletedTask;
         }
 
         public Task Execute(int value, IMainWindow mainWindow)
         {
-            // Not used for this handler
+            TryStartNativeMove(mainWindow);
             return Task.CompletedTask;
         }
+
         public Task Execute(IMainWindow mainWindow)
         {
-            try
-            {
-                mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                Logger.Log("MoveHandler: Move animation triggered successfully");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"MoveHandler: Failed to trigger move animation: {ex.Message}");
-            }
+            TryStartNativeMove(mainWindow);
             return Task.CompletedTask;
         }
+
         public int GetAnimationDuration(string animationName) => 0;
-
-
     }
 }

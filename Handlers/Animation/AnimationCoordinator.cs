@@ -197,6 +197,19 @@ namespace VPetLLM.Handlers.Animation
                         continue;
                     }
 
+                    // A request may have been queued before VPet entered a host-controlled
+                    // animation. Re-check the queue head so delayed high-priority requests
+                    // cannot interrupt native movement or dragging.
+                    var nextRequest = _queue.Peek();
+                    var currentDisplay = _mainWindow?.Main?.DisplayType;
+                    if (nextRequest is not null && !nextRequest.Force
+                        && currentDisplay is not null
+                        && global::VPetLLM.Core.Services.VPetMovementPolicy.IsAnimationProtected(currentDisplay.Type))
+                    {
+                        await Task.Delay(100, cancellationToken);
+                        continue;
+                    }
+
                     // 检查用户交互
                     if (_synchronizer.CurrentState.IsUserInteracting)
                     {

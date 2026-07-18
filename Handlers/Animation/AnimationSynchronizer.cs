@@ -150,6 +150,12 @@ namespace VPetLLM.Handlers.Animation
             var displayType = mainWindow.Main.DisplayType;
             if (displayType is not null)
             {
+                if (VPetMovementPolicy.IsAnimationProtected(displayType.Type))
+                {
+                    Logger.Log($"AnimationSynchronizer: VPet is in protected host animation ({displayType.Type}), cannot execute animation");
+                    return false;
+                }
+
                 if (displayType.Type == GraphType.Touch_Head ||
                     displayType.Type == GraphType.Touch_Body)
                 {
@@ -273,6 +279,9 @@ namespace VPetLLM.Handlers.Animation
             var displayType = mainWindow.Main.DisplayType;
             if (displayType is not null)
             {
+                if (VPetMovementPolicy.IsAnimationProtected(displayType.Type))
+                    return $"Protected host animation in progress ({displayType.Type})";
+
                 if (displayType.Type == GraphType.Touch_Head || displayType.Type == GraphType.Touch_Body)
                     return $"Touch animation in progress ({displayType.Type})";
                 if (displayType.Type == GraphType.Switch_Up || displayType.Type == GraphType.Switch_Down)

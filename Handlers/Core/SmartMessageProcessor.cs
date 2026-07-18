@@ -26,12 +26,6 @@ namespace VPetLLM.Handlers.Core
         // 气泡显示状态跟踪（用于智能过渡逻辑）
         private bool _isBubbleDisplayed = false;
 
-        // VPet 随机移动计数器(CountNomal)基线快照
-        // 用于在一次完整响应结束后还原 CountNomal，避免 VPetLLM 的 DisplayToNomal 级联
-        // 累加该计数器，导致 VPet 原生随机移动概率异常升高
-        private int _countNomalBaseline = 0;
-        private bool _countNomalBaselineCaptured = false;
-
         public SmartMessageProcessor(VPetLLM plugin)
         {
             _plugin = plugin;
@@ -221,25 +215,6 @@ namespace VPetLLM.Handlers.Core
             {
                 Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}, 跳过初始化: {skipInitialization}");
 
-                // 仅在首次响应时记录 VPet 原生 CountNomal 基线，
-                // 处理结束后将其还原，确保 VPetLLM 不影响 VPet 自身随机移动概率
-                if (!skipInitialization)
-                {
-                    try
-                    {
-                        if (_plugin?.MW?.Main is not null)
-                        {
-                            _countNomalBaseline = _plugin.MW.Main.CountNomal;
-                            _countNomalBaselineCaptured = true;
-                            Logger.Log($"SmartMessageProcessor: 记录 CountNomal 基线 = {_countNomalBaseline}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"SmartMessageProcessor: 记录 CountNomal 基线失败: {ex.Message}");
-                    }
-                }
-
                 // 设置状态灯为输出中（无论是首次响应还是后续命令）
                 try
                 {
@@ -253,20 +228,20 @@ namespace VPetLLM.Handlers.Core
                 // 只在首次响应时清理状态
                 if (!skipInitialization)
                 {
-                    // 若 VPet 正在播放触摸/提起动画，跳过 Clear 和思考动画停止，
-                    // 避免打断用户与 VPet 的交互动画
-                    bool isInUserInteractionAnim = IsInTouchOrRaisedAnimation();
+                    // 若 VPet 正在播放宿主保护动画（包括原生移动和拖拽），
+                    // 等待宿主先完成，避免插件清理流程抢占 DisplayType。
+                    bool isInUserInteractionAnim = IsInProtectedHostAnimation();
                     if (isInUserInteractionAnim)
                     {
-                        Logger.Log("SmartMessageProcessor: 跳过Clear - 触摸/提起动画进行中，等待完成");
-                        // 等待触摸动画结束（最多2秒）
+                        Logger.Log("SmartMessageProcessor: Protected host animation is active; waiting before Clear");
+                        // 短暂等待；后续 Say/Action handler 仍会再次执行保护检查。
                         int waited = 0;
-                        while (waited < 2000 && IsInTouchOrRaisedAnimation())
+                        while (waited < 2000 && IsInProtectedHostAnimation())
                         {
                             await Task.Delay(50).ConfigureAwait(false);
                             waited += 50;
                         }
-                        Logger.Log($"SmartMessageProcessor: 触摸/提起动画等待结束，实际等待 {waited}ms");
+                        Logger.Log($"SmartMessageProcessor: Protected animation wait completed after {waited}ms");
                     }
 
                     // 使用统一的BubbleFacade清理状态
@@ -348,32 +323,6 @@ namespace VPetLLM.Handlers.Core
                 lock (_processingLock)
                 {
                     _isProcessing = false;
-                }
-
-                // 还原 VPet 随机移动计数器(CountNomal)到处理前的基线，
-                // 抵消本次响应期间 DisplayToNomal 级联造成的累加，
-                // 确保 VPetLLM 不会推高 VPet 自身随机移动概率
-                // 注意：流式响应会多次调用本方法（后续子调用 skipInitialization=true），
-                //       基线在首次响应捕获后跨子调用保持，每次结束都还原，
-                //       下一次新响应的首次调用会重新捕获最新基线
-                if (_countNomalBaselineCaptured)
-                {
-                    try
-                    {
-                        if (_plugin?.MW?.Main is not null)
-                        {
-                            var current = _plugin.MW.Main.CountNomal;
-                            if (current != _countNomalBaseline)
-                            {
-                                _plugin.MW.Main.CountNomal = _countNomalBaseline;
-                                Logger.Log($"SmartMessageProcessor: 还原 CountNomal {current} -> {_countNomalBaseline}，避免随机移动概率异常");
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"SmartMessageProcessor: 还原 CountNomal 失败: {ex.Message}");
-                    }
                 }
 
                 // 结束消息处理会话
@@ -1877,19 +1826,15 @@ namespace VPetLLM.Handlers.Core
         }
 
         /// <summary>
-        /// 检查 VPet 当前是否在播放触摸或提起动画（这类动画不应被插件清理操作打断）
+        /// 检查 VPet 当前是否在播放宿主保护动画。
         /// </summary>
-        private bool IsInTouchOrRaisedAnimation()
+        private bool IsInProtectedHostAnimation()
         {
             try
             {
                 var displayType = _plugin.MW?.Main?.DisplayType;
                 if (displayType is null) return false;
-                var t = displayType.Type;
-                if (t == VPet_Simulator.Core.GraphInfo.GraphType.Touch_Head
-                    || t == VPet_Simulator.Core.GraphInfo.GraphType.Touch_Body
-                    || t == VPet_Simulator.Core.GraphInfo.GraphType.Raised_Dynamic
-                    || t == VPet_Simulator.Core.GraphInfo.GraphType.Raised_Static)
+                if (global::VPetLLM.Core.Services.VPetMovementPolicy.IsAnimationProtected(displayType.Type))
                     return true;
                 var name = displayType.Name?.ToLower();
                 return name?.Contains("touch") == true || name?.Contains("pinch") == true;

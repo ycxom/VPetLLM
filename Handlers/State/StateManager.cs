@@ -28,6 +28,8 @@ namespace VPetLLM.Handlers.State
         /// </summary>
         private static int _isProcessing = 0;
 
+        private static readonly TimeSpan ProtectedAnimationWaitTimeout = TimeSpan.FromSeconds(15);
+
         /// <summary>
         /// Represents a state transition request
         /// </summary>
@@ -100,6 +102,21 @@ namespace VPetLLM.Handlers.State
                 while (_stateTransitionQueue.TryDequeue(out var request))
                 {
                     Logger.Log($"StateManager: Processing queued state transition to {request.NewState} (action: {request.ActionName}) requested at {request.RequestTime:HH:mm:ss.fff}");
+
+                    var displayType = request.MainWindow?.Main?.DisplayType;
+                    if (displayType is not null && VPetMovementPolicy.IsAnimationProtected(displayType.Type))
+                    {
+                        if (DateTime.Now - request.RequestTime < ProtectedAnimationWaitTimeout)
+                        {
+                            _stateTransitionQueue.Enqueue(request);
+                            await Task.Delay(100);
+                        }
+                        else
+                        {
+                            Logger.Log($"StateManager: Dropped stale state transition after waiting for protected animation {displayType.Type}");
+                        }
+                        continue;
+                    }
 
                     // Execute the state transition with the lock
                     await _transitionLock.WaitAsync();

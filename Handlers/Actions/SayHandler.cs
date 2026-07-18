@@ -112,9 +112,18 @@ namespace VPetLLM.Handlers.Actions
                             }
                             break;
                         case "move":
-                            // 直接调用Display方法显示移动动画，绕过可能失效的委托属性
-                            mainWindow.Main.Display(GraphType.Move, AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                            actionTriggered = true;
+                            // A Move graph alone does not initialize VPet's move timer.
+                            // Always use the native move entry point and honor both settings.
+                            if (VPetLLM.Instance?.Settings?.EnableMove == true
+                                && mainWindow.Set?.AllowMove == true
+                                && VPetHostAdapter.TryDisplayToMove(mainWindow))
+                            {
+                                actionTriggered = true;
+                            }
+                            else
+                            {
+                                Logger.Log("SayHandler: Native movement is disabled or no eligible move is available");
+                            }
                             break;
                         case "sleep":
                             mainWindow.Main.DisplaySleep();
