@@ -187,7 +187,6 @@ namespace VPetLLM.Utils.Audio
                     if (e.BytesRecorded > 0)
                     {
                         _waveWriter?.Write(e.Buffer, 0, e.BytesRecorded);
-                        // Logger.Log($"ASR: Recorded {e.BytesRecorded} bytes");
                     }
                 };
 

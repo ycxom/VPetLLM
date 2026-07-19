@@ -679,19 +679,6 @@ namespace VPetLLM.Core.Integration.UnifiedTTS.Management
         }
 
         /// <summary>
-        /// 更新请求统计信息
-        /// </summary>
-        /// <param name="success">是否成功</param>
-        /// <param name="processingTime">处理时间</param>
-        private void UpdateRequestStatistics(bool success, TimeSpan processingTime)
-        {
-            lock (_dispatcherLock)
-            {
-                _serviceStatus.IncrementRequestCount(success, processingTime.TotalMilliseconds);
-            }
-        }
-
-        /// <summary>
         /// 根据配置路由请求到相应的适配器
         /// </summary>
         /// <param name="request">TTS 请求</param>

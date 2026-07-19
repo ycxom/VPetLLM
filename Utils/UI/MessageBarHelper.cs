@@ -698,7 +698,6 @@ namespace VPetLLM.Utils.UI
             //    打印总时间 ≈ (字符数 / 2.5) * 150ms
             // 
             // 2. 显示时间：timeleft = ComCheck(text) * 10 + 20
-            //    EndTimer.Interval = 200ms
             //    显示总时间 = timeleft * 200ms
             // 
             // 3. 总等待时间 = 打印时间 + 显示时间

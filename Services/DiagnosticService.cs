@@ -443,11 +443,6 @@ namespace VPetLLM.Services
             return (directOk, directMsg, proxyOk, proxyMsg);
         }
 
-        private HttpClientHandler CreateDirectHandler()
-        {
-            return new HttpClientHandler { UseProxy = false, Proxy = null };
-        }
-
         private HttpClientHandler CreateProxyHandler()
         {
             var handler = new HttpClientHandler();

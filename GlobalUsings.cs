@@ -96,5 +96,4 @@ global using UtilsASRService = VPetLLM.Utils.Audio.ASRService;
 // 別名逻辑 - 解决模型类冲突
 global using ModelsTTSRequest = VPetLLM.Models.TTSRequest;
 global using ModelsServiceStatus = VPetLLM.Models.ServiceStatus;
-global using ConfigTTSSettings = VPetLLM.Configuration.TTSSettings;
 global using JsonSerializer = System.Text.Json.JsonSerializer;

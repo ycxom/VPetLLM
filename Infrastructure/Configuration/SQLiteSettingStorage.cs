@@ -644,23 +644,4 @@ public class SQLiteSettingStorage : ISettingStorage
         }
     }
 
-    /// <summary>
-    /// Check if database needs maintenance based on file size
-    /// </summary>
-    private bool NeedsMaintenance()
-    {
-        try
-        {
-            if (!File.Exists(_databasePath))
-                return false;
-
-            var fileInfo = new FileInfo(_databasePath);
-            // Run VACUUM if database is larger than 10MB
-            return fileInfo.Length > 10 * 1024 * 1024;
-        }
-        catch
-        {
-            return false;
-        }
-    }
 }

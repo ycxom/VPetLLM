@@ -229,58 +229,6 @@ namespace VPetLLM
             _storage.Initialize(instanceId);
         }
 
-        private bool ShouldMigrate(ISettingStorage jsonStorage, ISettingStorage sqliteStorage)
-        {
-            try
-            {
-                Logger.Log("Checking if migration is needed...");
-                
-                // Check if JSON file exists
-                var jsonPath = jsonStorage.GetStorageLocation();
-                Logger.Log($"JSON path: {jsonPath}");
-                
-                if (!File.Exists(jsonPath))
-                {
-                    Logger.Log("JSON file does not exist, no migration needed");
-                    return false;
-                }
-
-                // Check if JSON file has content
-                var jsonContent = File.ReadAllText(jsonPath);
-                if (string.IsNullOrWhiteSpace(jsonContent))
-                {
-                    Logger.Log("JSON file is empty, no migration needed");
-                    return false;
-                }
-                
-                Logger.Log($"JSON file exists with {jsonContent.Length} characters");
-
-                // Check if SQLite database already has data
-                try
-                {
-                    var existingSettings = sqliteStorage.Load<Setting>();
-                    if (existingSettings != null)
-                    {
-                        Logger.Log("SQLite database already has data, no migration needed");
-                        return false;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Failed to check SQLite database: {ex.Message}");
-                    // If we can't check, assume we need to migrate
-                }
-
-                Logger.Log("Migration needed: JSON file exists but SQLite database is empty");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error checking migration status: {ex.Message}");
-                return false;
-            }
-        }
-
         private void LoadSettings()
         {
             try

@@ -30,7 +30,7 @@ public class TTSProviderFactory
 
     /// <summary>
     /// 获取当前活动的 TTS 提供者
-    /// 优先级: VPetTTS > EdgeTTS > BuiltinTTS
+    /// 优先级: VPetTTS > BuiltinTTS
     /// </summary>
     public ITTSProvider GetActiveProvider()
     {
@@ -38,12 +38,6 @@ public class TTSProviderFactory
         if (vpetTTSProvider.IsAvailable())
         {
             return vpetTTSProvider;
-        }
-
-        var edgeTTSProvider = new EdgeTTSProvider(_vpetAPI);
-        if (edgeTTSProvider.IsAvailable())
-        {
-            return edgeTTSProvider;
         }
 
         return new BuiltinTTSProvider(_vpetAPI, _mpvPlayer);
@@ -60,12 +54,6 @@ public class TTSProviderFactory
         if (vpetTTS.IsAvailable())
         {
             providers.Add(vpetTTS);
-        }
-
-        var edgeTTS = new EdgeTTSProvider(_vpetAPI);
-        if (edgeTTS.IsAvailable())
-        {
-            providers.Add(edgeTTS);
         }
 
         var builtinTTS = new BuiltinTTSProvider(_vpetAPI, _mpvPlayer);
@@ -85,7 +73,6 @@ public class TTSProviderFactory
         ITTSProvider? provider = providerName?.ToLower() switch
         {
             "vpettts" => new VPetTTSProvider(_vpetAPI, _unifiedTTSDispatcher, _vpetTTSIntegration),
-            "edgetts" => new EdgeTTSProvider(_vpetAPI),
             "builtintts" => new BuiltinTTSProvider(_vpetAPI, _mpvPlayer),
             _ => null
         };

@@ -45,11 +45,6 @@ namespace VPetLLM.Infrastructure.Services
             if (container is null)
                 throw new ArgumentNullException(nameof(container));
 
-            // TODO: 注册应用服务
-            // container.RegisterSingleton<VoiceInputService, VoiceInputService>();
-            // container.RegisterSingleton<ScreenshotService, ScreenshotService>();
-            // container.RegisterSingleton<PurchaseService, PurchaseService>();
-            // container.RegisterSingleton<MediaPlaybackService, MediaPlaybackService>();
         }
 
         /// <summary>
@@ -79,11 +74,6 @@ namespace VPetLLM.Infrastructure.Services
                 await serviceManager.StartServiceAsync<TTSService>();
                 await serviceManager.StartServiceAsync<ASRService>();
 
-                // TODO: 启动应用服务
-                // await serviceManager.StartServiceAsync<VoiceInputService>();
-                // await serviceManager.StartServiceAsync<ScreenshotService>();
-                // await serviceManager.StartServiceAsync<PurchaseService>();
-                // await serviceManager.StartServiceAsync<MediaPlaybackService>();
             }
             catch (Exception ex)
             {

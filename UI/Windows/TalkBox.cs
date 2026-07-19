@@ -33,18 +33,6 @@ namespace VPetLLM.UI.Windows
         /// </summary>
         public UnifiedBubbleFacade BubbleFacade => _messageProcessor?.BubbleFacade;
 
-        /// <summary>
-        /// 获取气泡管理器（向后兼容，已弃用）
-        /// </summary>
-        [Obsolete("BubbleManager is deprecated. Use BubbleFacade instead.")]
-        public object BubbleManager => null; // 返回null，强制使用新系统
-
-        /// <summary>
-        /// 获取气泡管理器适配器（向后兼容，已弃用）
-        /// </summary>
-        [Obsolete("BubbleManagerAdapter is deprecated. Use BubbleFacade instead.")]
-        public object BubbleManagerAdapter => null; // 返回null，强制使用新系统
-
         public TalkBox(VPetLLM plugin) : base(plugin)
         {
             _plugin = plugin;
@@ -621,43 +609,6 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
-        /// 回退的思考动画实现（保留用于兼容性）
-        /// 优化：增强退出检查，防止残留调用
-        /// </summary>
-        private void StartThinkingAnimationFallback(string baseText, System.Threading.CancellationTokenSource cts)
-        {
-            var dots = new[] { "", " ..", " ....", " ......", " ........" };
-
-            // 启动后台任务循环显示思考动画
-            _ = Task.Run(async () =>
-            {
-                int i = 0;
-                while (_isThinking && !cts.Token.IsCancellationRequested)
-                {
-                    var text = baseText + dots[i++ % dots.Length];
-
-                    // 三重检查：显示前、显示后、延迟后都检查状态
-                    if (!_isThinking || cts.Token.IsCancellationRequested)
-                        break;
-
-                    DirectBubbleManager.ShowThinkingBubble(_plugin, text);
-
-                    if (!_isThinking || cts.Token.IsCancellationRequested)
-                        break;
-
-                    try { await Task.Delay(450, cts.Token); }
-                    catch (TaskCanceledException) { break; }
-                    
-                    // 延迟后再次检查
-                    if (!_isThinking || cts.Token.IsCancellationRequested)
-                        break;
-                }
-                
-                Logger.Log("TalkBox: 思考动画循环已退出（Fallback）");
-            });
-        }
-
-        /// <summary>
         /// 停止思考动画但不隐藏气泡（用于流式响应，让新气泡直接覆盖）
         /// 优化：改为同步清理，确保在返回前完成状态清理
         /// 注意：不调用 ClearStreamState，因为它会清除 oldsaysstream 导致正在显示的 Say 气泡消失
@@ -703,50 +654,6 @@ namespace VPetLLM.UI.Windows
             {
                 Logger.Log($"TalkBox: 同步清理失败: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// 停止思考动画并隐藏气泡（用于错误情况或强制停止）
-        /// 优化：直接使用 DirectBubbleManager
-        /// </summary>
-        private void StopThinkingAnimation()
-        {
-            // 快速设置标志
-            _isThinking = false;
-
-            // 取消思考动画任务
-            var cts = _thinkingCancellationTokenSource;
-            if (cts is not null)
-            {
-                _thinkingCancellationTokenSource = null;
-                try { cts.Cancel(); cts.Dispose(); } catch { }
-            }
-
-            // 直接使用DirectBubbleManager清理和隐藏
-            Logger.Log("TalkBox: 使用DirectBubbleManager停止思考动画并隐藏（直接覆盖模式）");
-
-            // 直接使用DirectBubbleManager进行清理
-            try
-            {
-                DirectBubbleManager.ClearBubbleState(_plugin);
-                DirectBubbleManager.HideBubble(_plugin);
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"TalkBox: 清理气泡状态失败: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 瞬时显示思考气泡（优化版，减少异常处理开销）
-        /// </summary>
-        private void ShowThinkingBubbleInstantly(string text)
-        {
-            // 快速检查状态，避免不必要的操作
-            if (!_isThinking) return;
-
-            // 使用直接气泡管理器
-            DirectBubbleManager.ShowThinkingBubble(_plugin, text);
         }
 
         /// <summary>

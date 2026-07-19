@@ -1,236 +1,88 @@
 # VPetLLM
 
-VPetLLM 是一个为 [VPet-Simulator](https://github.com/LorisYounger/VPet) 设计的插件，它允许你使用各种大型语言模型（LLM）、语音识别（ASR）和文本转语音（TTS）技术与你的虚拟宠物进行深度互动。
+VPetLLM 是 [VPet Simulator](https://github.com/LorisYounger/VPet) 的大语言模型扩展插件，为桌宠提供对话、语音输入、语音合成、动作指令、截图识别和插件扩展能力。
 
-## 📋 系统要求
+## 功能
 
-- Windows 10/11
-- .NET Framework 4.6.2 或更高版本
-- VPet-Simulator 主程序
-- **MPV 播放器**（用于 TTS 音频播放）
+- 支持 OpenAI 兼容接口、Gemini、Ollama、LM Studio 和免费通道
+- 支持流式对话、上下文管理、备用通道与节点负载均衡
+- 支持 ASR 语音输入和多种 TTS 提供方
+- 支持 VPet 动作、状态、购买、截图和媒体播放指令
+- 支持扩展插件加载与插件商店
+- 主代理和插件商店代理独立配置，互不覆盖
+- 启动时通过远程 `3000_VPetLLM/info.lps` 检查最新版本
 
-## ✨ 功能
+## 安装
 
-- **多样的 LLM 提供商支持：**
-  - **Ollama:** 与在本地运行的 Ollama 模型进行交互。
-  - **OpenAI:** 集成 OpenAI 的 GPT 模型。
-  - **Gemini:** 连接 Google 的 Gemini 模型。
-  - **Free:** 通过免费的公共 API 访问 LLM 服务。
-- **丰富的语音交互：**
-  - **文本转语音 (TTS):** 让你的宠物用生动的声音说话。支持 `OpenAI`, `GPT-SoVITS`, `DIY` 和 `URL` 等多种 TTS 服务。
-  - **语音识别 (ASR):** 通过语音与你的宠物交谈。支持 `OpenAI`, `Soniox` 和 `Free` 等 ASR 服务，并可通过快捷键激活。
-- **LLM 驱动的智能行为：**
-  - **动作执行:** LLM 可以根据对话内容，驱动宠物做出各种动作，如移动、触摸反馈等。
-  - **状态感知:** LLM 能够感知宠物的当前状态（如饱食度、心情等），并作出相应的回应。
-  - **购买反馈:** 当你为宠物购买物品时，它会给出智能的反馈。
-- **灵活的上下文管理：**
-  - **保持聊天上下文：** 在整个会话中保持对话的连续性。
-  - **保存聊天记录：** 自动保存你的对话，以便下次启动时可以恢复。
-  - **按提供商分离聊天记录：** 为每个 LLM 提供商维护独立的聊天历史。
-- **高级模型设置：**
-  - **温度控制：** 调整模型响应的随机性。
-  - **最大 Token:** 设置模型单次响应的最大长度。
-- **优化的用户界面：**
-  - **选项卡式布局：** 清晰地组织不同 LLM 提供商的设置。
-  - **可调整的角色设定窗口：** 通过拖拽轻松地调整角色设定文本框的大小。
-  - **“未保存”提示：** 当有未保存的更改时，提供清晰的视觉提示。
-- **强大的插件系统：**
-  - **添加自定义工具：** 通过“工具列表”选项卡，添加、删除和配置外部工具。
-  - **扩展核心功能：** 开发者可以创建自己的插件来连接外部 API、执行自定义动作，或为宠物赋予全新的技能。
+1. 下载发布包并解压。
+2. 将 `3000_VPetLLM` 目录放入 VPet 的 `mod` 目录。
+3. 启动 VPet，在模组管理中启用 VPetLLM。
+4. 打开插件设置，配置对话提供方、模型和 API Key。
 
+运行环境为 Windows 10/11 和支持当前插件接口的 VPet Simulator。
 
-## ⚙️ 配置
+## 代理设置
 
-1. 打开 VPet-Simulator 的设置，并进入“MOD Config”选项卡。
-2. 点击“VPetLLM”以打开插件设置。
-3. **选择 LLM 提供商：** 从下拉菜单中选择你想要使用的 LLM 提供商（Ollama、OpenAI、Gemini 或 Free）。
-4. **填写提供商设置：**
-   - **Ollama:** 输入你的 Ollama 服务的 URL（默认为 `http://localhost:11434`）并选择一个模型。
-   - **OpenAI:** 输入你的 API 密钥、API 地址和模型名称。
-   - **Gemini:** 输入你的 API 密钥、API 地址和模型名称。
-   - **Free:** 无需额外配置。
-5. **语音服务 (TTS/ASR):**
-   - 进入 **TTS** 选项卡，启用并选择你喜欢的 TTS 提供商，并填写相关配置（如 API Key, URL 等）。
-   - 进入 **ASR** 选项卡，启用并选择你的 ASR 提供商，配置快捷键和相关 API 信息。
-6. **角色设定：** 在可调整大小的文本框中定义你的虚拟宠物的角色和个性。
-7. **上下文控制：** 根据你的偏好，配置聊天上下文和历史记录的保存选项。
-8. **高级设置：** 如果需要，可以为每个提供商启用并调整高级设置，如温度和最大 Token。
-9. **工具列表：**
-   - 点击“工具列表”选项卡。
-   - 点击“添加”按钮以添加一个新的工具。
-   - 在表格中填写工具的“名称”、“URL”和“API Key”（如果需要）。
-   - 勾选“启用”复选框以启用该工具。
-   - 点击“删除”按钮以删除选定的工具。
-10. **保存：** 点击“保存”按钮以应用你的设置。如果有未保存的更改，“未保存”的红色提示将会出现。
+VPetLLM 将两类代理开关分开处理：
 
-## 💬 使用
+- **启动代理**：供聊天、ASR、TTS 等主插件网络请求使用。
+- **启动插件商店代理**：只供插件商店请求使用，不读取或受主代理开关影响。
 
-1. 在 VPet-Simulator 中打开聊天窗口。
-2. 输入你的消息并按 Enter，或者使用你配置的快捷键进行语音输入。
-3. 你的虚拟宠物将会使用你配置的 LLM、TTS 和 ASR 服务来与你互动。如果启用了任何工具，它也可能会使用这些工具来提供更丰富、更有用的响应。
+代理连通性检查会按所选协议和地址建立实际请求，并给出可定位的失败原因。关闭某一代理不会改变另一代理的启用状态。
 
-## 🔌 插件系统
+## 版本检查
 
-VPetLLM 拥有一个强大的插件系统，允许开发者扩展其功能。通过创建自己的插件，你可以：
+插件启动后会读取：
 
-- **连接外部 API**: 获取天气、新闻、股票等实时数据。
-- **执行自定义动作**: 控制智能家居、发送邮件、或者任何你能想到的事情。
-- **增强 AI 的能力**: 为你的桌宠赋予全新的、独一无二的技能。
-
-我们为插件开发者提供了一套完整的接口和文档。
-
-**➡️ [点击这里查看详细的插件开发文档](https://github.com/ycxom/VPetLLM_Plugin)**
-
-### 🚀 LLM 调用接口
-
-插件和外部应用可以通过 `LLMEntry` 接口直接调用 LLM 服务：
-
-**插件调用：**
-```csharp
-var response = await _vpetLLM.LLMEntry.CallAsync("你的消息");
+```text
+https://raw.githubusercontent.com/ycxom/VPetLLM/main/3000_VPetLLM/info.lps
 ```
 
-**外部应用调用：**
-```csharp
-var response = await VPetLLM.VPetLLM.Instance.LLMEntry.CallAsync("你的消息");
+本地版本来自随插件发布的 `info.lps`。远程版本更高时才提示更新；网络失败或远程文件格式异常不会阻止插件启动。
+
+## 开发与构建
+
+需要安装 .NET 8 SDK。项目目标框架为 `net8.0-windows`，仅支持 Windows。
+
+```powershell
+dotnet restore VPetLLM.csproj
+dotnet build VPetLLM.csproj -p:SkipPluginCopy=true
 ```
 
-**日志示例：**
-```
-插件调用：
-[LLM Call] Plugin:AppLauncher calling LLM
-[LLM Call] Message: 启动 notepad...
-[LLM Call] Plugin:AppLauncher - Response in 2.34s
+省略 `SkipPluginCopy` 时，构建产物会复制到 `3000_VPetLLM/plugin`，用于本地加载测试。
 
-外部应用调用：
-[LLM Call] ExternalProgram:MyApp.Services.AIService calling LLM
-[LLM Call] Message: 分析这段文本...
-[LLM Call] ExternalProgram:MyApp.Services.AIService - Response in 1.56s
+独立回归检查：
+
+```powershell
+dotnet run --project Tests/VPetLLM.MovementChecks --no-restore
+dotnet run --project Tests/VPetLLM.ProxyChecks --no-restore
+dotnet run --project Tests/VPetLLM.VersionChecks --no-restore
 ```
 
-详细文档请参考 [插件开发指南](https://github.com/ycxom/VPetLLM_Plugin)
+## 代码结构
 
-## 📁 项目结构
-
-```
-VPetLLM/
-├── Configuration/          # 配置管理模块
-│   ├── ISettings.cs               # 设置接口
-│   ├── SettingsManager.cs         # 设置管理器
-│   ├── ASRSettings.cs             # ASR 配置
-│   ├── LLMSettings.cs             # LLM 配置
-│   ├── TTSSettings.cs             # TTS 配置
-│   ├── ProxySettings.cs           # 代理配置
-│   ├── ScreenshotSettings.cs      # 截图配置
-│   ├── FloatingSidebarSettings.cs # 悬浮侧边栏配置
-│   └── TTSCoordinationSettings.cs # TTS 协调配置
-├── Core/                   # 核心业务逻辑
-│   ├── Abstractions/              # 抽象层
-│   │   ├── Base/                  # 基类（ChatCoreBase/ASRCoreBase/TTSCoreBase）
-│   │   └── Interfaces/            # 接口定义（IChatCore/IOCREngine）
-│   ├── Cache/                     # 缓存管理
-│   ├── Data/                      # 数据层
-│   │   ├── Database/              # 数据库（聊天历史/重要记录）
-│   │   ├── Managers/              # 数据管理器
-│   │   └── Models/                # 数据模型
-│   ├── Engine/                    # 引擎（OCR）
-│   ├── Integration/               # 集成层
-│   │   ├── UnifiedTTS/            # 统一 TTS 系统
-│   │   ├── TTSIntegrationLayer.cs # TTS 集成层
-│   │   └── UnifiedBubbleFacade.cs # 统一气泡外观
-│   ├── Plugin/                    # 插件相关
-│   ├── Providers/                 # 服务提供商实现
-│   │   ├── ASR/                   # ASR 提供商（OpenAI/Soniox/Free）
-│   │   ├── Chat/                  # Chat 提供商（OpenAI/Ollama/Gemini/Free）
-│   │   └── TTS/                   # TTS 提供商（OpenAI/GPT-SoVITS/DIY/URL/Free）
-│   ├── Services/                  # 核心服务
-│   │   ├── ServiceContainer.cs    # 服务容器
-│   │   ├── SystemMessageProvider.cs # 系统消息提供者
-│   │   └── VPetAPIWrapper.cs      # VPet API 包装器
-│   ├── LLMEntryPoint.cs           # **LLM 调用入口点（供插件和外部应用使用）**
-│   └── PluginAdapter.cs           # 插件适配器
-├── Handlers/               # 动作处理器
-│   ├── Actions/                   # 动作处理器（移动/触摸/购买等）
-│   ├── Animation/                 # 动画处理器
-│   ├── Core/                      # 核心处理器（命令解析/结果聚合）
-│   ├── Infrastructure/            # 基础设施（处理器注册/限流）
-│   ├── State/                     # 状态处理器
-│   ├── TTS/                       # TTS 处理器
-│   └── UI/                        # UI 处理器
-├── Infrastructure/         # 基础设施层
-│   ├── Configuration/             # 配置基础设施
-│   ├── DependencyInjection/       # 依赖注入
-│   ├── Events/                    # 事件总线
-│   ├── Exceptions/                # 异常处理
-│   ├── Logging/                   # 日志系统
-│   ├── Performance/               # 性能监控
-│   ├── Services/                  # 基础设施服务
-│   └── Validation/                # 验证框架
-├── Interfaces/             # 接口定义
-│   └── IVPetAPI.cs                # VPet API 接口
-├── Models/                 # 数据模型
-│   ├── UnifiedTTS/                # 统一 TTS 模型
-│   ├── BubbleDisplayRequest.cs    # 气泡显示请求
-│   ├── TTSOptions.cs              # TTS 选项
-│   ├── TTSState.cs                # TTS 状态
-│   └── ValidationResult.cs        # 验证结果
-├── Services/               # 应用服务层
-│   ├── IASRService.cs             # ASR 服务接口
-│   ├── IMediaPlaybackService.cs   # 媒体播放服务接口
-│   ├── IPreprocessingMultimodal.cs # 预处理多模态接口
-│   ├── IPurchaseService.cs        # 购买服务接口
-│   ├── IScreenshotService.cs      # 截图服务接口
-│   ├── ITTSService.cs             # TTS 服务接口
-│   ├── IVoiceInputService.cs      # 语音输入服务接口
-│   ├── MediaPlaybackService.cs    # 媒体播放服务实现
-│   ├── PreprocessingMultimodal.cs # 预处理多模态实现
-│   ├── PurchaseService.cs         # 购买服务实现
-│   ├── ScreenshotService.cs       # 截图服务实现
-│   └── VoiceInputService.cs       # 语音输入服务实现
-├── UI/                     # 用户界面
-│   ├── Controls/                  # 自定义控件
-│   ├── Styles/                    # 样式资源
-│   └── Windows/                   # 窗口（设置/调试/截图编辑器等）
-├── Utils/                  # 工具类
-│   ├── Audio/                     # 音频工具（MpvPlayer/TTSService）
-│   ├── Common/                    # 通用工具
-│   ├── Configuration/             # 配置工具
-│   ├── Data/                      # 数据工具
-│   ├── Localization/              # 本地化工具
-│   ├── Plugin/                    # 插件工具
-│   ├── System/                    # 系统工具
-│   └── UI/                        # UI 工具
-├── Validation/             # 验证层
-│   └── ParameterValidator.cs      # 参数验证器
-├── VPetLLM.cs              # **插件主入口**
-├── Setting.cs              # 设置类
-└── GlobalUsings.cs         # 全局 using 声明
+```text
+VPetLLM.cs / Setting.cs   插件入口、生命周期和持久化设置
+Core/                     对话提供方、TTS、数据和插件核心
+Handlers/                 消息、动作、动画和语音处理
+Infrastructure/           配置、日志、事件、依赖注入和应用服务
+Services/                 当前业务服务与 VPet 能力适配
+UI/                       设置窗口、对话框和控件
+Utils/                    网络、音频、配置和通用工具
+Tests/                    移动、代理和版本检查回归项目
+3000_VPetLLM/             可直接安装的模组目录
 ```
 
-## 🛠️ 开发
+## 兼容性说明
 
-### 构建项目
+以下兼容层仍参与运行，不应视为可删除的旧代码：
 
-```bash
-# 克隆仓库
-git clone https://github.com/ycxom/VPetLLM.git
+- `Handlers/Legacy/ActionHandler.cs`：处理当前注册的 `action` 指令。
+- `Core/PluginAdapter.cs`：在插件管理器中适配旧版插件接口。
+- `Infrastructure/Configuration/ConfigurationMigrator.cs`：启动时迁移旧配置。
 
-# 使用 Visual Studio 打开 VPetLLM.sln
-# 或使用命令行构建
-dotnet build VPetLLM.sln
-```
+已经移除的内容包括无调用私有方法、失效的 TTS 下载队列、始终不可用的 EdgeTTS 占位实现、重复配置模型、重复服务实现以及历史源码归档。
 
-### 架构说明
+## 许可证
 
-项目采用模块化架构设计：
-
-- **依赖注入**: 使用 `ServiceContainer` 管理服务依赖
-- **处理器模式**: 通过 `HandlerRegistry` 统一管理动作处理器
-- **接口抽象**: 核心功能通过接口定义，便于扩展和测试
-- **分层设计**: Configuration → Core → Services → Handlers → UI
-
-## 🤝 贡献
-
-欢迎通过 Pull Request 为项目做出贡献。
-
-*该项目在开发过程中得到了 AI 的辅助。*
+本项目使用 [MIT License](LICENSE)。

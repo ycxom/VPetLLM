@@ -2133,14 +2133,6 @@ namespace VPetLLM
         }
 
         /// <summary>
-        /// 更新系统消息
-        /// </summary>
-        public void UpdateSystemMessage()
-        {
-            // System message is fetched dynamically
-        }
-
-        /// <summary>
         /// 更新动作处理器
         /// </summary>
         public void UpdateActionProcessor()

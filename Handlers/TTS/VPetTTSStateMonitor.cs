@@ -265,26 +265,6 @@ namespace VPetLLM.Handlers.TTS
         }
 
         /// <summary>
-        /// 获取最后心跳时间
-        /// </summary>
-        private DateTime GetLastHeartbeatTime()
-        {
-            if (_disposed) return DateTime.MinValue;
-
-            try
-            {
-                var ttsState = VPetTTSPluginAdapter.GetTTSState(_vpetTTSPlugin);
-                return VPetTTSPluginAdapter.GetStateValue(ttsState, "LastHeartbeatTime") is DateTime time
-                    ? time
-                    : DateTime.MinValue;
-            }
-            catch
-            {
-                return DateTime.MinValue;
-            }
-        }
-
-        /// <summary>
         /// 获取播放进度信息（按需查询）
         /// </summary>
         public PlaybackProgressInfo GetPlaybackProgress()

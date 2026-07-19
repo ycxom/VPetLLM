@@ -704,17 +704,6 @@ namespace VPetLLM.Utils.Configuration
                    type == typeof(decimal) || type == typeof(DateTime) || type == typeof(DateTimeOffset);
         }
 
-        /// <summary>
-        /// 判断是否为数值类型
-        /// </summary>
-        private bool IsNumericType(Type type)
-        {
-            return type == typeof(int) || type == typeof(long) || type == typeof(short) ||
-                   type == typeof(uint) || type == typeof(ulong) || type == typeof(ushort) ||
-                   type == typeof(byte) || type == typeof(sbyte) ||
-                   type == typeof(float) || type == typeof(double) || type == typeof(decimal);
-        }
-
         #endregion
     }
 }

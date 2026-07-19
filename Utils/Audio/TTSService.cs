@@ -289,7 +289,6 @@ namespace VPetLLM.Utils.Audio
 
             try
             {
-                // VPetLLMUtils.Logger.Log($"TTS: 直接播放预下载音频: {filePath}");
 
                 // 等待当前播放完成，确保不会被中断
                 await WaitForCurrentPlaybackAsync();
@@ -297,7 +296,6 @@ namespace VPetLLM.Utils.Audio
                 // 播放音频文件
                 await PlayAudioFileAsync(filePath);
 
-                // VPetLLMUtils.Logger.Log($"TTS: 预下载音频播放完成: {filePath}");
             }
             catch (Exception ex)
             {

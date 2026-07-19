@@ -349,11 +349,9 @@ namespace VPetLLM.Core.Providers.ASR
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    // Logger.Log($"ASR (Soniox): 获取详细模型列表失败: {response.StatusCode} - {responseContent}");
                     return new List<Setting.SonioxModelInfo>();
                 }
 
-                // Logger.Log($"ASR (Soniox): 详细模型响应: {responseContent}");
                 var result = JObject.Parse(responseContent);
                 var models = new List<Setting.SonioxModelInfo>();
 
