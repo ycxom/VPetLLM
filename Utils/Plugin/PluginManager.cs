@@ -50,7 +50,7 @@ namespace VPetLLM.Utils.Plugin
             // 使用 Parallel.ForEach + 线程安全的锁，支持多个插件同时加载
             var parallelOptions = new ParallelOptions
             {
-                MaxDegreeOfParallelism = Math.Min(dllFiles.Length, Environment.ProcessorCount)
+                MaxDegreeOfParallelism = GetLoadParallelism(dllFiles.Length)
             };
 
             Parallel.ForEach(dllFiles, parallelOptions, file =>
@@ -156,6 +156,11 @@ namespace VPetLLM.Utils.Plugin
                     }
                 }
             });
+        }
+
+        private static int GetLoadParallelism(int pluginCount)
+        {
+            return Math.Max(1, Math.Min(pluginCount, Environment.ProcessorCount));
         }
 
         public static void SavePluginStates()

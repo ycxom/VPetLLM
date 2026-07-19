@@ -57,6 +57,7 @@ dotnet build VPetLLM.csproj -p:SkipPluginCopy=true
 dotnet run --project Tests/VPetLLM.MovementChecks --no-restore
 dotnet run --project Tests/VPetLLM.ProxyChecks --no-restore
 dotnet run --project Tests/VPetLLM.VersionChecks --no-restore
+dotnet run --project Tests/VPetLLM.PluginChecks --no-restore
 ```
 
 ## 代码结构
@@ -69,7 +70,7 @@ Infrastructure/           配置、日志、事件、依赖注入和应用服务
 Services/                 当前业务服务与 VPet 能力适配
 UI/                       设置窗口、对话框和控件
 Utils/                    网络、音频、配置和通用工具
-Tests/                    移动、代理和版本检查回归项目
+Tests/                    移动、代理、版本和插件加载回归项目
 3000_VPetLLM/             可直接安装的模组目录
 ```
 
