@@ -22,7 +22,7 @@ namespace VPetLLM
     /// VPetLLM 主插件类 - 重构版本（完整）
     /// 职责：核心协调和生命周期管理，具体功能委托给服务层
     /// </summary>
-    public class VPetLLM : MainPlugin
+    public partial class VPetLLM : MainPlugin
     {
         #region Static Instance
 

@@ -26,6 +26,12 @@ namespace VPetLLM.Core.Abstractions.Base
         protected int _pendingOverflowSnapshotCount;
         protected Action<string> ResponseHandler;
         protected Action<string> StreamingChunkHandler;
+
+        protected ChatCoreBase()
+        {
+            ResponseHandler = response => global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.CaptureAssistant(response);
+            StreamingChunkHandler = chunk => global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.CaptureAssistant(chunk);
+        }
         public abstract Task<string> Chat(string prompt);
         public abstract Task<string> Chat(string prompt, bool isFunctionCall);
         public abstract Task<string> Summarize(string systemPrompt, string userContent);
@@ -305,6 +311,7 @@ namespace VPetLLM.Core.Abstractions.Base
         }
 
         protected ChatCoreBase(Setting? settings, IMainWindow? mainWindow, ActionProcessor? actionProcessor)
+            : this()
         {
             Settings = settings;
             MainWindow = mainWindow;
@@ -751,12 +758,20 @@ namespace VPetLLM.Core.Abstractions.Base
         }
         public void SetResponseHandler(Action<string> handler)
         {
-            ResponseHandler = handler;
+            ResponseHandler = response =>
+            {
+                global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.CaptureAssistant(response);
+                handler?.Invoke(response);
+            };
         }
 
         public void SetStreamingChunkHandler(Action<string> handler)
         {
-            StreamingChunkHandler = handler;
+            StreamingChunkHandler = chunk =>
+            {
+                global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.CaptureAssistant(chunk);
+                handler?.Invoke(chunk);
+            };
         }
 
         public virtual void AddPlugin(IVPetLLMPlugin plugin)

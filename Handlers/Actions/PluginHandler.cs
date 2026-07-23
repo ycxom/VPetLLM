@@ -90,7 +90,18 @@ namespace VPetLLM.Handlers.Actions
                 VPetLLM.Instance.Log($"PluginHandler: Found plugin: {plugin.Name}");
                 if (plugin is IActionPlugin actionPlugin)
                 {
-                    var result = await actionPlugin.Function(arguments);
+                    global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.PluginStarted(pluginName, arguments);
+                    string result;
+                    try
+                    {
+                        result = await actionPlugin.Function(arguments);
+                        global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.PluginCompleted(pluginName, result, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.PluginCompleted(pluginName, ex.Message, false);
+                        throw;
+                    }
                     VPetLLM.Instance.Log($"PluginHandler: Plugin function returned: {result}");
 
                     // 只有当返回值非空时才回灌给 AI
@@ -112,6 +123,8 @@ namespace VPetLLM.Handlers.Actions
                 VPetLLM.Instance.Log($"PluginHandler: Plugin not found: {pluginName}");
                 var availablePlugins = string.Join(", ", VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => p.Name));
                 var errorMessage = $"[SYSTEM] Error: Plugin '{pluginName}' not found. Available plugins are: {availablePlugins}";
+                global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.PluginStarted(pluginName, arguments);
+                global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.PluginCompleted(pluginName, errorMessage, false);
 
                 // 错误信息也进入聚合，避免多次触发LLM
                 ResultAggregator.Enqueue(errorMessage);
