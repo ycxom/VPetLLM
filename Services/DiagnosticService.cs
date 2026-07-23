@@ -1717,6 +1717,26 @@ namespace VPetLLM.Services
             Logger.Log($"Applied {recommendations.Count} recommended settings");
         }
 
+        /// <summary>
+        /// 为一组建议计算一个稳定的内容签名（与顺序无关）。
+        /// 仅取 Key 与 RecommendedValue，因为它们决定"要改成什么"；
+        /// 用于判断本次建议与用户上次拒绝的建议是否相同，从而决定是否跳过弹窗。
+        /// </summary>
+        public static string ComputeRecommendationSignature(List<RecommendedSetting> recommendations)
+        {
+            if (recommendations == null || recommendations.Count == 0)
+                return "";
+
+            var normalized = string.Join("|",
+                recommendations
+                    .Select(r => $"{r.Key}={r.RecommendedValue}")
+                    .OrderBy(s => s, StringComparer.Ordinal));
+
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(normalized));
+            return Convert.ToHexString(hash);
+        }
+
         public string FormatRecommendationsReport(List<RecommendedSetting> recommendations)
         {
             var sb = new StringBuilder();

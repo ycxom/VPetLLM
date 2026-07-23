@@ -117,6 +117,13 @@ namespace VPetLLM
         public bool EnableStartupProxyOptimization { get; set; } = true;
 
         /// <summary>
+        /// 用户上一次在启动代理优化弹窗中拒绝的建议签名。
+        /// 当本次生成的建议签名与该值相同时（即建议内容未变化），跳过弹窗，避免每次启动重复打扰；
+        /// 一旦网络环境变化导致建议内容不同，签名不匹配会重新提示。用户接受建议后此值会被清空。
+        /// </summary>
+        public string DismissedProxyOptimizationSignature { get; set; } = "";
+
+        /// <summary>
         /// 降级提供商配置列表
         /// </summary>
         public List<ProviderFallbackConfig> FallbackProviders { get; set; } = new();

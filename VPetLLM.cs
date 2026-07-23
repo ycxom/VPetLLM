@@ -1772,6 +1772,20 @@ namespace VPetLLM
                 if (recommendations.Count == 0)
                 {
                     Logger.Log("StartupProxyOptimization: 未发现需要调整的代理相关项。");
+                    // 环境已无可优化项，清除历史拒绝签名，避免污染后续判断
+                    if (!string.IsNullOrEmpty(Settings?.DismissedProxyOptimizationSignature))
+                    {
+                        Settings!.DismissedProxyOptimizationSignature = "";
+                        Settings.Save();
+                    }
+                    return;
+                }
+
+                // 若本次建议与用户上次拒绝的建议内容一致，则跳过弹窗，避免每次启动重复打扰
+                var signature = Services.DiagnosticService.ComputeRecommendationSignature(recommendations);
+                if (signature == (Settings?.DismissedProxyOptimizationSignature ?? ""))
+                {
+                    Logger.Log("StartupProxyOptimization: 建议与用户上次拒绝的内容一致，已跳过弹窗。");
                     return;
                 }
 
@@ -1796,10 +1810,20 @@ namespace VPetLLM
                             {
                                 diagService.ApplyRecommendedSettings(recommendations);
                                 diagWindow.OnRecommendationsApplied();
+                                // 已接受，清除历史拒绝签名（ApplyRecommendedSettings 内部已 Save）
+                                if (Settings != null)
+                                    Settings.DismissedProxyOptimizationSignature = "";
                                 Logger.Log("StartupProxyOptimization: 已应用代理相关推荐设置。");
                             }
                             else
                             {
+                                // 记录本次拒绝的建议签名并持久化：内容不变时后续启动不再弹窗
+                                if (Settings != null)
+                                {
+                                    Settings.DismissedProxyOptimizationSignature = signature;
+                                    Settings.Save();
+                                    Logger.Log("StartupProxyOptimization: 用户拒绝，已记录建议签名，内容不变将不再提示。");
+                                }
                                 diagWindow.Close();
                             }
                         });
