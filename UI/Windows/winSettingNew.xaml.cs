@@ -306,49 +306,12 @@ namespace VPetLLM.UI.Windows
             };
         }
 
+        /// <summary>
+        /// 取插件（含禁用插件）的本地化描述。禁用插件绝不会因此被启动——
+        /// 具体做法见 <see cref="PluginDescriptionProbe"/>。
+        /// </summary>
         private string GetPluginDescription(IVPetLLMPlugin plugin, string langCode)
-        {
-            try
-            {
-                // 尝试获取插件的多语言描述
-                // 如果插件支持多语言，它应该能根据当前语言返回正确的描述
-                if (plugin.Enabled)
-                {
-                    // 启用的插件应该已经正确初始化，可以直接获取Description
-                    return plugin.Description;
-                }
-                else
-                {
-                    // 禁用的插件需要特殊处理来获取正确的多语言描述
-                    try
-                    {
-                        // 临时初始化插件以获取正确的多语言描述
-                        var wasEnabled = plugin.Enabled;
-                        plugin.Initialize(_plugin);
-                        var description = plugin.Description;
-
-                        // 如果插件原本是禁用的，恢复禁用状态
-                        if (!wasEnabled)
-                        {
-                            plugin.Unload();
-                        }
-
-                        return description;
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"Failed to get localized description for disabled plugin {plugin.Name}: {ex.Message}");
-                        // 回退到原始描述
-                        return plugin.Description;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error getting plugin description for {plugin.Name}: {ex.Message}");
-                return plugin.Description ?? string.Empty;
-            }
-        }
+            => PluginDescriptionProbe.Get(plugin, _plugin, langCode);
 
         private readonly global::VPetLLM.VPetLLM _plugin;
 
@@ -2612,7 +2575,8 @@ namespace VPetLLM.UI.Windows
                     {
                         try
                         {
-                            item.LocalPlugin.Initialize(_plugin);
+                            if (!PluginLifecycleGuard.SafeInitialize(item.LocalPlugin, _plugin))
+                                throw new TimeoutException(LanguageHelper.Get("Plugin.InitializeTimeout", langCode) ?? "插件初始化超时或失败，已跳过。");
                             // Convert new-style plugin to legacy interface for ChatCore
                             var legacyPlugin = global::VPetLLM.Core.PluginCompatibility.ToLegacy(item.LocalPlugin);
                             _plugin.ChatCore?.AddPlugin(legacyPlugin);
@@ -2635,7 +2599,7 @@ namespace VPetLLM.UI.Windows
                     {
                         try
                         {
-                            item.LocalPlugin.Unload();
+                            PluginLifecycleGuard.SafeUnload(item.LocalPlugin);
                             // Convert new-style plugin to legacy interface for ChatCore
                             var legacyPlugin = global::VPetLLM.Core.PluginCompatibility.ToLegacy(item.LocalPlugin);
                             _plugin.ChatCore?.RemovePlugin(legacyPlugin);
@@ -2656,8 +2620,11 @@ namespace VPetLLM.UI.Windows
                     // 更新描述（因为启用/禁用状态可能影响多语言描述的获取）
                     try
                     {
-                        item.Description = GetPluginDescription(item.LocalPlugin, langCode);
-                        item.OriginalDescription = GetPluginDescription(item.LocalPlugin, langCode);
+                        // 启停后插件持有的宿主引用变了，之前探测到的文案可能过期。
+                        PluginDescriptionProbe.Invalidate(item.LocalPlugin.Name);
+                        var updatedDescription = GetPluginDescription(item.LocalPlugin, langCode);
+                        item.Description = updatedDescription;
+                        item.OriginalDescription = updatedDescription;
                     }
                     catch (Exception ex)
                     {
@@ -3602,6 +3569,7 @@ namespace VPetLLM.UI.Windows
                 {
                     var sha = PluginManager.GetFileSha256(localPlugin.FilePath);
                     var id = localPlugin.Name; // 先用本地名称作为ID
+                    var localDescription = GetPluginDescription(localPlugin, langCode);
 
                     var item = new UnifiedPluginItem
                     {
@@ -3610,8 +3578,8 @@ namespace VPetLLM.UI.Windows
                         Name = localPlugin.Name,
                         OriginalName = localPlugin.Name,
                         Author = localPlugin.Author,
-                        Description = GetPluginDescription(localPlugin, langCode),
-                        OriginalDescription = GetPluginDescription(localPlugin, langCode),
+                        Description = localDescription,
+                        OriginalDescription = localDescription,
                         IsEnabled = localPlugin.Enabled,
                         ActionText = LanguageHelper.Get("Plugin.UnloadPlugin", langCode),
                         Icon = "\uE8A5", // Folder icon

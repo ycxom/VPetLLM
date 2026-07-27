@@ -117,7 +117,7 @@ namespace VPetLLM.Utils.Plugin
 
                             if (plugin.Enabled)
                             {
-                                plugin.Initialize(VPetLLM.Instance);
+                                PluginLifecycleGuard.SafeInitialize(plugin, VPetLLM.Instance);
                                 if (chatCore is not null)
                                 {
                                     var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(plugin);
@@ -204,7 +204,7 @@ namespace VPetLLM.Utils.Plugin
                 var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(plugin);
                 chatCore.RemovePlugin(legacyPlugin);
             }
-            plugin.Unload();
+            await PluginLifecycleGuard.SafeUnloadAsync(plugin);
             Plugins.Remove(plugin);
 
             if (_pluginContexts.TryGetValue(filePath, out var context))
@@ -343,7 +343,7 @@ namespace VPetLLM.Utils.Plugin
                     // Convert to legacy interface for chatCore
                     var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(p);
                     chatCore.RemovePlugin(legacyPlugin);
-                    p.Unload();
+                    PluginLifecycleGuard.SafeUnload(p);
                 }
             }
             Plugins.Clear();
@@ -706,7 +706,7 @@ namespace VPetLLM.Utils.Plugin
                         var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(existingPlugin);
                         chatCore.RemovePlugin(legacyPlugin);
                     }
-                    existingPlugin.Unload();
+                    await PluginLifecycleGuard.SafeUnloadAsync(existingPlugin);
                     Plugins.Remove(existingPlugin);
 
                     // 卸载旧的 AssemblyLoadContext
@@ -793,7 +793,7 @@ namespace VPetLLM.Utils.Plugin
                             var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(duplicatePlugin);
                             chatCore.RemovePlugin(legacyPlugin);
                         }
-                        duplicatePlugin.Unload();
+                        PluginLifecycleGuard.SafeUnload(duplicatePlugin);
                         Plugins.Remove(duplicatePlugin);
 
                         // 清理相关资源
@@ -883,7 +883,7 @@ namespace VPetLLM.Utils.Plugin
                                 var legacyPlugin = LegacyPlugin.PluginCompatibility.ToLegacy(existingPlugin);
                                 chatCore.RemovePlugin(legacyPlugin);
                             }
-                            existingPlugin.Unload();
+                            PluginLifecycleGuard.SafeUnload(existingPlugin);
                             Plugins.Remove(existingPlugin);
                         }
 
