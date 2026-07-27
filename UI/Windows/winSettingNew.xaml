@@ -91,6 +91,117 @@
                 <Setter Property="LineHeight" Value="18"/>
             </Style>
 
+            <Style x:Key="AdvancedPageTitle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="FontSize" Value="20"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Margin" Value="0,0,0,20"/>
+            </Style>
+
+            <Style x:Key="AdvancedSectionHeader" TargetType="TextBlock"
+                   BasedOn="{StaticResource SectionHeader}">
+                <Setter Property="Margin" Value="0,0,0,14"/>
+            </Style>
+
+            <Style x:Key="AdvancedDivider" TargetType="Separator">
+                <Setter Property="Background" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="Height" Value="1"/>
+                <Setter Property="Margin" Value="0,24,0,20"/>
+            </Style>
+
+            <Style x:Key="AdvancedSettingRow" TargetType="StackPanel">
+                <Setter Property="Margin" Value="0,0,0,12"/>
+            </Style>
+
+            <Style x:Key="AdvancedNestedSettingRow" TargetType="StackPanel"
+                   BasedOn="{StaticResource AdvancedSettingRow}">
+                <Setter Property="Margin" Value="20,0,0,12"/>
+            </Style>
+
+            <Style x:Key="AdvancedFieldLabel" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Width" Value="190"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+
+            <!-- 高级选项：统一的说明文本 -->
+            <Style x:Key="AdvancedDescription" TargetType="TextBlock"
+                   BasedOn="{StaticResource DescriptionText}">
+                <Setter Property="Margin" Value="0,0,0,12"/>
+            </Style>
+
+            <!-- 高级选项：统一的复选框（含缩进变体） -->
+            <Style x:Key="AdvancedCheckBox" TargetType="CheckBox"
+                   BasedOn="{StaticResource ModernCheckBox}">
+                <Setter Property="Margin" Value="0,0,0,10"/>
+                <Setter Property="HorizontalAlignment" Value="Left"/>
+            </Style>
+
+            <Style x:Key="AdvancedNestedCheckBox" TargetType="CheckBox"
+                   BasedOn="{StaticResource AdvancedCheckBox}">
+                <Setter Property="Margin" Value="20,0,0,10"/>
+            </Style>
+
+            <!-- 高级选项：统一的子项容器（一级缩进） -->
+            <Style x:Key="AdvancedSubGroup" TargetType="StackPanel">
+                <Setter Property="Margin" Value="20,0,0,0"/>
+            </Style>
+
+            <!-- 高级选项：统一的一行设置（标签 + 控件） -->
+            <Style x:Key="AdvancedRow" TargetType="StackPanel"
+                   BasedOn="{StaticResource AdvancedSettingRow}">
+                <Setter Property="Orientation" Value="Horizontal"/>
+            </Style>
+
+            <Style x:Key="AdvancedNestedRow" TargetType="StackPanel"
+                   BasedOn="{StaticResource AdvancedNestedSettingRow}">
+                <Setter Property="Orientation" Value="Horizontal"/>
+            </Style>
+
+            <!-- 高级选项：行内的次要文本（数值、单位、提示） -->
+            <Style x:Key="AdvancedValueText" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+
+            <Style x:Key="AdvancedInlineLabel" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Margin" Value="20,0,6,0"/>
+            </Style>
+
+            <Style x:Key="AdvancedWarningText" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Margin" Value="10,0,0,0"/>
+            </Style>
+
+            <!-- 高级选项：统一的数值输入框与下拉框 -->
+            <Style x:Key="AdvancedNumberBox" TargetType="TextBox"
+                   BasedOn="{StaticResource ModernTextBox}">
+                <Setter Property="Width" Value="110"/>
+                <Setter Property="Margin" Value="10,0,0,0"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+
+            <Style x:Key="AdvancedComboBox" TargetType="ComboBox"
+                   BasedOn="{StaticResource ModernComboBox}">
+                <Setter Property="Width" Value="220"/>
+                <Setter Property="Margin" Value="10,0,0,0"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+
+            <Style x:Key="AdvancedSlider" TargetType="Slider">
+                <Setter Property="Width" Value="180"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Margin" Value="10,0,10,0"/>
+            </Style>
+
             <!-- 现代化密码框样式 --> 
             <Style x:Key="ModernPasswordBox" TargetType="PasswordBox">
                 <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
@@ -2073,51 +2184,54 @@
             <TabItem Header="{utils:Localize KeyPath=Advanced_Options.Tab}"
                     x:Name="Tab_Advanced"
                     Style="{StaticResource ModernTabItem}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="0,4,12,0">
                     <Border Style="{StaticResource CardContainer}">
                         <StackPanel Style="{StaticResource SettingGroup}">
+                            <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.Tab}"
+                                       Style="{StaticResource AdvancedPageTitle}"/>
+
+                            <!-- 动作与交互 -->
+                            <TextBlock Name="TextBlock_ActionSectionTitle"
+                                     Text="{utils:Localize KeyPath=Advanced_Options.ActionSectionTitle, Default=动作与交互}"
+                                     Style="{StaticResource AdvancedSectionHeader}"/>
                             <CheckBox x:Name="CheckBox_EnableAction"
                                     Content="{utils:Localize KeyPath=Advanced_Options.EnableAction}"
-                                    Margin="0,0,0,16"
                                     IsChecked="True"
-                                    Style="{StaticResource ModernCheckBox}">
+                                    Style="{StaticResource AdvancedCheckBox}">
                                 <CheckBox.ToolTip>
                                     <ToolTip>
                                         <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableActionToolTip}"/>
                                     </ToolTip>
                                 </CheckBox.ToolTip>
                             </CheckBox>
-                            <StackPanel Margin="20,0,0,0">
+                            <StackPanel Style="{StaticResource AdvancedSubGroup}">
                                 <CheckBox x:Name="CheckBox_EnableVPetSettingsControl"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableVPetSettingsControl}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="False"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}"/>
+                                        Style="{StaticResource AdvancedCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableMediaPlayback"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableMediaPlayback}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}"/>
+                                        Style="{StaticResource AdvancedCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableBuy"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableBuy}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}"/>
+                                        Style="{StaticResource AdvancedCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableState"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableState}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}"/>
+                                        Style="{StaticResource AdvancedCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableExtendedState"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableExtendedState}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableState}"
                                         IsChecked="False"
-                                        Margin="20,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}">
+                                        Style="{StaticResource AdvancedNestedCheckBox}">
                                     <CheckBox.ToolTip>
                                         <ToolTip>
                                             <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableExtendedStateToolTip}"/>
@@ -2128,8 +2242,7 @@
                                         Content="{utils:Localize KeyPath=Advanced_Options.ReduceInputTokenUsage}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableState}"
                                         IsChecked="False"
-                                        Margin="20,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}">
+                                        Style="{StaticResource AdvancedNestedCheckBox}">
                                     <CheckBox.ToolTip>
                                         <ToolTip>
                                             <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ReduceInputTokenUsageToolTip}"/>
@@ -2140,39 +2253,24 @@
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableActionExecution}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}"/>
+                                        Style="{StaticResource AdvancedCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableMove"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableMove}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}"/>
+                                        Style="{StaticResource AdvancedCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableTime"
                                         Content="{utils:Localize KeyPath=Advanced_Options.EnableTime}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}"/>
+                                        Style="{StaticResource AdvancedCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableBuyFeedback"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="True"
-                                        Margin="0,0,0,16"
-                                        Style="{StaticResource ModernCheckBox}">
+                                        Style="{StaticResource AdvancedCheckBox}">
                                     <CheckBox.ToolTip>
                                         <ToolTip>
                                             <TextBlock x:Name="ToolTip_EnableBuyFeedback" Text="{utils:Localize KeyPath=BuyInteraction.EnableTooltip}"/>
-                                        </ToolTip>
-                                    </CheckBox.ToolTip>
-                                </CheckBox>
-                                <CheckBox x:Name="CheckBox_EnableLiveMode"
-                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableLiveMode}"
-                                        IsChecked="False"
-                                        Margin="0,0,0,16"
-                                        Style="{StaticResource ModernCheckBox}">
-                                    <CheckBox.ToolTip>
-                                        <ToolTip>
-                                            <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableLiveModeToolTip}"/>
                                         </ToolTip>
                                     </CheckBox.ToolTip>
                                 </CheckBox>
@@ -2180,43 +2278,50 @@
                                         Content="{utils:Localize KeyPath=Advanced_Options.LimitStateChanges}"
                                         IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableAction}"
                                         IsChecked="False"
-                                        Margin="0,0,0,16"
-                                        Style="{StaticResource ModernCheckBox}">
+                                        Style="{StaticResource AdvancedCheckBox}">
                                     <CheckBox.ToolTip>
                                         <ToolTip>
                                             <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.LimitStateChangesToolTip}"/>
                                         </ToolTip>
                                     </CheckBox.ToolTip>
                                 </CheckBox>
+                            </StackPanel>
+                            <CheckBox x:Name="CheckBox_EnableLiveMode"
+                                    Content="{utils:Localize KeyPath=Advanced_Options.EnableLiveMode}"
+                                    IsChecked="False"
+                                    Style="{StaticResource AdvancedCheckBox}">
+                                <CheckBox.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableLiveModeToolTip}"/>
+                                    </ToolTip>
+                                </CheckBox.ToolTip>
+                            </CheckBox>
+
+                            <!-- 上下文管理 -->
+                            <Separator Style="{StaticResource AdvancedDivider}"/>
+                            <TextBlock Name="TextBlock_ContextSectionTitle"
+                                     Text="{utils:Localize KeyPath=Advanced_Options.ContextSectionTitle, Default=上下文管理}"
+                                     Style="{StaticResource AdvancedSectionHeader}"/>
+                            <StackPanel>
                                 <!-- 上下文模式选择（压缩模式 vs 长上下文模式）-->
-                                <StackPanel Orientation="Horizontal"
-                                        Margin="0,0,0,12">
+                                <StackPanel Style="{StaticResource AdvancedRow}">
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ContextMode, Default=上下文模式:}"
-                                            VerticalAlignment="Center"
                                             x:Name="TextBlock_ContextMode"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"
-                                            Width="80"/>
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
                                     <ComboBox x:Name="ComboBox_ContextMode"
-                                            Width="220"
-                                            Style="{StaticResource ModernComboBox}">
+                                            Style="{StaticResource AdvancedComboBox}">
                                         <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.ContextMode_Overflow, Default=长上下文模式（推荐）}" Tag="Overflow"/>
                                         <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.ContextMode_Compression, Default=聊天压缩模式（有损）}" Tag="Compression"/>
                                     </ComboBox>
                                 </StackPanel>
+
                                 <!-- 压缩触发模式 -->
-                                <StackPanel Orientation="Horizontal"
-                                        Margin="20,0,0,12">
+                                <StackPanel Style="{StaticResource AdvancedNestedRow}">
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.CompressionMode}"
-                                            VerticalAlignment="Center"
                                             x:Name="TextBlock_CompressionMode"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"
-                                            Width="80"/>
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
                                     <ComboBox x:Name="ComboBox_CompressionMode"
-                                            Width="150"
-                                            Margin="10,0"
-                                            Style="{StaticResource ModernComboBox}">
+                                            Style="{StaticResource AdvancedComboBox}">
                                         <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.CompressionMode_MessageCount}" Tag="MessageCount"/>
                                         <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.CompressionMode_TokenCount}" Tag="TokenCount"/>
                                         <ComboBoxItem Content="{utils:Localize KeyPath=Advanced_Options.CompressionMode_Both}" Tag="Both"/>
@@ -2224,80 +2329,46 @@
                                 </StackPanel>
 
                                 <!-- 消息数量阈值-->
-                                <StackPanel Orientation="Horizontal"
-                                        Margin="20,0,0,12">
+                                <StackPanel Style="{StaticResource AdvancedNestedRow}">
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.HistoryCompressionThreshold}"
-                                            VerticalAlignment="Center"
                                             x:Name="TextBlock_HistoryCompressionThreshold"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"
-                                            Width="80"/>
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
                                     <TextBox x:Name="TextBox_HistoryCompressionThreshold"
-                                            Width="110"
-                                            Margin="10,0"
-                                            Style="{StaticResource ModernTextBox}"/>
+                                            Style="{StaticResource AdvancedNumberBox}"/>
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.CurrentContextLength}"
-                                            VerticalAlignment="Center"
-                                            Margin="20,0,5,0"
                                             x:Name="TextBlock_CurrentContextLengthLabel"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"/>
+                                            Style="{StaticResource AdvancedInlineLabel}"/>
                                     <TextBlock x:Name="TextBlock_CurrentContextLength"
-                                            VerticalAlignment="Center"
-                                            Foreground="{StaticResource SecondaryTextBrush}"
-                                            FontSize="14"/>
+                                            Style="{StaticResource AdvancedValueText}"/>
                                     <TextBlock x:Name="TextBlock_OverflowMessageCount"
-                                            VerticalAlignment="Center"
-                                            Foreground="{StaticResource WarningBrush}"
-                                            FontSize="12"
-                                            Margin="10,0,0,0"/>
+                                            Style="{StaticResource AdvancedWarningText}"/>
                                 </StackPanel>
 
                                 <!-- Token数量阈值-->
-                                <StackPanel Orientation="Horizontal"
-                                        Margin="20,0,0,0"
+                                <StackPanel Style="{StaticResource AdvancedNestedRow}"
                                         x:Name="Panel_HistoryCompressionTokenThreshold">
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.HistoryCompressionTokenThreshold}"
-                                            VerticalAlignment="Center"
                                             x:Name="TextBlock_HistoryCompressionTokenThreshold"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"
-                                            Width="80"/>
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
                                     <TextBox x:Name="TextBox_HistoryCompressionTokenThreshold"
-                                            Width="110"
-                                            Margin="10,0"
-                                            Style="{StaticResource ModernTextBox}"/>
+                                            Style="{StaticResource AdvancedNumberBox}"/>
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.CurrentTokenCount}"
-                                            VerticalAlignment="Center"
-                                            Margin="20,0,5,0"
                                             x:Name="TextBlock_CurrentTokenCountLabel"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"/>
+                                            Style="{StaticResource AdvancedInlineLabel}"/>
                                     <TextBlock x:Name="TextBlock_CurrentTokenCount"
-                                            VerticalAlignment="Center"
-                                            Foreground="{StaticResource SecondaryTextBrush}"
-                                            FontSize="14"/>
+                                            Style="{StaticResource AdvancedValueText}"/>
                                     <TextBlock x:Name="TextBlock_OverflowTokenCount"
-                                            VerticalAlignment="Center"
-                                            Foreground="{StaticResource WarningBrush}"
-                                            FontSize="12"
-                                            Margin="10,0,0,0"/>
+                                            Style="{StaticResource AdvancedWarningText}"/>
                                 </StackPanel>
 
                                 <!-- 总结后保留对话消息数（仅压缩模式有效） -->
-                                <StackPanel Orientation="Horizontal"
-                                        Margin="20,12,0,12"
+                                <StackPanel Style="{StaticResource AdvancedNestedRow}"
                                         x:Name="Panel_CompressionRetainCount">
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.CompressionRetainCount}"
-                                            VerticalAlignment="Center"
                                             x:Name="TextBlock_CompressionRetainCount"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"
-                                            Width="140"/>
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
                                     <TextBox x:Name="TextBox_CompressionRetainCount"
-                                            Width="70"
-                                            Margin="10,0"
-                                            Style="{StaticResource ModernTextBox}"/>
+                                            Style="{StaticResource AdvancedNumberBox}"/>
                                     <CheckBox x:Name="CheckBox_EnableAIRetainCount"
                                             Content="{utils:Localize KeyPath=Advanced_Options.EnableAIRetainCount, Default=AI 动态调优}"
                                             VerticalAlignment="Center"
@@ -2312,36 +2383,26 @@
                                 </StackPanel>
 
                                 <!-- 压缩时写入记录-->
-                                <StackPanel Orientation="Horizontal"
-                                        Margin="20,0,0,12">
-                                    <CheckBox x:Name="CheckBox_EnableCompressionRecords"
-                                            Content="{utils:Localize KeyPath=Advanced_Options.EnableCompressionRecords, Default=总结时写入记忆}"
-                                            VerticalAlignment="Center"
-                                            Style="{StaticResource ModernCheckBox}">
-                                        <CheckBox.ToolTip>
-                                            <ToolTip>
-                                                <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableCompressionRecordsTooltip, Default=启用后AI 在压缩上下文时会自动将重要事件写入记忆库}"/>
-                                            </ToolTip>
-                                        </CheckBox.ToolTip>
-                                    </CheckBox>
-                                </StackPanel>
+                                <CheckBox x:Name="CheckBox_EnableCompressionRecords"
+                                        Content="{utils:Localize KeyPath=Advanced_Options.EnableCompressionRecords, Default=总结时写入记忆}"
+                                        Style="{StaticResource AdvancedNestedCheckBox}">
+                                    <CheckBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableCompressionRecordsTooltip, Default=启用后AI 在压缩上下文时会自动将重要事件写入记忆库}"/>
+                                        </ToolTip>
+                                    </CheckBox.ToolTip>
+                                </CheckBox>
 
                                 <!-- ===== 长上下文模式设置 ===== -->
 
                                 <!-- 专家模型检索上下文长度（仅长上下文模式有效） -->
-                                <StackPanel Orientation="Horizontal"
-                                        Margin="20,0,0,12"
+                                <StackPanel Style="{StaticResource AdvancedNestedRow}"
                                         x:Name="Panel_ExpertMemoryContextLength">
                                     <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ExpertMemoryContextLength, Default=专家检索上下文长度:}"
-                                            VerticalAlignment="Center"
                                             x:Name="TextBlock_ExpertMemoryContextLength"
-                                            Foreground="{StaticResource PrimaryTextBrush}"
-                                            FontSize="14"
-                                            Width="140"/>
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
                                     <TextBox x:Name="TextBox_ExpertMemoryContextLength"
-                                            Width="152"
-                                            Margin="10,0"
-                                            Style="{StaticResource ModernTextBox}"/>
+                                            Style="{StaticResource AdvancedNumberBox}"/>
                                 </StackPanel>
 
                                 <!-- 注意：Prompt Token 预算使用下方"消息Token阈值"控制 -->
@@ -2349,29 +2410,18 @@
                             </StackPanel>
 
                             <!-- 强化记忆高级设置 -->
-                            <Separator Margin="0,20,0,20"
-                                     Background="{StaticResource BorderBrush}"
-                                     Height="1"/>
+                            <Separator Style="{StaticResource AdvancedDivider}"/>
                             <TextBlock Name="TextBlock_RecordsAdvancedTitle"
                                      Text="{utils:Localize KeyPath=Advanced_Options.RecordsAdvancedTitle}"
-                                     FontSize="16"
-                                     FontWeight="SemiBold"
-                                     Margin="0,0,0,16"
-                                     Foreground="{StaticResource PrimaryTextBrush}"/>
+                                     Style="{StaticResource AdvancedSectionHeader}"/>
 
                             <!-- 记忆衰退轮数 -->
-                            <StackPanel Orientation="Horizontal"
-                                        Margin="0,0,0,12">
+                            <StackPanel Style="{StaticResource AdvancedRow}">
                                 <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.WeightDecayTurns}"
-                                        VerticalAlignment="Center"
                                         x:Name="TextBlock_WeightDecayTurns"
-                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                        FontSize="14"
-                                        Width="200"/>
+                                        Style="{StaticResource AdvancedFieldLabel}"/>
                                 <TextBox x:Name="TextBox_WeightDecayTurns"
-                                        Width="110"
-                                        Margin="10,0"
-                                        Style="{StaticResource ModernTextBox}">
+                                        Style="{StaticResource AdvancedNumberBox}">
                                     <TextBox.ToolTip>
                                         <ToolTip>
                                             <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.WeightDecayTurnsToolTip}"/>
@@ -2379,25 +2429,17 @@
                                     </TextBox.ToolTip>
                                 </TextBox>
                                 <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.WeightDecayTurnsUnit}"
-                                        VerticalAlignment="Center"
                                         Margin="10,0,0,0"
-                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                        FontSize="14"/>
+                                        Style="{StaticResource AdvancedValueText}"/>
                             </StackPanel>
 
                             <!-- 记忆条数上限 -->
-                            <StackPanel Orientation="Horizontal"
-                                        Margin="0,0,0,12">
+                            <StackPanel Style="{StaticResource AdvancedRow}">
                                 <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.MaxRecordsLimit}"
-                                        VerticalAlignment="Center"
                                         x:Name="TextBlock_MaxRecordsLimit"
-                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                        FontSize="14"
-                                        Width="200"/>
+                                        Style="{StaticResource AdvancedFieldLabel}"/>
                                 <TextBox x:Name="TextBox_MaxRecordsLimit"
-                                        Width="110"
-                                        Margin="10,0"
-                                        Style="{StaticResource ModernTextBox}">
+                                        Style="{StaticResource AdvancedNumberBox}">
                                     <TextBox.ToolTip>
                                         <ToolTip>
                                             <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.MaxRecordsLimitToolTip}"/>
@@ -2405,85 +2447,62 @@
                                     </TextBox.ToolTip>
                                 </TextBox>
                                 <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.MaxRecordsLimitUnit}"
-                                        VerticalAlignment="Center"
                                         Margin="10,0,0,0"
-                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                        FontSize="14"/>
+                                        Style="{StaticResource AdvancedValueText}"/>
                             </StackPanel>
 
                             <!-- 运行诊断 -->
-                            <Separator Margin="0,20,0,20"
-                                     Background="{StaticResource BorderBrush}"
-                                     Height="1"/>
+                            <Separator Style="{StaticResource AdvancedDivider}"/>
                             <TextBlock Name="TextBlock_DiagnosticTitle"
                                      Text="{utils:Localize KeyPath=Advanced_Options.DiagnosticTitle, Default=运行诊断}"
-                                     FontSize="16"
-                                     FontWeight="SemiBold"
-                                     Margin="0,0,0,12"
-                                     Foreground="{StaticResource PrimaryTextBrush}"/>
+                                     Style="{StaticResource AdvancedSectionHeader}"/>
                             <TextBlock Name="TextBlock_DiagnosticDesc"
                                      Text="{utils:Localize KeyPath=Advanced_Options.DiagnosticDesc, Default=检查网络连接、代理可用性及 API 接口状态，帮助快速定位连接问题。连续5次AI请求失败时也会自动运行。}"
-                                     Foreground="{StaticResource SecondaryTextBrush}"
-                                     FontSize="12"
-                                     TextWrapping="Wrap"
-                                     Margin="0,0,0,12"/>
+                                     Style="{StaticResource AdvancedDescription}"/>
+                            <CheckBox x:Name="CheckBox_EnableAutoDiagnostic"
+                                      Content="{utils:Localize KeyPath=Advanced_Options.EnableAutoDiagnostic, Default=启用自动诊断（连续5次AI请求失败时自动运行）}"
+                                      IsChecked="True"
+                                      Checked="CheckBox_EnableAutoDiagnostic_Changed"
+                                      Unchecked="CheckBox_EnableAutoDiagnostic_Changed"
+                                      Style="{StaticResource AdvancedCheckBox}"/>
+                            <CheckBox x:Name="CheckBox_EnableStartupProxyOptimization"
+                                      Content="{utils:Localize KeyPath=Advanced_Options.EnableStartupProxyOptimization, Default=启动时代理自动优化（检测到可优化项时弹窗建议）}"
+                                      IsChecked="True"
+                                      Checked="CheckBox_EnableStartupProxyOptimization_Changed"
+                                      Unchecked="CheckBox_EnableStartupProxyOptimization_Changed"
+                                      Style="{StaticResource AdvancedCheckBox}"/>
                             <Button x:Name="Button_RunDiagnostic"
                                     Content="{utils:Localize KeyPath=Advanced_Options.RunDiagnostic, Default=运行诊断}"
                                     Width="150"
                                     Height="36"
-                                    Margin="0,0,0,12"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,4,0,0"
                                     Click="Button_RunDiagnostic_Click"
                                     Style="{StaticResource PrimaryButton}"/>
-                            <CheckBox x:Name="CheckBox_EnableAutoDiagnostic"
-                                      Content="{utils:Localize KeyPath=Advanced_Options.EnableAutoDiagnostic, Default=启用自动诊断（连续5次AI请求失败时自动运行）}"
-                                      IsChecked="True"
-                                      Margin="0,0,0,12"
-                                      Checked="CheckBox_EnableAutoDiagnostic_Changed"
-                                      Unchecked="CheckBox_EnableAutoDiagnostic_Changed"
-                                      Style="{StaticResource ModernCheckBox}"/>
-                            <CheckBox x:Name="CheckBox_EnableStartupProxyOptimization"
-                                      Content="{utils:Localize KeyPath=Advanced_Options.EnableStartupProxyOptimization, Default=启动时代理自动优化（检测到可优化项时弹窗建议）}"
-                                      IsChecked="True"
-                                      Margin="0,0,0,12"
-                                      Checked="CheckBox_EnableStartupProxyOptimization_Changed"
-                                      Unchecked="CheckBox_EnableStartupProxyOptimization_Changed"
-                                      Style="{StaticResource ModernCheckBox}"/>
-                            <StackPanel x:Name="StackPanel_DiagnosticProgress" Visibility="Collapsed" Margin="0,0,0,16">
+                            <StackPanel x:Name="StackPanel_DiagnosticProgress" Visibility="Collapsed" Margin="0,12,0,0">
                                 <TextBlock x:Name="TextBlock_DiagnosticStatus"
                                          Foreground="{StaticResource PrimaryTextBrush}"
                                          FontSize="14"
-                                         TextWrapping="Wrap"
-                                         Margin="0,0,0,8"/>
+                                         TextWrapping="Wrap"/>
                             </StackPanel>
 
                             <!-- 身体交互设置 -->
-                            <Separator Margin="0,20,0,20"
-                                     Background="{StaticResource BorderBrush}"
-                                     Height="1"/>
+                            <Separator Style="{StaticResource AdvancedDivider}"/>
                             <TextBlock Name="TextBlock_TouchFeedbackTitle"
                                      Text="{utils:Localize KeyPath=TouchFeedback.Title}"
-                                     FontSize="16"
-                                     FontWeight="SemiBold"
-                                     Margin="0,0,0,16"
-                                     Foreground="{StaticResource PrimaryTextBrush}"/>
+                                     Style="{StaticResource AdvancedSectionHeader}"/>
                             <ContentPresenter x:Name="TouchFeedbackSettingsContainer"/>
 
                             <!-- 悬浮侧边栏设置-->
-                            <Separator Margin="0,20,0,20"
-                                     Background="{StaticResource BorderBrush}"
-                                     Height="1"/>
+                            <Separator Style="{StaticResource AdvancedDivider}"/>
                             <TextBlock Name="TextBlock_FloatingSidebarTitle"
                                      Text="{utils:Localize KeyPath=FloatingSidebar.Title, Default=悬浮侧边栏}"
-                                     FontSize="16"
-                                     FontWeight="SemiBold"
-                                     Margin="0,0,0,16"
-                                     Foreground="{StaticResource PrimaryTextBrush}"/>
+                                     Style="{StaticResource AdvancedSectionHeader}"/>
 
                             <!-- 启用悬浮侧边栏-->
                             <CheckBox x:Name="CheckBox_EnableFloatingSidebar"
                                     Content="{utils:Localize KeyPath=FloatingSidebar.Enable, Default=启用悬浮侧边栏}"
-                                    Margin="0,0,0,12"
-                                    Style="{StaticResource ModernCheckBox}">
+                                    Style="{StaticResource AdvancedCheckBox}">
                                 <CheckBox.ToolTip>
                                     <ToolTip>
                                         <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.EnableTooltip, Default=在桌宠旁边显示快捷操作面板}"/>
@@ -2491,84 +2510,58 @@
                                 </CheckBox.ToolTip>
                             </CheckBox>
 
-                            <!-- 自动隐藏 -->
-                            <CheckBox x:Name="CheckBox_FloatingSidebar_AutoHide"
-                                    Content="{utils:Localize KeyPath=FloatingSidebar.AutoHide, Default=自动隐藏}"
-                                    IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
-                                    Margin="20,0,0,12"
-                                    Style="{StaticResource ModernCheckBox}">
-                                <CheckBox.ToolTip>
-                                    <ToolTip>
-                                        <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.AutoHideTooltip, Default=无交互时自动降低透明度}"/>
-                                    </ToolTip>
-                                </CheckBox.ToolTip>
-                            </CheckBox>
+                            <StackPanel Style="{StaticResource AdvancedSubGroup}"
+                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}">
+                                <!-- 自动隐藏 -->
+                                <CheckBox x:Name="CheckBox_FloatingSidebar_AutoHide"
+                                        Content="{utils:Localize KeyPath=FloatingSidebar.AutoHide, Default=自动隐藏}"
+                                        Style="{StaticResource AdvancedCheckBox}">
+                                    <CheckBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.AutoHideTooltip, Default=无交互时自动降低透明度}"/>
+                                        </ToolTip>
+                                    </CheckBox.ToolTip>
+                                </CheckBox>
 
-                            <!-- 侧边栏位置-->
-                            <StackPanel Orientation="Horizontal"
-                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
-                                        Margin="20,0,0,12">
-                                <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.Position, Default=位置:}"
-                                        VerticalAlignment="Center"
-                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                        FontSize="14"
-                                        Width="80"/>
-                                <ComboBox x:Name="ComboBox_FloatingSidebar_Position"
-                                        Width="120"
-                                        Margin="10,0"
-                                        Style="{StaticResource ModernComboBox}">
-                                    <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Left, Default=左侧}" Tag="Left"/>
-                                    <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Right, Default=右侧}" Tag="Right"/>
-                                    <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Top, Default=上方}" Tag="Top"/>
-                                    <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Bottom, Default=下方}" Tag="Bottom"/>
-                                </ComboBox>
+                                <!-- 侧边栏位置-->
+                                <StackPanel Style="{StaticResource AdvancedRow}">
+                                    <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.Position, Default=位置:}"
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
+                                    <ComboBox x:Name="ComboBox_FloatingSidebar_Position"
+                                            Style="{StaticResource AdvancedComboBox}">
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Left, Default=左侧}" Tag="Left"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Right, Default=右侧}" Tag="Right"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Top, Default=上方}" Tag="Top"/>
+                                        <ComboBoxItem Content="{utils:Localize KeyPath=FloatingSidebar.Position_Bottom, Default=下方}" Tag="Bottom"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <!-- 默认透明度-->
+                                <StackPanel Style="{StaticResource AdvancedRow}">
+                                    <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.DefaultOpacity, Default=默认透明度}"
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
+                                    <Slider x:Name="Slider_FloatingSidebar_DefaultOpacity"
+                                            Minimum="0.1"
+                                            Maximum="1.0"
+                                            Style="{StaticResource AdvancedSlider}"/>
+                                    <TextBlock x:Name="TextBlock_FloatingSidebar_DefaultOpacityValue"
+                                            Width="40"
+                                            Style="{StaticResource AdvancedValueText}"/>
+                                </StackPanel>
+
+                                <!-- 非活动透明度-->
+                                <StackPanel Style="{StaticResource AdvancedRow}">
+                                    <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.InactiveOpacity, Default=非活动透明度}"
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
+                                    <Slider x:Name="Slider_FloatingSidebar_InactiveOpacity"
+                                            Minimum="0.1"
+                                            Maximum="1.0"
+                                            Style="{StaticResource AdvancedSlider}"/>
+                                    <TextBlock x:Name="TextBlock_FloatingSidebar_InactiveOpacityValue"
+                                            Width="40"
+                                            Style="{StaticResource AdvancedValueText}"/>
+                                </StackPanel>
                             </StackPanel>
-
-                            <!-- 默认透明度-->
-                            <StackPanel Orientation="Horizontal"
-                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
-                                        Margin="20,0,0,12">
-                                <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.DefaultOpacity, Default=默认透明度}"
-                                        VerticalAlignment="Center"
-                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                        FontSize="14"
-                                        Width="80"/>
-                                <Slider x:Name="Slider_FloatingSidebar_DefaultOpacity"
-                                        Minimum="0.1"
-                                        Maximum="1.0"
-                                        Width="150"
-                                        Margin="10,0"
-                                        VerticalAlignment="Center"/>
-                                <TextBlock x:Name="TextBlock_FloatingSidebar_DefaultOpacityValue"
-                                        Width="40"
-                                        VerticalAlignment="Center"
-                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                        FontSize="14"/>
-                            </StackPanel>
-
-                            <!-- 非活动透明度-->
-                            <StackPanel Orientation="Horizontal"
-                                        IsEnabled="{Binding IsChecked, ElementName=CheckBox_EnableFloatingSidebar}"
-                                        Margin="20,0,0,12">
-                                <TextBlock Text="{utils:Localize KeyPath=FloatingSidebar.InactiveOpacity, Default=非活动透明度}"
-                                        VerticalAlignment="Center"
-                                        Foreground="{StaticResource PrimaryTextBrush}"
-                                        FontSize="14"
-                                        Width="80"/>
-                                <Slider x:Name="Slider_FloatingSidebar_InactiveOpacity"
-                                        Minimum="0.1"
-                                        Maximum="1.0"
-                                        Width="150"
-                                        Margin="10,0"
-                                        VerticalAlignment="Center"/>
-                                <TextBlock x:Name="TextBlock_FloatingSidebar_InactiveOpacityValue"
-                                        Width="40"
-                                        VerticalAlignment="Center"
-                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                        FontSize="14"/>
-                            </StackPanel>
-
-
                         </StackPanel>
                     </Border>
                 </ScrollViewer>

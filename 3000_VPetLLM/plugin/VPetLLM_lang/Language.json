@@ -814,6 +814,18 @@
       "zh-hant": "啟用後 AI 在壓縮上下文時會自動將重要事件寫入記憶庫",
       "jp": "有効にすると、AIがコンテキスト圧縮時に重要なイベントを自動的にメモリデータベースに書き込みます"
     },
+    "ActionSectionTitle": {
+      "en": "Actions & Interaction",
+      "zh-hans": "动作与交互",
+      "zh-hant": "動作與互動",
+      "jp": "アクションとインタラクション"
+    },
+    "ContextSectionTitle": {
+      "en": "Context Management",
+      "zh-hans": "上下文管理",
+      "zh-hant": "上下文管理",
+      "jp": "コンテキスト管理"
+    },
     "RecordsAdvancedTitle": {
       "en": "Enhanced Memory Advanced Settings",
       "zh-hans": "强化记忆高级设置",

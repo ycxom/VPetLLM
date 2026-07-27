@@ -3304,6 +3304,10 @@ namespace VPetLLM.UI.Windows
             if (FindName("Button_ClearEmbeddingCache") is Button btnEmbClear) btnEmbClear.Content = LanguageHelper.Get("Embedding.ClearCache", langCode);
             if (FindName("TextBlock_EmbeddingClearHint") is TextBlock tbEmbClearHintL) tbEmbClearHintL.Text = LanguageHelper.Get("Embedding.ClearCacheHint", langCode);
 
+            // 高级选项分节标题本地化
+            if (FindName("TextBlock_ActionSectionTitle") is TextBlock textBlockActionSectionTitle) textBlockActionSectionTitle.Text = LanguageHelper.Get("Advanced_Options.ActionSectionTitle", langCode);
+            if (FindName("TextBlock_ContextSectionTitle") is TextBlock textBlockContextSectionTitle) textBlockContextSectionTitle.Text = LanguageHelper.Get("Advanced_Options.ContextSectionTitle", langCode);
+
             // 记录器高级设置本地化
             if (FindName("TextBlock_RecordsAdvancedTitle") is TextBlock textBlockRecordsAdvancedTitle) textBlockRecordsAdvancedTitle.Text = LanguageHelper.Get("Advanced_Options.RecordsAdvancedTitle", langCode);
             if (FindName("TextBlock_WeightDecayTurns") is TextBlock textBlockWeightDecayTurns) textBlockWeightDecayTurns.Text = LanguageHelper.Get("Advanced_Options.WeightDecayTurns", langCode);
