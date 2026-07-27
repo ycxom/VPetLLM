@@ -1005,6 +1005,12 @@
       "zh-hans": "启用自动诊断（连续5次AI请求失败时自动运行）",
       "zh-hant": "啟用自動診斷（連續5次AI請求失敗時自動運行）",
       "jp": "自動診断を有効にする（5回連続でAIリクエストが失敗した場合に自動実行）"
+    },
+    "EnableStartupProxyOptimization": {
+      "en": "Auto proxy optimization on startup (prompts with suggestions when optimizable settings are detected)",
+      "zh-hans": "启动时代理自动优化（检测到可优化项时弹窗建议）",
+      "zh-hant": "啟動時代理自動優化（偵測到可優化項時彈窗建議）",
+      "jp": "起動時のプロキシ自動最適化（最適化可能な項目を検出した際に提案を表示）"
     }
   },
   "PluginPanels": {

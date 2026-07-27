@@ -69,6 +69,18 @@ namespace VPetLLM.Core.Providers.TTS
                     return Array.Empty<byte>();
                 }
 
+                // 先探一次 /health（结果 120 秒内复用）。服务器下线时这里几百毫秒就返回，
+                // 而不是让下面那个 30 秒超时的请求把气泡和动画一起拖住。
+                var (healthy, reason) = await Utils.Network.FreeServiceHealthCheck
+                    .IsHealthyAsync(_apiUrl, GetProxy(), m => Logger.Log($"TTS (Free): {m}"))
+                    .ConfigureAwait(false);
+                if (!healthy)
+                {
+                    Logger.Log($"TTS (Free): 预检判定服务不可用（{reason}），跳过本次请求");
+                    OnAudioGenerationError($"Free TTS {reason}，已跳过本次语音");
+                    return Array.Empty<byte>();
+                }
+
                 Logger.Log($"TTS (Free): 发送请求，文本长度: {text.Length}");
 
                 var requestBody = new
@@ -117,18 +129,24 @@ namespace VPetLLM.Core.Providers.TTS
                 var audioData = await response.Content.ReadAsByteArrayAsync();
                 Logger.Log($"TTS (Free): 音频生成成功，大小 {audioData.Length} bytes");
 
+                // 真实请求成功是最强的可用性证据，立刻抹掉可能存在的误判。
+                Utils.Network.FreeServiceHealthCheck.ReportOutcome(_apiUrl, true, "服务正常");
+
                 OnAudioGenerated(audioData);
                 return audioData;
             }
             catch (TaskCanceledException ex)
             {
                 Logger.Log($"TTS (Free): 请求超时: {ex.Message}");
+                // 回填结论：接下来 120 秒内的请求直接跳过，不必再各等 30 秒。
+                Utils.Network.FreeServiceHealthCheck.ReportOutcome(_apiUrl, false, "服务无响应");
                 OnAudioGenerationError("请求超时，请检查网络连接");
                 return Array.Empty<byte>();
             }
             catch (HttpRequestException ex)
             {
                 Logger.Log($"TTS (Free): 网络错误: {ex.Message}");
+                Utils.Network.FreeServiceHealthCheck.ReportOutcome(_apiUrl, false, "无法连接到服务");
                 OnAudioGenerationError($"网络错误: {ex.Message}");
                 return Array.Empty<byte>();
             }

@@ -41,13 +41,25 @@ public class VPetTTSProvider : ITTSProvider
             if (_vpetTTSIntegration is not null && _vpetTTSIntegration.IsInExclusiveSession())
             {
                 var requestId = await _vpetTTSIntegration.SubmitTTSRequestAsync(text);
-                var estimatedDuration = EstimateDuration(text, options.Speed);
+
+                // 拿不到请求 ID 说明 VPetTTS 根本没受理，这时不能报成功——
+                // 否则 WaitForPlaybackAsync 会退化成按估算时长空等。
+                if (string.IsNullOrEmpty(requestId))
+                {
+                    return new TTSAudioResult
+                    {
+                        Success = false,
+                        AudioFilePath = null,
+                        DurationMs = 0,
+                        ErrorMessage = "VPetTTS 未受理该请求"
+                    };
+                }
 
                 return new TTSAudioResult
                 {
                     Success = true,
                     AudioFilePath = null,
-                    DurationMs = estimatedDuration,
+                    DurationMs = EstimateDuration(text, options.Speed),
                     ErrorMessage = null,
                     RequestId = requestId
                 };
@@ -78,7 +90,11 @@ public class VPetTTSProvider : ITTSProvider
             {
                 Success = response.Success,
                 AudioFilePath = response.AudioFilePath,
-                DurationMs = response.AudioDurationMs > 0 ? response.AudioDurationMs : EstimateDuration(text, options.Speed),
+                // 失败时时长必须是 0：没有音频却给出估算时长，会让动画控制器为一段
+                // 根本不存在的语音保持说话动画，直到那个"估算"耗尽。
+                DurationMs = !response.Success
+                    ? 0
+                    : (response.AudioDurationMs > 0 ? response.AudioDurationMs : EstimateDuration(text, options.Speed)),
                 ErrorMessage = response.ErrorMessage
             };
         }

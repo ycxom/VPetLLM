@@ -2441,6 +2441,13 @@
                                       Checked="CheckBox_EnableAutoDiagnostic_Changed"
                                       Unchecked="CheckBox_EnableAutoDiagnostic_Changed"
                                       Style="{StaticResource ModernCheckBox}"/>
+                            <CheckBox x:Name="CheckBox_EnableStartupProxyOptimization"
+                                      Content="{utils:Localize KeyPath=Advanced_Options.EnableStartupProxyOptimization, Default=启动时代理自动优化（检测到可优化项时弹窗建议）}"
+                                      IsChecked="True"
+                                      Margin="0,0,0,12"
+                                      Checked="CheckBox_EnableStartupProxyOptimization_Changed"
+                                      Unchecked="CheckBox_EnableStartupProxyOptimization_Changed"
+                                      Style="{StaticResource ModernCheckBox}"/>
                             <StackPanel x:Name="StackPanel_DiagnosticProgress" Visibility="Collapsed" Margin="0,0,0,16">
                                 <TextBlock x:Name="TextBlock_DiagnosticStatus"
                                          Foreground="{StaticResource PrimaryTextBrush}"

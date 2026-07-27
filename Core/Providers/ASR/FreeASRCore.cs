@@ -70,6 +70,17 @@ namespace VPetLLM.Core.Providers.ASR
                 }
 
                 var url = $"{_apiUrl}/audio/transcriptions";
+
+                // 与 TTS 共用同一份主机级健康状态：任一方刚探过或刚失败过，这里直接复用结论。
+                var (healthy, healthReason) = await Utils.Network.FreeServiceHealthCheck
+                    .IsHealthyAsync(url, GetProxy(), m => Logger.Log($"ASR (Free): {m}"))
+                    .ConfigureAwait(false);
+                if (!healthy)
+                {
+                    Logger.Log($"ASR (Free): 预检判定服务不可用（{healthReason}），跳过本次请求");
+                    throw new Exception($"Free ASR {healthReason}");
+                }
+
                 Logger.Log("{1}: 发送请求，音频大小: {0} bytes".Translate(audioData.Length, "ASR (Free)"));
 
                 using var content = new MultipartFormDataContent();
@@ -109,17 +120,23 @@ namespace VPetLLM.Core.Providers.ASR
                 }
 
                 Logger.Log("{1}: 响应内容: {0}".Translate(responseContent, "ASR (Free)"));
+
+                // 成功即刷新共享 TTL，TTS 那边也能立刻受益。
+                Utils.Network.FreeServiceHealthCheck.ReportOutcome(url, true, "服务正常");
+
                 var result = JObject.Parse(responseContent);
                 return result["text"]?.ToString() ?? "";
             }
             catch (TaskCanceledException ex)
             {
                 Logger.Log("{1}: 请求超时: {0}".Translate(ex.Message, "ASR (Free)"));
+                Utils.Network.FreeServiceHealthCheck.ReportOutcome($"{_apiUrl}/audio/transcriptions", false, "服务无响应");
                 throw new Exception("请求超时，请检查网络连接或尝试录制更短的音频".Translate());
             }
             catch (HttpRequestException ex)
             {
                 Logger.Log("{1}: 网络错误: {0}".Translate(ex.Message, "ASR (Free)"));
+                Utils.Network.FreeServiceHealthCheck.ReportOutcome($"{_apiUrl}/audio/transcriptions", false, "无法连接到服务");
                 throw new Exception("网络错误: {0}".Translate(ex.Message));
             }
             catch (Exception ex)

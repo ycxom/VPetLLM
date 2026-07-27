@@ -894,6 +894,8 @@ namespace VPetLLM.UI.Windows
             ((ComboBox)this.FindName("ComboBox_Provider")).SelectedItem = _plugin.Settings.Provider;
             ((CheckBox)this.FindName("CheckBox_EnableFallback")).IsChecked = _plugin.Settings.EnableFallback;
             ((CheckBox)this.FindName("CheckBox_EnableAutoDiagnostic")).IsChecked = _plugin.Settings.EnableAutoDiagnostic;
+            if (this.FindName("CheckBox_EnableStartupProxyOptimization") is CheckBox cbStartupProxyOpt)
+                cbStartupProxyOpt.IsChecked = _plugin.Settings.EnableStartupProxyOptimization;
             if (_plugin.Settings.EnableFallback == true && Panel_FallbackPriority != null)
             {
                 Panel_FallbackPriority.Visibility = Visibility.Visible;
@@ -1870,6 +1872,14 @@ namespace VPetLLM.UI.Windows
             MarkUnsavedChanges();
         }
 
+        private void CheckBox_EnableStartupProxyOptimization_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_plugin == null) return;
+            var cb = sender as CheckBox;
+            _plugin.Settings.EnableStartupProxyOptimization = cb?.IsChecked == true;
+            MarkUnsavedChanges();
+        }
+
         private void LoadFallbackProviders()
         {
             if (ListBox_FallbackProviders == null) return;
@@ -1949,6 +1959,8 @@ namespace VPetLLM.UI.Windows
 
                 _plugin.Settings.EnableFallback = CheckBox_EnableFallback?.IsChecked == true;
                 _plugin.Settings.EnableAutoDiagnostic = CheckBox_EnableAutoDiagnostic?.IsChecked == true;
+                if (this.FindName("CheckBox_EnableStartupProxyOptimization") is CheckBox cbStartupProxyOpt)
+                    _plugin.Settings.EnableStartupProxyOptimization = cbStartupProxyOpt.IsChecked == true;
                 MarkUnsavedChanges();
             }
             catch { }
