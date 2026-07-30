@@ -438,10 +438,9 @@ namespace VPetLLM.Core.Abstractions.Base
         }
 
         private HttpClient NewEmbeddingHttpClient(int timeoutSeconds)
-            => new HttpClient(CreateHttpClientHandler())
-            {
-                Timeout = TimeSpan.FromSeconds(Math.Max(1, timeoutSeconds))
-            };
+            => Utils.Network.HttpHandlerPool.CreateClient(
+                CreateHttpClientHandler,
+                TimeSpan.FromSeconds(Math.Max(1, timeoutSeconds)));
 
         private IEmbeddingProvider? CreateCustomEmbeddingProvider(Setting.EmbeddingSetting config)
         {
@@ -932,12 +931,11 @@ namespace VPetLLM.Core.Abstractions.Base
 
         protected HttpClient GetClient()
         {
-            var handler = CreateHttpClientHandler();
-            var client = new HttpClient(handler);
             var timeoutSeconds = Settings?.LLMRequestTimeoutSeconds ?? 120;
             if (timeoutSeconds <= 0) timeoutSeconds = 120;
-            client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
-            return client;
+            // handler（连接池）按代理配置共享，返回的 HttpClient 仍是独立实例，
+            // 调用方 Dispose 掉的只是这层壳子。
+            return Utils.Network.HttpHandlerPool.CreateClient(CreateHttpClientHandler, TimeSpan.FromSeconds(timeoutSeconds));
         }
 
         // 统一将内部 Message 映射为 OpenAI 风格的 { role, content }，避免额外字段
@@ -1090,11 +1088,43 @@ namespace VPetLLM.Core.Abstractions.Base
                 .Replace("\t", "\\t");
         }
 
+        private byte[]? _imageData;
+        private Func<byte[]?>? _imageLoader;
+
         /// <summary>
-        /// 图像数据（用于多模态消息）
+        /// 图像数据（用于多模态消息）。
+        ///
+        /// 从数据库读出的历史消息只带一个加载器，真正读盘要等到第一次访问这个属性
+        /// （也就是这条消息确实要发给模型的时候）。否则整段历史里的每张截图都会在
+        /// 启动时进内存并一直待到进程结束。
         /// </summary>
         [JsonIgnore]
-        public byte[]? ImageData { get; set; }
+        public byte[]? ImageData
+        {
+            get
+            {
+                if (_imageData is null && _imageLoader is not null)
+                {
+                    _imageData = _imageLoader();
+                    _imageLoader = null;
+                }
+                return _imageData;
+            }
+            set
+            {
+                _imageData = value;
+                _imageLoader = null;
+                // 新数据尚未落盘，旧文件 ID 不再对应当前内容
+                ImageId = null;
+            }
+        }
+
+        /// <summary>
+        /// 已落盘的图像文件 ID；null 表示图像还没有对应的文件。
+        /// 有值时重写历史可以直接复用该文件，不必把图片再存一份。
+        /// </summary>
+        [JsonIgnore]
+        public string? ImageId { get; internal set; }
 
         /// <summary>
         /// 图像 MIME 类型
@@ -1103,10 +1133,20 @@ namespace VPetLLM.Core.Abstractions.Base
         public string ImageMimeType { get; set; } = "image/png";
 
         /// <summary>
-        /// 是否包含图像
+        /// 是否包含图像。注意这里不会触发惰性加载——仅仅问"有没有图"不该把图读进内存。
         /// </summary>
         [JsonIgnore]
-        public bool HasImage => ImageData is not null && ImageData.Length > 0;
+        public bool HasImage => _imageData is { Length: > 0 } || _imageLoader is not null;
+
+        /// <summary>
+        /// 挂上一个已落盘的图像，实际内容按需加载。
+        /// </summary>
+        internal void AttachStoredImage(string imageId, Func<string, byte[]?> loader)
+        {
+            ImageId = imageId;
+            _imageData = null;
+            _imageLoader = () => loader(imageId);
+        }
     }
 }
 

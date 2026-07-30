@@ -1,4 +1,4 @@
-using LinePutScript.Localization.WPF;
+﻿using LinePutScript.Localization.WPF;
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
@@ -249,6 +249,9 @@ namespace VPetLLM.Core.Providers.Chat
         /// <returns>响应内容</returns>
         public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
         {
+            // 钳制尺寸，避免过大的图片被目标服务端拒收
+            imageData = Utils.Common.ImageDownscaler.ClampToMaxDimension(imageData)!;
+
             // Handle conversation turn for record weight decrement
             OnConversationTurn();
 

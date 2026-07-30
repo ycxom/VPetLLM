@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Net.Http;
@@ -223,6 +223,9 @@ namespace VPetLLM.Core.Providers.Chat
 
         public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
         {
+            // 钳制尺寸，避免过大的图片被目标服务端拒收
+            imageData = Utils.Common.ImageDownscaler.ClampToMaxDimension(imageData)!;
+
             if (!_lmStudioSetting.EnableVision)
             {
                 var visionError = "LM Studio 未启用视觉能力，请在设置中启用 EnableVision";

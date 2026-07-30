@@ -1,4 +1,4 @@
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
@@ -48,6 +48,9 @@ namespace VPetLLM.Core.Providers.Chat
         /// <returns>响应内容</returns>
         public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
         {
+            // 钳制尺寸，避免过大的图片被目标服务端拒收
+            imageData = Utils.Common.ImageDownscaler.ClampToMaxDimension(imageData)!;
+
             try
             {
                 // Handle conversation turn for record weight decrement
@@ -104,10 +107,15 @@ namespace VPetLLM.Core.Providers.Chat
                         ["content"] = msg.DisplayContent
                     };
 
-                    // 如果消息包含图像，添加 images 数组
+                    // 如果消息包含图像，添加 images 数组。
+                    // 这里的图可能来自本次改动之前存下的历史，尺寸未必受控，所以再钳一次。
                     if (msg.HasImage)
                     {
-                        messageObj["images"] = new[] { Convert.ToBase64String(msg.ImageData) };
+                        var historyImage = Utils.Common.ImageDownscaler.ClampToMaxDimension(msg.ImageData);
+                        if (historyImage is not null)
+                        {
+                            messageObj["images"] = new[] { Convert.ToBase64String(historyImage) };
+                        }
                     }
 
                     messages.Add(messageObj);

@@ -11,11 +11,21 @@ namespace VPetLLM.Utils.Common
         private static readonly object _lock = new();
         private static readonly Dictionary<string, List<string>> _buffers = new();
         private static readonly Dictionary<string, SystemTimers.Timer> _timers = new();
+        private static readonly Dictionary<string, DateTime> _lastTouchUtc = new();
 
         /// <summary>
         /// 聚合窗口时长
         /// </summary>
         public static TimeSpan Window { get; set; } = TimeSpan.FromSeconds(2);
+
+        /// <summary>
+        /// 会话缓冲区的存活上限。
+        ///
+        /// session: 开头的 key 不带计时器，只能靠 FlushSession 清理；一旦会话因异常中断
+        /// 而没走到 Flush，这个 key 就永远留在字典里。每个会话都是新 GUID，累积起来
+        /// 就是一条只增不减的泄漏路径，所以这里给它一个兜底的过期时间。
+        /// </summary>
+        private static readonly TimeSpan SessionBufferTtl = TimeSpan.FromMinutes(10);
 
         private static string CurrentKey
         {
@@ -40,12 +50,15 @@ namespace VPetLLM.Utils.Common
 
                 lock (_lock)
                 {
+                    PruneStaleSessions();
+
                     if (!_buffers.TryGetValue(key, out var list))
                     {
                         list = new List<string>();
                         _buffers[key] = list;
                     }
                     list.Add(payload);
+                    _lastTouchUtc[key] = DateTime.UtcNow;
 
                     // 会话内不启用计时器，统一由会话结束时 FlushSession 触发一次
                     if (!IsSessionKey(key))
@@ -117,18 +130,18 @@ namespace VPetLLM.Utils.Common
             {
                 lock (_lock)
                 {
-                    if (!_buffers.TryGetValue(key, out var list) || list.Count == 0)
-                        return;
+                    var hasContent = _buffers.TryGetValue(key, out var list) && list.Count > 0;
 
-                    // 按原顺序拼接
-                    aggregated = string.Join("", list);
-                    _buffers.Remove(key);
-
-                    if (_timers.TryGetValue(key, out var t))
+                    // 无论有没有内容都要清干净这个 key，空缓冲区同样会把字典撑大
+                    if (hasContent)
                     {
-                        t.Dispose();
-                        _timers.Remove(key);
+                        // 按原顺序拼接
+                        aggregated = string.Join("", list!);
                     }
+                    Discard(key);
+
+                    if (!hasContent)
+                        return;
                 }
 
                 if (!string.IsNullOrEmpty(aggregated) && VPetLLM.Instance?.ChatCore is not null)
@@ -165,6 +178,51 @@ namespace VPetLLM.Utils.Common
         private static async void Flush(string key)
         {
             await FlushAsync(key);
+        }
+
+        /// <summary>
+        /// 丢弃某个 key 的全部状态。调用方须持有 <see cref="_lock"/>。
+        /// </summary>
+        private static void Discard(string key)
+        {
+            _buffers.Remove(key);
+            _lastTouchUtc.Remove(key);
+
+            if (_timers.TryGetValue(key, out var timer))
+            {
+                timer.Dispose();
+                _timers.Remove(key);
+            }
+        }
+
+        /// <summary>
+        /// 清掉超过 <see cref="SessionBufferTtl"/> 没再写入的会话缓冲区。
+        /// 调用方须持有 <see cref="_lock"/>。
+        /// </summary>
+        private static void PruneStaleSessions()
+        {
+            if (_lastTouchUtc.Count == 0)
+                return;
+
+            var cutoff = DateTime.UtcNow - SessionBufferTtl;
+            List<string>? stale = null;
+
+            foreach (var pair in _lastTouchUtc)
+            {
+                if (IsSessionKey(pair.Key) && pair.Value < cutoff)
+                {
+                    (stale ??= new List<string>()).Add(pair.Key);
+                }
+            }
+
+            if (stale is null)
+                return;
+
+            foreach (var key in stale)
+            {
+                Discard(key);
+            }
+            VPetLLMUtils.Logger.Log($"ResultAggregator: 清理了 {stale.Count} 个超时未回收的会话缓冲区");
         }
     }
 }

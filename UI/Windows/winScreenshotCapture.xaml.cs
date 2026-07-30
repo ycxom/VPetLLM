@@ -215,6 +215,9 @@ namespace VPetLLM.UI.Windows
                 var imageData = ms.ToArray();
 
                 Logger.Log($"Screenshot captured: {width}x{height}, size: {imageData.Length} bytes");
+
+                // 在源头就把尺寸压下来：后续的编辑、落盘、发送都基于这份数据
+                imageData = Utils.Common.ImageDownscaler.ClampToMaxDimension(imageData)!;
                 ScreenshotCaptured?.Invoke(this, imageData);
                 Close();
             }

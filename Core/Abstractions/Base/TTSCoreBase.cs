@@ -101,6 +101,15 @@ namespace VPetLLM.Core.Abstractions.Base
         /// </summary>
         protected HttpClient CreateHttpClient()
         {
+            var timeoutSeconds = Settings?.TTS?.RequestTimeoutSeconds ?? 30;
+            if (timeoutSeconds <= 0) timeoutSeconds = 30;
+            // handler（连接池）按代理配置共享，返回的 HttpClient 仍是独立实例，
+            // 调用方 Dispose 掉的只是这层壳子。
+            return Utils.Network.HttpHandlerPool.CreateClient(CreateHandler, TimeSpan.FromSeconds(timeoutSeconds));
+        }
+
+        private HttpClientHandler CreateHandler()
+        {
             var handler = new HttpClientHandler();
             var proxy = GetProxy();
 
@@ -115,12 +124,7 @@ namespace VPetLLM.Core.Abstractions.Base
                 handler.Proxy = null;
             }
 
-            var timeoutSeconds = Settings?.TTS?.RequestTimeoutSeconds ?? 30;
-            if (timeoutSeconds <= 0) timeoutSeconds = 30;
-            return new HttpClient(handler)
-            {
-                Timeout = TimeSpan.FromSeconds(timeoutSeconds)
-            };
+            return handler;
         }
     }
 }

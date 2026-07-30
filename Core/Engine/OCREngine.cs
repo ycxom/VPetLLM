@@ -37,6 +37,13 @@ namespace VPetLLM.Core.Engine
         /// </summary>
         private HttpClient CreateOcrHttpClient()
         {
+            // handler（连接池）按代理配置共享；超时保持 HttpClient 默认的 100 秒，
+            // 各调用点会按需覆盖。
+            return Utils.Network.HttpHandlerPool.CreateClient(CreateOcrHandler, TimeSpan.FromSeconds(100));
+        }
+
+        private HttpClientHandler CreateOcrHandler()
+        {
             var handler = new HttpClientHandler { UseProxy = false, Proxy = null };
             var proxy = _settings.Proxy;
             if (proxy?.IsEnabled == true && proxy.ForAllAPI)
@@ -52,7 +59,7 @@ namespace VPetLLM.Core.Engine
                 }
                 handler.UseProxy = handler.Proxy is not null;
             }
-            return new HttpClient(handler);
+            return handler;
         }
 
         private async Task<string> RecognizeWithOpenAI(byte[] imageData)

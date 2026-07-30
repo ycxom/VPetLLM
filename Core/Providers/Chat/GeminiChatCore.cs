@@ -1,4 +1,4 @@
-using LinePutScript.Localization.WPF;
+﻿using LinePutScript.Localization.WPF;
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
@@ -62,6 +62,9 @@ namespace VPetLLM.Core.Providers.Chat
 
         public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
         {
+            // 钳制尺寸，避免过大的图片被目标服务端拒收
+            imageData = Utils.Common.ImageDownscaler.ClampToMaxDimension(imageData)!;
+
             OnConversationTurn();
 
             var node = _geminiSetting.GetCurrentGeminiSetting("Chat");

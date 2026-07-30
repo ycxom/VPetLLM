@@ -160,9 +160,9 @@ namespace VPetLLM.Core.Data.Database
             {
                 // 如果消息包含图像，先保存图像文件
                 string? imageId = null;
-                if (message.HasImage && message.ImageData is not null)
+                if (message.HasImage)
                 {
-                    imageId = SaveImageFile(message.ImageData);
+                    imageId = EnsureImageSaved(message);
                 }
 
                 using var connection = new SqliteConnection(_connectionString);
@@ -212,9 +212,9 @@ namespace VPetLLM.Core.Data.Database
                 {
                     // 如果消息包含图像，先保存图像文件
                     string? imageId = null;
-                    if (message.HasImage && message.ImageData is not null)
+                    if (message.HasImage)
                     {
-                        imageId = SaveImageFile(message.ImageData);
+                        imageId = EnsureImageSaved(message);
                     }
 
                     command.Parameters.Clear();
@@ -269,11 +269,10 @@ namespace VPetLLM.Core.Data.Database
                         StatusInfo = reader.IsDBNull(3) ? null : reader.GetString(3)
                     };
 
-                    // 加载图像数据
+                    // 只挂加载器，真正读盘推迟到这条消息要发给模型时
                     if (!reader.IsDBNull(4))
                     {
-                        var imageId = reader.GetString(4);
-                        message.ImageData = LoadImageFile(imageId);
+                        message.AttachStoredImage(reader.GetString(4), LoadImageFile);
                     }
 
                     messages.Add(message);
@@ -317,11 +316,10 @@ namespace VPetLLM.Core.Data.Database
                         StatusInfo = reader.IsDBNull(3) ? null : reader.GetString(3)
                     };
 
-                    // 加载图像数据
+                    // 只挂加载器，真正读盘推迟到这条消息要发给模型时
                     if (!reader.IsDBNull(4))
                     {
-                        var imageId = reader.GetString(4);
-                        message.ImageData = LoadImageFile(imageId);
+                        message.AttachStoredImage(reader.GetString(4), LoadImageFile);
                     }
 
                     messages.Add(message);
@@ -477,9 +475,10 @@ namespace VPetLLM.Core.Data.Database
                 {
                     // 如果消息包含图像，保存图像文件
                     string? imageId = null;
-                    if (message.HasImage && message.ImageData is not null)
+                    if (message.HasImage)
                     {
-                        imageId = SaveImageFile(message.ImageData);
+                        // 已落盘的图片直接复用原文件：重写历史不该把每张图都再存一份
+                        imageId = EnsureImageSaved(message);
                         if (imageId is not null)
                         {
                             newImageIds.Add(imageId);
@@ -499,8 +498,13 @@ namespace VPetLLM.Core.Data.Database
 
                 transaction.Commit();
 
-                // 删除不再使用的旧图像文件
-                var orphanedImages = oldImageIds.Except(newImageIds).ToList();
+                // 删除不再使用的旧图像文件。
+                //
+                // 判断依据必须是"全表还有没有行引用它"而不是"本 provider 还用不用"：
+                // SeparateChatByProvider 关闭时历史是跨 provider 混读的，同一个图像文件
+                // 可能同时挂在别的 provider 行上，只看本 provider 会把别人的图删掉。
+                var stillReferenced = GetReferencedImageIds(connection);
+                var orphanedImages = oldImageIds.Except(newImageIds).Except(stillReferenced).ToList();
                 foreach (var imageId in orphanedImages)
                 {
                     DeleteImageFile(imageId);
@@ -549,6 +553,44 @@ namespace VPetLLM.Core.Data.Database
         }
 
         #region 图像文件操作
+
+        /// <summary>
+        /// 全表当前仍被引用的图像文件 ID。
+        /// </summary>
+        private static HashSet<string> GetReferencedImageIds(SqliteConnection connection)
+        {
+            var ids = new HashSet<string>();
+            var command = connection.CreateCommand();
+            command.CommandText = "SELECT DISTINCT image_id FROM chat_history WHERE image_id IS NOT NULL";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                ids.Add(reader.GetString(0));
+            }
+            return ids;
+        }
+
+        /// <summary>
+        /// 取得消息图像对应的文件 ID：已经落过盘的直接复用，否则写一份新文件。
+        /// 复用这一步同时避免了惰性图像被"读盘只为再写一遍"。
+        /// </summary>
+        private string? EnsureImageSaved(Message message)
+        {
+            if (message.ImageId is not null)
+            {
+                return message.ImageId;
+            }
+
+            var data = message.ImageData;
+            if (data is null || data.Length == 0)
+            {
+                return null;
+            }
+
+            var imageId = SaveImageFile(data);
+            message.ImageId = imageId;
+            return imageId;
+        }
 
         /// <summary>
         /// 保存图像文件并返回图像ID
