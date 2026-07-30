@@ -319,6 +319,17 @@ namespace VPetLLM.UI.Windows
         private DispatcherTimer? _autoSaveTimer;
         // 密钥输入专用去抖保存计时器（避免每次按键均保存）
         private DispatcherTimer? _secretSaveTimer;
+
+        // 打开一次设置窗口会从两条路径各做一次 TTS 插件检测（反射扫描全部已知插件）。
+        // 传批次 ID 即可走 TTSPluginDetector 的 5 秒缓存，第二次直接命中。
+        private const string TTSDetectCacheBatch = "settings-window";
+
+        // 挂在单例/静态对象上的事件处理器。
+        // 这两个源的生命周期比窗口长，处理器又捕获了 this，不在关窗时摘掉的话
+        // 每开一次设置界面就会把一整个窗口（连同它所有控件、插件列表、模型缓存）
+        // 永久留在内存里。必须存成字段才能取消订阅——匿名 lambda 是摘不掉的。
+        private global::System.ComponentModel.PropertyChangedEventHandler? _localizationChangedHandler;
+        private global::System.Collections.Specialized.NotifyCollectionChangedEventHandler? _logsChangedHandler;
         // Gemini 列表刷新去抖计时器（避免每次键入都刷新列表导致重绘卡顿）
         private bool _hasUnsavedChanges = false;
         private bool _aboutTabLoaded = false;
@@ -399,17 +410,22 @@ namespace VPetLLM.UI.Windows
                 UpdateUIForLanguage();
                 this.Title = WindowTitle;
 
-                LocalizationService.Instance.PropertyChanged += (sender2, e2) =>
+                // Loaded 可能不止触发一次，重复订阅同样会累积
+                if (_localizationChangedHandler is null)
                 {
-                    if (e2.PropertyName == "Item[]")
+                    _localizationChangedHandler = (sender2, e2) =>
                     {
-                        Dispatcher.BeginInvoke(new Action(() =>
+                        if (e2.PropertyName == "Item[]")
                         {
-                            UpdateUIForLanguage();
-                            this.Title = WindowTitle;
-                        }), System.Windows.Threading.DispatcherPriority.Background);
-                    }
-                };
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                UpdateUIForLanguage();
+                                this.Title = WindowTitle;
+                            }), System.Windows.Threading.DispatcherPriority.Background);
+                        }
+                    };
+                    LocalizationService.Instance.PropertyChanged += _localizationChangedHandler;
+                }
                 Button_RefreshPlugins_Click(this, new RoutedEventArgs());
 
                 PopulatePluginPanels();
@@ -426,7 +442,7 @@ namespace VPetLLM.UI.Windows
 
                 _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    var result = TTSPluginDetector.DetectAllOtherTTSPlugins(_plugin.MW);
+                    var result = TTSPluginDetector.DetectAllOtherTTSPluginsWithCache(_plugin.MW, TTSDetectCacheBatch);
                     RefreshTTSPluginStatus(result.HasOtherEnabledTTSPlugin, result.EnabledPluginNames);
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
 
@@ -2316,13 +2332,17 @@ namespace VPetLLM.UI.Windows
                 UpdateLogCount();
             }, System.Windows.Threading.DispatcherPriority.Background);
 
-            Logger.Logs.CollectionChanged += (s, args) =>
+            if (_logsChangedHandler is null)
             {
-                Dispatcher.BeginInvoke(new Action(() =>
+                _logsChangedHandler = (s, args) =>
                 {
-                    UpdateLogCount();
-                }), System.Windows.Threading.DispatcherPriority.Background);
-            };
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        UpdateLogCount();
+                    }), System.Windows.Threading.DispatcherPriority.Background);
+                };
+                Logger.Logs.CollectionChanged += _logsChangedHandler;
+            }
         }
 
         private void UpdateLogCount()
@@ -2932,9 +2952,33 @@ namespace VPetLLM.UI.Windows
         {
             _plugin.TTSServiceAvailabilityChanged -= OnTTSServiceAvailabilityChanged;
 
+            // 摘掉挂在单例/静态对象上的处理器，否则它们会把整个窗口一直钉在内存里
+            if (_localizationChangedHandler is not null)
+            {
+                LocalizationService.Instance.PropertyChanged -= _localizationChangedHandler;
+                _localizationChangedHandler = null;
+            }
+
+            if (_logsChangedHandler is not null)
+            {
+                Logger.Logs.CollectionChanged -= _logsChangedHandler;
+                _logsChangedHandler = null;
+            }
+
+            // 日志列表直接绑的是静态集合，不解绑同样会留一条引用链
+            if (this.FindName("LogBox") is ListBox logBox)
+            {
+                logBox.ItemsSource = null;
+            }
+
             // 停止并清理定时器
             _autoSaveTimer?.Stop();
             _autoSaveTimer = null;
+
+            // 这个去抖计时器原先没有清理：仍在运行的 DispatcherTimer 由 Dispatcher 持有，
+            // 既会漏掉窗口，也可能在窗口关闭后再触发一次 SaveSettings
+            _secretSaveTimer?.Stop();
+            _secretSaveTimer = null;
 
             // 释放TTS资源
             _ttsService?.Dispose();
@@ -4252,7 +4296,7 @@ namespace VPetLLM.UI.Windows
             try
             {
                 // 使用 TTSPluginDetector 检测所有其他 TTS 插件
-                var result = TTSPluginDetector.DetectAllOtherTTSPlugins(_plugin.MW);
+                var result = TTSPluginDetector.DetectAllOtherTTSPluginsWithCache(_plugin.MW, TTSDetectCacheBatch);
 
                 // 通过 RefreshTTSPluginStatus 更新 UI（使用 TextBlock_TTS_PluginStatus）
                 RefreshTTSPluginStatus(result.HasOtherEnabledTTSPlugin, result.EnabledPluginNames);
