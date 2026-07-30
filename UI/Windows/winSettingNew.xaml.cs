@@ -7233,6 +7233,10 @@ namespace VPetLLM.UI.Windows
                 // 先保存当前设置
                 SaveSettings();
 
+                // 与 TTS 测试同理：手动测试不该沿用 120 秒的预检缓存，
+                // 否则一次失败会让接下来两分钟内的测试全部直接判死，无法验证服务是否已恢复。
+                Utils.Network.FreeServiceHealthCheck.Invalidate();
+
                 // 显示语音输入窗口
                 _plugin.ShowVoiceInputWindow();
             }

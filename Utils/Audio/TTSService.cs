@@ -794,6 +794,18 @@ namespace VPetLLM.Utils.Audio
         {
             var testText = "这是一个TTS测试，Hello World!";
             VPetLLMUtils.Logger.Log("TTS: 开始测试TTS功能");
+
+            // 手动测试必须真的打一次服务器，不能复用预检缓存。
+            //
+            // 预检结论有 120 秒 TTL：服务器曾经不可用时，这两分钟内的每次测试都会在
+            // 预检那一步直接判失败、连请求都不发。用户改完配置、或服务已经恢复，
+            // 点测试却依然失败，等于"服务不可用时反而没法测试是否恢复"。
+            //
+            // 清掉缓存后，本次探测和真实请求的结论会回填同一条目
+            // （见 FreeServiceHealthCheck.ReportOutcome），服务可用即刻反映到状态里。
+            Utils.Network.FreeServiceHealthCheck.Invalidate();
+            VPetLLMUtils.Logger.Log("TTS: 已清除服务可用性缓存，本次测试将重新探测");
+
             return await PlayTextAsync(testText);
         }
 
