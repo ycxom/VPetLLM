@@ -1198,6 +1198,15 @@ namespace VPetLLM
         {
             try
             {
+                // 先关掉自己开的窗口，必须早于其它清理。
+                //
+                // 这些窗口以 VPet 主窗口为 Owner，退出时主窗口的 HWND 一销毁，
+                // Win32 会连带销毁所有 owned 窗口——这一步绕过了 WPF。等到
+                // Dispatcher.ShutdownFinished 时，WPF 仍以为这些 HwndSource 有效，
+                // 再调一次 DestroyWindow 就会抛 Win32Exception(1400) 无效窗口句柄。
+                // 主动 Close() 能让 HwndSource 在句柄还有效时有序释放。
+                CloseOwnedWindows();
+
                 // 取消事件监听
                 if (MW is not null)
                 {
@@ -1216,8 +1225,19 @@ namespace VPetLLM
                 _syncTimer?.Stop();
                 _syncTimer?.Dispose();
 
-                // 停止所有服务
-                _serviceManager.StopAsync().Wait();
+                // 停止所有服务。
+                //
+                // 这里过去是 _serviceManager.StopAsync().Wait()：在 UI 线程上无超时等待一个
+                // 异步方法，而它 await 之后的续体又要回到同一个 UI 线程——典型的 async 死锁，
+                // 一旦命中就是退出永久卡死。
+                //
+                // Task.Run 把异步流程挪到线程池启动，续体不再需要 UI 线程；再加上超时兜底，
+                // 即使某个服务停不下来也不会拖住整个退出流程。
+                if (!Task.Run(() => _serviceManager.StopAsync()).Wait(TimeSpan.FromSeconds(5)))
+                {
+                    _logger.LogWarning("Service shutdown timed out after 5s, continuing disposal");
+                }
+
                 _serviceManager.Dispose();
                 _container.Dispose();
 
@@ -1226,6 +1246,33 @@ namespace VPetLLM
             catch (Exception ex)
             {
                 _logger.LogError("Error during disposal", ex);
+            }
+        }
+
+        /// <summary>
+        /// 关闭插件自己开的窗口。退出路径专用，任何一个窗口关闭失败都不能中断后续清理。
+        /// </summary>
+        private void CloseOwnedWindows()
+        {
+            // 只处理真正的 Window（有自己的 HWND）。TalkBox 是宿主在主窗口里的
+            // UserControl，没有独立窗口句柄，不涉及本问题。
+            CloseWindowSafely(SettingWindow, nameof(SettingWindow));
+            SettingWindow = null;
+        }
+
+        private void CloseWindowSafely(System.Windows.Window? window, string name)
+        {
+            if (window is null)
+                return;
+
+            try
+            {
+                // 已经关闭的窗口再 Close() 是无害的空操作，但窗口可能属于别的线程
+                window.Dispatcher.Invoke(window.Close);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"关闭窗口 {name} 失败（退出流程继续）: {ex.Message}");
             }
         }
 

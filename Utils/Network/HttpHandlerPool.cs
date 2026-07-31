@@ -108,12 +108,19 @@ namespace VPetLLM.Utils.Network
         /// </summary>
         private static string BuildKey(HttpClientHandler handler)
         {
-            if (!handler.UseProxy || handler.Proxy is null)
+            // 注意：UseProxy=true 且 Proxy=null 表示"跟随系统代理"，
+            // 与 UseProxy=false 的直连是两种不同行为，绝不能共用同一个 handler。
+            if (!handler.UseProxy)
             {
                 return "noproxy";
             }
 
-            // WebProxy 能读出地址；系统代理读不到，按类型归为一类，靠 HandlerLifetime 轮换跟进变化。
+            if (handler.Proxy is null)
+            {
+                return "sysproxy:default";
+            }
+
+            // WebProxy 能读出地址；其它代理实现读不到，按类型归为一类，靠 HandlerLifetime 轮换跟进变化。
             return handler.Proxy is WebProxy web && web.Address is not null
                 ? "proxy:" + web.Address.AbsoluteUri
                 : "sysproxy:" + handler.Proxy.GetType().FullName;
