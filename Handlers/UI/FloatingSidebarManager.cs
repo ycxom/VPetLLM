@@ -21,6 +21,9 @@ namespace VPetLLM.Handlers.UI
         private int _activeSessionCount = 0;
         private readonly object _sessionLock = new object();
 
+        // 最近一次状态。独立于侧边栏控件存在，侧边栏没开时也有效
+        private volatile VPetLLMStatus _lastStatus = VPetLLMStatus.Idle;
+
         // 动态位置监控 - 防止侧边栏显示到屏幕外部
         private DispatcherTimer? _positionMonitorTimer;
         private SidebarPosition _currentDisplayPosition = SidebarPosition.Right;
@@ -186,6 +189,7 @@ namespace VPetLLM.Handlers.UI
                 // 订阅事件
                 _sidebar.ButtonClicked += OnButtonClicked;
                 _sidebar.SidebarClosed += OnSidebarClosed;
+                _sidebar.InterruptRequested += OnInterruptRequested;
 
                 Logger.Log("Sidebar UserControl created and inserted into UIGrid");
             }
@@ -390,6 +394,7 @@ namespace VPetLLM.Handlers.UI
                 {
                     _sidebar.ButtonClicked -= OnButtonClicked;
                     _sidebar.SidebarClosed -= OnSidebarClosed;
+                    _sidebar.InterruptRequested -= OnInterruptRequested;
                     _sidebar.Dispose();
                     _sidebar = null;
                 }
@@ -463,6 +468,11 @@ namespace VPetLLM.Handlers.UI
         /// <param name="status">新状态</param>
         public void UpdateStatus(VPetLLMStatus status)
         {
+            // 状态记在管理器上，而不是只记在侧边栏控件里：
+            // 侧边栏被用户关掉时控件根本不存在，但"当前是否在响应"这个信息
+            // 气泡上的中断按钮同样要用
+            _lastStatus = status;
+
             try
             {
                 if (_sidebar is not null && !_isDisposed)
@@ -474,24 +484,25 @@ namespace VPetLLM.Handlers.UI
             {
                 Logger.Log($"Error updating VPetLLM status: {ex.Message}");
             }
+
+            // 状态变化可能意味着中断按钮该出现或该消失
+            try { global::VPetLLM.UI.Controls.BubbleInterruptButton.Refresh(); }
+            catch (Exception ex) { Logger.Log($"Error refreshing bubble interrupt button: {ex.Message}"); }
         }
 
         /// <summary>
         /// 获取当前状态
         /// </summary>
         /// <returns>当前VPetLLM状态</returns>
-        public VPetLLMStatus GetCurrentStatus()
-        {
-            try
-            {
-                return _sidebar?.GetCurrentStatus() ?? VPetLLMStatus.Idle;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error getting current status: {ex.Message}");
-                return VPetLLMStatus.Idle;
-            }
-        }
+        public VPetLLMStatus GetCurrentStatus() => _lastStatus;
+
+        /// <summary>
+        /// 当前是否有一轮对话正在进行（可中断）
+        /// </summary>
+        public bool IsBusy =>
+            _lastStatus == VPetLLMStatus.Processing
+            || _lastStatus == VPetLLMStatus.Outputting
+            || _lastStatus == VPetLLMStatus.PluginExecuting;
 
         /// <summary>
         /// 示例：设置处理请求状态
@@ -598,6 +609,24 @@ namespace VPetLLM.Handlers.UI
             }
             UpdateStatus(VPetLLMStatus.Idle);
         }
+
+        /// <summary>
+        /// 侧边栏状态按钮请求中断
+        /// </summary>
+        private void OnInterruptRequested(object? sender, EventArgs e)
+        {
+            InterruptCurrentSession();
+        }
+
+        /// <summary>
+        /// 中断当前这一轮对话：取消在途的 LLM 请求，停掉还没播完的语音和还没输出完的气泡，
+        /// 并把状态灯直接归位到待机。
+        ///
+        /// 会话计数器一并清零 —— 被中断的那些 BeginActiveSession 不会再走到自己的
+        /// EndActiveSession，计数不清零的话下一轮的状态灯就再也回不到 Idle。
+        /// </summary>
+        /// <returns>true 表示确实中断了一轮进行中的对话</returns>
+        public bool InterruptCurrentSession() => _vpetLLM.InterruptCurrentResponse();
 
         /// <summary>
         /// 测试状态灯功能 - 循环显示所有状态

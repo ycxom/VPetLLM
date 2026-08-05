@@ -23,13 +23,55 @@ namespace VPetLLM.Handlers.Core
         private bool _useBatching = false;
         private int _batchWindowMs = 100;
 
+        // 存活实例登记表。处理器是各 Provider / TalkBox 按请求现场 new 出来的局部对象，
+        // 外面拿不到引用，中断时没法逐个通知；用弱引用登记既能广播中断，又不会把
+        // 已经用完的处理器钉在内存里。
+        private static readonly List<WeakReference<StreamingCommandProcessor>> _liveProcessors = new();
+        private static readonly object _liveLock = new object();
+
         public StreamingCommandProcessor(Action<string> onCompleteCommand, VPetLLM plugin = null)
         {
             _onCompleteCommand = onCompleteCommand;
             _plugin = plugin;
 
+            lock (_liveLock)
+            {
+                // 顺手清掉已被回收的登记项，避免表随会话数无限增长
+                _liveProcessors.RemoveAll(w => !w.TryGetTarget(out _));
+                _liveProcessors.Add(new WeakReference<StreamingCommandProcessor>(this));
+            }
+
             // 从设置中读取批处理配置
             InitializeBatching();
+        }
+
+        /// <summary>
+        /// 中断所有存活的处理器：清空命令队列、结束插件接管。
+        /// </summary>
+        public static async Task AbortAllAsync()
+        {
+            List<StreamingCommandProcessor> targets = new();
+            lock (_liveLock)
+            {
+                foreach (var weak in _liveProcessors)
+                {
+                    if (weak.TryGetTarget(out var processor))
+                        targets.Add(processor);
+                }
+                _liveProcessors.RemoveAll(w => !w.TryGetTarget(out _));
+            }
+
+            foreach (var processor in targets)
+            {
+                try
+                {
+                    await processor.AbortAsync();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"StreamingCommandProcessor: 中断处理器失败: {ex.Message}");
+                }
+            }
         }
 
         /// <summary>
@@ -91,6 +133,14 @@ namespace VPetLLM.Handlers.Core
         {
             if (string.IsNullOrEmpty(chunk))
                 return;
+
+            // 中断后新到的片段一律不再解析：接管中的插件也不能再喂内容，
+            // 否则中断只挡住了气泡，插件那条线还在继续跑
+            if (InterruptManager.IsInterrupted)
+            {
+                Logger.Log("StreamingCommandProcessor: 已中断，丢弃后续片段");
+                return;
+            }
 
             // 先添加到缓冲区
             _buffer.Append(chunk);
@@ -283,6 +333,21 @@ namespace VPetLLM.Handlers.Core
                 {
                     string command;
 
+                    // 中断：队列里还没执行的命令（很可能包含 plugin/tool）直接丢弃，
+                    // 不要一条条空转过去 —— 空转本身还会带着每条命令的等待逻辑
+                    if (InterruptManager.IsInterrupted)
+                    {
+                        lock (_lock)
+                        {
+                            var dropped = _commandQueue.Count;
+                            _commandQueue.Clear();
+                            _isProcessing = false;
+                            if (dropped > 0)
+                                Logger.Log($"StreamingCommandProcessor: 已中断，丢弃 {dropped} 条未执行命令");
+                        }
+                        break;
+                    }
+
                     lock (_lock)
                     {
                         if (_commandQueue.Count == 0)
@@ -292,12 +357,12 @@ namespace VPetLLM.Handlers.Core
                             // 队列为空，使用智能等待策略检查是否需要设置Idle状态
                             _ = Task.Run(async () =>
                             {
-                                await Task.Delay(500).ConfigureAwait(false);
+                                await InterruptManager.Delay(500).ConfigureAwait(false);
 
                                 int maxWaitMs = 5000;
                                 int elapsedMs = 500;
 
-                                while (elapsedMs < maxWaitMs)
+                                while (elapsedMs < maxWaitMs && !InterruptManager.IsInterrupted)
                                 {
                                     bool hasActivity;
                                     lock (_lock)
@@ -315,7 +380,7 @@ namespace VPetLLM.Handlers.Core
                                     if (activeSessionCount > 0)
                                     {
                                         Logger.Log($"StreamingCommandProcessor: 检测到活动会话({activeSessionCount})，继续等待");
-                                        await Task.Delay(500).ConfigureAwait(false);
+                                        await InterruptManager.Delay(500).ConfigureAwait(false);
                                         elapsedMs += 500;
                                         continue;
                                     }
@@ -323,7 +388,7 @@ namespace VPetLLM.Handlers.Core
                                     var processor = pluginInstance?.TalkBox?.MessageProcessor;
                                     if (processor is not null && processor.IsProcessing)
                                     {
-                                        await Task.Delay(500).ConfigureAwait(false);
+                                        await InterruptManager.Delay(500).ConfigureAwait(false);
                                         elapsedMs += 500;
                                         continue;
                                     }
@@ -406,7 +471,7 @@ namespace VPetLLM.Handlers.Core
 
             if (string.IsNullOrEmpty(command))
             {
-                await Task.Delay(50).ConfigureAwait(false);
+                await InterruptManager.Delay(50).ConfigureAwait(false);
                 return;
             }
 
@@ -414,7 +479,7 @@ namespace VPetLLM.Handlers.Core
             var match = Regex.Match(command, @"<\|\s*(\w+)\s*_begin\s*\|>");
             if (!match.Success)
             {
-                await Task.Delay(50).ConfigureAwait(false);
+                await InterruptManager.Delay(50).ConfigureAwait(false);
                 return;
             }
             
@@ -442,16 +507,16 @@ namespace VPetLLM.Handlers.Core
                 int startWaitTime = 0;
 
                 // 等待消息开始处理
-                while (!pluginInstance.TalkBox.MessageProcessor.IsProcessing && startWaitTime < 1000)
+                while (!pluginInstance.TalkBox.MessageProcessor.IsProcessing && !InterruptManager.IsInterrupted && startWaitTime < 1000)
                 {
-                    await Task.Delay(100).ConfigureAwait(false);  // 优化：50ms → 100ms
+                    await InterruptManager.Delay(100).ConfigureAwait(false);  // 优化：50ms → 100ms
                     startWaitTime += 100;
                 }
 
                 // 等待 FloatingSidebarManager 的活动会话结束（包括音频播放）
-                while (pluginInstance.FloatingSidebarManager?.ActiveSessionCount > 0 && elapsedTime < maxWaitTime)
+                while (pluginInstance.FloatingSidebarManager?.ActiveSessionCount > 0 && !InterruptManager.IsInterrupted && elapsedTime < maxWaitTime)
                 {
-                    await Task.Delay(checkInterval).ConfigureAwait(false);
+                    await InterruptManager.Delay(checkInterval).ConfigureAwait(false);
                     elapsedTime += checkInterval;
                 }
             }
@@ -464,24 +529,24 @@ namespace VPetLLM.Handlers.Core
                 {
                     case "say":
                     case "talk":
-                        await Task.Delay(500).ConfigureAwait(false);
+                        await InterruptManager.Delay(500).ConfigureAwait(false);
                         break;
                     case "action":
                     case "move":
-                        await Task.Delay(300).ConfigureAwait(false);
+                        await InterruptManager.Delay(300).ConfigureAwait(false);
                         break;
                     case "buy":
                     case "happy":
                     case "health":
                     case "exp":
-                        await Task.Delay(100).ConfigureAwait(false);
+                        await InterruptManager.Delay(100).ConfigureAwait(false);
                         break;
                     case "plugin":
                     case "tool":
-                        await Task.Delay(800).ConfigureAwait(false);
+                        await InterruptManager.Delay(800).ConfigureAwait(false);
                         break;
                     default:
-                        await Task.Delay(30).ConfigureAwait(false);
+                        await InterruptManager.Delay(30).ConfigureAwait(false);
                         break;
                 }
             }
@@ -498,17 +563,53 @@ namespace VPetLLM.Handlers.Core
             int pollInterval = 100;  // 增加轮询间隔，减少 CPU 唤醒
 
             // 等待 ActiveSessionCount 变为 0（命令完成）
-            while (pluginInstance?.FloatingSidebarManager?.ActiveSessionCount > 0 && elapsedTime < maxWaitTime)
+            while (pluginInstance?.FloatingSidebarManager?.ActiveSessionCount > 0 && !InterruptManager.IsInterrupted && elapsedTime < maxWaitTime)
             {
-                await Task.Delay(pollInterval).ConfigureAwait(false);
+                await InterruptManager.Delay(pollInterval).ConfigureAwait(false);
                 elapsedTime += pollInterval;
             }
 
             // 如果无法访问 SessionCount，用保守的固定延迟
             if (pluginInstance?.FloatingSidebarManager == null)
             {
-                await Task.Delay(800).ConfigureAwait(false);
+                await InterruptManager.Delay(800).ConfigureAwait(false);
             }
+        }
+
+        /// <summary>
+        /// 中断：丢弃缓冲区和未执行的命令，并结束可能正在进行的插件接管。
+        /// 与 <see cref="Reset"/> 的区别只在于会把接管中的插件也收掉。
+        /// </summary>
+        public async Task AbortAsync()
+        {
+            int dropped;
+            lock (_lock)
+            {
+                dropped = _commandQueue.Count;
+                _buffer.Clear();
+                _lastProcessedIndex = 0;
+                _commandQueue.Clear();
+                _isProcessing = false;
+            }
+
+            _commandBatcher?.Clear();
+
+            if (_takeoverManager.IsTakingOver)
+            {
+                var pluginName = _takeoverManager.CurrentTakeoverPlugin;
+                try
+                {
+                    await _takeoverManager.ForceEndTakeoverAsync();
+                    Logger.Log($"StreamingCommandProcessor: 中断时已结束插件接管: {pluginName}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"StreamingCommandProcessor: 结束插件接管失败: {ex.Message}");
+                    _takeoverManager.Reset();
+                }
+            }
+
+            Logger.Log($"StreamingCommandProcessor: 已中断，丢弃 {dropped} 条待处理命令");
         }
 
         /// <summary>

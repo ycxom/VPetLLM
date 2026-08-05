@@ -72,6 +72,25 @@ namespace VPetLLM.Handlers.TTS
                 while (true)
                 {
                     TTSRequest request;
+
+                    // 中断：排队等着说的话不用再说了。必须逐个把 CompletionSource 结掉，
+                    // 否则提交这些请求的调用方会一直 await 一个永远不会完成的任务
+                    if (InterruptManager.IsInterrupted)
+                    {
+                        lock (_lockObject)
+                        {
+                            var dropped = _requestQueue.Count;
+                            while (_requestQueue.Count > 0)
+                            {
+                                _requestQueue.Dequeue().CompletionSource.TrySetResult(false);
+                            }
+                            _currentRequest = null;
+                            if (dropped > 0)
+                                Logger.Log($"TTSRequestSerializer: 已中断，丢弃 {dropped} 个排队请求");
+                        }
+                        break;
+                    }
+
                     lock (_lockObject)
                     {
                         if (_requestQueue.Count == 0) break;

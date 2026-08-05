@@ -24,6 +24,12 @@ namespace VPetLLM.Core.Abstractions.Interfaces
         /// <returns>响应内容</returns>
         Task<string> ChatWithImage(string prompt, byte[] imageData);
 
+        /// <summary>
+        /// 给历史中本轮的助手回复补上"被用户中断"标记，供模型下一轮自我纠正。
+        /// 回复尚未入库时不做任何事（保存时会自动带上标记）。
+        /// </summary>
+        void MarkLastResponseInterrupted();
+
         void SetResponseHandler(Action<string> handler);
         void SaveHistory();
         void LoadHistory();

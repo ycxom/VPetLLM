@@ -94,7 +94,7 @@ namespace VPetLLM.Handlers.TTS
                 var playbackStarted = false;
                 
                 Logger.Log($"VPetTTSStateMonitor: 等待播放开始...");
-                while ((DateTime.Now - waitStartTime).TotalMilliseconds < maxWaitForPlaybackStart)
+                while ((DateTime.Now - waitStartTime).TotalMilliseconds < maxWaitForPlaybackStart && !InterruptManager.IsInterrupted)
                 {
                     if (IsPlaying)
                     {
@@ -144,8 +144,17 @@ namespace VPetLLM.Handlers.TTS
                     }
 
                     // 等待事件或超时
+                    // 中断也算一种"别等了"：不加这一路，播放完成事件不会再来，
+                    // 这个 await 会一直挂到 maxTimeout（默认 60 秒）才放手
                     var timeoutTask = Task.Delay(maxTimeout);
-                    var completedTask = await Task.WhenAny(completionSource.Task, timeoutTask);
+                    var completedTask = await Task.WhenAny(
+                        completionSource.Task, timeoutTask, InterruptManager.WhenInterruptedAsync());
+
+                    if (completedTask != completionSource.Task && InterruptManager.IsInterrupted)
+                    {
+                        Logger.Log("VPetTTSStateMonitor: 等待播放完成时被中断");
+                        return false;
+                    }
 
                     if (completedTask == completionSource.Task)
                     {
@@ -183,7 +192,7 @@ namespace VPetLLM.Handlers.TTS
 
             // 第一阶段：等待播放开始（IsPlaying 变为 True）
             var startWaitBegin = DateTime.Now;
-            while (!IsPlaying && (DateTime.Now - startWaitBegin).TotalMilliseconds < startWaitTimeout)
+            while (!IsPlaying && !InterruptManager.IsInterrupted && (DateTime.Now - startWaitBegin).TotalMilliseconds < startWaitTimeout)
             {
                 await Task.Delay(pollingInterval);
             }
@@ -206,7 +215,7 @@ namespace VPetLLM.Handlers.TTS
             var stableStateStartTime = DateTime.Now;
             var stableStateDuration = 500; // 状态稳定持续时间（毫秒）
 
-            while ((DateTime.Now - startTime).TotalMilliseconds < maxTimeout)
+            while ((DateTime.Now - startTime).TotalMilliseconds < maxTimeout && !InterruptManager.IsInterrupted)
             {
                 var currentIsPlaying = IsPlaying;
 

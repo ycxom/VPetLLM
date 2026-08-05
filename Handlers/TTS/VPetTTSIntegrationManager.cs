@@ -202,6 +202,22 @@ public class VPetTTSIntegrationManager
     }
 
     /// <summary>
+    /// 通知 VPetTTS 中断当前语音。用户点中断时调用，独立于独占会话是否存在 ——
+    /// 语音可能是会话外（宿主 Say 捕获）触发的，一样要停。
+    /// </summary>
+    /// <returns>true 表示通知已送达 VPetTTS</returns>
+    public async Task<bool> InterruptAsync()
+    {
+        var coordinator = GetCoordinator();
+        if (coordinator == null)
+        {
+            return false;
+        }
+
+        return await coordinator.InterruptAsync();
+    }
+
+    /// <summary>
     /// 检查是否正在处理
     /// </summary>
     public bool IsProcessing()

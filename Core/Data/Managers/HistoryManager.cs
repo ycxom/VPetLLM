@@ -83,6 +83,31 @@ namespace VPetLLM.Core.Data.Managers
             }
         }
 
+        /// <summary>
+        /// 给历史中最后一条消息的内容追加一段文本并持久化。
+        /// 目前用于给被用户打断的回复补中断标记。
+        /// </summary>
+        /// <returns>true 表示已追加</returns>
+        public bool AppendToLastMessage(string suffix)
+        {
+            if (string.IsNullOrEmpty(suffix) || _history.Count == 0)
+                return false;
+
+            var last = _history[_history.Count - 1];
+            last.Content = (last.Content ?? "") + suffix;
+
+            try
+            {
+                _database.UpdateLastMessageContent(_providerName, last.Content);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"追加内容到最后一条消息失败: {ex.Message}");
+            }
+
+            return true;
+        }
+
         public async Task AddMessage(Message message)
         {
             // Only use compression path in Compression mode; in Overflow mode we never compress

@@ -117,7 +117,7 @@ namespace VPetLLM.Core.Providers.Chat
                         {
                             Content = content
                         };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -137,7 +137,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -166,7 +166,7 @@ namespace VPetLLM.Core.Providers.Chat
                     else
                     {
                         SystemLogger.Log("LM Studio: 使用非流式传输模式");
-                        var response = await client.PostAsync(apiUrl, content);
+                        var response = await client.PostAsync(apiUrl, content, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -189,7 +189,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         await HistoryManager.AddMessage(tempUserMessage);
                     }
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
                 }
@@ -198,6 +198,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (TaskCanceledException tcEx)
             {
+                // 用户中断时 HttpClient 抛的就是 TaskCanceledException，不是超时
+                if (InterruptManager.IsInterrupted)
+                {
+                    SystemLogger.Log("LM Studio 请求已被用户中断");
+                    return "";
+                }
+
                 SystemLogger.Log($"LM Studio Chat 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorHelper.GetOllamaTimeoutError(Settings)
                     ?? $"LM Studio 请求超时: {tcEx.Message}";
@@ -214,6 +221,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    SystemLogger.Log("LM Studio 请求已被用户中断");
+                    return "";
+                }
+
                 SystemLogger.Log($"LM Studio Chat 异常: {ex.Message}");
                 var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "LM Studio");
                 ResponseHandler?.Invoke(errorMessage);
@@ -296,7 +310,7 @@ namespace VPetLLM.Core.Providers.Chat
                         {
                             Content = content
                         };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -316,7 +330,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -345,7 +359,7 @@ namespace VPetLLM.Core.Providers.Chat
                     else
                     {
                         SystemLogger.Log("LM Studio ChatWithImage: 使用非流式传输模式");
-                        var response = await client.PostAsync(apiUrl, content);
+                        var response = await client.PostAsync(apiUrl, content, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -368,7 +382,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         await HistoryManager.AddMessage(tempUserMessage);
                     }
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
                 }
@@ -377,6 +391,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (TaskCanceledException tcEx)
             {
+                // 用户中断时 HttpClient 抛的就是 TaskCanceledException，不是超时
+                if (InterruptManager.IsInterrupted)
+                {
+                    SystemLogger.Log("LM Studio 请求已被用户中断");
+                    return "";
+                }
+
                 SystemLogger.Log($"LM Studio ChatWithImage 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorHelper.GetOllamaTimeoutError(Settings)
                     ?? $"LM Studio 请求超时: {tcEx.Message}";
@@ -393,6 +414,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    SystemLogger.Log("LM Studio 请求已被用户中断");
+                    return "";
+                }
+
                 SystemLogger.Log($"LM Studio ChatWithImage 异常: {ex.Message}");
                 var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "LM Studio");
                 ResponseHandler?.Invoke(errorMessage);

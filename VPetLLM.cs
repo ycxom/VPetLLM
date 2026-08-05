@@ -965,6 +965,9 @@ namespace VPetLLM
                 {
                     _floatingSidebarManager.Show();
                 }
+
+                // 气泡上的中断按钮：侧边栏没显示时才出现，给关掉侧边栏的用户留一个中断入口
+                UI.Controls.BubbleInterruptButton.Attach(this);
             }
             catch (Exception ex)
             {
@@ -1217,6 +1220,7 @@ namespace VPetLLM
                 // 清理服务
                 _voiceInputService?.Dispose();
                 _purchaseService?.Dispose();
+                UI.Controls.BubbleInterruptButton.Detach();
                 _floatingSidebarManager?.Dispose();
                 TTSService?.Dispose();
                 TouchInteractionHandler?.Dispose();
@@ -2379,6 +2383,57 @@ namespace VPetLLM
         public void SetSidebarIdleStatus()
         {
             UpdateSidebarStatus(VPetLLMPlugin.UI.Controls.VPetLLMStatus.Idle);
+        }
+
+        /// <summary>
+        /// 中断当前这一轮对话：取消在途的 LLM 请求，停掉还没播完的语音和还没输出完的气泡，
+        /// 在历史里留下中断标记，并把状态归位到待机。
+        ///
+        /// 侧边栏状态按钮和气泡上的中断按钮共用这一个入口 —— 中断的语义不该跟着入口走。
+        /// </summary>
+        /// <returns>true 表示确实中断了一轮进行中的对话</returns>
+        public bool InterruptCurrentResponse()
+        {
+            try
+            {
+                if (!InterruptManager.Interrupt())
+                {
+                    Logger.Log("VPetLLM: 当前没有可中断的会话");
+                    return false;
+                }
+
+                // 停止输出侧：思考动画、命令队列、气泡、TTS 播放
+                try
+                {
+                    TalkBox?.AbortCurrentResponse();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"VPetLLM: 中断输出失败: {ex.Message}");
+                }
+
+                // 在历史里留下"这条回复被打断了"，模型下一轮据此纠正
+                try
+                {
+                    ChatCore?.MarkLastResponseInterrupted();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"VPetLLM: 追加中断标记失败: {ex.Message}");
+                }
+
+                // 会话计数一并清零：被中断的那些 BeginActiveSession 不会再走到自己的
+                // EndActiveSession，计数不清零的话下一轮的状态灯就再也回不到 Idle
+                _floatingSidebarManager?.SetIdleStatus();
+
+                Logger.Log("VPetLLM: 本轮对话已被用户中断");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"VPetLLM: 中断会话失败: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>

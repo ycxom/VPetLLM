@@ -147,7 +147,7 @@ namespace VPetLLM.Core.Providers.Chat
                         {
                             Content = content
                         };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
                         response.EnsureSuccessStatusCode();
 
                         var fullMessage = new StringBuilder();
@@ -162,7 +162,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line))
                                     continue;
@@ -198,7 +198,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         // 非流式传输模式
                         Logger.Log("Ollama ChatWithImage: 使用非流式传输模式");
-                        var response = await client.PostAsync("/api/chat", content);
+                        var response = await client.PostAsync("/api/chat", content, InterruptManager.Token);
                         response.EnsureSuccessStatusCode();
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
@@ -218,7 +218,7 @@ namespace VPetLLM.Core.Providers.Chat
                         await HistoryManager.AddMessage(tempUserMessage);
                     }
                     // 再保存助手回复
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                     // 保存历史记录
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
@@ -227,6 +227,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (TaskCanceledException tcEx)
             {
+                // 用户中断时 HttpClient 抛的就是 TaskCanceledException，不是超时
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Ollama 请求已被用户中断");
+                    return "";
+                }
+
                 Logger.Log($"Ollama ChatWithImage 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorMessageHelper.GetOllamaTimeoutError(Settings)
                     ?? $"Ollama 请求超时: {tcEx.Message}";
@@ -243,6 +250,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Chat 请求已被用户中断");
+                    return "";
+                }
+
                 Logger.Log($"Ollama ChatWithImage 异常: {ex.Message}");
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
                 ResponseHandler?.Invoke(errorMessage);
@@ -296,7 +310,7 @@ namespace VPetLLM.Core.Providers.Chat
                         {
                             Content = content
                         };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
                         response.EnsureSuccessStatusCode();
 
                         var fullMessage = new StringBuilder();
@@ -311,7 +325,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line))
                                     continue;
@@ -347,7 +361,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         // 非流式传输模式
                         Logger.Log("Ollama: 使用非流式传输模式");
-                        var response = await client.PostAsync("/api/chat", content);
+                        var response = await client.PostAsync("/api/chat", content, InterruptManager.Token);
                         response.EnsureSuccessStatusCode();
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
@@ -367,7 +381,7 @@ namespace VPetLLM.Core.Providers.Chat
                         await HistoryManager.AddMessage(tempUserMessage);
                     }
                     // 再保存助手回复
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                     // 保存历史记录
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
@@ -376,6 +390,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (TaskCanceledException tcEx)
             {
+                // 用户中断时 HttpClient 抛的就是 TaskCanceledException，不是超时
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Ollama 请求已被用户中断");
+                    return "";
+                }
+
                 Logger.Log($"Ollama Chat 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorMessageHelper.GetOllamaTimeoutError(Settings)
                     ?? $"Ollama 请求超时: {tcEx.Message}\n{tcEx.StackTrace}";
@@ -392,6 +413,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Chat 请求已被用户中断");
+                    return "";
+                }
+
                 Logger.Log($"Ollama Chat 异常: {ex.Message}");
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
                 ResponseHandler?.Invoke(errorMessage);

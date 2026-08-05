@@ -225,6 +225,14 @@ public class VPetTTSCoordinator : IDisposable
             var startTime = DateTime.Now;
             while ((DateTime.Now - startTime).TotalSeconds < timeoutSeconds)
             {
+                // 中断时新版 VPetTTS 会把在途请求全部标记完成，这里自然退出；
+                // 旧版没有中断接口，靠这一条别把等待拖满整个超时
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log($"VPetTTSCoordinator: 等待请求 {requestId} 时被中断");
+                    return false;
+                }
+
                 var task = VPetTTSPluginAdapter.IsRequestComplete(_ttsCoordinator, requestId);
                 if (task == null)
                 {
@@ -246,6 +254,37 @@ public class VPetTTSCoordinator : IDisposable
         {
             Logger.Log($"VPetTTSCoordinator: 等待请求完成失败: {ex.Message}");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 通知 VPetTTS 中断当前语音：停止播放并作废已提交但未播出的请求。
+    /// 对方不支持（旧版插件）或未初始化时返回 false，调用方据此决定是否提示。
+    /// </summary>
+    public async Task<bool> InterruptAsync()
+    {
+        if (!_isInitialized || _ttsCoordinator == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var task = VPetTTSPluginAdapter.Interrupt(_ttsCoordinator, _callerId);
+            if (task == null)
+            {
+                Logger.Log("VPetTTSCoordinator: 当前 VPetTTS 版本不支持中断通知");
+                return false;
+            }
+
+            await task;
+            Logger.Log("VPetTTSCoordinator: 已通知 VPetTTS 中断语音");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"VPetTTSCoordinator: 通知 VPetTTS 中断失败: {ex.Message}");
+            return false;
         }
     }
 

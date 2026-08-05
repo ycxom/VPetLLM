@@ -210,7 +210,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         Content = content
                     };
-                    var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                    var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -225,7 +225,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -266,7 +266,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     // 非流式传输模式
                     Logger.Log("Free ChatWithImage: 使用非流式传输模式");
-                    var response = await _httpClient.PostAsync(_apiUrl, content);
+                    var response = await _httpClient.PostAsync(_apiUrl, content, InterruptManager.Token);
                     var responseContent = await response.Content.ReadAsStringAsync();
 
                     if (response.IsSuccessStatusCode)
@@ -297,7 +297,7 @@ namespace VPetLLM.Core.Providers.Chat
                         userMessage.ImageData = imageData;
                         await HistoryManager.AddMessage(userMessage);
                     }
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
                 }
@@ -315,6 +315,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (TaskCanceledException tcEx)
             {
+                // 用户中断时 HttpClient 抛的就是 TaskCanceledException，不是超时
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Free 请求已被用户中断");
+                    return "";
+                }
+
                 Logger.Log($"Free ChatWithImage 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free ChatWithImage 请求超时: {tcEx.Message}\n{tcEx.StackTrace}"
@@ -324,6 +331,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Chat 请求已被用户中断");
+                    return "";
+                }
+
                 Logger.Log($"Free ChatWithImage 异常: {ex.Message}");
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);
@@ -392,7 +406,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         Content = content
                     };
-                    var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                    var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -408,7 +422,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -451,7 +465,7 @@ namespace VPetLLM.Core.Providers.Chat
                             {
                                 await HistoryManager.AddMessage(tempUserMessage);
                             }
-                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                             SaveHistory();
 
                             TriggerOverflowCheckAfterSuccess();
@@ -501,7 +515,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     // 非流式传输模式
                     Logger.Log("Free: 使用非流式传输模式");
-                    var response = await _httpClient.PostAsync(_apiUrl, content);
+                    var response = await _httpClient.PostAsync(_apiUrl, content, InterruptManager.Token);
                     var responseContent = await response.Content.ReadAsStringAsync();
 
                     if (response.IsSuccessStatusCode)
@@ -519,7 +533,7 @@ namespace VPetLLM.Core.Providers.Chat
                             {
                                 await HistoryManager.AddMessage(tempUserMessage);
                             }
-                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                             SaveHistory();
 
                             TriggerOverflowCheckAfterSuccess();
@@ -586,6 +600,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (TaskCanceledException tcEx)
             {
+                // 用户中断时 HttpClient 抛的就是 TaskCanceledException，不是超时
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Free 请求已被用户中断");
+                    return "";
+                }
+
                 Logger.Log($"Free Chat 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free Chat 请求超时: {tcEx.Message}\n{tcEx.StackTrace}"
@@ -595,6 +616,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Chat 请求已被用户中断");
+                    return "";
+                }
+
                 Logger.Log($"Free Chat 异常: {ex.Message}");
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
                 ResponseHandler?.Invoke(errorMessage);

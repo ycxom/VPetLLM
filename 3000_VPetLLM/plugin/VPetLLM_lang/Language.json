@@ -3090,6 +3090,42 @@
       "zh-hant": "語音輸入未啟用，請在設定中配置ASR",
       "jp": "音声入力が有効になっていません。設定でASRを構成してください"
     },
+    "Interrupt": {
+      "en": "Click to interrupt",
+      "zh-hans": "点击中断",
+      "zh-hant": "點擊中斷",
+      "jp": "クリックで中断"
+    },
+    "Status_Idle": {
+      "en": "Idle",
+      "zh-hans": "空闲",
+      "zh-hant": "空閒",
+      "jp": "待機中"
+    },
+    "Status_Processing": {
+      "en": "Thinking",
+      "zh-hans": "正在思考",
+      "zh-hant": "正在思考",
+      "jp": "考え中"
+    },
+    "Status_Outputting": {
+      "en": "Replying",
+      "zh-hans": "正在回复",
+      "zh-hant": "正在回覆",
+      "jp": "応答中"
+    },
+    "Status_PluginExecuting": {
+      "en": "Running plugin",
+      "zh-hans": "插件执行中",
+      "zh-hant": "插件執行中",
+      "jp": "プラグイン実行中"
+    },
+    "Status_Error": {
+      "en": "Last request failed",
+      "zh-hans": "上一次请求出错",
+      "zh-hant": "上一次請求出錯",
+      "jp": "前回のリクエストが失敗しました"
+    },
     "ClearHistory": {
       "en": "Clear Chat History",
       "zh-hans": "清除聊天历史",

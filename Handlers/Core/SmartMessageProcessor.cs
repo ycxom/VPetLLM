@@ -18,6 +18,7 @@ namespace VPetLLM.Handlers.Core
         private readonly TTSRequestSerializer _ttsSerializer;
         private readonly UnifiedTTSProcessor? _unifiedTTSProcessor;
         private readonly TTSProviderFactory _ttsProviderFactory;
+        private readonly MpvPlayer? _mpvPlayer;
         // 非 readonly：VPetTTS 插件检测可能晚于本类构造完成，支持延迟初始化
         private VPetTTSIntegrationManager? _vpetTTSIntegration;
         private bool _isProcessing = false;
@@ -43,11 +44,12 @@ namespace VPetLLM.Handlers.Core
             }
             
             // 创建 TTSProviderFactory（传递集成管理器的协调器）
-            var mpvPlayer = InitializeMpvPlayer();
+            // 播放器实例保留一份引用：中断时要能直接掐掉正在播的音频
+            _mpvPlayer = InitializeMpvPlayer();
             _ttsProviderFactory = new TTSProviderFactory(
                 vpetAPI,
                 null, // unifiedTTSDispatcher - 暂时为 null，将来可以注入
-                mpvPlayer,
+                _mpvPlayer,
                 _vpetTTSIntegration // 传递集成管理器
             );
             
@@ -113,6 +115,72 @@ namespace VPetLLM.Handlers.Core
             {
                 Logger.Log($"SmartMessageProcessor: 初始化 mpv 播放器失败: {ex.Message}");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// 中断当前输出：清空气泡/TTS 状态并掐断正在播放的音频。
+        ///
+        /// 分段循环本身靠 <see cref="InterruptManager.IsInterrupted"/> 在下一段边界退出，
+        /// 这里负责把"已经发出去"的那部分（正在播的语音、TTS 状态机）收干净。
+        /// </summary>
+        public void Abort()
+        {
+            Logger.Log("SmartMessageProcessor: 收到中断请求");
+
+            // 停播一律甩到后台：本方法是从侧边栏按钮的点击处理里同步调下来的，
+            // 也就是跑在 UI 线程上。而杀播放器进程、Dispatcher 往返都可能要几百毫秒，
+            // 卡在这里的表现就是"点了中断，界面先僵一下"
+            _ = Task.Run(StopAllPlaybackAsync);
+
+            // 复位气泡与 TTS 状态机，避免下一轮沿用被中断的中间状态
+            try { _unifiedBubbleFacade?.Clear(); }
+            catch (Exception ex) { Logger.Log($"SmartMessageProcessor: 清理气泡状态失败: {ex.Message}"); }
+
+            lock (_processingLock)
+            {
+                _isProcessing = false;
+            }
+            _isBubbleDisplayed = false;
+        }
+
+        /// <summary>
+        /// 停掉所有正在出声的通道：内置 TTS、本地 mpv、以及外置的 VPetTTS 插件。
+        /// 三条互不相干，各自兜异常，一条失败不影响其余。
+        /// </summary>
+        private async Task StopAllPlaybackAsync()
+        {
+            try { _plugin?.TTSService?.Stop(); }
+            catch (Exception ex) { Logger.Log($"SmartMessageProcessor: 停止TTS播放失败: {ex.Message}"); }
+
+            try { _mpvPlayer?.Stop(); }
+            catch (Exception ex) { Logger.Log($"SmartMessageProcessor: 停止mpv播放失败: {ex.Message}"); }
+
+            // 外置 TTS 的音频在它自己进程里放，我们停不了，只能通知
+            await InterruptVPetTTSAsync();
+        }
+
+        /// <summary>
+        /// 通知 VPetTTS 插件中断语音。集成管理器可能晚于本类构造才可用，这里按需取一次。
+        /// </summary>
+        private async Task InterruptVPetTTSAsync()
+        {
+            try
+            {
+                var integration = GetVPetTTSIntegration();
+                if (integration is null)
+                {
+                    return;
+                }
+
+                var notified = await integration.InterruptAsync();
+                Logger.Log(notified
+                    ? "SmartMessageProcessor: 已通知 VPetTTS 中断语音"
+                    : "SmartMessageProcessor: VPetTTS 未响应中断通知（未初始化或版本过旧）");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 通知 VPetTTS 中断失败: {ex.Message}");
             }
         }
 
@@ -199,6 +267,13 @@ namespace VPetLLM.Handlers.Core
             if (string.IsNullOrWhiteSpace(response))
                 return;
 
+            // 本轮已被用户中断：排队等待的片段不再启动处理
+            if (InterruptManager.IsInterrupted)
+            {
+                Logger.Log("SmartMessageProcessor: 本轮已被中断，跳过该消息");
+                return;
+            }
+
             // 设置处理状态
             lock (_processingLock)
             {
@@ -236,9 +311,9 @@ namespace VPetLLM.Handlers.Core
                         Logger.Log("SmartMessageProcessor: Protected host animation is active; waiting before Clear");
                         // 短暂等待；后续 Say/Action handler 仍会再次执行保护检查。
                         int waited = 0;
-                        while (waited < 2000 && IsInProtectedHostAnimation())
+                        while (waited < 2000 && !InterruptManager.IsInterrupted && IsInProtectedHostAnimation())
                         {
-                            await Task.Delay(50).ConfigureAwait(false);
+                            await InterruptManager.Delay(50).ConfigureAwait(false);
                             waited += 50;
                         }
                         Logger.Log($"SmartMessageProcessor: Protected animation wait completed after {waited}ms");
@@ -264,7 +339,7 @@ namespace VPetLLM.Handlers.Core
                     var delayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
                     if (delayMs > 0)
                     {
-                        await Task.Delay(delayMs);
+                        await InterruptManager.Delay(delayMs);
                         Logger.Log($"SmartMessageProcessor: 延迟 {delayMs}ms 完成，思考动画已完全停止");
                     }
                 }
@@ -291,6 +366,13 @@ namespace VPetLLM.Handlers.Core
                 {
                     foreach (var segment in messageSegments)
                     {
+                        // 中断在段边界生效：已经播出去的那一段让它自然结束，后面的不再输出
+                        if (InterruptManager.IsInterrupted)
+                        {
+                            Logger.Log("SmartMessageProcessor: 检测到中断，停止处理剩余片段");
+                            break;
+                        }
+
                         if (segment.Type == SegmentType.Talk)
                         {
                             await ProcessTalkSegmentWithPreloadAsync(segment, talkIndex++).ConfigureAwait(false);
@@ -680,7 +762,7 @@ namespace VPetLLM.Handlers.Core
                     // 最后的回退：动态计算等待时间而非硬编码
                     int fallbackWaitMs = CalculateDynamicWaitTime(text, baseMs: 1000);
                     Logger.Log($"SmartMessageProcessor: 使用动态回退延迟: {fallbackWaitMs}ms");
-                    await Task.Delay(fallbackWaitMs).ConfigureAwait(false);
+                    await InterruptManager.Delay(fallbackWaitMs).ConfigureAwait(false);
                 }
             }
             finally
@@ -757,7 +839,7 @@ namespace VPetLLM.Handlers.Core
                             {
                                 int timeoutMs = CalculateDynamicWaitTime(text, baseMs: 2000);
                                 Logger.Log($"SmartMessageProcessor: 启动超时保护，超时时间: {timeoutMs}ms");
-                                await Task.Delay(timeoutMs);
+                                await InterruptManager.Delay(timeoutMs);
                                 if (!_isBubbleDisplayed)
                                 {
                                     Logger.Log("SmartMessageProcessor: 超时保护触发，强制显示气泡");
@@ -789,7 +871,7 @@ namespace VPetLLM.Handlers.Core
                 });
 
                 // 添加初始延迟，等待 MessageBar Timer 启动
-                await Task.Delay(200).ConfigureAwait(false);
+                await InterruptManager.Delay(200).ConfigureAwait(false);
 
                 // 检查是否有外置 TTS 插件（如 VPetTTS）
                 if (_plugin.IsVPetTTSPluginDetected)
@@ -838,7 +920,7 @@ namespace VPetLLM.Handlers.Core
                 {
                     Logger.Log("SmartMessageProcessor: MessageBar为null，使用固定等待时间");
                     int fallbackWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(text);
-                    await Task.Delay(fallbackWaitMs).ConfigureAwait(false);
+                    await InterruptManager.Delay(fallbackWaitMs).ConfigureAwait(false);
                     return;
                 }
 
@@ -852,7 +934,7 @@ namespace VPetLLM.Handlers.Core
                 {
                     Logger.Log("SmartMessageProcessor: 无法获取MessageBar Timer字段，使用固定等待时间");
                     int fallbackWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(text);
-                    await Task.Delay(fallbackWaitMs).ConfigureAwait(false);
+                    await InterruptManager.Delay(fallbackWaitMs).ConfigureAwait(false);
                     return;
                 }
 
@@ -861,7 +943,7 @@ namespace VPetLLM.Handlers.Core
                 bool hasSeenTimerRunning = false; // 跟踪是否见过 Timer 运行
 
                 // 等待所有Timer都停止
-                while (elapsedMs < maxWaitMs)
+                while (elapsedMs < maxWaitMs && !InterruptManager.IsInterrupted)
                 {
                     bool isAnyTimerRunning = await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                     {
@@ -897,7 +979,7 @@ namespace VPetLLM.Handlers.Core
                         return;
                     }
 
-                    await Task.Delay(checkInterval).ConfigureAwait(false);
+                    await InterruptManager.Delay(checkInterval).ConfigureAwait(false);
                     elapsedMs += checkInterval;
                 }
 
@@ -912,7 +994,7 @@ namespace VPetLLM.Handlers.Core
                 // 发生异常时使用固定等待时间作为回退
                 int fallbackWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(text);
                 Logger.Log($"SmartMessageProcessor: 使用固定等待时间作为回退: {fallbackWaitMs}ms");
-                await Task.Delay(fallbackWaitMs).ConfigureAwait(false);
+                await InterruptManager.Delay(fallbackWaitMs).ConfigureAwait(false);
             }
         }
 
@@ -977,9 +1059,9 @@ namespace VPetLLM.Handlers.Core
                 // 仅在确认有外置 TTS 插件时给足合成宽限；否则短宽限，避免无语音场景白等
                 int startupGraceMs = _plugin.IsVPetTTSPluginDetected ? 4000 : 1000;
                 int startupWaited = 0;
-                while (!_plugin.MW.Main.PlayingVoice && startupWaited < startupGraceMs)
+                while (!_plugin.MW.Main.PlayingVoice && !InterruptManager.IsInterrupted && startupWaited < startupGraceMs)
                 {
-                    await Task.Delay(checkInterval).ConfigureAwait(false);
+                    await InterruptManager.Delay(checkInterval).ConfigureAwait(false);
                     startupWaited += checkInterval;
                 }
                 bool voiceStarted = _plugin.MW.Main.PlayingVoice;
@@ -989,9 +1071,9 @@ namespace VPetLLM.Handlers.Core
                 }
 
                 // 第一阶段：等待VPet主程序的PlayingVoice状态结束
-                while (_plugin.MW.Main.PlayingVoice && elapsedTime < maxWaitTime)
+                while (_plugin.MW.Main.PlayingVoice && !InterruptManager.IsInterrupted && elapsedTime < maxWaitTime)
                 {
-                    await Task.Delay(checkInterval).ConfigureAwait(false);
+                    await InterruptManager.Delay(checkInterval).ConfigureAwait(false);
                     elapsedTime += checkInterval;
                 }
 
@@ -1019,9 +1101,9 @@ namespace VPetLLM.Handlers.Core
                     int ttsMaxWait = 15000; // VPetTTS专用等待时间：最多15秒
 
                     // 使用集成管理器检测播放状态
-                    while (_vpetTTSIntegration.IsProcessing() && ttsWaitTime < ttsMaxWait)
+                    while (_vpetTTSIntegration.IsProcessing() && !InterruptManager.IsInterrupted && ttsWaitTime < ttsMaxWait)
                     {
-                        await Task.Delay(checkInterval).ConfigureAwait(false);
+                        await InterruptManager.Delay(checkInterval).ConfigureAwait(false);
                         ttsWaitTime += checkInterval;
                     }
 
@@ -1034,20 +1116,20 @@ namespace VPetLLM.Handlers.Core
                         // 仅在完全未观测到实际播放时才用文本长度估算
                         int calculatedWaitTime = CalculateTTSWaitTime(text);
                         Logger.Log($"SmartMessageProcessor: VPetTTS未在播放，根据文本长度计算等待时间: {calculatedWaitTime}ms");
-                        await Task.Delay(calculatedWaitTime).ConfigureAwait(false);
+                        await InterruptManager.Delay(calculatedWaitTime).ConfigureAwait(false);
                     }
                 }
                 else if (actualPlaybackTracked)
                 {
                     // 已跟踪到实际播放结束：只加小缓冲吸收音频尾部，不再叠加完整估算（避免过度等待）
-                    await Task.Delay(300).ConfigureAwait(false);
+                    await InterruptManager.Delay(300).ConfigureAwait(false);
                 }
                 else
                 {
                     // 完全未观测到播放（宽限期内未起播）：回退文本长度估算
                     int calculatedWaitTime = CalculateTTSWaitTime(text);
                     Logger.Log($"SmartMessageProcessor: 为外置TTS添加基于文本长度的等待时间: {calculatedWaitTime}ms");
-                    await Task.Delay(calculatedWaitTime).ConfigureAwait(false);
+                    await InterruptManager.Delay(calculatedWaitTime).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
@@ -1056,7 +1138,7 @@ namespace VPetLLM.Handlers.Core
                 // 发生异常时也添加额外等待时间，确保安全
                 int fallbackWaitTime = CalculateTTSWaitTime(text);
                 Logger.Log($"SmartMessageProcessor: 异常情况下为外置TTS添加额外等待: {fallbackWaitTime}ms");
-                await Task.Delay(fallbackWaitTime).ConfigureAwait(false);
+                await InterruptManager.Delay(fallbackWaitTime).ConfigureAwait(false);
             }
         }
 
@@ -1261,6 +1343,13 @@ namespace VPetLLM.Handlers.Core
             Logger.Log($"SmartMessageProcessor: 处理动作片段: {segment.Content}");
             Logger.Log($"SmartMessageProcessor: ActionType = '{segment.ActionType}', 检查plugin条件...");
 
+            // 中断后连状态灯和过渡延迟都不用走了，直接不进这一段
+            if (InterruptManager.IsInterrupted)
+            {
+                Logger.Log("SmartMessageProcessor: 已中断，跳过该动作片段");
+                return;
+            }
+
             // 如果是插件类型的动作，设置蓝色状态灯
             // 支持 "plugin" 和 "plugin_xxx" 格式（不区分大小写）
             bool isPluginAction = string.Equals(segment.ActionType, "plugin", StringComparison.OrdinalIgnoreCase)
@@ -1275,7 +1364,7 @@ namespace VPetLLM.Handlers.Core
                 var transitionDelayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
                 if (transitionDelayMs > 0)
                 {
-                    await Task.Delay(transitionDelayMs);
+                    await InterruptManager.Delay(transitionDelayMs);
                     Logger.Log($"SmartMessageProcessor: say->plugin 过渡延迟 {transitionDelayMs}ms 完成");
                 }
 
@@ -1297,7 +1386,7 @@ namespace VPetLLM.Handlers.Core
                 var delayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
                 if (delayMs > 0)
                 {
-                    await Task.Delay(delayMs);
+                    await InterruptManager.Delay(delayMs);
                     Logger.Log($"SmartMessageProcessor: Plugin执行前延迟 {delayMs}ms 完成，状态灯已更新");
                 }
             }
@@ -1313,7 +1402,7 @@ namespace VPetLLM.Handlers.Core
                 var delayMs = Utils.UI.BubbleDelayController.GetConfiguredDelay();
                 if (delayMs > 0)
                 {
-                    await Task.Delay(delayMs);
+                    await InterruptManager.Delay(delayMs);
                     Logger.Log($"SmartMessageProcessor: Plugin执行后延迟 {delayMs}ms 完成，确保UI处理完成");
                 }
             }
@@ -1427,12 +1516,27 @@ namespace VPetLLM.Handlers.Core
         {
             Logger.Log($"SmartMessageProcessor: 执行动作指令: {actionContent}");
 
+            // 中断后不再启动任何动作。插件动作尤其重要：一旦调下去就是一次外部调用
+            // （联网、写文件、买东西），结果还会回灌给 AI 触发新一轮请求
+            if (InterruptManager.IsInterrupted)
+            {
+                Logger.Log("SmartMessageProcessor: 已中断，跳过动作执行");
+                return;
+            }
+
             try
             {
                 var actionQueue = _actionProcessor.Process(actionContent, _plugin.Settings);
 
                 foreach (var action in actionQueue)
                 {
+                    // 一条命令可能展开成多个动作，逐个再确认一次
+                    if (InterruptManager.IsInterrupted)
+                    {
+                        Logger.Log("SmartMessageProcessor: 已中断，停止执行剩余动作");
+                        break;
+                    }
+
                     // 对插件类动作做非用户触发限流（会话内豁免）
                     var isPluginAction = action.Type == ActionType.Plugin || string.Equals(action.Keyword, "plugin", StringComparison.OrdinalIgnoreCase);
                     if (isPluginAction)

@@ -740,7 +740,7 @@ namespace VPetLLM.Utils.UI
                 int delayMs = await ApplyDelayBeforeShow(text);
                 if (delayMs > 0)
                 {
-                    await Task.Delay(delayMs);
+                    await InterruptManager.Delay(delayMs);
                     Logger.Log($"BubbleDelayController: 应用延迟 {delayMs}ms");
                 }
 
@@ -768,7 +768,7 @@ namespace VPetLLM.Utils.UI
                 int delayMs = _minDelayMs / 2;
                 if (delayMs > 0)
                 {
-                    await Task.Delay(delayMs);
+                    await InterruptManager.Delay(delayMs);
                 }
 
                 // 显示思考气泡

@@ -82,6 +82,10 @@ namespace VPetLLM.Utils.Audio
                 _process = new Process { StartInfo = startInfo };
                 _process.Start();
 
+                // 挂进 Job：宿主进程无论怎么没的（VPet 退出走的是 Environment.Exit，
+                // 插件清理根本跑不到），系统都会把 mpv 一起收走
+                global::VPetLLM.Utils.System.ChildProcessTracker.Track(_process);
+
                 // 等待进程结束
                 await _process.WaitForExitAsync();
 

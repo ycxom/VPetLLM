@@ -63,6 +63,101 @@ namespace VPetLLM.Core.Abstractions.Base
         }
 
         /// <summary>
+        /// 用户中断时追加到助手消息末尾的标记。
+        ///
+        /// 被中断的那半句仍然入库，且带上这个标记 —— 模型下一轮能看到自己"说到哪被打断了"，
+        /// 从而接着说、换个说法或者干脆别再提。双语是因为角色语言由用户配置，不能假定中文。
+        /// </summary>
+        protected const string InterruptedMarker =
+            "\n[System: Interrupted by user — the rest of this reply was never delivered. 用户中断了本次回复，后续内容未送出。]";
+
+        /// <summary>去掉首尾修饰后的标记特征串，用于判重</summary>
+        private const string InterruptedMarkerTag = "Interrupted by user";
+
+        /// <summary>
+        /// 本轮回复是否已经写进历史。中断发生在写库之后（气泡/语音还在播）时，
+        /// 补标记要走 <see cref="MarkLastResponseInterrupted"/> 改写已落库的那条。
+        /// </summary>
+        private bool _responseSavedThisTurn;
+
+        /// <summary>
+        /// 本轮被中断时给回复补上中断标记，否则原样返回。
+        /// 各 Provider 在存助手消息时调用，因此这里同时充当"本轮回复已入库"的标记点。
+        /// </summary>
+        protected string AppendInterruptMarker(string message)
+        {
+            _responseSavedThisTurn = true;
+
+            if (!Utils.Common.InterruptManager.IsInterrupted)
+                return message;
+
+            Logger.Log($"{Name}: 本轮被中断，回复入库时已带上中断标记");
+            return string.IsNullOrWhiteSpace(message)
+                ? InterruptedMarker.TrimStart('\n')
+                : message + InterruptedMarker;
+        }
+
+        /// <summary>
+        /// 给历史中本轮那条助手回复补上中断标记 —— 用户是在气泡/语音播到一半时按的中断，
+        /// 那时回复早就完整入库了，模型下一轮必须知道这段话其实没说完。
+        ///
+        /// 本轮回复还没入库时什么都不做：保存时 <see cref="AppendInterruptMarker"/> 会带上标记。
+        /// </summary>
+        public void MarkLastResponseInterrupted()
+        {
+            try
+            {
+                if (!_responseSavedThisTurn)
+                {
+                    Logger.Log($"{Name}: 本轮回复尚未入库，中断标记留给保存流程追加");
+                    return;
+                }
+
+                var history = HistoryManager.GetHistory();
+                if (history.Count == 0)
+                    return;
+
+                var last = history[history.Count - 1];
+                if (!string.Equals(last.NormalizedRole, "assistant", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                // 保存流程可能已经加过（流式中途被中断的情况），别加第二遍
+                if (last.Content?.Contains(InterruptedMarkerTag) == true)
+                    return;
+
+                if (HistoryManager.AppendToLastMessage(InterruptedMarker))
+                {
+                    _responseSavedThisTurn = false;
+                    Logger.Log($"{Name}: 已给上一条回复补上中断标记");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"{Name}: 追加中断标记失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 读取流式响应的一行。
+        ///
+        /// 中断会取消令牌，底层连接随之断开，直接 ReadLineAsync 会抛异常把调用方冲进 catch，
+        /// 已经收到（并且已经念出去）的半截回复就丢了。这里把中断引起的异常吃掉并返回 null，
+        /// 让读取循环正常收尾，调用方照常走保存流程，半截回复带着中断标记入库。
+        /// </summary>
+        protected static async Task<string?> ReadStreamLineAsync(System.IO.StreamReader reader)
+        {
+            try
+            {
+                return await reader.ReadLineAsync();
+            }
+            catch (Exception ex) when (Utils.Common.InterruptManager.IsInterrupted)
+            {
+                Logger.Log($"流式读取被中断结束: {ex.GetType().Name}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// 组装好的 prompt 达到预算的这个占比时开始裁剪，留出输出 token 的余量。
         /// </summary>
         private const double ContextBudgetTriggerRatio = 0.82;
@@ -226,6 +321,9 @@ namespace VPetLLM.Core.Abstractions.Base
         {
             if (string.IsNullOrEmpty(content))
                 return null;
+
+            // 新一次请求开始（多模态路径是在存档前才建用户消息，此时紧跟着就会置回 true）
+            _responseSavedThisTurn = false;
 
             if (messageType == "User" && SystemMessageProvider is not null)
             {
@@ -759,6 +857,11 @@ namespace VPetLLM.Core.Abstractions.Base
         {
             ResponseHandler = response =>
             {
+                // 用户已中断本轮：所有 Provider 的回调在此统一拦下，
+                // 免得每个 Provider 各自判一遍还漏掉分支
+                if (Utils.Common.InterruptManager.IsInterrupted)
+                    return;
+
                 global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.CaptureAssistant(response);
                 handler?.Invoke(response);
             };
@@ -768,6 +871,9 @@ namespace VPetLLM.Core.Abstractions.Base
         {
             StreamingChunkHandler = chunk =>
             {
+                if (Utils.Common.InterruptManager.IsInterrupted)
+                    return;
+
                 global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.CaptureAssistant(chunk);
                 handler?.Invoke(chunk);
             };

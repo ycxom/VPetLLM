@@ -46,6 +46,14 @@ namespace VPetLLM.Utils.Common
         {
             try
             {
+                // 中断之后产生的回执直接丢弃，别等到窗口到期才在 Flush 那里拦 ——
+                // 聚合窗口可能比中断标记的自动复位还长，那时就拦不住了
+                if (InterruptManager.IsInterrupted)
+                {
+                    VPetLLMUtils.Logger.Log("ResultAggregator: 本轮已被中断，丢弃回执片段");
+                    return;
+                }
+
                 var key = CurrentKey;
 
                 lock (_lock)
@@ -142,6 +150,13 @@ namespace VPetLLM.Utils.Common
 
                     if (!hasContent)
                         return;
+                }
+
+                // 用户中断本轮后不再回灌：回灌会触发新一次 LLM 请求，等于中断没生效
+                if (InterruptManager.IsInterrupted)
+                {
+                    VPetLLMUtils.Logger.Log("ResultAggregator: 本轮已被中断，放弃回灌");
+                    return;
                 }
 
                 if (!string.IsNullOrEmpty(aggregated) && VPetLLM.Instance?.ChatCore is not null)

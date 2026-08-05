@@ -68,6 +68,27 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>
+        /// 中断当前这一轮的输出：停掉思考动画、气泡队列和 TTS 播放。
+        /// LLM 请求本身由 <see cref="InterruptManager"/> 的取消令牌断开，这里只负责已经落到本地的输出。
+        /// </summary>
+        public void AbortCurrentResponse()
+        {
+            Logger.Log("TalkBox: 中断当前回复");
+
+            try { StopThinkingAnimationWithoutHide(); }
+            catch (Exception ex) { Logger.Log($"TalkBox: 中断时停止思考动画失败: {ex.Message}"); }
+
+            try { _messageProcessor?.Abort(); }
+            catch (Exception ex) { Logger.Log($"TalkBox: 中断消息处理器失败: {ex.Message}"); }
+
+            // 清空还没执行的命令队列并收掉正在接管的插件。
+            // 火抛：结束接管要走插件自己的收尾逻辑，不能让中断卡在这
+            _ = Handlers.Core.StreamingCommandProcessor.AbortAllAsync();
+
+            ResetStreamingState();
+        }
+
+        /// <summary>
         /// 重置流式处理状态（在新对话开始时调用）
         /// </summary>
         public void ResetStreamingState()
@@ -89,6 +110,13 @@ namespace VPetLLM.UI.Windows
             bool isFirstResponse;
             try
             {
+                // 用户已中断本轮：在途的流式片段一律丢弃，不再进入输出管线
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("HandleResponse: 本轮已被中断，丢弃该回复片段");
+                    return;
+                }
+
                 Logger.Log($"HandleResponse: 收到AI回复: {response}");
 
                 // 使用状态机管理流式处理
@@ -152,6 +180,12 @@ namespace VPetLLM.UI.Windows
                 }
                 catch (Exception ex)
                 {
+                    if (InterruptManager.IsInterrupted)
+                    {
+                        Logger.Log("HandleResponse: 本轮已被用户中断，跳过错误提示");
+                        return;
+                    }
+
                     Logger.Log($"HandleResponse: 处理错误: {ex.Message}");
                     // 更新状态灯为错误状态
                     _plugin.FloatingSidebarManager?.SetErrorStatus();
@@ -197,6 +231,9 @@ namespace VPetLLM.UI.Windows
             // 注意：不在这里调用 BeginActiveSession()，会话跟踪由 StreamingCommandProcessor 和 ResultAggregator 管理
             try
             {
+                // 新一轮提问：换发取消令牌，清除上一轮可能留下的中断标记
+                InterruptManager.BeginSession();
+
                 _plugin.FloatingSidebarManager?.SetProcessingStatus();
 
                 // 重置流式处理状态，为新对话做准备
@@ -273,14 +310,28 @@ namespace VPetLLM.UI.Windows
                 
                 await Task.Run(() => _plugin.ChatCore.Chat(text));
 
+                // 已中断就不再触发用户配置的工具回调，那是本轮的一部分
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Responded: 本轮已被中断，跳过工具处理");
+                    return;
+                }
+
                 Logger.Log("Processing tools...");
                 await ProcessTools(text);
                 Logger.Log("Responded finished.");
             }
             catch (Exception e)
             {
+                // 中断引发的异常不是错误：不亮红灯、不弹错误气泡
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Responded: 本轮已被用户中断");
+                    return;
+                }
+
                 Logger.Log($"An error occurred in Responded: {e}");
-                
+
                 // 通知生命周期插件：处理错误
                 try
                 {
@@ -330,6 +381,9 @@ namespace VPetLLM.UI.Windows
 
             Logger.Log($"SendChat called with text: {text}");
 
+            // 新一轮提问：换发取消令牌，清除上一轮可能留下的中断标记
+            InterruptManager.BeginSession();
+
             // 重置流式处理状态
             ResetStreamingState();
 
@@ -359,6 +413,12 @@ namespace VPetLLM.UI.Windows
             }
             catch (Exception e)
             {
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("SendChat: 本轮已被用户中断");
+                    return;
+                }
+
                 Logger.Log($"An error occurred in SendChat: {e}");
                 // 只有在发生异常时才停止思考动画
                 StopThinkingAnimationWithoutHide();
@@ -385,6 +445,9 @@ namespace VPetLLM.UI.Windows
             }
 
             Logger.Log($"SendChatWithImage called with text: {text}, image size: {imageData.Length}");
+
+            // 新一轮提问：换发取消令牌，清除上一轮可能留下的中断标记
+            InterruptManager.BeginSession();
 
             // 重置流式处理状态
             ResetStreamingState();
@@ -415,6 +478,12 @@ namespace VPetLLM.UI.Windows
             }
             catch (Exception e)
             {
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("SendChatWithImage: 本轮已被用户中断");
+                    return;
+                }
+
                 Logger.Log($"An error occurred in SendChatWithImage: {e}");
                 // 只有在发生异常时才停止思考动画
                 StopThinkingAnimationWithoutHide();
@@ -787,9 +856,14 @@ namespace VPetLLM.UI.Windows
 
                 Logger.Log("统一流式处理: StreamingCommandProcessor.Complete() 已调用，等待所有命令处理完成...");
 
-                // 等待所有命令真正处理完成
-                await allCommandsCompletedSource.Task;
-                Logger.Log("统一流式处理: 所有命令处理完成");
+                // 等待所有命令真正处理完成。
+                // 必须同时等中断信号：中断会把队列里没执行的命令直接丢掉，
+                // 那些命令的完成计数永远补不齐，只等这个信号量就是永久挂起 ——
+                // 独占会话结束不了、_responseLock 也放不掉。
+                await Task.WhenAny(allCommandsCompletedSource.Task, InterruptManager.WhenInterruptedAsync());
+                Logger.Log(InterruptManager.IsInterrupted
+                    ? "统一流式处理: 被中断，不再等待剩余命令"
+                    : "统一流式处理: 所有命令处理完成");
             }
             catch (Exception ex)
             {

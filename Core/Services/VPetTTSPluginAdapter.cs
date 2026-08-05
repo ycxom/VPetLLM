@@ -68,6 +68,8 @@ namespace VPetLLM.Core.Services
         private static MethodInfo _miSubmitTTS;
         private static MethodInfo _miIsRequestComplete;
         private static MethodInfo _miIsProcessing;
+        // 可选能力：旧版 VPetTTS 没有中断接口，缺失时中断只停 VPetLLM 自己这侧的播放
+        private static MethodInfo _miInterrupt;
 
         private static void EnsureCoordinatorAccessors(object coordinator)
         {
@@ -84,6 +86,11 @@ namespace VPetLLM.Core.Services
                 _miSubmitTTS = type.GetMethod("SubmitTTSAsync");
                 _miIsRequestComplete = type.GetMethod("IsRequestCompleteAsync");
                 _miIsProcessing = type.GetMethod("IsProcessing");
+                _miInterrupt = type.GetMethod("InterruptAsync");
+
+                if (_miInterrupt is null)
+                    Logger.Log($"VPetTTSPluginAdapter: 协调器({type.Name}) 不支持 InterruptAsync，" +
+                               $"中断时无法通知外置 TTS 停止播放（请更新 VPetTTS 插件）");
 
                 var missing = new List<string>();
                 if (_miStartExclusiveSession is null) missing.Add("StartExclusiveSessionAsync");
@@ -132,6 +139,17 @@ namespace VPetLLM.Core.Services
             if (coordinator is null) return null;
             EnsureCoordinatorAccessors(coordinator);
             return _miIsRequestComplete?.Invoke(coordinator, new object[] { requestId }) as Task<bool>;
+        }
+
+        /// <summary>
+        /// 通知 VPetTTS 中断当前语音（停播 + 作废在途请求）。
+        /// 返回 null 表示对方不支持该能力（旧版插件），调用方按能力缺失处理。
+        /// </summary>
+        public static Task Interrupt(object coordinator, string callerId)
+        {
+            if (coordinator is null) return null;
+            EnsureCoordinatorAccessors(coordinator);
+            return _miInterrupt?.Invoke(coordinator, new object[] { callerId }) as Task;
         }
 
         public static bool IsProcessing(object coordinator)

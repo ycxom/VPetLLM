@@ -29,23 +29,57 @@
         </Border.Effect>
         <!-- 垂直布局容器 -->
         <StackPanel x:Name="VerticalLayoutPanel" Orientation="Vertical">
-            <!-- Status Light -->
-            <Ellipse x:Name="StatusLight" 
-                     Width="12" Height="12"
-                     HorizontalAlignment="Center"
-                     Margin="0,2,0,4"
-                     Fill="Transparent"
-                     Stroke="White"
-                     StrokeThickness="1">
-                <Ellipse.Effect>
-                    <DropShadowEffect x:Name="StatusLightGlow"
-                                      Color="Transparent" 
-                                      Direction="0" 
-                                      ShadowDepth="0" 
-                                      BlurRadius="6" 
-                                      Opacity="0.9"/>
-                </Ellipse.Effect>
-            </Ellipse>
+            <!-- 状态指示 / 中断按钮：颜色表示当前状态，忙碌时点击中断本轮对话 -->
+            <Button x:Name="StatusButton"
+                    HorizontalAlignment="Center"
+                    Margin="0,2,0,4"
+                    Width="18" Height="18"
+                    Padding="0"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Focusable="False"
+                    Click="StatusButton_Click">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <!-- 透明背景保证整块 18x18 都能接到点击，而不只是 12x12 的圆点 -->
+                        <Border x:Name="HitArea"
+                                Background="Transparent"
+                                CornerRadius="9">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HitArea" Property="Background" Value="#33FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+                <Grid>
+                    <Ellipse x:Name="StatusLight"
+                             Width="12" Height="12"
+                             Fill="Transparent"
+                             Stroke="White"
+                             StrokeThickness="1">
+                        <Ellipse.Effect>
+                            <DropShadowEffect x:Name="StatusLightGlow"
+                                              Color="Transparent"
+                                              Direction="0"
+                                              ShadowDepth="0"
+                                              BlurRadius="6"
+                                              Opacity="0.9"/>
+                        </Ellipse.Effect>
+                    </Ellipse>
+                    <!-- 中断标记（■），仅在有可中断的会话时显示 -->
+                    <Rectangle x:Name="StopGlyph"
+                               Width="5" Height="5"
+                               RadiusX="1" RadiusY="1"
+                               Fill="White"
+                               Visibility="Collapsed"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Button>
             <!-- Close Button -->
             <Button x:Name="CloseButton" 
                     HorizontalAlignment="Center"

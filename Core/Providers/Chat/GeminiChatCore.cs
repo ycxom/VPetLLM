@@ -152,7 +152,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         Logger.Log("Gemini (OpenAI兼容): 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl) { Content = content };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -172,7 +172,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -200,7 +200,7 @@ namespace VPetLLM.Core.Providers.Chat
                     else
                     {
                         Logger.Log("Gemini (OpenAI兼容): 使用非流式传输模式");
-                        var response = await client.PostAsync(apiUrl, content);
+                        var response = await client.PostAsync(apiUrl, content, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -218,6 +218,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Chat 请求已被用户中断");
+                    return "";
+                }
+
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
                 Logger.Log($"Gemini ChatWithImage 异常: {ex.Message}");
                 ResponseHandler?.Invoke(errorMessage);
@@ -232,7 +239,7 @@ namespace VPetLLM.Core.Providers.Chat
                     userMessage.ImageData = imageData;
                     await HistoryManager.AddMessage(userMessage);
                 }
-                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
@@ -288,7 +295,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         Logger.Log("Gemini ChatWithImage: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint) { Content = content };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -308,7 +315,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -333,7 +340,7 @@ namespace VPetLLM.Core.Providers.Chat
                     else
                     {
                         Logger.Log("Gemini ChatWithImage: 使用非流式传输模式");
-                        var response = await client.PostAsync(apiEndpoint, content);
+                        var response = await client.PostAsync(apiEndpoint, content, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -351,6 +358,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Chat 请求已被用户中断");
+                    return "";
+                }
+
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
                 Logger.Log($"Gemini ChatWithImage 异常: {ex.Message}");
                 ResponseHandler?.Invoke(errorMessage);
@@ -365,7 +379,7 @@ namespace VPetLLM.Core.Providers.Chat
                     userMessage.ImageData = imageData;
                     await HistoryManager.AddMessage(userMessage);
                 }
-                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
@@ -452,7 +466,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         Logger.Log("Gemini (OpenAI兼容): 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl) { Content = content };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -476,7 +490,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -509,7 +523,7 @@ namespace VPetLLM.Core.Providers.Chat
                     else
                     {
                         Logger.Log("Gemini (OpenAI兼容): 使用非流式传输模式");
-                        var response = await client.PostAsync(apiUrl, content);
+                        var response = await client.PostAsync(apiUrl, content, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -527,6 +541,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Chat 请求已被用户中断");
+                    return "";
+                }
+
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
                 Logger.Log($"Gemini Chat 异常: {ex.Message}");
                 ResponseHandler?.Invoke(errorMessage);
@@ -539,7 +560,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     await HistoryManager.AddMessage(tempUserMessage);
                 }
-                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
@@ -579,7 +600,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         Logger.Log("Gemini: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint) { Content = content };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -599,7 +620,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -625,7 +646,7 @@ namespace VPetLLM.Core.Providers.Chat
                     else
                     {
                         Logger.Log("Gemini: 使用非流式传输模式");
-                        var response = await client.PostAsync(apiEndpoint, content);
+                        var response = await client.PostAsync(apiEndpoint, content, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -644,6 +665,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("Chat 请求已被用户中断");
+                    return "";
+                }
+
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
                 Logger.Log($"Gemini Chat 异常: {ex.Message}");
                 ResponseHandler?.Invoke(errorMessage);
@@ -656,7 +684,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     await HistoryManager.AddMessage(tempUserMessage);
                 }
-                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }

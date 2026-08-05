@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using VPetLLM.UI.Controls;
+using VPetLLM.Utils.Localization;
 
 namespace VPetLLMPlugin.UI.Controls
 {
@@ -59,6 +60,11 @@ namespace VPetLLMPlugin.UI.Controls
         public event EventHandler? SidebarClosed;
 
         /// <summary>
+        /// 用户点击状态按钮请求中断当前对话
+        /// </summary>
+        public event EventHandler? InterruptRequested;
+
+        /// <summary>
         /// 默认透明度
         /// </summary>
         public double DefaultOpacity { get; set; } = 0.7;
@@ -107,6 +113,10 @@ namespace VPetLLMPlugin.UI.Controls
             _errorResetTimer.Elapsed += ErrorResetTimer_Elapsed;
 
             Opacity = DefaultOpacity;
+
+            // 初始为待机：不显示中断标记，提示文本走本地化
+            ApplyInterruptAffordance(VPetLLMStatus.Idle);
+
             Logger.Log("FloatingSidebar UserControl initialized");
         }
 
@@ -239,6 +249,9 @@ namespace VPetLLMPlugin.UI.Controls
                         StatusLight.Fill = new SolidColorBrush(lightColor);
                         StatusLightGlow.Color = glowColor;
 
+                        // 同步中断按钮的可点击状态（忙碌时才是"中断"，其余时候只是状态指示）
+                        ApplyInterruptAffordance(status);
+
                         Logger.Log($"Status light updated: {oldStatus} -> {status}");
                     }
                     catch (Exception ex)
@@ -259,6 +272,106 @@ namespace VPetLLMPlugin.UI.Controls
         public VPetLLMStatus GetCurrentStatus()
         {
             return _currentStatus;
+        }
+
+        /// <summary>
+        /// 状态是否表示"有一轮对话正在进行"，即中断按钮此时可用
+        /// </summary>
+        private static bool IsBusyStatus(VPetLLMStatus status)
+        {
+            return status == VPetLLMStatus.Processing
+                || status == VPetLLMStatus.Outputting
+                || status == VPetLLMStatus.PluginExecuting;
+        }
+
+        /// <summary>
+        /// 按状态切换按钮外观：忙碌时显示 ■ 中断标记并呼吸闪烁，空闲/错误时只作状态指示。
+        /// 必须在 UI 线程调用。
+        /// </summary>
+        private void ApplyInterruptAffordance(VPetLLMStatus status)
+        {
+            bool busy = IsBusyStatus(status);
+
+            StopGlyph.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+            StatusButton.Cursor = busy ? Cursors.Hand : Cursors.Arrow;
+            StatusButton.ToolTip = GetStatusToolTip(status, busy);
+
+            // 呼吸动画只在等待模型响应时开启，输出阶段保持常亮，避免和气泡一起闪
+            if (status == VPetLLMStatus.Processing)
+            {
+                var pulse = new DoubleAnimation
+                {
+                    From = 1.0,
+                    To = 0.45,
+                    Duration = TimeSpan.FromMilliseconds(700),
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever
+                };
+                StatusLight.BeginAnimation(OpacityProperty, pulse);
+            }
+            else
+            {
+                // 传 null 释放动画对属性的占用，否则后续赋值不生效
+                StatusLight.BeginAnimation(OpacityProperty, null);
+                StatusLight.Opacity = 1.0;
+            }
+        }
+
+        /// <summary>
+        /// 状态按钮的提示文本：说明当前状态，忙碌时附带"点击中断"
+        /// </summary>
+        private static string GetStatusToolTip(VPetLLMStatus status, bool busy)
+        {
+            var statusText = status switch
+            {
+                VPetLLMStatus.Processing => Localize("FloatingSidebar.Status_Processing", "正在思考"),
+                VPetLLMStatus.Outputting => Localize("FloatingSidebar.Status_Outputting", "正在回复"),
+                VPetLLMStatus.PluginExecuting => Localize("FloatingSidebar.Status_PluginExecuting", "插件执行中"),
+                VPetLLMStatus.Error => Localize("FloatingSidebar.Status_Error", "上一次请求出错"),
+                _ => Localize("FloatingSidebar.Status_Idle", "空闲")
+            };
+
+            return busy
+                ? $"{statusText} — {Localize("FloatingSidebar.Interrupt", "点击中断")}"
+                : statusText;
+        }
+
+        private static string Localize(string key, string fallback)
+        {
+            try
+            {
+                var text = LocalizationService.Instance[key];
+                // 缺失的键通常会回落成键名本身，这种情况用中文兜底更可读
+                return string.IsNullOrWhiteSpace(text) || text == key ? fallback : text;
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        /// <summary>
+        /// 状态按钮点击：忙碌时中断当前对话，空闲时不做任何事
+        /// </summary>
+        private void StatusButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (_isClosing) return;
+
+                if (!IsBusyStatus(_currentStatus))
+                {
+                    Logger.Log($"StatusButton clicked while {_currentStatus}, nothing to interrupt");
+                    return;
+                }
+
+                Logger.Log($"StatusButton clicked while {_currentStatus}, requesting interrupt");
+                InterruptRequested?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling status button click: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -650,7 +763,7 @@ namespace VPetLLMPlugin.UI.Controls
                     MinHeight = 50;
 
                     // 调整状态灯位置（横向时在左侧）
-                    StatusLight.Margin = new Thickness(2, 0, 4, 0);
+                    StatusButton.Margin = new Thickness(2, 0, 4, 0);
 
                     // 调整关闭按钮位置（横向时在状态灯右侧）
                     CloseButton.Margin = new Thickness(0, 0, 4, 0);
@@ -673,7 +786,7 @@ namespace VPetLLMPlugin.UI.Controls
                     MinHeight = 0;
 
                     // 调整状态灯位置（竖向时在顶部）
-                    StatusLight.Margin = new Thickness(0, 2, 0, 4);
+                    StatusButton.Margin = new Thickness(0, 2, 0, 4);
 
                     // 调整关闭按钮位置（竖向时在状态灯下方）
                     CloseButton.Margin = new Thickness(0, 0, 0, 2);
@@ -820,6 +933,7 @@ namespace VPetLLMPlugin.UI.Controls
                 _buttons.Clear();
                 ButtonClicked = null;
                 SidebarClosed = null;
+                InterruptRequested = null;
 
                 Logger.Log("FloatingSidebar disposed");
             }

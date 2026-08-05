@@ -191,6 +191,38 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
+        /// 改写某提供商最后一条消息的内容。
+        ///
+        /// 用于给已经落库、但话没说完就被用户打断的回复补中断标记 ——
+        /// 走 UpdateHistory 全量重写代价太大，而且在"不按提供商分离"时会把
+        /// 别的提供商的消息一并搬到当前提供商名下。
+        /// </summary>
+        /// <returns>true 表示确实改写了一行</returns>
+        public bool UpdateLastMessageContent(string provider, string newContent)
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                var command = connection.CreateCommand();
+                command.CommandText = @"
+                    UPDATE chat_history SET content = @content
+                    WHERE id = (SELECT MAX(id) FROM chat_history WHERE provider = @provider)
+                ";
+                command.Parameters.AddWithValue("@content", newContent ?? "");
+                command.Parameters.AddWithValue("@provider", provider);
+
+                return command.ExecuteNonQuery() > 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"改写最后一条消息失败: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 批量添加消息
         /// </summary>
         public void AddMessages(string provider, List<Message> messages)

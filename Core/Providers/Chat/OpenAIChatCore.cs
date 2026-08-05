@@ -370,7 +370,7 @@ namespace VPetLLM.Core.Providers.Chat
                         {
                             Content = content
                         };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -389,7 +389,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -430,7 +430,7 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                     else
                     {
-                        var response = await client.PostAsync(apiUrl, content);
+                        var response = await client.PostAsync(apiUrl, content, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -455,6 +455,13 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，既不重试也不弹错误提示
+                if (InterruptManager.IsInterrupted)
+                {
+                    SystemLogger.Log("OpenAI 请求已被用户中断");
+                    return "";
+                }
+
                 var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
                 SystemLogger.Log($"OpenAI ChatWithImage 异常: {ex.Message}");
                 ResponseHandler?.Invoke(errorMessage);
@@ -471,7 +478,7 @@ namespace VPetLLM.Core.Providers.Chat
                     userMessage.ImageData = imageData;
                     await HistoryManager.AddMessage(userMessage);
                 }
-                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
@@ -599,7 +606,7 @@ namespace VPetLLM.Core.Providers.Chat
                         {
                             Content = content
                         };
-                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -625,7 +632,7 @@ namespace VPetLLM.Core.Providers.Chat
                         using (var reader = new System.IO.StreamReader(stream))
                         {
                             string line;
-                            while ((line = await reader.ReadLineAsync()) is not null)
+                            while ((line = await ReadStreamLineAsync(reader)) is not null && !InterruptManager.IsInterrupted)
                             {
                                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                                     continue;
@@ -678,7 +685,7 @@ namespace VPetLLM.Core.Providers.Chat
                     else
                     {
                         // 非流式传输模式
-                        var response = await client.PostAsync(apiUrl, content);
+                        var response = await client.PostAsync(apiUrl, content, InterruptManager.Token);
 
                         if (!response.IsSuccessStatusCode)
                         {
@@ -706,6 +713,14 @@ namespace VPetLLM.Core.Providers.Chat
             }
             catch (Exception ex)
             {
+                // 用户中断：取消引发的异常不是故障，绝不能走下面的节点转移重试
+                if (InterruptManager.IsInterrupted)
+                {
+                    SystemLogger.Log("OpenAI Chat 已被用户中断");
+                    _triedNodeIndices.Clear();
+                    return "";
+                }
+
                 // 错误转移：当启用负载均衡时，尝试下一个节点
                 var nextNode = GetNextNodeForFailover("Chat");
                 if (nextNode is not null)
@@ -738,7 +753,7 @@ namespace VPetLLM.Core.Providers.Chat
                     await HistoryManager.AddMessage(tempUserMessage);
                 }
                 // 再保存助手回复
-                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = message });
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 // 保存历史记录
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
