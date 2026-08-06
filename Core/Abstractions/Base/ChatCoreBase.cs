@@ -33,7 +33,7 @@ namespace VPetLLM.Core.Abstractions.Base
             StreamingChunkHandler = chunk => global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.CaptureAssistant(chunk);
         }
         public abstract Task<string> Chat(string prompt);
-        public abstract Task<string> Chat(string prompt, bool isFunctionCall);
+        public abstract Task<string> Chat(string prompt, bool isRetry);
         public abstract Task<string> Summarize(string systemPrompt, string userContent);
 
         /// <summary>

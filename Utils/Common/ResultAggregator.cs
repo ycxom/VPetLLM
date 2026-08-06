@@ -14,6 +14,15 @@ namespace VPetLLM.Utils.Common
         private static readonly Dictionary<string, DateTime> _lastTouchUtc = new();
 
         /// <summary>
+        /// 随本次回灌一并送出的图像。
+        ///
+        /// 存在的理由：原生多模态要求主模型看到真实像素，而不是先让它描述一遍再读自己的描述。
+        /// 回灌时机由本类掌握（必须等本回合结束），但图像真正的发送仍然复用手动截图那条路
+        /// —— TalkBox.SendChatWithImages —— 不另起炉灶。
+        /// </summary>
+        private static readonly Dictionary<string, List<byte[]>> _imageBuffers = new();
+
+        /// <summary>
         /// 聚合窗口时长
         /// </summary>
         public static TimeSpan Window { get; set; } = TimeSpan.FromSeconds(2);
@@ -42,7 +51,15 @@ namespace VPetLLM.Utils.Common
         /// 入队一条需要回灌给AI的片段（例如 [Plugin Result: X] ... 或 [Tool.X: "..."]）
         /// 会在窗口内与同Key的其他片段合并后，仅触发一次 ChatCore.Chat(..., true)
         /// </summary>
-        public static void Enqueue(string payload)
+        public static void Enqueue(string payload) => Enqueue(payload, null);
+
+        /// <summary>
+        /// 入队一条回执，并可附带图像。
+        ///
+        /// 带图时回灌会走 TalkBox.SendChatWithImages（与手动截图完全同一条路），
+        /// 主模型看到的是真实图片；不带图则维持原来的 ChatCore.Chat 文本回灌。
+        /// </summary>
+        public static void Enqueue(string payload, IReadOnlyList<byte[]>? images)
         {
             try
             {
@@ -67,6 +84,16 @@ namespace VPetLLM.Utils.Common
                     }
                     list.Add(payload);
                     _lastTouchUtc[key] = DateTime.UtcNow;
+
+                    if (images is not null && images.Count > 0)
+                    {
+                        if (!_imageBuffers.TryGetValue(key, out var imageList))
+                        {
+                            imageList = new List<byte[]>();
+                            _imageBuffers[key] = imageList;
+                        }
+                        imageList.AddRange(images.Where(i => i is not null && i.Length > 0));
+                    }
 
                     // 会话内不启用计时器，统一由会话结束时 FlushSession 触发一次
                     if (!IsSessionKey(key))
@@ -134,6 +161,7 @@ namespace VPetLLM.Utils.Common
         private static async Task FlushAsync(string key)
         {
             string aggregated = null;
+            List<byte[]>? images = null;
             try
             {
                 lock (_lock)
@@ -146,6 +174,12 @@ namespace VPetLLM.Utils.Common
                         // 按原顺序拼接
                         aggregated = string.Join("", list!);
                     }
+
+                    if (_imageBuffers.TryGetValue(key, out var imageList) && imageList.Count > 0)
+                    {
+                        images = new List<byte[]>(imageList);
+                    }
+
                     Discard(key);
 
                     if (!hasContent)
@@ -169,7 +203,17 @@ namespace VPetLLM.Utils.Common
 
                     try
                     {
-                        await VPetLLM.Instance.ChatCore.Chat(aggregated, true);
+                        if (images is not null && images.Count > 0 && VPetLLM.Instance.TalkBox is not null)
+                        {
+                            // 原生多模态：走手动截图那条既有链路，图片真实进入主模型请求体。
+                            // 这里不新起一套发送逻辑，只是把回灌时机接到已有入口上。
+                            VPetLLMUtils.Logger.Log($"ResultAggregator: 携带 {images.Count} 张图片回灌（原生多模态）");
+                            await VPetLLM.Instance.TalkBox.SendChatWithImages(aggregated, images);
+                        }
+                        else
+                        {
+                            await VPetLLM.Instance.ChatCore.Chat(aggregated, true);
+                        }
                     }
                     finally
                     {
@@ -201,6 +245,8 @@ namespace VPetLLM.Utils.Common
         private static void Discard(string key)
         {
             _buffers.Remove(key);
+            // 图像缓冲同样要清，否则一张整屏截图会一直占着内存
+            _imageBuffers.Remove(key);
             _lastTouchUtc.Remove(key);
 
             if (_timers.TryGetValue(key, out var timer))

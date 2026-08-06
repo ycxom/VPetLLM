@@ -274,7 +274,7 @@ namespace VPetLLM.Core.Providers.Chat
             }
         }
 
-        public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
+        public override async Task<string> Chat(string prompt, bool isRetry = false)
         {
             try
             {

@@ -43,8 +43,8 @@ namespace VPetLLM.Core
                 Logger.Log($"[LLM Call] {caller} calling LLM");
                 Logger.Log($"[LLM Call] Message: {TruncateForLog(message, 200)}");
 
-                // 使用现有的 Chat 方法，isFunctionCall=true 表示不修改历史
-                var response = await _vpetLLM.ChatCore.Chat(message, isFunctionCall: true);
+                // 使用现有的 Chat 方法，isRetry=true 表示不修改历史
+                var response = await _vpetLLM.ChatCore.Chat(message, isRetry: true);
 
                 // 计算耗时
                 var duration = DateTime.UtcNow - startTime;

@@ -88,6 +88,23 @@ namespace VPetLLM.Handlers.Actions
                     return;
                 }
 
+                var mode = _settings.Screenshot?.ProcessingMode ?? ScreenshotProcessingMode.NativeMultimodal;
+
+                // 原生多模态：不做任何描述，把截图原样交给回灌，
+                // 由 ResultAggregator 在本回合结束时经 TalkBox.SendChatWithImages 送出——
+                // 与手动截图完全同一条链路，主模型看到的是真实像素而不是自己写的描述。
+                if (mode == ScreenshotProcessingMode.NativeMultimodal)
+                {
+                    var caption = string.IsNullOrWhiteSpace(question)
+                        ? "[屏幕内容] 这是用户当前屏幕的截图，请据此回答。"
+                        : $"[屏幕内容] 这是用户当前屏幕的截图，关注点：{question}";
+
+                    Logger.Log("SeeScreenHandler: 原生多模态，截图直接随回灌送入主模型（不预先描述）");
+                    ResultAggregator.Enqueue(caption, new[] { imageData });
+                    return;
+                }
+
+                // 前置多模态 / OCR：先转成文字再回灌
                 var text = await AnalyzeAsync(imageData, question);
                 if (InterruptManager.IsInterrupted)
                 {
@@ -143,28 +160,16 @@ namespace VPetLLM.Handlers.Actions
                 return await AnalyzeWithOcrAsync(imageData);
             }
 
-            PreprocessingResult result;
-
-            if (mode == ScreenshotProcessingMode.NativeMultimodal)
+            // 走到这里只剩前置多模态：原生模式在 Execute 里就已经把图直接交给回灌了，
+            // 根本不进本方法。
+            if (!preprocessing.HasAvailableProvider())
             {
-                // 原生多模态 = 图片交给用户正在聊天的那个模型自己看。
-                // 不能走 AnalyzeImageAsync：那读的是 Screenshot.MultimodalProvider
-                // 那套独立的前置视觉渠道配置（默认 Free），跟用户选的主渠道毫无关系。
-                Logger.Log($"SeeScreenHandler: 原生多模态，交给主渠道 {_settings.Provider} 识图");
-                result = await preprocessing.AnalyzeWithMainProviderAsync(imageData, visionPrompt);
+                Logger.Log("SeeScreenHandler: 前置多模态未配置可用视觉节点，改用 OCR");
+                return await AnalyzeWithOcrAsync(imageData);
             }
-            else
-            {
-                // 前置多模态：用独立配置的视觉节点，没配就只能退 OCR
-                if (!preprocessing.HasAvailableProvider())
-                {
-                    Logger.Log("SeeScreenHandler: 前置多模态未配置可用视觉节点，改用 OCR");
-                    return await AnalyzeWithOcrAsync(imageData);
-                }
 
-                Logger.Log("SeeScreenHandler: 前置多模态，使用配置的视觉节点识图");
-                result = await preprocessing.AnalyzeImageAsync(imageData, visionPrompt);
-            }
+            Logger.Log("SeeScreenHandler: 前置多模态，使用配置的视觉节点识图");
+            var result = await preprocessing.AnalyzeImageAsync(imageData, visionPrompt);
 
             if (result.Success && !string.IsNullOrWhiteSpace(result.ImageDescription))
             {

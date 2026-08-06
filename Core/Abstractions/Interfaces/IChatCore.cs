@@ -7,7 +7,19 @@ namespace VPetLLM.Core.Abstractions.Interfaces
         RecordManager RecordManager { get; }
         SkillManager SkillManager { get; }
         Task<string> Chat(string prompt);
-        Task<string> Chat(string prompt, bool isFunctionCall);
+
+        /// <summary>
+        /// 发送对话。
+        /// </summary>
+        /// <param name="prompt">提示词</param>
+        /// <param name="isRetry">
+        /// 重试递归守卫：true 表示「本次调用本身就是一次重试」，失败时不要再自动重试。
+        /// 目前只有 Free 渠道真正用到（5xx / 网络异常时自动重试一次），
+        /// OpenAI 仅在故障转移里透传，Gemini / LMStudio / Ollama 未使用。
+        /// ResultAggregator 回灌时传 true —— 工具回执失败就算了，不值得再打一次。
+        /// 注意：它与「函数调用」无关，早期曾被命名为 isFunctionCall。
+        /// </param>
+        Task<string> Chat(string prompt, bool isRetry);
         Task<string> Summarize(string systemPrompt, string userContent);
 
         /// <summary>

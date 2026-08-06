@@ -487,7 +487,7 @@ namespace VPetLLM.Core.Providers.Chat
             return "";
         }
 
-        public override async Task<string> Chat(string prompt, bool isFunctionCall = false)
+        public override async Task<string> Chat(string prompt, bool isRetry = false)
         {
             // Handle conversation turn for record weight decrement
             OnConversationTurn();
@@ -733,7 +733,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                     // 重新调用 Chat 方法（会递归重试）
                     // 注意：_triedNodeIndices 已记录失败节点，且 _isFailoverRetry 保证不会重新轮选
-                    return await Chat(prompt, isFunctionCall);
+                    return await Chat(prompt, isRetry);
                 }
 
                 var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");

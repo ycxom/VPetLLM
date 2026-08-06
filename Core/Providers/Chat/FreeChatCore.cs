@@ -376,8 +376,6 @@ namespace VPetLLM.Core.Providers.Chat
                 // 使用 CreateUserMessage 自动设置时间戳和状态信息
                 var tempUserMessage = CreateUserMessage(prompt);
 
-                // 系统注入（isRetry=true 来自 ResultAggregator 回灌）时跳过主动记忆检索
-
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
                 if (tempUserMessage is not null)
