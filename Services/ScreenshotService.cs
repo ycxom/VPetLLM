@@ -345,7 +345,77 @@ namespace VPetLLM.Services
         /// </summary>
         /// <param name="imageData">图片数据</param>
         /// <param name="userQuestion">用户问题</param>
-        public async Task<PreprocessingResult> ProcessWithPreprocessingAsync(byte[] imageData, string userQuestion)
+        public Task<PreprocessingResult> ProcessWithPreprocessingAsync(byte[] imageData, string userQuestion)
+            => ProcessWithPreprocessingAsync(new[] { imageData }, userQuestion);
+
+        /// <summary>
+        /// 多图前置处理：逐张送视觉模型拿描述，再把描述按顺序编号拼成一段文本。
+        /// 前置多模态的本质是「把图翻译成文字再给主模型」，所以多图只能逐张翻译后合并，
+        /// 没法像原生多模态那样一次请求塞多张。
+        /// </summary>
+        public async Task<PreprocessingResult> ProcessWithPreprocessingAsync(IReadOnlyList<byte[]> images, string userQuestion)
+        {
+            images = images?.Where(i => i is not null && i.Length > 0).ToList() ?? new List<byte[]>();
+
+            if (images.Count == 0)
+            {
+                return PreprocessingResult.CreateFailure("没有可分析的图片");
+            }
+
+            if (images.Count == 1)
+            {
+                return await ProcessSingleWithPreprocessingAsync(images[0], userQuestion);
+            }
+
+            try
+            {
+                Logger.Log($"Starting preprocessing for {images.Count} images");
+                SetState(ScreenshotState.Processing);
+
+                var descriptions = new List<string>();
+                var provider = "";
+
+                for (int i = 0; i < images.Count; i++)
+                {
+                    var result = await _preprocessingMultimodal.AnalyzeImageAsync(images[i]);
+                    if (result.Success && !string.IsNullOrWhiteSpace(result.ImageDescription))
+                    {
+                        descriptions.Add($"【图片 {i + 1}/{images.Count}】{result.ImageDescription.Trim()}");
+                        provider = result.UsedProvider;
+                    }
+                    else
+                    {
+                        Logger.Log($"Preprocessing failed for image {i + 1}: {result.ErrorMessage}");
+                        descriptions.Add($"【图片 {i + 1}/{images.Count}】（识别失败：{result.ErrorMessage}）");
+                    }
+                }
+
+                var combinedDescription = string.Join("\n\n", descriptions);
+                var combinedMessage = MessageCombiner.Combine(combinedDescription, userQuestion);
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    PreprocessingCompleted?.Invoke(this, new PreprocessingCompletedEventArgs
+                    {
+                        Success = true,
+                        CombinedMessage = combinedMessage,
+                        ImageDescription = combinedDescription,
+                        UsedProvider = provider
+                    });
+                    SetState(ScreenshotState.Idle);
+                });
+
+                return PreprocessingResult.CreateSuccess(combinedDescription, provider);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error in multi-image preprocessing: {ex.Message}");
+                SetState(ScreenshotState.Idle);
+                return PreprocessingResult.CreateFailure($"前置处理异常: {ex.Message}");
+            }
+        }
+
+        private async Task<PreprocessingResult> ProcessSingleWithPreprocessingAsync(byte[] imageData, string userQuestion)
         {
             try
             {

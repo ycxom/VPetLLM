@@ -39,6 +39,9 @@ namespace VPetLLM.UI.Windows
         private const double MagnifierMargin = 24;
 
         private System.Windows.Point _startPoint;
+        // 鼠标最后位置，用于把提示条/放大镜摆到「当前所在的那块屏幕」上
+        private System.Windows.Point _lastMousePoint;
+        private Rect _lastScreenRect = Rect.Empty;
         private bool _isSelecting;
         private bool _hasDragged;
         private double _selectionLeft;
@@ -213,6 +216,19 @@ namespace VPetLLM.UI.Windows
 
             Activate();
             Focus();
+
+            // 先取一次真实光标位置：否则 _lastMousePoint 还是 (0,0)，
+            // 提示条会先闪现在虚拟桌面原点那块屏幕上，鼠标一动才跳过来
+            try
+            {
+                _lastMousePoint = Mouse.GetPosition(OverlayCanvas);
+                _lastScreenRect = GetScreenRectAt(_lastMousePoint);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"winScreenshotCapture: 取初始光标位置失败: {ex.Message}");
+            }
+
             LayoutOverlay();
             FadeIn(HintPanel);
             StartWindowDetection();
@@ -246,10 +262,26 @@ namespace VPetLLM.UI.Windows
             FrozenScreen.Height = h;
 
             UpdateDimMask();
+            PositionHintPanel();
+        }
 
-            HintPanel.Measure(new System.Windows.Size(w, h));
-            Canvas.SetLeft(HintPanel, Math.Max(0, (w - HintPanel.DesiredSize.Width) / 2));
-            Canvas.SetTop(HintPanel, 60);
+        /// <summary>
+        /// 把提示条摆在「鼠标所在那块屏幕」的顶部居中。
+        /// 按整个虚拟桌面居中的话，双屏时它会跑到两屏接缝处，甚至整条落在另一块屏上。
+        /// </summary>
+        private void PositionHintPanel()
+        {
+            var w = OverlayCanvas.ActualWidth;
+            var h = OverlayCanvas.ActualHeight;
+            if (w <= 0 || h <= 0) return;
+
+            var screen = GetScreenRectAt(_lastMousePoint);
+
+            HintPanel.Measure(new System.Windows.Size(screen.Width, screen.Height));
+            var size = HintPanel.DesiredSize;
+
+            Canvas.SetLeft(HintPanel, Math.Max(screen.Left, screen.Left + ((screen.Width - size.Width) / 2)));
+            Canvas.SetTop(HintPanel, screen.Top + 60);
         }
 
         /// <summary>
@@ -317,6 +349,15 @@ namespace VPetLLM.UI.Windows
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
             var currentPoint = e.GetPosition(OverlayCanvas);
+            _lastMousePoint = currentPoint;
+
+            // 光标换到另一块屏幕时，提示条要跟过去
+            var screenNow = GetScreenRectAt(currentPoint);
+            if (screenNow != _lastScreenRect)
+            {
+                _lastScreenRect = screenNow;
+                if (HintPanel.Visibility == Visibility.Visible) PositionHintPanel();
+            }
 
             if (_toolDragging)
             {
@@ -497,6 +538,30 @@ namespace VPetLLM.UI.Windows
             LayoutOverlay();
         }
 
+        /// <summary>
+        /// 取包含指定画布坐标的那块显示器，返回其在画布坐标系下的矩形。
+        /// 画布覆盖的是整个虚拟桌面，直接拿画布尺寸当边界会让浮层被推到
+        /// 「虚拟桌面之内、但当前物理屏幕之外」的位置——多屏时就看不见了。
+        /// </summary>
+        private Rect GetScreenRectAt(System.Windows.Point canvasPoint)
+        {
+            try
+            {
+                var (px, py) = CanvasToPixel(canvasPoint);
+                var screen = System.Windows.Forms.Screen.FromPoint(
+                    new System.Drawing.Point(_virtualBounds.Left + px, _virtualBounds.Top + py));
+                var rect = ScreenRectToCanvas(screen.Bounds);
+                if (rect.Width > 0 && rect.Height > 0) return rect;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"winScreenshotCapture: 取所在显示器失败: {ex.Message}");
+            }
+
+            // 兜底：整块画布
+            return new Rect(0, 0, OverlayCanvas.ActualWidth, OverlayCanvas.ActualHeight);
+        }
+
         private Rect ScreenRectToCanvas(System.Drawing.Rectangle bounds)
         {
             double scaleX = ScaleX(), scaleY = ScaleY();
@@ -671,19 +736,24 @@ namespace VPetLLM.UI.Windows
             var size = Toolbar.DesiredSize;
 
             const double gap = 8;
-            double canvasW = OverlayCanvas.ActualWidth;
-            double canvasH = OverlayCanvas.ActualHeight;
+
+            // 以选区右下角所在的那块屏幕为界，而不是整个虚拟桌面：
+            // 否则多屏时功能栏会被摆到相邻屏幕上，甚至落在物理屏幕之外
+            var screen = GetScreenRectAt(new System.Windows.Point(
+                _selectionLeft + _selectionWidth, _selectionTop + _selectionHeight));
 
             double x = _selectionLeft + _selectionWidth - size.Width;
-            x = Math.Clamp(x, 0, Math.Max(0, canvasW - size.Width));
+            x = Math.Clamp(x, screen.Left, Math.Max(screen.Left, screen.Right - size.Width));
 
             double y = _selectionTop + _selectionHeight + gap;
-            if (y + size.Height > canvasH)
+            if (y + size.Height > screen.Bottom)
             {
+                // 下方放不下就翻到选区上方
                 y = _selectionTop - gap - size.Height;
-                if (y < 0)
+                if (y < screen.Top)
                 {
-                    y = Math.Max(0, _selectionTop + _selectionHeight - size.Height - gap);
+                    // 上下都放不下（选区几乎占满该屏），压在选区内侧底部
+                    y = Math.Max(screen.Top, _selectionTop + _selectionHeight - size.Height - gap);
                 }
             }
 
@@ -1082,16 +1152,19 @@ namespace VPetLLM.UI.Windows
             Magnifier.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
             var size = Magnifier.DesiredSize;
 
+            // 同样以光标所在屏幕为界，避免放大镜跨到相邻屏或被推出物理屏幕
+            var screen = GetScreenRectAt(canvasPoint);
+
             double x = canvasPoint.X + MagnifierMargin;
             double y = canvasPoint.Y + MagnifierMargin;
 
-            if (x + size.Width > OverlayCanvas.ActualWidth)
+            if (x + size.Width > screen.Right)
                 x = canvasPoint.X - MagnifierMargin - size.Width;
-            if (y + size.Height > OverlayCanvas.ActualHeight)
+            if (y + size.Height > screen.Bottom)
                 y = canvasPoint.Y - MagnifierMargin - size.Height;
 
-            Canvas.SetLeft(Magnifier, Math.Max(0, x));
-            Canvas.SetTop(Magnifier, Math.Max(0, y));
+            Canvas.SetLeft(Magnifier, Math.Clamp(x, screen.Left, Math.Max(screen.Left, screen.Right - size.Width)));
+            Canvas.SetTop(Magnifier, Math.Clamp(y, screen.Top, Math.Max(screen.Top, screen.Bottom - size.Height)));
         }
 
         private System.Windows.Media.Color? GetPixelColor(int px, int py)

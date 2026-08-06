@@ -73,6 +73,26 @@
             </Grid>
         </Border>
 
+        <!-- 多图缩略图条：两张及以上时才出现，点缩略图切换主预览 -->
+        <Border x:Name="ThumbnailBar"
+                Grid.Row="0"
+                VerticalAlignment="Bottom"
+                Background="#CC1E1E1E"
+                CornerRadius="0,0,4,4"
+                Padding="6"
+                Margin="1,0,1,17"
+                Visibility="Collapsed">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="ThumbnailList">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
         <!-- 提示词输入区域 -->
         <Grid Grid.Row="1" Margin="0,0,0,16">
             <TextBox x:Name="TextBoxPrompt"
@@ -95,6 +115,16 @@
         <StackPanel Grid.Row="2" 
                     Orientation="Horizontal" 
                     HorizontalAlignment="Right">
+            <TextBlock x:Name="TextImageCount"
+                       Foreground="#9AA0A6"
+                       VerticalAlignment="Center"
+                       Margin="0,0,12,0"/>
+            <Button x:Name="ButtonAddShot"
+                    Content="＋ 继续截图"
+                    Style="{StaticResource SecondaryButton}"
+                    Margin="0,0,8,0"
+                    ToolTip="再截一张，与当前图片一并发送"
+                    Click="ButtonAddShot_Click"/>
             <Button x:Name="ButtonCancel"
                     Content="{utils:Localize KeyPath=Screenshot.Editor.Cancel, Default=Cancel}"
                     Style="{StaticResource SecondaryButton}"

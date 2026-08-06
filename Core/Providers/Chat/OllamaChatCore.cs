@@ -46,10 +46,15 @@ namespace VPetLLM.Core.Providers.Chat
         /// <param name="prompt">文本提示</param>
         /// <param name="imageData">图像数据</param>
         /// <returns>响应内容</returns>
-        public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
+        public override async Task<string> ChatWithImages(string prompt, IReadOnlyList<byte[]> images)
         {
-            // 钳制尺寸，避免过大的图片被目标服务端拒收
-            imageData = Utils.Common.ImageDownscaler.ClampToMaxDimension(imageData)!;
+            LastCallFailed = false;
+            // 逐张钳制尺寸，避免过大的图片被目标服务端拒收；空图直接剔除
+            images = images.Select(i => Utils.Common.ImageDownscaler.ClampToMaxDimension(i)!)
+                           .Where(i => i is not null && i.Length > 0).ToList();
+            if (images.Count == 0) return "";
+            // 历史只有一个图像槽位，先留第一张（见 README 已知限制）
+            var imageData = images[0];
 
             try
             {
@@ -61,23 +66,23 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     var visionError = "Ollama 未启用视觉能力，请在设置中启用 EnableVision";
                     Logger.Log($"Ollama ChatWithImage 错误: {visionError}");
-                    ResponseHandler?.Invoke(visionError);
+                    ReportFailure(visionError);
                     return "";
                 }
 
                 // 验证图像数据
-                if (imageData is null || imageData.Length == 0)
+                if (images.Count == 0)
                 {
                     var invalidImageError = "图像数据无效";
                     Logger.Log($"Ollama ChatWithImage 错误: {invalidImageError}");
-                    ResponseHandler?.Invoke(invalidImageError);
+                    ReportFailure(invalidImageError);
                     return "";
                 }
 
-                Logger.Log($"Ollama ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+                Logger.Log($"Ollama ChatWithImage: 发送多模态消息，图像大小: {DescribeImages(images)}");
 
-                // 编码图像为 base64
-                var base64Image = Convert.ToBase64String(imageData);
+                // Ollama 的 images 字段本来就是数组，多图天然支持
+                var base64Images = images.Select(Convert.ToBase64String).ToArray();
 
                 // 创建用户消息
                 var tempUserMessage = CreateUserMessage($"[图像] {prompt}");
@@ -107,9 +112,14 @@ namespace VPetLLM.Core.Providers.Chat
                         ["content"] = msg.DisplayContent
                     };
 
-                    // 如果消息包含图像，添加 images 数组。
-                    // 这里的图可能来自本次改动之前存下的历史，尺寸未必受控，所以再钳一次。
-                    if (msg.HasImage)
+                    // 本轮这条消息带的是本次截的全部图；Message 只有一个图像槽位，
+                    // 所以多图不能靠 msg.ImageData 取，得直接用手上的 base64Images。
+                    if (ReferenceEquals(msg, tempUserMessage))
+                    {
+                        messageObj["images"] = base64Images;
+                    }
+                    // 历史消息里的图可能是早先存下的，尺寸未必受控，所以再钳一次。
+                    else if (msg.HasImage)
                     {
                         var historyImage = Utils.Common.ImageDownscaler.ClampToMaxDimension(msg.ImageData);
                         if (historyImage is not null)
@@ -237,7 +247,7 @@ namespace VPetLLM.Core.Providers.Chat
                 Logger.Log($"Ollama ChatWithImage 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorMessageHelper.GetOllamaTimeoutError(Settings)
                     ?? $"Ollama 请求超时: {tcEx.Message}";
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (HttpRequestException httpEx)
@@ -245,7 +255,7 @@ namespace VPetLLM.Core.Providers.Chat
                 Logger.Log($"Ollama ChatWithImage 网络异常: {httpEx.Message}");
                 var errorMessage = ErrorMessageHelper.GetOllamaConnectionError(Settings)
                     ?? $"Ollama 网络异常: {httpEx.Message}";
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (Exception ex)
@@ -259,7 +269,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 Logger.Log($"Ollama ChatWithImage 异常: {ex.Message}");
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
         }

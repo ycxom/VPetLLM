@@ -134,34 +134,84 @@ namespace VPetLLM.Handlers.Actions
         private async Task<string> AnalyzeAsync(byte[] imageData, string question)
         {
             var mode = _settings.Screenshot?.ProcessingMode ?? ScreenshotProcessingMode.NativeMultimodal;
-
-            // OCR 模式，或没有配置任何视觉节点时，退回纯文字识别
             var preprocessing = GetPreprocessing();
-            bool useOcr = mode == ScreenshotProcessingMode.OCRApi || !preprocessing.HasAvailableProvider();
+            var visionPrompt = BuildVisionPrompt(question);
 
-            if (useOcr)
+            // OCR 模式：纯文字识别
+            if (mode == ScreenshotProcessingMode.OCRApi)
+            {
+                return await AnalyzeWithOcrAsync(imageData);
+            }
+
+            PreprocessingResult result;
+
+            if (mode == ScreenshotProcessingMode.NativeMultimodal)
+            {
+                // 原生多模态 = 图片交给用户正在聊天的那个模型自己看。
+                // 不能走 AnalyzeImageAsync：那读的是 Screenshot.MultimodalProvider
+                // 那套独立的前置视觉渠道配置（默认 Free），跟用户选的主渠道毫无关系。
+                Logger.Log($"SeeScreenHandler: 原生多模态，交给主渠道 {_settings.Provider} 识图");
+                result = await preprocessing.AnalyzeWithMainProviderAsync(imageData, visionPrompt);
+            }
+            else
+            {
+                // 前置多模态：用独立配置的视觉节点，没配就只能退 OCR
+                if (!preprocessing.HasAvailableProvider())
+                {
+                    Logger.Log("SeeScreenHandler: 前置多模态未配置可用视觉节点，改用 OCR");
+                    return await AnalyzeWithOcrAsync(imageData);
+                }
+
+                Logger.Log("SeeScreenHandler: 前置多模态，使用配置的视觉节点识图");
+                result = await preprocessing.AnalyzeImageAsync(imageData, visionPrompt);
+            }
+
+            if (result.Success && !string.IsNullOrWhiteSpace(result.ImageDescription))
+            {
+                return $"[屏幕内容]\n{result.ImageDescription.Trim()}\n[/屏幕内容]";
+            }
+
+            // 视觉不可用（鉴权失败、节点全挂、返回空）时回落 OCR：
+            // 读出屏幕上的文字，总好过让 AI 干瞪眼
+            var visionError = string.IsNullOrWhiteSpace(result.ErrorMessage) ? "视觉模型没有返回内容" : result.ErrorMessage;
+            Logger.Log($"SeeScreenHandler: 视觉分析失败（{visionError}），回落 OCR");
+
+            var fallback = await AnalyzeWithOcrAsync(imageData);
+            if (!fallback.StartsWith("[屏幕内容] "))
+            {
+                return fallback;
+            }
+
+            // OCR 也没成：给 AI 一句干净的说明即可。
+            // 原始报文（鉴权失败、状态码之类）只写日志——那是给用户排查用的，
+            // 塞进对话只会让模型对着一段它无能为力的错误信息瞎猜。
+            Logger.Log($"SeeScreenHandler: OCR 回落同样失败，视觉侧原始错误: {visionError}");
+            return "[屏幕内容] 这次没能看清屏幕（识别服务不可用）。如实告诉用户你暂时看不了屏幕，建议他检查截图/视觉相关设置，不要复述技术错误，也不要重复请求。";
+        }
+
+        /// <summary>
+        /// 用 OCR 读屏幕文字
+        /// </summary>
+        private async Task<string> AnalyzeWithOcrAsync(byte[] imageData)
+        {
+            try
             {
                 Logger.Log("SeeScreenHandler: 使用 OCR 读取屏幕文字");
                 var ocrEngine = new OCREngine(_settings, VPetLLM.Instance);
                 var ocrText = await ocrEngine.RecognizeText(imageData);
+
                 if (string.IsNullOrWhiteSpace(ocrText))
                 {
                     return "[屏幕内容] 屏幕上没有识别到文字。";
                 }
+
                 return $"[屏幕内容 - 文字识别]\n{ocrText.Trim()}\n[/屏幕内容]";
             }
-
-            Logger.Log("SeeScreenHandler: 使用视觉模型描述屏幕");
-            var customPrompt = BuildVisionPrompt(question);
-            var result = await preprocessing.AnalyzeImageAsync(imageData, customPrompt);
-
-            if (!result.Success || string.IsNullOrWhiteSpace(result.ImageDescription))
+            catch (Exception ex)
             {
-                var reason = string.IsNullOrWhiteSpace(result.ErrorMessage) ? "视觉模型没有返回内容" : result.ErrorMessage;
-                return $"[屏幕内容] 看不清屏幕：{reason}";
+                Logger.Log($"SeeScreenHandler: OCR 失败: {ex.Message}");
+                return "[屏幕内容] OCR 识别失败。";
             }
-
-            return $"[屏幕内容]\n{result.ImageDescription.Trim()}\n[/屏幕内容]";
         }
 
         /// <summary>

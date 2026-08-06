@@ -129,10 +129,16 @@ namespace VPetLLM.Core.Providers.Chat
         /// <param name="prompt">文本提示</param>
         /// <param name="imageData">图像数据</param>
         /// <returns>响应内容</returns>
-        public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
+        public override async Task<string> ChatWithImages(string prompt, IReadOnlyList<byte[]> images)
         {
+            LastCallFailed = false;
             // 钳制尺寸，避免过大的图片被目标服务端拒收
-            imageData = Utils.Common.ImageDownscaler.ClampToMaxDimension(imageData)!;
+            // 逐张钳制尺寸，避免过大的图片被目标服务端拒收；空图直接剔除
+            images = images.Select(i => Utils.Common.ImageDownscaler.ClampToMaxDimension(i)!)
+                           .Where(i => i is not null && i.Length > 0).ToList();
+            if (images.Count == 0) return "";
+            // 历史只有一个图像槽位，先留第一张（见 README 已知限制）
+            var imageData = images[0];
 
             try
             {
@@ -144,7 +150,7 @@ namespace VPetLLM.Core.Providers.Chat
                     var errorMessage = ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded")
                         ?? "Free Chat 配置未加载，请等待配置下载完成后重启程序";
                     Logger.Log(errorMessage);
-                    ResponseHandler?.Invoke(errorMessage);
+                    ReportFailure(errorMessage);
                     return "";
                 }
 
@@ -153,7 +159,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     var visionError = "Free 接口未启用视觉能力，请在设置中启用EnableVision";
                     Logger.Log($"Free ChatWithImage 错误: {visionError}");
-                    ResponseHandler?.Invoke(visionError);
+                    ReportFailure(visionError);
                     return "";
                 }
 
@@ -167,15 +173,10 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                 }
 
-                Logger.Log($"Free ChatWithImage: 发送多模态消息，图像大小: {imageData.Length} bytes");
+                Logger.Log($"Free ChatWithImage: 发送多模态消息，图像大小: {DescribeImages(images)}");
 
                 // 构建多模态消息内容
-                var base64Image = Convert.ToBase64String(imageData);
-                var userContent = new object[]
-                {
-                    new { type = "text", text = prompt },
-                    new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Image}" } }
-                };
+                var userContent = BuildMultimodalContent(prompt, images);
 
                 // 构建历史消息（不包含图像）
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
@@ -258,7 +259,7 @@ namespace VPetLLM.Core.Providers.Chat
                         message = ErrorMessageHelper.IsDebugMode(Settings)
                             ? $"API调用失败: {response.StatusCode} - {responseContent}"
                             : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
-                        ResponseHandler?.Invoke(message);
+                        ReportFailure(message);
                         return "";
                     }
                 }
@@ -282,7 +283,7 @@ namespace VPetLLM.Core.Providers.Chat
                         message = ErrorMessageHelper.IsDebugMode(Settings)
                             ? $"API调用失败: {response.StatusCode} - {responseContent}"
                             : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
-                        ResponseHandler?.Invoke(message);
+                        ReportFailure(message);
                         return "";
                     }
                 }
@@ -310,7 +311,7 @@ namespace VPetLLM.Core.Providers.Chat
                 var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free ChatWithImage 网络异常: {httpEx.Message}\n{httpEx.StackTrace}"
                     : ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (TaskCanceledException tcEx)
@@ -326,7 +327,7 @@ namespace VPetLLM.Core.Providers.Chat
                 var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free ChatWithImage 请求超时: {tcEx.Message}\n{tcEx.StackTrace}"
                     : ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (Exception ex)
@@ -340,7 +341,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 Logger.Log($"Free ChatWithImage 异常: {ex.Message}");
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
         }

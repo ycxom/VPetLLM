@@ -45,6 +45,62 @@ namespace VPetLLM.Services
         }
 
         /// <summary>
+        /// 用「主聊天渠道」分析图片，供原生多模态模式使用。
+        ///
+        /// 与 AnalyzeImageAsync 的区别：后者读的是 Screenshot.MultimodalProvider 这套
+        /// 前置视觉渠道配置（默认 Free）；本方法直接用用户正在聊天的那个 provider。
+        /// 原生多模态的语义就是「图片交给主模型自己看」，不该绕道前置视觉渠道。
+        /// </summary>
+        public async Task<PreprocessingResult> AnalyzeWithMainProviderAsync(byte[] imageData, string? customPrompt = null)
+        {
+            if (imageData is null || imageData.Length == 0)
+            {
+                return PreprocessingResult.CreateFailure("图片数据为空");
+            }
+
+            var providerType = _settings.Provider switch
+            {
+                Setting.LLMType.Free => "Free",
+                Setting.LLMType.OpenAI => "OpenAI",
+                Setting.LLMType.Gemini => "Gemini",
+                Setting.LLMType.Ollama => "Ollama",
+                Setting.LLMType.LMStudio => "LMStudio",
+                _ => ""
+            };
+
+            if (string.IsNullOrEmpty(providerType))
+            {
+                return PreprocessingResult.CreateFailure($"未知的主渠道类型: {_settings.Provider}");
+            }
+
+            var lang = _settings.PromptLanguage ?? "zh";
+            var prompt = string.IsNullOrWhiteSpace(customPrompt)
+                ? (_settings.Screenshot?.MultimodalProvider ?? new MultimodalProviderConfig()).GetEffectivePrompt(lang)
+                : customPrompt;
+
+            try
+            {
+                Logger.Log($"PreprocessingMultimodal: 原生多模态 - 使用主渠道 {providerType} 分析图片，大小: {imageData.Length} bytes");
+
+                // 主渠道走 OpenAI/Gemini 这类多节点配置时，节点由各自 ChatCore 自行挑选，
+                // 这里不指定 node，交给 provider 用它当前生效的那个
+                var description = await CallChatWithImageForDescription(providerType, null, imageData, prompt);
+
+                if (string.IsNullOrWhiteSpace(description))
+                {
+                    return PreprocessingResult.CreateFailure($"主渠道 {providerType} 未返回图片描述（可能未启用视觉能力）");
+                }
+
+                return PreprocessingResult.CreateSuccess(description, providerType);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"PreprocessingMultimodal: 主渠道 {providerType} 分析失败: {ex.Message}");
+                return PreprocessingResult.CreateFailure($"主渠道 {providerType} 分析失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 使用 Free 渠道分析图片
         /// </summary>
         private async Task<PreprocessingResult> AnalyzeWithFree(byte[] imageData, string prompt)
@@ -182,12 +238,16 @@ namespace VPetLLM.Services
                         }
                         break;
 
+                    // 下面几个渠道：node 为 null 表示「不指定节点」（原生多模态走主渠道时就是这样），
+                    // 此时退回该渠道当前生效的节点，而不是直接失败
                     case "OpenAI":
-                        if (node is not null && _settings.OpenAI?.OpenAINodes is not null)
+                        if (_settings.OpenAI?.OpenAINodes is not null)
                         {
-                            var openAINode = _settings.OpenAI.OpenAINodes
-                                .FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision);
-                            if (openAINode is not null)
+                            var openAINode = node is not null
+                                ? _settings.OpenAI.OpenAINodes.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
+                                : _settings.OpenAI.GetCurrentOpenAISetting();
+
+                            if (openAINode is not null && openAINode.EnableVision)
                             {
                                 chatCore = new OpenAIChatCore(openAINode, _settings, mainWindow, null!);
                             }
@@ -195,11 +255,13 @@ namespace VPetLLM.Services
                         break;
 
                     case "Gemini":
-                        if (node is not null && _settings.Gemini?.GeminiNodes is not null)
+                        if (_settings.Gemini?.GeminiNodes is not null)
                         {
-                            var geminiNode = _settings.Gemini.GeminiNodes
-                                .FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision);
-                            if (geminiNode is not null)
+                            var geminiNode = node is not null
+                                ? _settings.Gemini.GeminiNodes.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
+                                : _settings.Gemini.GetCurrentGeminiSetting();
+
+                            if (geminiNode is not null && geminiNode.EnableVision)
                             {
                                 chatCore = new GeminiChatCore(_settings.Gemini, _settings, mainWindow, null!);
                             }
@@ -211,6 +273,14 @@ namespace VPetLLM.Services
                         if (ollamaVisionNode != null && ollamaVisionNode.EnableVision)
                         {
                             chatCore = new OllamaChatCore(ollamaVisionNode, _settings, mainWindow, null!);
+                        }
+                        break;
+
+                    case "LMStudio":
+                        var lmNode = _settings.LMStudio?.GetCurrentLMStudioSetting();
+                        if (lmNode is not null && lmNode.EnableVision)
+                        {
+                            chatCore = new LMStudioChatCore(lmNode, _settings, mainWindow, null!);
                         }
                         break;
                 }
@@ -228,6 +298,14 @@ namespace VPetLLM.Services
 
                 // 调用 ChatWithImage
                 await chatCore.ChatWithImage(prompt, imageData);
+
+                // 失败时 capturedResponse 里装的是错误文本（例如「API调用失败: Forbidden ...」）。
+                // 它非空，若直接返回就会被当成图片描述判成功——节点容灾也就永远轮不到第二个节点。
+                if (chatCore.LastCallFailed)
+                {
+                    Logger.Log($"PreprocessingMultimodal: {providerType} 调用失败: {capturedResponse}");
+                    return "";
+                }
 
                 return capturedResponse ?? "";
             }

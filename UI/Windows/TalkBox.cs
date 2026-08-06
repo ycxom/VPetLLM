@@ -542,15 +542,23 @@ namespace VPetLLM.UI.Windows
         /// </summary>
         /// <param name="text">消息文本</param>
         /// <param name="imageData">图片数据</param>
-        public async Task SendChatWithImage(string text, byte[] imageData)
+        public Task SendChatWithImage(string text, byte[] imageData)
+            => SendChatWithImages(text, new[] { imageData });
+
+        /// <summary>
+        /// 发送带多张图片的聊天消息（一次请求内一并送出）
+        /// </summary>
+        public async Task SendChatWithImages(string text, IReadOnlyList<byte[]> images)
         {
-            if (imageData is null || imageData.Length == 0)
+            images = images?.Where(i => i is not null && i.Length > 0).ToList() ?? new List<byte[]>();
+
+            if (images.Count == 0)
             {
                 await SendChat(text);
                 return;
             }
 
-            Logger.Log($"SendChatWithImage called with text: {text}, image size: {imageData.Length}");
+            Logger.Log($"SendChatWithImages called with text: {text}, images: {images.Count}, total {images.Sum(i => i.Length)} bytes");
 
             // 新一轮提问：换发取消令牌，清除上一轮可能留下的中断标记
             InterruptManager.BeginSession();
@@ -578,7 +586,7 @@ namespace VPetLLM.UI.Windows
                 // SmartMessageProcessor 会在处理完成后自动管理动画状态
                 if (_plugin.ChatCore is not null)
                 {
-                    await _plugin.ChatCore.ChatWithImage(text, imageData);
+                    await _plugin.ChatCore.ChatWithImages(text, images);
                 }
                 // 注意：不在这里停止思考动画，由 SmartMessageProcessor 处理
             }
@@ -586,11 +594,11 @@ namespace VPetLLM.UI.Windows
             {
                 if (InterruptManager.IsInterrupted)
                 {
-                    Logger.Log("SendChatWithImage: 本轮已被用户中断");
+                    Logger.Log("SendChatWithImages: 本轮已被用户中断");
                     return;
                 }
 
-                Logger.Log($"An error occurred in SendChatWithImage: {e}");
+                Logger.Log($"An error occurred in SendChatWithImages: {e}");
                 // 只有在发生异常时才停止思考动画
                 StopThinkingAnimationWithoutHide();
                 await Application.Current.Dispatcher.InvokeAsync(() =>

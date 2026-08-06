@@ -48,14 +48,67 @@ namespace VPetLLM.Core.Abstractions.Base
         }
 
         /// <summary>
-        /// 发送带图像的多模态消息（默认实现：不支持）
+        /// 最近一次调用是否失败。
+        ///
+        /// 为什么需要它：错误文本和正常回复都是经 ResponseHandler 送出、随后 return ""，
+        /// 两者在调用方看来完全一样。前置多模态因此会把「API调用失败: Forbidden ...」
+        /// 当成图片描述返回成功，导致视觉节点容灾形同虚设。这个标志位就是用来区分的。
         /// </summary>
-        public virtual Task<string> ChatWithImage(string prompt, byte[] imageData)
+        public bool LastCallFailed { get; protected set; }
+
+        /// <summary>
+        /// 上报一次失败：置位标志并把错误文本照常送给 ResponseHandler
+        /// </summary>
+        protected void ReportFailure(string message)
+        {
+            LastCallFailed = true;
+            ResponseHandler?.Invoke(message);
+        }
+
+        /// <summary>
+        /// 发送带图像的多模态消息。单图是多图的特例，统一走 ChatWithImages，
+        /// 各 provider 只需实现后者。
+        /// </summary>
+        public Task<string> ChatWithImage(string prompt, byte[] imageData)
+            => ChatWithImages(prompt, new[] { imageData });
+
+        /// <summary>
+        /// 发送带多张图像的多模态消息（默认实现：不支持）
+        /// </summary>
+        public virtual Task<string> ChatWithImages(string prompt, IReadOnlyList<byte[]> images)
         {
             Logger.Log($"{Name} 不支持多模态消息");
             ResponseHandler?.Invoke("当前模型不支持图像输入");
             return Task.FromResult("");
         }
+
+        /// <summary>
+        /// 构造 OpenAI 兼容格式的多模态 content 数组：一段文本 + N 张图。
+        /// 五个 provider 里有四个用的是同一套结构，抽出来避免各写各的。
+        /// </summary>
+        protected static object[] BuildMultimodalContent(string prompt, IReadOnlyList<byte[]> images)
+        {
+            var parts = new List<object> { new { type = "text", text = prompt } };
+
+            foreach (var image in images)
+            {
+                if (image is null || image.Length == 0) continue;
+
+                parts.Add(new
+                {
+                    type = "image_url",
+                    image_url = new { url = $"data:image/png;base64,{Convert.ToBase64String(image)}" }
+                });
+            }
+
+            return parts.ToArray();
+        }
+
+        /// <summary>
+        /// 多图日志用的尺寸摘要
+        /// </summary>
+        protected static string DescribeImages(IReadOnlyList<byte[]> images)
+            => $"{images.Count} 张，共 {images.Sum(i => i?.Length ?? 0)} bytes";
 
         protected string GetSystemMessage()
         {

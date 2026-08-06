@@ -25,6 +25,20 @@ namespace VPetLLM.Core.Abstractions.Interfaces
         Task<string> ChatWithImage(string prompt, byte[] imageData);
 
         /// <summary>
+        /// 发送带多张图像的多模态消息（一次请求内一并送出）
+        /// </summary>
+        /// <param name="prompt">文本提示</param>
+        /// <param name="images">图像数据列表，按顺序附在提示词之后</param>
+        /// <returns>响应内容</returns>
+        Task<string> ChatWithImages(string prompt, IReadOnlyList<byte[]> images);
+
+        /// <summary>
+        /// 最近一次调用是否失败。错误文本与正常回复都经 ResponseHandler 送出、
+        /// 随后一律 return ""，调用方只能靠这个标志位区分两者。
+        /// </summary>
+        bool LastCallFailed { get; }
+
+        /// <summary>
         /// 给历史中本轮的助手回复补上"被用户中断"标记，供模型下一轮自我纠正。
         /// 回复尚未入库时不做任何事（保存时会自动带上标记）。
         /// </summary>

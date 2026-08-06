@@ -247,10 +247,16 @@ namespace VPetLLM.Core.Providers.Chat
         /// <param name="prompt">文本提示</param>
         /// <param name="imageData">图像数据</param>
         /// <returns>响应内容</returns>
-        public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
+        public override async Task<string> ChatWithImages(string prompt, IReadOnlyList<byte[]> images)
         {
+            LastCallFailed = false;
             // 钳制尺寸，避免过大的图片被目标服务端拒收
-            imageData = Utils.Common.ImageDownscaler.ClampToMaxDimension(imageData)!;
+            // 逐张钳制尺寸，避免过大的图片被目标服务端拒收；空图直接剔除
+            images = images.Select(i => Utils.Common.ImageDownscaler.ClampToMaxDimension(i)!)
+                           .Where(i => i is not null && i.Length > 0).ToList();
+            if (images.Count == 0) return "";
+            // 历史只有一个图像槽位，先留第一张（见 README 已知限制）
+            var imageData = images[0];
 
             // Handle conversation turn for record weight decrement
             OnConversationTurn();
@@ -266,7 +272,7 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 var noNodeError = "没有启用的OpenAI 节点，请在设置中启用至少一个节点";
                 SystemLogger.Log($"OpenAI ChatWithImage 错误: {noNodeError}");
-                ResponseHandler?.Invoke(noNodeError);
+                ReportFailure(noNodeError);
                 return "";
             }
 
@@ -275,19 +281,14 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 var visionError = "当前节点未启用视觉能力，请在设置中启用EnableVision";
                 SystemLogger.Log($"OpenAI ChatWithImage 错误: {visionError}");
-                ResponseHandler?.Invoke(visionError);
+                ReportFailure(visionError);
                 return "";
             }
 
 
 
             // 构建多模态消息内容
-            var base64Image = Convert.ToBase64String(imageData);
-            var userContent = new object[]
-            {
-                new { type = "text", text = prompt },
-                new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Image}" } }
-            };
+            var userContent = BuildMultimodalContent(prompt, images);
 
             // 构建历史消息（不包含图像）
             List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
@@ -375,7 +376,7 @@ namespace VPetLLM.Core.Providers.Chat
                         if (!response.IsSuccessStatusCode)
                         {
                             var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -435,7 +436,7 @@ namespace VPetLLM.Core.Providers.Chat
                         if (!response.IsSuccessStatusCode)
                         {
                             var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -464,7 +465,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
                 SystemLogger.Log($"OpenAI ChatWithImage 异常: {ex.Message}");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
 

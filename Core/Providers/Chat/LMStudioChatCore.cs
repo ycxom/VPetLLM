@@ -235,16 +235,22 @@ namespace VPetLLM.Core.Providers.Chat
             }
         }
 
-        public override async Task<string> ChatWithImage(string prompt, byte[] imageData)
+        public override async Task<string> ChatWithImages(string prompt, IReadOnlyList<byte[]> images)
         {
+            LastCallFailed = false;
             // 钳制尺寸，避免过大的图片被目标服务端拒收
-            imageData = Utils.Common.ImageDownscaler.ClampToMaxDimension(imageData)!;
+            // 逐张钳制尺寸，避免过大的图片被目标服务端拒收；空图直接剔除
+            images = images.Select(i => Utils.Common.ImageDownscaler.ClampToMaxDimension(i)!)
+                           .Where(i => i is not null && i.Length > 0).ToList();
+            if (images.Count == 0) return "";
+            // 历史只有一个图像槽位，先留第一张（见 README 已知限制）
+            var imageData = images[0];
 
             if (!_lmStudioSetting.EnableVision)
             {
                 var visionError = "LM Studio 未启用视觉能力，请在设置中启用 EnableVision";
                 SystemLogger.Log($"LM Studio ChatWithImage 错误: {visionError}");
-                ResponseHandler?.Invoke(visionError);
+                ReportFailure(visionError);
                 return "";
             }
 
@@ -252,12 +258,7 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 OnConversationTurn();
 
-                var base64Image = Convert.ToBase64String(imageData);
-                var userContent = new object[]
-                {
-                    new { type = "text", text = prompt },
-                    new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Image}" } }
-                };
+                var userContent = BuildMultimodalContent(prompt, images);
 
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 var requestMessages = new List<object>();
@@ -315,7 +316,7 @@ namespace VPetLLM.Core.Providers.Chat
                         if (!response.IsSuccessStatusCode)
                         {
                             var errorMessage = await HandleHttpError(response, Settings, "LM Studio");
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -364,7 +365,7 @@ namespace VPetLLM.Core.Providers.Chat
                         if (!response.IsSuccessStatusCode)
                         {
                             var errorMessage = await HandleHttpError(response, Settings, "LM Studio");
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -401,7 +402,7 @@ namespace VPetLLM.Core.Providers.Chat
                 SystemLogger.Log($"LM Studio ChatWithImage 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorHelper.GetOllamaTimeoutError(Settings)
                     ?? $"LM Studio 请求超时: {tcEx.Message}";
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (HttpRequestException httpEx)
@@ -409,7 +410,7 @@ namespace VPetLLM.Core.Providers.Chat
                 SystemLogger.Log($"LM Studio ChatWithImage 网络异常: {httpEx.Message}");
                 var errorMessage = ErrorHelper.GetOllamaConnectionError(Settings)
                     ?? $"LM Studio 网络异常: {httpEx.Message}";
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (Exception ex)
@@ -423,7 +424,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 SystemLogger.Log($"LM Studio ChatWithImage 异常: {ex.Message}");
                 var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "LM Studio");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
         }

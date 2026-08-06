@@ -1361,17 +1361,17 @@ namespace VPetLLM
                 {
                     try
                     {
-                        if (args.ImageData is not null && args.ImageData.Length > 0)
+                        if (args.Images.Count > 0)
                         {
-                            Logger.Log($"Sending screenshot with prompt: {args.Prompt}");
+                            Logger.Log($"Sending {args.Images.Count} screenshot(s) with prompt: {args.Prompt}");
 
                             if (TalkBox is not null)
                             {
-                                await TalkBox.SendChatWithImage(args.Prompt, args.ImageData);
+                                await TalkBox.SendChatWithImages(args.Prompt, args.Images);
                             }
                             else if (ChatCore is not null)
                             {
-                                await ChatCore.ChatWithImage(args.Prompt, args.ImageData);
+                                await ChatCore.ChatWithImages(args.Prompt, args.Images);
                             }
                         }
                         else
@@ -1418,9 +1418,9 @@ namespace VPetLLM
                 {
                     try
                     {
-                        if (args.ImageData is not null && args.ImageData.Length > 0)
+                        if (args.Images.Count > 0)
                         {
-                            Logger.Log($"Processing screenshot with preprocessing");
+                            Logger.Log($"Processing {args.Images.Count} screenshot(s) with preprocessing");
 
                             Application.Current.Dispatcher.Invoke(() =>
                             {
@@ -1431,7 +1431,7 @@ namespace VPetLLM
                             if (_screenshotService is Services.ScreenshotService screenshotService)
                             {
                                 _pendingImageData = args.ImageData;
-                                await screenshotService.ProcessWithPreprocessingAsync(args.ImageData, args.Prompt);
+                                await screenshotService.ProcessWithPreprocessingAsync(args.Images, args.Prompt);
                             }
                             else
                             {

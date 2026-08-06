@@ -65,6 +65,16 @@ namespace VPetLLM.Services
         Task<PreprocessingResult> AnalyzeImageAsync(byte[] imageData, string? customPrompt = null);
 
         /// <summary>
+        /// 用主聊天渠道（Setting.Provider）分析图片，供原生多模态模式使用。
+        /// AnalyzeImageAsync 读的是 Screenshot.MultimodalProvider 那套独立的前置视觉配置，
+        /// 两者指向的渠道通常不是同一个，不可混用。
+        /// </summary>
+        /// <param name="imageData">图片数据</param>
+        /// <param name="customPrompt">自定义提示词（可选）</param>
+        /// <returns>处理结果</returns>
+        Task<PreprocessingResult> AnalyzeWithMainProviderAsync(byte[] imageData, string? customPrompt = null);
+
+        /// <summary>
         /// 获取所有可用的视觉节点
         /// </summary>
         /// <returns>视觉节点列表</returns>
