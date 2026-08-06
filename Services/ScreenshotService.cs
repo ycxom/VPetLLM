@@ -296,7 +296,10 @@ namespace VPetLLM.Services
                 var processingMode = _settings.Screenshot.ProcessingMode;
                 Logger.Log($"Processing screenshot with mode: {processingMode}");
 
-                if (processingMode == ScreenshotProcessingMode.OCRApi)
+                // 只有 AutoSend 打开时才在这里直接识别并发送；
+                // 否则图片交给编辑器流程，由用户补充提问后再识别，
+                // 避免同一张图被识别两次（编辑器发送时还会再走一次）。
+                if (processingMode == ScreenshotProcessingMode.OCRApi && _settings.Screenshot.AutoSend)
                 {
                     _ = Task.Run(async () =>
                     {
@@ -349,6 +352,32 @@ namespace VPetLLM.Services
             => ProcessWithPreprocessingAsync(new[] { imageData }, userQuestion);
 
         /// <summary>
+        /// 把一张图变成文字。OCR 模式与前置多模态走的是同一条链路，
+        /// 区别只在识别时用的提示词——所以在这里按模式分流，
+        /// 上层的单图/多图逻辑不必各自再判断一次。
+        /// </summary>
+        private async Task<PreprocessingResult> RecognizeImageAsync(byte[] image)
+        {
+            if (_settings.Screenshot?.ProcessingMode != ScreenshotProcessingMode.OCRApi)
+            {
+                return await _preprocessingMultimodal.AnalyzeImageAsync(image);
+            }
+
+            try
+            {
+                var text = await PerformOCR(image);
+                return string.IsNullOrWhiteSpace(text)
+                    ? PreprocessingResult.CreateFailure("未识别到文字")
+                    : PreprocessingResult.CreateSuccess(text, "OCR");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ScreenshotService: OCR 识别失败: {ex.Message}");
+                return PreprocessingResult.CreateFailure($"OCR 识别失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 多图前置处理：逐张送视觉模型拿描述，再把描述按顺序编号拼成一段文本。
         /// 前置多模态的本质是「把图翻译成文字再给主模型」，所以多图只能逐张翻译后合并，
         /// 没法像原生多模态那样一次请求塞多张。
@@ -377,7 +406,7 @@ namespace VPetLLM.Services
 
                 for (int i = 0; i < images.Count; i++)
                 {
-                    var result = await _preprocessingMultimodal.AnalyzeImageAsync(images[i]);
+                    var result = await RecognizeImageAsync(images[i]);
                     if (result.Success && !string.IsNullOrWhiteSpace(result.ImageDescription))
                     {
                         descriptions.Add($"【图片 {i + 1}/{images.Count}】{result.ImageDescription.Trim()}");
@@ -422,7 +451,7 @@ namespace VPetLLM.Services
                 Logger.Log($"Starting preprocessing multimodal analysis, image size: {imageData.Length} bytes");
                 SetState(ScreenshotState.Processing);
 
-                var result = await _preprocessingMultimodal.AnalyzeImageAsync(imageData);
+                var result = await RecognizeImageAsync(imageData);
 
                 if (result.Success)
                 {

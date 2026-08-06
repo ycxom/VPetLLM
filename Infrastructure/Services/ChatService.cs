@@ -207,7 +207,12 @@ namespace VPetLLM.Infrastructure.Services
         }
 
         /// <summary>
-        /// 发送带图像的多模态消�?
+        /// 发送带图像的多模态消息。
+        ///
+        /// 注意：这是 Infrastructure 层的备用入口，当前无任何调用方——图像的实际处理链路
+        /// 统一走「截图与模型视觉」那一套（ScreenshotService / PreprocessingMultimodal /
+        /// SeeScreenHandler），由 Screenshot.ProcessingMode 决定走原生多模态、前置多模态还是 OCR。
+        /// 若将来要启用本方法，请先确认它不会绕开那套模式判断，否则会出现两条行为不一致的图像链路。
         /// </summary>
         public async Task<string> ChatWithImageAsync(string prompt, byte[] imageData)
         {

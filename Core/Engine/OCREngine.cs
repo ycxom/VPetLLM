@@ -17,18 +17,69 @@ namespace VPetLLM.Core.Engine
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
         }
 
+        /// <summary>
+        /// OCR 是否走独立端点（用户单独填了 key/base_url）。
+        ///
+        /// 为 false 时，OCR 复用的是截图视觉那套节点——也就是说它与视觉调用
+        /// 共享端点和凭据，**不构成独立的失败域**。调用方若想拿 OCR 当视觉失败后的兜底，
+        /// 必须先看这个属性：同一套节点刚失败过，再打一次只是白费往返。
+        /// </summary>
+        public bool UsesDedicatedEndpoint =>
+            _settings.Screenshot?.OCR?.Provider == "OpenAI"
+            && !string.IsNullOrWhiteSpace(_settings.Screenshot?.OCR?.ApiKey);
+
         /// <inheritdoc/>
         public async Task<string> RecognizeText(byte[] imageData)
         {
-            var provider = _settings.Screenshot.OCR.Provider;
-            Logger.Log($"Performing OCR with provider: {provider}");
+            var ocrSettings = _settings.Screenshot.OCR;
+            var provider = ocrSettings.Provider;
 
-            return provider switch
+            // 只有当用户确实单独填了 OCR 专用端点时，才走那条独立链路。
+            // 否则一律复用截图视觉那套节点配置——OCR 本质就是「带识字提示词的视觉调用」，
+            // 没道理让用户在节点系统之外再维护一份 key/base_url。
+            if (UsesDedicatedEndpoint)
             {
-                "OpenAI" => await RecognizeWithOpenAI(imageData),
-                "Free" => await RecognizeWithFree(imageData),
-                _ => throw new NotSupportedException($"OCR provider not supported: {provider}")
-            };
+                Logger.Log("OCREngine: 使用独立配置的 OpenAI OCR 端点");
+                return await RecognizeWithOpenAI(imageData);
+            }
+
+            Logger.Log($"OCREngine: 未配置独立 OCR 端点（provider={provider}），复用视觉节点识字");
+            return await RecognizeWithConfiguredNodes(imageData);
+        }
+
+        /// <summary>
+        /// 复用截图视觉的节点配置做文字识别。
+        /// 好处：与截图共用同一份节点（模型、密钥、地址都不必重复填），
+        /// 并且自动获得多节点容灾；也顺带补上了 Free 渠道的 OCR
+        /// （原本 RecognizeWithFree 只是个返回占位文案的桩）。
+        /// </summary>
+        private async Task<string> RecognizeWithConfiguredNodes(byte[] imageData)
+        {
+            var lang = _settings.PromptLanguage ?? "zh";
+            var prompt = PromptHelper.Get("OCR_Recognize_Prompt", lang);
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                prompt = lang == "zh"
+                    ? "请识别这张图片中的所有文字，只返回识别到的文字内容，不要添加任何解释或格式。"
+                    : "Extract all text from this image. Return only the recognized text, without any explanation or formatting.";
+            }
+
+            var preprocessing = new global::VPetLLM.Services.PreprocessingMultimodal(_settings, _plugin);
+
+            // 用户显式选过视觉节点就用那些；没选则退回主聊天渠道
+            var result = preprocessing.HasAvailableProvider()
+                ? await preprocessing.AnalyzeImageAsync(imageData, prompt)
+                : await preprocessing.AnalyzeWithMainProviderAsync(imageData, prompt);
+
+            if (!result.Success || string.IsNullOrWhiteSpace(result.ImageDescription))
+            {
+                var reason = string.IsNullOrWhiteSpace(result.ErrorMessage) ? "未返回内容" : result.ErrorMessage;
+                Logger.Log($"OCREngine: 节点识字失败: {reason}");
+                throw new InvalidOperationException($"OCR 失败: {reason}");
+            }
+
+            Logger.Log($"OCREngine: 节点识字成功（{result.UsedProvider}），{result.ImageDescription.Length} 字");
+            return result.ImageDescription;
         }
 
         /// <summary>

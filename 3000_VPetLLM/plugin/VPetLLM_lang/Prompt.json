@@ -394,5 +394,9 @@
     "Capability_Plugin": {
         "en": "- Tools: you have external plugins/tools installed; see the plugin list for what each one does.",
         "zh": "- 工具：你安装了外部插件/工具，具体能力见插件列表。"
+    },
+    "OCR_Recognize_Prompt": {
+        "en": "Extract all text from this image. Return only the recognized text, without any explanation or formatting.",
+        "zh": "请识别这张图片中的所有文字，只返回识别到的文字内容，不要添加任何解释或格式。"
     }
 }

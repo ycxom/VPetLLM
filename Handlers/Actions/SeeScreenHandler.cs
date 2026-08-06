@@ -171,15 +171,27 @@ namespace VPetLLM.Handlers.Actions
                 return $"[屏幕内容]\n{result.ImageDescription.Trim()}\n[/屏幕内容]";
             }
 
-            // 视觉不可用（鉴权失败、节点全挂、返回空）时回落 OCR：
-            // 读出屏幕上的文字，总好过让 AI 干瞪眼
             var visionError = string.IsNullOrWhiteSpace(result.ErrorMessage) ? "视觉模型没有返回内容" : result.ErrorMessage;
-            Logger.Log($"SeeScreenHandler: 视觉分析失败（{visionError}），回落 OCR");
 
-            var fallback = await AnalyzeWithOcrAsync(imageData);
-            if (!fallback.StartsWith("[屏幕内容] "))
+            // 视觉不可用时回落 OCR——但只在 OCR 确实是另一条链路时才值得试。
+            // OCR 未配独立端点时复用的就是刚失败的这批节点，凭据和地址完全一样，
+            // 再打一次必然同样失败，只是多耗一次往返和一次超时等待。
+            var ocrEngine = new OCREngine(_settings, VPetLLM.Instance);
+            if (ocrEngine.UsesDedicatedEndpoint)
             {
-                return fallback;
+                Logger.Log($"SeeScreenHandler: 视觉分析失败（{visionError}），回落独立 OCR 端点");
+
+                var fallback = await AnalyzeWithOcrAsync(imageData);
+                if (!fallback.StartsWith("[屏幕内容] "))
+                {
+                    return fallback;
+                }
+                Logger.Log("SeeScreenHandler: 独立 OCR 端点同样未取到文字");
+            }
+            else
+            {
+                Logger.Log($"SeeScreenHandler: 视觉分析失败（{visionError}）；" +
+                           "OCR 与视觉共用同一批节点，跳过必然失败的重试");
             }
 
             // OCR 也没成：给 AI 一句干净的说明即可。

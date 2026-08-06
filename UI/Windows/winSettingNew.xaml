@@ -1896,7 +1896,7 @@
             </TabItem>
 
             <!-- Screenshot 独立标签页-->
-            <TabItem Header="{utils:Localize KeyPath=Screenshot.Tab, Default=截图与OCR}"
+            <TabItem Header="{utils:Localize KeyPath=Screenshot.Tab, Default=截图与模型视觉}"
                     x:Name="Tab_Screenshot_Main"
                     Style="{StaticResource ModernTabItem}">
                 <Grid>
@@ -2022,7 +2022,7 @@
                                             Margin="0,0,0,16"
                                             Style="{StaticResource ModernTextBox}"/>
 
-                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.OCR.Description, Default=OCR 模式将使用OpenAI Vision API 识别图像中的文字}"
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.OCR.Description, Default=OCR 模式默认复用「前置多模态」配置的视觉节点（未配置则使用主聊天渠道）识别文字；只有需要接入独立的 OpenAI 接口时，才需要在下方填写 API 地址和 Key}"
                                             Style="{StaticResource DescriptionText}"
                                             Margin="0,0,0,16"/>
                                 </StackPanel>

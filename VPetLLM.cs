@@ -1337,12 +1337,20 @@ namespace VPetLLM
                         ShowScreenshotEditor(e.ImageData);
                     });
                 }
-                else if (processingMode == Configuration.ScreenshotProcessingMode.PreprocessingMultimodal)
+                else if (processingMode == Configuration.ScreenshotProcessingMode.PreprocessingMultimodal
+                         || processingMode == Configuration.ScreenshotProcessingMode.OCRApi)
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
+                    // OCR 与前置多模态是同一条链路：图 → 文字 → 与提问拼合 → 发主模型，
+                    // 只是识别时用的提示词不同。所以共用同一个编辑器流程，
+                    // 用户同样能补充提问、追加多张图。
+                    // AutoSend 打开时才跳过编辑器，由 ScreenshotService.ProcessScreenshot 直接识别并发送。
+                    if (!Settings.Screenshot.AutoSend)
                     {
-                        ShowScreenshotEditorForPreprocessing(e.ImageData);
-                    });
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            ShowScreenshotEditorForPreprocessing(e.ImageData);
+                        });
+                    }
                 }
             }
             catch (Exception ex)

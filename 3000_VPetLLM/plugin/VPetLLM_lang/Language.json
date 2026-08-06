@@ -3191,10 +3191,10 @@
   },
   "Screenshot": {
     "Tab": {
-      "en": "Screenshot & OCR",
-      "zh-hans": "截图与OCR",
-      "zh-hant": "截圖與OCR",
-      "jp": "スクリーンショット＆OCR"
+      "en": "Screenshot & Model Vision",
+      "zh-hans": "截图与模型视觉",
+      "zh-hant": "截圖與模型視覺",
+      "jp": "スクリーンショットとモデルビジョン"
     },
     "BasicSettings": {
       "en": "Basic Settings",
@@ -3386,10 +3386,10 @@
         "jp": "認識言語"
       },
       "Description": {
-        "en": "OCR mode uses OpenAI Vision API to recognize text in images",
-        "zh-hans": "OCR 模式将使用 OpenAI Vision API 识别图像中的文字",
-        "zh-hant": "OCR 模式將使用 OpenAI Vision API 識別圖像中的文字",
-        "jp": "OCRモードはOpenAI Vision APIを使用して画像内のテキストを認識します"
+        "en": "OCR mode reuses the vision nodes configured for Preprocessing Multimodal (or the main chat provider if none configured) to recognize text. Only fill in the API URL and Key below if you need a dedicated OpenAI endpoint instead.",
+        "zh-hans": "OCR 模式默认复用「前置多模态」配置的视觉节点（未配置则使用主聊天渠道）识别文字；只有需要接入独立的 OpenAI 接口时，才需要在下方填写 API 地址和 Key",
+        "zh-hant": "OCR 模式預設複用「前置多模態」配置的視覺節點（未配置則使用主聊天管道）識別文字；僅當你需要接入獨立的 OpenAI 介面時，才需要在下方填寫 API 位址和 Key",
+        "jp": "OCRモードはデフォルトで「前置マルチモーダル」に設定されたビジョンノード（未設定の場合はメインチャットプロバイダー）を再利用してテキストを認識します。専用のOpenAIエンドポイントが必要な場合のみ、下記にAPI URLとKeyを入力してください"
       }
     },
     "OCRProvider": {
