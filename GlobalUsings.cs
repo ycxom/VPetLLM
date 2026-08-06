@@ -87,9 +87,6 @@ global using InfraConfigurationManager = VPetLLM.Infrastructure.Configuration.Co
 global using ServiceStatusChangedEvent = VPetLLM.Infrastructure.Events.InfraServiceStatusChangedEvent;
 
 // 別名逻辑 - 解决服务类冲突
-global using InfraTTSService = VPetLLM.Infrastructure.Services.TTSService;
-global using InfraASRService = VPetLLM.Infrastructure.Services.ASRService;
-global using InfraTTSRequest = VPetLLM.Infrastructure.Services.TTSRequest;
 global using UtilsTTSService = VPetLLM.Utils.Audio.TTSService;
 global using UtilsASRService = VPetLLM.Utils.Audio.ASRService;
 
