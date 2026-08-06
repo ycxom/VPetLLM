@@ -3181,6 +3181,14 @@
       "jp": "スクリーンショットが有効になっていません。設定で構成してください"
     }
   },
+  "TalkBox": {
+    "Interrupt": {
+      "en": "Stop",
+      "zh-hans": "中断",
+      "zh-hant": "中斷",
+      "jp": "中断"
+    }
+  },
   "Screenshot": {
     "Tab": {
       "en": "Screenshot & OCR",

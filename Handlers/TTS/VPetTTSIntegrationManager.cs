@@ -134,6 +134,13 @@ public class VPetTTSIntegrationManager
         int successCount = 0;
         foreach (var text in texts)
         {
+            // 预加载 = 真去合成一遍音频，中断后再合成剩下的纯属烧算力和额度
+            if (InterruptManager.IsInterrupted)
+            {
+                Logger.Log($"VPetTTSIntegrationManager: 已中断，停止预加载剩余文本（已完成 {successCount}/{texts.Count}）");
+                break;
+            }
+
             try
             {
                 var success = await coordinator.PreloadTextAsync(text);

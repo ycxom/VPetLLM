@@ -3,32 +3,177 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Screenshot Capture"
         WindowStyle="None"
-        AllowsTransparency="True"
-        Background="Transparent"
+        ResizeMode="NoResize"
+        Background="Black"
         Topmost="True"
         ShowInTaskbar="False"
         WindowStartupLocation="Manual"
+        UseLayoutRounding="True"
         Cursor="Cross">
-    <Grid>
-        <!-- 半透明遮罩层 -->
-        <Canvas x:Name="OverlayCanvas" Background="#40000000">
-            <!-- 选择区域矩形 -->
-            <Rectangle x:Name="SelectionRect"
-                       Stroke="#FF00BFFF"
-                       StrokeThickness="2"
-                       Fill="#20FFFFFF"
-                       Visibility="Collapsed"/>
-        </Canvas>
-        
-        <!-- 提示文本 -->
-        <TextBlock x:Name="HintText"
-                   Text="拖动鼠标选择截图区域，按 Enter 确认，按 Escape 取消"
-                   Foreground="White"
-                   FontSize="16"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Top"
-                   Margin="0,50,0,0"
-                   Padding="20,10"
-                   Background="#80000000"/>
-    </Grid>
+    <Window.Resources>
+        <!-- 工具栏按钮：扁平深色，悬停高亮；主按钮用 AccentToolButton -->
+        <Style x:Key="ToolButton" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="1,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Arrow"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#55FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="AccentToolButton" TargetType="Button" BasedOn="{StaticResource ToolButton}">
+            <Setter Property="Background" Value="#FF0A84C8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+    </Window.Resources>
+
+    <Canvas x:Name="OverlayCanvas" ClipToBounds="True">
+        <!-- 冻结的桌面底图：选区期间画面不再变化，放大镜也从这里采样 -->
+        <Image x:Name="FrozenScreen"
+               Canvas.Left="0" Canvas.Top="0"
+               Stretch="Fill"
+               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+
+        <!-- 变暗遮罩：整屏减去选区的组合几何，选区内保持原始亮度 -->
+        <Path x:Name="DimMask" Fill="#78000000" IsHitTestVisible="False"/>
+
+        <!-- 自动识别窗口时的高亮框。与选区完全分离：它只是"预览"，
+             不写入选区状态，必须由用户单击才会转成真正的选区 -->
+        <Rectangle x:Name="WindowHighlight"
+                   Stroke="#FF00BFFF"
+                   StrokeThickness="2"
+                   StrokeDashArray="4 3"
+                   IsHitTestVisible="False"
+                   Visibility="Collapsed"/>
+
+        <!-- 选区边框 -->
+        <Rectangle x:Name="SelectionRect"
+                   Stroke="#FF00BFFF"
+                   StrokeThickness="1"
+                   IsHitTestVisible="False"
+                   Visibility="Collapsed"/>
+
+        <!-- 标注（马赛克/画框）拖动时的预览框，配色跟随当前工具 -->
+        <Rectangle x:Name="ShapePreview"
+                   Stroke="#FFFFC400"
+                   StrokeThickness="1"
+                   StrokeDashArray="3 2"
+                   Fill="#30FFC400"
+                   IsHitTestVisible="False"
+                   Visibility="Collapsed"/>
+
+        <!-- 顶部提示条 -->
+        <Border x:Name="HintPanel"
+                Background="#B4000000"
+                BorderBrush="#40FFFFFF"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="18,10"
+                IsHitTestVisible="False">
+            <StackPanel>
+                <TextBlock x:Name="ReasonText"
+                           Foreground="#FF7FD8FF"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           TextAlignment="Center"
+                           Margin="0,0,0,4"
+                           Visibility="Collapsed"/>
+                <TextBlock x:Name="HintText"
+                           Foreground="White"
+                           FontSize="14"
+                           TextAlignment="Center"
+                           Text="移动鼠标自动识别窗口，单击即可捕获；拖动可自由框选（Shift 正方形 / Ctrl+A 全屏 / 方向键微调）"/>
+            </StackPanel>
+        </Border>
+
+        <!-- 框选完成后出现的功能栏（类似 QQ 截图），贴在选区右下角 -->
+        <Border x:Name="Toolbar"
+                Background="#E6202020"
+                BorderBrush="#40FFFFFF"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="4"
+                Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="ToolbarSizeText"
+                           Foreground="#FF9AA0A6"
+                           FontFamily="Consolas" FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="6,0,8,0"/>
+                <Border Width="1" Background="#33FFFFFF" Margin="0,4"/>
+                <Button x:Name="BtnMosaic"  Style="{StaticResource ToolButton}"       Content="马赛克" ToolTip="涂抹遮盖敏感内容：开启后在选区内拖动"/>
+                <Button x:Name="BtnRect"    Style="{StaticResource ToolButton}"       Content="画框"   ToolTip="画矩形标记框：开启后在选区内拖动"/>
+                <Button x:Name="BtnUndo"    Style="{StaticResource ToolButton}"       Content="撤销"   ToolTip="撤销上一次涂抹 (Ctrl+Z)"/>
+                <Border Width="1" Background="#33FFFFFF" Margin="0,4"/>
+                <Button x:Name="BtnRedo"    Style="{StaticResource ToolButton}"       Content="重选"   ToolTip="重新框选区域"/>
+                <Button x:Name="BtnCopy"    Style="{StaticResource ToolButton}"       Content="复制"   ToolTip="复制到剪贴板 (Ctrl+C)"/>
+                <Button x:Name="BtnSave"    Style="{StaticResource ToolButton}"       Content="保存"   ToolTip="另存为 PNG (Ctrl+S)"/>
+                <Border Width="1" Background="#33FFFFFF" Margin="0,4"/>
+                <Button x:Name="BtnCancel"  Style="{StaticResource ToolButton}"       Content="取消"   ToolTip="放弃本次截图 (Esc)"/>
+                <Button x:Name="BtnConfirm" Style="{StaticResource AccentToolButton}" Content="✓ 确认" ToolTip="确认并使用这张截图 (Enter)"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ShareX 风格像素放大镜：跟随光标，最近邻放大，中心十字定位当前像素 -->
+        <Border x:Name="Magnifier"
+                Background="#DC000000"
+                BorderBrush="#8CFFFFFF"
+                BorderThickness="1"
+                CornerRadius="3"
+                Padding="4"
+                IsHitTestVisible="False"
+                Visibility="Collapsed">
+            <StackPanel>
+                <Border BorderBrush="#8CFFFFFF" BorderThickness="1">
+                    <Grid Width="140" Height="140">
+                        <Image x:Name="MagnifierImage"
+                               Stretch="Fill"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                        <!-- 中心像素十字准星 -->
+                        <Rectangle x:Name="CrosshairV"
+                                   Width="2" Fill="#FF00BFFF"
+                                   HorizontalAlignment="Left" VerticalAlignment="Stretch"/>
+                        <Rectangle x:Name="CrosshairH"
+                                   Height="2" Fill="#FF00BFFF"
+                                   VerticalAlignment="Top" HorizontalAlignment="Stretch"/>
+                    </Grid>
+                </Border>
+                <TextBlock x:Name="MagPosText"
+                           Foreground="White" FontFamily="Consolas" FontSize="12"
+                           Margin="2,4,2,0"/>
+                <TextBlock x:Name="MagSizeText"
+                           Foreground="#FF7FD8FF" FontFamily="Consolas" FontSize="12"
+                           Margin="2,1,2,0"/>
+                <StackPanel Orientation="Horizontal" Margin="2,3,2,1">
+                    <Border x:Name="ColorSwatch"
+                            Width="12" Height="12"
+                            BorderBrush="#8CFFFFFF" BorderThickness="1"
+                            VerticalAlignment="Center"/>
+                    <TextBlock x:Name="MagColorText"
+                               Foreground="White" FontFamily="Consolas" FontSize="12"
+                               Margin="5,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Canvas>
 </Window>

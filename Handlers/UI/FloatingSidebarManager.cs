@@ -470,7 +470,7 @@ namespace VPetLLM.Handlers.UI
         {
             // 状态记在管理器上，而不是只记在侧边栏控件里：
             // 侧边栏被用户关掉时控件根本不存在，但"当前是否在响应"这个信息
-            // 气泡上的中断按钮同样要用
+            // 输入框上的中断按钮同样要用
             _lastStatus = status;
 
             try
@@ -486,7 +486,7 @@ namespace VPetLLM.Handlers.UI
             }
 
             // 状态变化可能意味着中断按钮该出现或该消失
-            try { global::VPetLLM.UI.Controls.BubbleInterruptButton.Refresh(); }
+            try { global::VPetLLM.UI.Controls.TalkBoxInterruptButton.Refresh(); }
             catch (Exception ex) { Logger.Log($"Error refreshing bubble interrupt button: {ex.Message}"); }
         }
 

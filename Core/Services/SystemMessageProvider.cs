@@ -103,6 +103,73 @@ namespace VPetLLM.Core.Services
             return "";
         }
 
+        /// <summary>
+        /// 汇总当前真实可用的「自身能力」，只列开关打开的项。
+        /// 每条形如「- 能力：一句话说明（调用方式）」，让模型能直接回答用户的能力问询。
+        /// </summary>
+        private List<string> BuildCapabilityList(string lang)
+        {
+            var items = new List<string>();
+
+            void Add(string key)
+            {
+                var text = PromptHelper.Get(key, lang);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    items.Add(text);
+                }
+            }
+
+            try
+            {
+                if (_settings.Screenshot?.IsEnabled == true)
+                {
+                    Add("Capability_SeeScreen");
+                }
+
+                if (_settings.ASR?.IsEnabled == true)
+                {
+                    Add("Capability_Listen");
+                }
+
+                if (_settings.TTS?.IsEnabled == true || VPetLLM.Instance?.IsVPetTTSPluginDetected == true)
+                {
+                    Add("Capability_Speak");
+                }
+
+                if (_settings.EnableMediaPlayback)
+                {
+                    Add("Capability_Play");
+                }
+
+                if (_settings.Records?.EnableRecords ?? true)
+                {
+                    Add("Capability_Memory");
+                }
+
+                if (_settings.EnableBuy)
+                {
+                    Add("Capability_Buy");
+                }
+
+                if (_settings.EnableActionExecution)
+                {
+                    Add("Capability_Action");
+                }
+
+                if (_settings.EnablePlugin && (VPetLLM.Instance?.Plugins.Any(p => p.Enabled) ?? false))
+                {
+                    Add("Capability_Plugin");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SystemMessageProvider: 构建能力清单失败: {ex.Message}");
+            }
+
+            return items;
+        }
+
         public string GetSystemMessage()
         {
             if (_settings is null || _mainWindow is null || _actionProcessor is null) return "";
@@ -223,7 +290,8 @@ namespace VPetLLM.Core.Services
                         isEnabled = _settings.EnableMediaPlayback;
                     }
 
-                    if (isEnabled)
+                    // 描述为空表示该 handler 自认不可用（如未配置的能力），不要塞空行进提示词
+                    if (isEnabled && !string.IsNullOrWhiteSpace(handler.Description))
                     {
                         instructions.Add(handler.Description);
                     }
@@ -233,6 +301,15 @@ namespace VPetLLM.Core.Services
                 {
                     parts.Add(PromptHelper.Get("Available_Commands_Prefix", lang)
                                 .Replace("{CommandList}", string.Join("\n", instructions)));
+                }
+
+                // 能力清单：命令说明只告诉 AI「怎么调」，这里额外告诉它「你确实拥有这些能力」，
+                // 避免用户问「你能看屏幕吗」时它凭直觉否认
+                var capabilities = BuildCapabilityList(lang);
+                if (capabilities.Any())
+                {
+                    parts.Add(PromptHelper.Get("Self_Capabilities_Prefix", lang)
+                                .Replace("{CapabilityList}", string.Join("\n", capabilities)));
                 }
 
                 // 只有在Records系统启用时才添加记录系统说明

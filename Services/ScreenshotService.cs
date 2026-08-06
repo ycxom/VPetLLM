@@ -213,6 +213,62 @@ namespace VPetLLM.Services
         }
 
         /// <inheritdoc/>
+        public async Task<byte[]?> RequestUserCaptureAsync(string reason, int timeoutSeconds = 60)
+        {
+            if (_currentState != ScreenshotState.Idle)
+            {
+                Logger.Log($"ScreenshotService: 当前状态为 {_currentState}，拒绝 AI 的截图请求");
+                return null;
+            }
+
+            var tcs = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            UI.Windows.winScreenshotCapture? window = null;
+
+            try
+            {
+                SetState(ScreenshotState.Capturing);
+
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    window = new UI.Windows.winScreenshotCapture(reason);
+                    window.ScreenshotCaptured += (s, data) => tcs.TrySetResult(data);
+                    window.CaptureCancelled += (s, e) => tcs.TrySetResult(null);
+                    // 兜底：窗口被外部关闭（如宿主退出）时也要让等待方解除阻塞
+                    window.Closed += (s, e) => tcs.TrySetResult(null);
+                    window.Show();
+                });
+
+                var timeout = Task.Delay(TimeSpan.FromSeconds(Math.Max(5, timeoutSeconds)));
+                var finished = await Task.WhenAny(tcs.Task, timeout);
+
+                if (finished != tcs.Task)
+                {
+                    Logger.Log($"ScreenshotService: AI 截图请求等待超时（{timeoutSeconds}s），自动取消");
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        try { window?.Close(); } catch { }
+                    });
+                    return null;
+                }
+
+                var result = await tcs.Task;
+                Logger.Log(result is null
+                    ? "ScreenshotService: 用户取消了 AI 的截图请求"
+                    : $"ScreenshotService: 用户已授权截图，{result.Length} 字节");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ScreenshotService: AI 截图请求失败: {ex.Message}");
+                return null;
+            }
+            finally
+            {
+                SetState(ScreenshotState.Idle);
+            }
+        }
+
+        /// <inheritdoc/>
         public void CancelCapture()
         {
             try

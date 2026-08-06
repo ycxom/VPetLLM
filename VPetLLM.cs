@@ -966,8 +966,8 @@ namespace VPetLLM
                     _floatingSidebarManager.Show();
                 }
 
-                // 气泡上的中断按钮：侧边栏没显示时才出现，给关掉侧边栏的用户留一个中断入口
-                UI.Controls.BubbleInterruptButton.Attach(this);
+                // 劫持输入框的发送按钮：处理期间变成"中断"，给关掉侧边栏的用户留一个中断入口
+                UI.Controls.TalkBoxInterruptButton.Attach(this);
             }
             catch (Exception ex)
             {
@@ -1220,7 +1220,7 @@ namespace VPetLLM
                 // 清理服务
                 _voiceInputService?.Dispose();
                 _purchaseService?.Dispose();
-                UI.Controls.BubbleInterruptButton.Detach();
+                UI.Controls.TalkBoxInterruptButton.Detach();
                 _floatingSidebarManager?.Dispose();
                 TTSService?.Dispose();
                 TouchInteractionHandler?.Dispose();
@@ -2033,11 +2033,34 @@ namespace VPetLLM
         }
 
         /// <summary>
+        /// 语音输入是否正在录音/编辑中。
+        /// ListenHandler 用它避免把用户正在进行的录音顶掉。
+        /// </summary>
+        public bool IsVoiceInputActive
+        {
+            get
+            {
+                var service = _voiceInputService as Infrastructure.Services.ApplicationServices.VoiceInputService;
+                return service is not null
+                    && service.CurrentState != Infrastructure.Services.ApplicationServices.VoiceInputState.Idle;
+            }
+        }
+
+        /// <summary>
         /// 开始截图捕获
         /// </summary>
         public void StartScreenshotCapture()
         {
             _screenshotService?.StartCapture();
+        }
+
+        /// <summary>
+        /// AI 主动请求看屏幕：弹出选区窗口让用户圈定范围。用户取消或超时返回 null。
+        /// </summary>
+        public Task<byte[]?> RequestScreenshotFromUserAsync(string reason, int timeoutSeconds = 60)
+        {
+            if (_screenshotService is null) return Task.FromResult<byte[]?>(null);
+            return _screenshotService.RequestUserCaptureAsync(reason, timeoutSeconds);
         }
 
         /// <summary>
@@ -2389,7 +2412,7 @@ namespace VPetLLM
         /// 中断当前这一轮对话：取消在途的 LLM 请求，停掉还没播完的语音和还没输出完的气泡，
         /// 在历史里留下中断标记，并把状态归位到待机。
         ///
-        /// 侧边栏状态按钮和气泡上的中断按钮共用这一个入口 —— 中断的语义不该跟着入口走。
+        /// 侧边栏状态按钮和输入框的中断按钮共用这一个入口 —— 中断的语义不该跟着入口走。
         /// </summary>
         /// <returns>true 表示确实中断了一轮进行中的对话</returns>
         public bool InterruptCurrentResponse()

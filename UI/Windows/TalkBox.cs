@@ -78,14 +78,120 @@ namespace VPetLLM.UI.Windows
             try { StopThinkingAnimationWithoutHide(); }
             catch (Exception ex) { Logger.Log($"TalkBox: 中断时停止思考动画失败: {ex.Message}"); }
 
+            // 先让停播动起来（内部是火抛的后台任务）：宿主的气泡收尾分支会先看
+            // PlayingVoice，语音还没停时它会继续等，早一点开始停就早一点收干净
             try { _messageProcessor?.Abort(); }
             catch (Exception ex) { Logger.Log($"TalkBox: 中断消息处理器失败: {ex.Message}"); }
+
+            // 让气泡和动画走宿主自己的收尾流程。
+            // StopThinkingAnimationWithoutHide 只清流式缓冲区、刻意不收气泡（流式接力要用），
+            // 所以中断后气泡会一直挂到它自己的计时器到点，桌宠也一直卡在说话/思考循环里
+            try { CloseBubbleAndRestoreAnimation(); }
+            catch (Exception ex) { Logger.Log($"TalkBox: 中断时收尾气泡/动画失败: {ex.Message}"); }
 
             // 清空还没执行的命令队列并收掉正在接管的插件。
             // 火抛：结束接管要走插件自己的收尾逻辑，不能让中断卡在这
             _ = Handlers.Core.StreamingCommandProcessor.AbortAllAsync();
 
             ResetStreamingState();
+        }
+
+        /// <summary>
+        /// 中断时把气泡和桌宠动画带回常态 —— 走宿主自己的收尾流程，只是把它快进。
+        ///
+        /// 不能用宿主的 ForceClose()：它内部是 <c>CloseTimer.Close()</c>（等同 Dispose），
+        /// 而之后每条气泡结束时 EndTimer_Elapsed 都会去 <c>CloseTimer.Start()</c> ——
+        /// 对已释放的计时器调用会在计时器线程上抛 ObjectDisposedException。
+        /// 也就是说点一次中断，之后所有气泡的关闭流程就都废了。
+        ///
+        /// 快进的办法是喂给宿主它自己认得的终止条件：
+        ///   · 清掉没打完的字 → 下一个 ShowTimer tick 走进"说完了"分支，
+        ///     那里会停打字机、启动 EndTimer，并接上 C_End 把桌宠带回常态
+        ///   · timeleft 打到底 → EndTimer 下一跳就转交 CloseTimer 淡出
+        /// </summary>
+        private void CloseBubbleAndRestoreAnimation()
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var main = _plugin.MW?.Main;
+                if (main is null) return;
+
+                try { FastForwardBubbleClose(main.MsgBar); }
+                catch (Exception ex) { Logger.Log($"TalkBox: 收起气泡失败: {ex.Message}"); }
+
+                try { RestoreAnimationToNormal(main); }
+                catch (Exception ex) { Logger.Log($"TalkBox: 恢复动画失败: {ex.Message}"); }
+            });
+        }
+
+        /// <summary>
+        /// 把气泡推进宿主的关闭流程。必须在 UI 线程调用。
+        /// </summary>
+        private void FastForwardBubbleClose(object msgBar)
+        {
+            if (msgBar is null) return;
+
+            MessageBarHelper.GetFieldValue<List<char>>(msgBar, "outputtext")?.Clear();
+            MessageBarHelper.SetFieldValue(msgBar, "timeleft", 1);
+
+            // 思考气泡是直接写文本显示出来的，三个计时器一个都没在跑，
+            // 没有任何人会去关它 —— 这种情况手动把它送进淡出流程
+            if (IsBarTimerRunning(msgBar, "ShowTimer")
+                || IsBarTimerRunning(msgBar, "EndTimer")
+                || IsBarTimerRunning(msgBar, "CloseTimer"))
+            {
+                Logger.Log("TalkBox: 气泡已在宿主的收尾流程中，仅快进");
+                return;
+            }
+
+            MessageBarHelper.GetFieldValue<global::System.Timers.Timer>(msgBar, "CloseTimer")?.Start();
+            Logger.Log("TalkBox: 气泡无计时器推进（思考气泡），已手动启动关闭流程");
+        }
+
+        private static bool IsBarTimerRunning(object msgBar, string fieldName)
+        {
+            return MessageBarHelper.GetFieldValue<global::System.Timers.Timer>(msgBar, fieldName)?.Enabled == true;
+        }
+
+        /// <summary>
+        /// 把桌宠动画带回常态。必须在 UI 线程调用。
+        /// </summary>
+        private void RestoreAnimationToNormal(VPet_Simulator.Core.Main main)
+        {
+            var display = main.DisplayType;
+            if (display is null) return;
+
+            // 思考动画不在气泡的收尾路径里（那时 DisplayType 是 think 而不是 say），
+            // 不单独收的话，在等模型时中断，桌宠会一直转着思考动作
+            if (display.Name == "think")
+            {
+                var thinkEnd = _plugin.MW.Core.Graph.FindGraphs(
+                    "think",
+                    VPet_Simulator.Core.GraphInfo.AnimatType.C_End,
+                    _plugin.MW.Core.Save.Mode);
+
+                if (thinkEnd.Count > 0)
+                {
+                    main.Display(thinkEnd[VPet_Simulator.Core.Function.Rnd.Next(thinkEnd.Count)],
+                        () => Logger.Log("TalkBox: 思考结束动画播放完成（中断）"));
+                }
+                else
+                {
+                    main.DisplayToNomal();
+                    Logger.Log("TalkBox: 无思考结束动画，直接回到常态（中断）");
+                }
+                return;
+            }
+
+            // 说话动画：气泡若已经打完字，宿主自己接过 C_End 了；
+            // 没接上的情况（比如打字机被我们清空前就停了）在这里补一次。
+            // 与宿主 ShowTimer 收尾分支同样的判断条件，避免重复触发。
+            if (display.Type == VPet_Simulator.Core.GraphInfo.GraphType.Say
+                && display.Animat != VPet_Simulator.Core.GraphInfo.AnimatType.C_End)
+            {
+                main.DisplayCEndtoNomal(display.Name);
+                Logger.Log("TalkBox: 说话动画已接 C_End 回到常态（中断）");
+            }
         }
 
         /// <summary>
@@ -781,6 +887,15 @@ namespace VPetLLM.UI.Windows
                     }
                 }
 
+                // 预加载可能要跑好几秒，用户很可能就是在这期间按的中断。
+                // 这里不拦一下的话，下面会白建一个处理器再把整条消息喂进去让它逐字丢弃。
+                // 独占会话交给 finally 正常收尾。
+                if (InterruptManager.IsInterrupted)
+                {
+                    Logger.Log("统一流式处理: 预加载后发现已中断，不再处理本条消息");
+                    return;
+                }
+
                 // 创建一个完成信号，用于等待所有命令处理完成
                 var allCommandsCompletedSource = new TaskCompletionSource<bool>();
                 var commandCount = 0;
@@ -828,6 +943,14 @@ namespace VPetLLM.UI.Windows
                 // 这样可以模拟流式接收，触发命令检测和处理
                 foreach (char c in completeMessage)
                 {
+                    // 中断后立刻停手：这是逐字符喂，一条几百字的回复就是几百次
+                    // "已中断，丢弃"的空转 —— 既刷屏也白费
+                    if (InterruptManager.IsInterrupted)
+                    {
+                        Logger.Log("统一流式处理: 已中断，停止投喂剩余内容");
+                        break;
+                    }
+
                     streamProcessor.AddText(c.ToString());
                 }
 

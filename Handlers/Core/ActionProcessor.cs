@@ -96,6 +96,12 @@ namespace VPetLLM.Handlers.Core
             if (_settings is not null)
             {
                 _handlerRegistry.Register("vpet_settings", new VPetSettingsHandler(_settings));
+
+                // 自身能力入口：截屏看画面 / 唤起语音输入。
+                // 两者内部各自按 Screenshot.IsEnabled、ASR.IsEnabled 决定是否向 AI 暴露描述，
+                // 所以这里无条件注册即可，关闭时 Description 为空、Execute 直接返回。
+                _handlerRegistry.Register("see_screen", new SeeScreenHandler(_settings));
+                _handlerRegistry.Register("listen", new ListenHandler(_settings));
             }
 
             // Add SkillCommandHandlers if SkillManager is available

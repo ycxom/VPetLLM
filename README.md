@@ -84,6 +84,29 @@ Tests/                    移动、代理、版本和插件加载回归项目
 
 已经移除的内容包括无调用私有方法、失效的 TTS 下载队列、始终不可用的 EdgeTTS 占位实现、重复配置模型、重复服务实现以及历史源码归档。
 
+## 第三方致谢与引用说明
+
+### ShareX
+
+截图模块（`UI/Windows/winScreenshotCapture`、`Services/WindowDetector`、`Services/ScreenCapture`）的交互设计参考了
+[ShareX](https://github.com/ShareX/ShareX) 的区域截图实现，具体借鉴了以下**公开做法**：
+
+- 进入选区前先冻结整个虚拟桌面为一张位图，后续选区、放大镜取样、最终裁剪都基于这张冻结底图
+- 自动窗口识别：`EnumWindows` 的回调顺序即 z-order，命中测试取第一个包含光标的窗口
+- 用 `DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS)` 取窗口边框，避开 Win10+ 的不可见阴影余量
+- 过滤 `DWMWA_CLOAKED` 窗口，以及 `WS_EX_TOOLWINDOW + WS_EX_NOACTIVATE` 的非激活浮层
+- 悬停窗口切换时用矩形插值做过渡动画，并在切换目标时从动画当前帧接续
+
+**重要说明：本项目未复制、未改编 ShareX 的任何源代码。** 上述模块均为独立编写的实现，
+借鉴范围仅限于"调用哪些系统 API、需要过滤哪几类窗口"这类功能性做法，不涉及代码表达本身。
+
+之所以要强调这一点：ShareX 以 **GPL**（`LICENSE.txt` 为 GPL v3，源文件头为 GPL v2 or later）发布，
+而 GPL 是强著佐权协议——任何包含或改编其代码的作品，整体必须同样以 GPL 发布。
+本项目使用宽松协议，两者方向上不兼容，因此**不得**将 ShareX 的源代码引入本仓库。
+在 README 中致谢**不能**豁免这一义务。
+
+若未来确有复用其代码的需要，唯一合规路径是将本项目整体改为 GPLv3 发布，请先做出该决定再实施。
+
 ## 许可证
 
-本项目使用 [MIT License](LICENSE)。
+本项目使用 [Apache License 2.0](LICENSE)。

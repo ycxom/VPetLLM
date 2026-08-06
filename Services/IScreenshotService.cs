@@ -140,6 +140,15 @@ namespace VPetLLM.Services
         void ClearCurrentImage();
 
         /// <summary>
+        /// 请求用户圈选一块区域并返回图像（AI 主动看屏幕时走这条路）。
+        /// 与 StartCapture 的区别：不触发 ScreenshotCaptured / 前置多模态等常规事件链，
+        /// 结果只回给调用方；用户取消或超时返回 null。
+        /// </summary>
+        /// <param name="reason">展示给用户的请求原因</param>
+        /// <param name="timeoutSeconds">等待用户操作的上限</param>
+        Task<byte[]?> RequestUserCaptureAsync(string reason, int timeoutSeconds = 60);
+
+        /// <summary>
         /// 执行 OCR
         /// </summary>
         /// <param name="imageData">图像数据</param>

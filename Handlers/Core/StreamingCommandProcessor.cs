@@ -20,6 +20,8 @@ namespace VPetLLM.Handlers.Core
 
         // 命令批处理器
         private CommandBatcher _commandBatcher;
+        // 中断丢弃日志只打一次的标记（上游是逐字符投喂）
+        private bool _interruptLogged;
         private bool _useBatching = false;
         private int _batchWindowMs = 100;
 
@@ -138,7 +140,12 @@ namespace VPetLLM.Handlers.Core
             // 否则中断只挡住了气泡，插件那条线还在继续跑
             if (InterruptManager.IsInterrupted)
             {
-                Logger.Log("StreamingCommandProcessor: 已中断，丢弃后续片段");
+                // 上游可能是逐字符投喂的，每个字符打一行日志会把日志刷爆，只记第一次
+                if (!_interruptLogged)
+                {
+                    _interruptLogged = true;
+                    Logger.Log("StreamingCommandProcessor: 已中断，丢弃后续片段");
+                }
                 return;
             }
 
