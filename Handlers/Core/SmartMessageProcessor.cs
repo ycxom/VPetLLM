@@ -251,11 +251,98 @@ namespace VPetLLM.Handlers.Core
                 await ProcessMessageInternalAsync(response, skipInitialization, autoSetIdleOnComplete, existingSessionId);
                 return;
             }
-            
-            // 标准处理（不启动独占会话）
-            // 独占会话应该由外层（如 TalkBox）管理
-            Logger.Log($"SmartMessageProcessor: 使用标准模式处理消息，SkipInit={skipInitialization}");
-            await ProcessMessageInternalAsync(response, skipInitialization, autoSetIdleOnComplete, null);
+
+            // 外层没给会话（流式片段、以及只含一条 say 的回复 —— 它不满足 TalkBox
+            // 的"完整消息"判定，走不到那边的会话管理）。这时如果就这么处理下去，
+            // VPetTTS 只能靠钩宿主的 Say 事件事后捕获文本：气泡先出来，它才开始合成，
+            // 语音要晚上一整个合成往返。这里自建一个会话，把语音拉回受控链路。
+            var ownedSessionId = await TryStartOwnedExclusiveSessionAsync(response);
+
+            try
+            {
+                Logger.Log($"SmartMessageProcessor: 处理消息，SkipInit={skipInitialization}，" +
+                           $"自建会话: {ownedSessionId ?? "无"}");
+                await ProcessMessageInternalAsync(response, skipInitialization, autoSetIdleOnComplete, ownedSessionId);
+            }
+            finally
+            {
+                await EndOwnedExclusiveSessionAsync(ownedSessionId);
+            }
+        }
+
+        /// <summary>
+        /// 在外层没有独占会话时自建一个，让本条消息的语音走"提交-起播-完成"的受控链路，
+        /// 而不是退化成 VPetTTS 事后捕获宿主 Say 文本（那条路上气泡必然早于语音）。
+        ///
+        /// 拿不到会话不是错误：没装 VPetTTS、独占模式关闭、消息里根本没有要说的话、
+        /// 或已经有别人的会话在跑 —— 一律返回 null 走原来的路径。
+        /// </summary>
+        private async Task<string> TryStartOwnedExclusiveSessionAsync(string response)
+        {
+            try
+            {
+                var integration = EnsureVPetTTSIntegration();
+                if (integration is null || !integration.CanUseExclusiveMode())
+                {
+                    return null;
+                }
+
+                // 已经有会话在跑（外层建的、或上一条还没收尾）：抢会导致
+                // ExclusiveSessionManager 抛"会话已存在"，交给现有会话即可
+                if (integration.IsInExclusiveSession())
+                {
+                    return null;
+                }
+
+                // 没有要说的话就不必开会话——开了还得收，纯属给纯动作消息添开销
+                var talkTexts = integration.ExtractAllTalkTexts(response);
+                if (talkTexts.Count == 0)
+                {
+                    return null;
+                }
+
+                var sessionId = await integration.StartExclusiveSessionAsync();
+
+                // 先把音频合出来放进缓存，正式提交时就能立刻起播，
+                // 气泡也就不用干等一次网络往返
+                if (TTSCoordinationSettings.Instance.EnablePreload)
+                {
+                    var preloaded = await integration.PreloadTextsAsync(talkTexts);
+                    Logger.Log($"SmartMessageProcessor: 自建会话预加载完成 {preloaded}/{talkTexts.Count}");
+                }
+
+                return sessionId;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 自建独占会话失败，回退到非会话模式: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 收掉自建的独占会话。必须收：会话没结束的话 VPetTTS 的文本捕获一直是关的，
+        /// 宿主自己触发的说话就再也没有语音了。
+        /// </summary>
+        private async Task EndOwnedExclusiveSessionAsync(string ownedSessionId)
+        {
+            if (string.IsNullOrEmpty(ownedSessionId))
+            {
+                return;
+            }
+
+            try
+            {
+                var integration = GetVPetTTSIntegration();
+                if (integration is not null)
+                {
+                    await integration.EndExclusiveSessionAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SmartMessageProcessor: 结束自建独占会话失败: {ex.Message}");
+            }
         }
 
         /// <summary>

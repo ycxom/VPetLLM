@@ -151,6 +151,96 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+        // ── 滚轮 ────────────────────────────────────────────────────────────
+
+        /// <summary>列表滚动条缓存；模板套用后才拿得到，故惰性获取</summary>
+        private ScrollViewer? _listScrollViewer;
+
+        /// <summary>
+        /// 接管消息列表的滚轮。
+        ///
+        /// 不接管的话有两个毛病：
+        /// 一是 ScrollUnit="Pixel" 下 VirtualizingStackPanel.LineUp() 字面意义就是"减 1 像素"，
+        /// 而一格滚轮只调 3 次，于是滚一格才走 3px；
+        /// 二是 TextBox 会吞掉滚轮（ScrollViewer.OnMouseWheel 只要能处理就无条件 Handled，
+        /// 哪怕自己根本没得滚），而本窗口正文几乎全是 TextBox。
+        ///
+        /// 用 Preview（隧道，从外往里）就能在 TextBox 拿到事件之前先决定归属：
+        /// 完全模式的原文框自己还能往这个方向滚时让给它，其余一律按正常步长滚列表。
+        /// </summary>
+        private void List_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            if (e.Handled || e.Delta == 0) return;
+
+            if (EditorWantsWheel(e.OriginalSource as DependencyObject, e.Delta))
+            {
+                return;
+            }
+
+            _listScrollViewer ??= FindScrollViewer(List_Messages);
+            if (_listScrollViewer is null) return;
+
+            e.Handled = true;
+            _listScrollViewer.ScrollToVerticalOffset(
+                _listScrollViewer.VerticalOffset - e.Delta / 120.0 * GetWheelStep(_listScrollViewer));
+        }
+
+        /// <summary>
+        /// 命中的原文框自己还有余量可滚时，把这一格让给它。
+        /// 从事件源往上找，遇到列表就停——只关心气泡内部的输入框。
+        /// </summary>
+        private bool EditorWantsWheel(DependencyObject? source, int delta)
+        {
+            const double epsilon = 0.5;
+
+            while (source is not null && source != List_Messages)
+            {
+                if (source is TextBox box)
+                {
+                    // TextBoxBase 直接暴露这几个量，不必去翻模板里的 PART_ContentHost
+                    var maxOffset = box.ExtentHeight - box.ViewportHeight;
+                    if (maxOffset <= epsilon) return false;
+
+                    return delta < 0
+                        ? box.VerticalOffset < maxOffset - epsilon
+                        : box.VerticalOffset > epsilon;
+                }
+
+                // 命中的通常都是 Visual；ContentElement（如芯片里的 Run）走逻辑树兜底
+                source = source is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+                    ? System.Windows.Media.VisualTreeHelper.GetParent(source)
+                    : LogicalTreeHelper.GetParent(source);
+            }
+
+            return false;
+        }
+
+        /// <summary>一格滚轮走多少像素，跟随系统"每次滚动行数"设置</summary>
+        private static double GetWheelStep(ScrollViewer viewer)
+        {
+            var lines = SystemParameters.WheelScrollLines;
+
+            // -1 表示系统设置为"滚动一屏"
+            if (lines < 0) return Math.Max(viewer.ViewportHeight - 24, 48);
+
+            const double lineHeight = 20.0;
+            return Math.Max(lines, 1) * lineHeight;
+        }
+
+        private static ScrollViewer? FindScrollViewer(DependencyObject root)
+        {
+            if (root is ScrollViewer found) return found;
+
+            var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+            for (var i = 0; i < count; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+                if (FindScrollViewer(child) is ScrollViewer viewer) return viewer;
+            }
+
+            return null;
+        }
+
         // ── 图像 ────────────────────────────────────────────────────────────
 
         private void Thumbnail_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)

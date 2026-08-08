@@ -5,10 +5,13 @@ using System.Net.Http;
 namespace VPetLLM.Utils.Network
 {
     /// <summary>
-    /// Free 服务可用性预检：在发起真正的请求前先探一次 <c>/health</c>，结果按 120 秒 TTL 缓存。
+    /// Free 服务可用性预检：在发起真正的请求前先探一次 <c>/health</c>，结果按 6 秒 TTL 缓存。
     ///
     /// 动机：业务请求的超时是 30 秒。服务器下线时每次说话都要干等满 30 秒，期间气泡与动画全被拖住；
-    /// 预检链路通畅时 1 秒内返回，且 120 秒内的所有请求复用同一结论，不会给服务器额外压力。
+    /// 预检链路通畅时 1 秒内返回，短 TTL 内的连续请求（同一句话拆成的多段）复用同一结论。
+    ///
+    /// TTL 取 6 秒是刻意压短的：宁可多探几次，也要让服务器恢复/掉线能在几秒内反映出来，
+    /// 而不是被一个长缓存钉死在过期结论上。代价是探测频次上升，但 /health 本身极轻。
     ///
     /// 缓存以**主机（scheme+host+port）为键**：TTS、ASR、Chat 走的是同一个 standalone 网关，
     /// 谁先探到结果谁就把 TTL 刷新，其余服务直接复用；任何一次真实请求的成败也会回填同一条目。
@@ -22,10 +25,11 @@ namespace VPetLLM.Utils.Network
     /// </summary>
     public static class FreeServiceHealthCheck
     {
-        private static readonly TimeSpan Ttl = TimeSpan.FromSeconds(120);
+        /// <summary>探测结论的有效期。短 TTL 换取对服务器状态变化的快速跟进。</summary>
+        private static readonly TimeSpan Ttl = TimeSpan.FromSeconds(6);
 
-        /// <summary>链路正常时 /health 应在 1 秒内返回，3 秒足够容忍抖动；再长只是白等。</summary>
-        private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(3);
+        /// <summary>心跳超时：链路正常时 /health 应在 1 秒内返回，2 秒还没动静就按服务异常处理。</summary>
+        private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(2);
 
         /// <summary>键为主机（scheme://host:port），TTS/ASR/Chat 共用。</summary>
         private static readonly ConcurrentDictionary<string, HealthEntry> _cache = new(StringComparer.OrdinalIgnoreCase);

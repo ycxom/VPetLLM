@@ -157,31 +157,22 @@ namespace VPetLLM.Handlers.TTS
                 {
                     Logger.Log($"TTSRequestSerializer: 在独占会话中提交TTS请求");
 
-                    // 检查是否启用预加载
-                    if (Configuration.TTSCoordinationSettings.Instance.EnablePreload)
-                    {
-                        try
-                        {
-                            // 尝试预加载（不阻塞）
-                            // 注意：预加载已经在 SmartMessageProcessor 的批量预加载中处理
-                            // 这里只是额外的单个预加载尝试
-                            Logger.Log($"TTSRequestSerializer: 跳过单个预加载（已在批量预加载中处理）");
-                        }
-                        catch (Exception preloadEx)
-                        {
-                            Logger.Log($"TTSRequestSerializer: 预加载异常: {preloadEx.Message}");
-                        }
-                    }
-
-                    // 提交TTS请求
+                    // 提交本身会先走一遍预加载（命中批量预加载的缓存则立即返回），
+                    // 所以这里不再单独预加载
                     ttsRequestId = await vpetTTSIntegration.SubmitTTSRequestAsync(request.Text);
                     Logger.Log($"TTSRequestSerializer: TTS请求已提交，请求ID: {ttsRequestId}");
                 }
+
+                // 等语音真正出声，再放气泡 —— 这是气泡/语音同步的关键一步。
+                // 提交只是把请求排进 VPetTTS 的队列，音频可能还在合成、或在等前一句播完；
+                // 在这里显示气泡，字就会比声音早几百毫秒到几秒。
+                await WaitForPlaybackStartAsync(vpetTTSIntegration, ttsRequestId);
 
                 // 标记播放开始
                 _operationTracker.MarkPlaybackStart(request.Id);
 
                 // 执行动作指令（显示气泡等）
+                // 气泡自身的打字速度和停留时长一律沿用宿主默认（按字数计时），不做干预
                 await ExecuteActionAsync(request.ActionContent);
 
                 // 等待TTS完成
@@ -220,6 +211,40 @@ namespace VPetLLM.Handlers.TTS
                 Logger.Log($"TTSRequestSerializer: 请求 {request.Id} 处理异常: {ex.Message}");
                 throw; // 重新抛出异常，让调用方处理
             }
+        }
+
+        /// <summary>
+        /// 等语音真正出声，之后调用方才把气泡放出来。
+        ///
+        /// 等不到不算异常，一律照常显示气泡：不在独占会话、对方是旧版插件、
+        /// 合成失败、被中断、或等超时了 —— 没出声也得出字，否则用户面对的是
+        /// 一只既不说话也不显示的桌宠。等到与否只影响起点是否对齐，
+        /// 气泡自身的节奏始终沿用宿主默认。
+        /// </summary>
+        private async Task WaitForPlaybackStartAsync(
+            VPetTTSIntegrationManager vpetTTSIntegration, string ttsRequestId)
+        {
+            if (vpetTTSIntegration is null || string.IsNullOrEmpty(ttsRequestId))
+            {
+                return;
+            }
+
+            if (!TTSCoordinationSettings.Instance.EnablePlaybackStartSync)
+            {
+                Logger.Log("TTSRequestSerializer: 起播同步已关闭，沿用旧时序（气泡可能早于语音）");
+                return;
+            }
+
+            var timeoutMs = TTSCoordinationSettings.Instance.PlaybackStartTimeoutMs;
+            var waitStart = DateTime.Now;
+
+            var durationMs = await vpetTTSIntegration.WaitForPlaybackStartAsync(ttsRequestId, timeoutMs);
+            var waited = (int)(DateTime.Now - waitStart).TotalMilliseconds;
+
+            // durationMs 只用于记日志：它能直接告诉你旧时序下气泡早出来了多久
+            Logger.Log(durationMs >= 0
+                ? $"TTSRequestSerializer: 语音已起播（等待 {waited}ms，音频时长 {durationMs}ms），现在显示气泡"
+                : $"TTSRequestSerializer: 等待 {waited}ms 未检测到起播，直接显示气泡");
         }
 
         /// <summary>

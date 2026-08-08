@@ -82,6 +82,23 @@ namespace VPetLLM.Configuration
         public int RequestCompleteTimeoutMs { get; set; } = 60000;
 
         /// <summary>
+        /// 是否让气泡等语音真正起播后再显示。
+        ///
+        /// 关掉就退回旧时序（提交 TTS 后立刻出气泡），字会早于声音出现；
+        /// 仅在排查问题或对方插件行为异常时才需要关。
+        /// </summary>
+        public bool EnablePlaybackStartSync { get; set; } = true;
+
+        /// <summary>
+        /// 等待语音起播的最长时间（毫秒）。
+        ///
+        /// 超过这个时间还没出声，就认为这句合成失败或被跳过了，直接把气泡放出来 ——
+        /// 宁可字先出来，也不能让桌宠既不出声又不出字地干等着。
+        /// 取值要盖住一次冷合成的网络往返（预加载未命中时通常 1-4 秒）。
+        /// </summary>
+        public int PlaybackStartTimeoutMs { get; set; } = 8000;
+
+        /// <summary>
         /// 是否启用调试日志
         /// </summary>
         public bool EnableDebugLogging { get; set; } = false;

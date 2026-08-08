@@ -70,6 +70,8 @@ namespace VPetLLM.Core.Services
         private static MethodInfo _miIsProcessing;
         // 可选能力：旧版 VPetTTS 没有中断接口，缺失时中断只停 VPetLLM 自己这侧的播放
         private static MethodInfo _miInterrupt;
+        // 可选能力：起播回报。缺失时回退到"提交完就出气泡"的旧时序（气泡会早于语音）
+        private static MethodInfo _miWaitForPlaybackStart;
 
         private static void EnsureCoordinatorAccessors(object coordinator)
         {
@@ -87,10 +89,15 @@ namespace VPetLLM.Core.Services
                 _miIsRequestComplete = type.GetMethod("IsRequestCompleteAsync");
                 _miIsProcessing = type.GetMethod("IsProcessing");
                 _miInterrupt = type.GetMethod("InterruptAsync");
+                _miWaitForPlaybackStart = type.GetMethod("WaitForPlaybackStartAsync");
 
                 if (_miInterrupt is null)
                     Logger.Log($"VPetTTSPluginAdapter: 协调器({type.Name}) 不支持 InterruptAsync，" +
                                $"中断时无法通知外置 TTS 停止播放（请更新 VPetTTS 插件）");
+
+                if (_miWaitForPlaybackStart is null)
+                    Logger.Log($"VPetTTSPluginAdapter: 协调器({type.Name}) 不支持 WaitForPlaybackStartAsync，" +
+                               $"气泡将按旧时序在提交请求时立即显示，可能早于语音（请更新 VPetTTS 插件）");
 
                 var missing = new List<string>();
                 if (_miStartExclusiveSession is null) missing.Add("StartExclusiveSessionAsync");
@@ -150,6 +157,17 @@ namespace VPetLLM.Core.Services
             if (coordinator is null) return null;
             EnsureCoordinatorAccessors(coordinator);
             return _miInterrupt?.Invoke(coordinator, new object[] { callerId }) as Task;
+        }
+
+        /// <summary>
+        /// 等待某个 TTS 请求的音频真正起播，返回音频时长（毫秒，未知为 0），未起播返回 -1。
+        /// 返回 null 表示对方不支持该能力（旧版插件），调用方按能力缺失处理。
+        /// </summary>
+        public static Task<long> WaitForPlaybackStart(object coordinator, string requestId, int timeoutMs)
+        {
+            if (coordinator is null) return null;
+            EnsureCoordinatorAccessors(coordinator);
+            return _miWaitForPlaybackStart?.Invoke(coordinator, new object[] { requestId, timeoutMs }) as Task<long>;
         }
 
         public static bool IsProcessing(object coordinator)

@@ -174,6 +174,21 @@ public class VPetTTSIntegrationManager
     }
 
     /// <summary>
+    /// 等待某个 TTS 请求的音频真正起播，返回音频时长（毫秒，未知为 0）；
+    /// 未起播或对方不支持起播回报时返回 -1，调用方应当照常显示气泡并按文本估算时长。
+    /// </summary>
+    public async Task<long> WaitForPlaybackStartAsync(string requestId, int timeoutMs)
+    {
+        var coordinator = GetCoordinator();
+        if (coordinator == null)
+        {
+            return VPetTTSCoordinator.PlaybackNeverStarted;
+        }
+
+        return await coordinator.WaitForPlaybackStartAsync(requestId, timeoutMs);
+    }
+
+    /// <summary>
     /// 等待 TTS 请求完成
     /// </summary>
     public async Task<bool> WaitForRequestCompleteAsync(string requestId, int timeoutSeconds = 60)

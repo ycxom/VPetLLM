@@ -211,6 +211,47 @@ public class VPetTTSCoordinator : IDisposable
     }
 
     /// <summary>
+    /// 等待某个 TTS 请求的音频真正起播。
+    ///
+    /// SubmitTTSAsync 返回时音频还没出声（可能在合成，也可能在排队等前一句播完），
+    /// 此刻显示气泡会比语音早出来。等到本方法返回再显示，字和声音就对齐了。
+    /// </summary>
+    /// <returns>
+    /// ≥0：已起播，值为音频时长（毫秒，未知为 0）；
+    /// -1：超时、合成失败、被中断，或当前 VPetTTS 版本不支持起播回报。
+    /// 调用方拿到 -1 时应当按文本长度估算，照常把气泡放出来。
+    /// </returns>
+    public async Task<long> WaitForPlaybackStartAsync(string requestId, int timeoutMs)
+    {
+        if (!_isInitialized || _ttsCoordinator == null || string.IsNullOrEmpty(requestId))
+        {
+            return PlaybackNeverStarted;
+        }
+
+        try
+        {
+            var task = VPetTTSPluginAdapter.WaitForPlaybackStart(_ttsCoordinator, requestId, timeoutMs);
+            if (task == null)
+            {
+                // 旧版插件：没有这个能力，让调用方立刻走回退路径，别白等一个超时
+                return PlaybackNeverStarted;
+            }
+
+            return await task;
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"VPetTTSCoordinator: 等待起播失败: {ex.Message}");
+            return PlaybackNeverStarted;
+        }
+    }
+
+    /// <summary>
+    /// <see cref="WaitForPlaybackStartAsync"/> 的哨兵值：音频没能播出来（或对方不支持回报）。
+    /// </summary>
+    public const long PlaybackNeverStarted = -1;
+
+    /// <summary>
     /// 等待请求完成
     /// </summary>
     public async Task<bool> WaitForRequestCompleteAsync(string requestId, int timeoutSeconds = 60)
