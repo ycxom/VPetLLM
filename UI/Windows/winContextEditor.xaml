@@ -3,173 +3,459 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:VPetLLM"
         mc:Ignorable="d"
-        Title="上下文编辑器" Height="450" Width="900"
-        Background="{DynamicResource PrimaryBackgroundBrush}">
+        Title="上下文编辑器"
+        Height="720" Width="900"
+        MinHeight="420" MinWidth="620"
+        WindowStartupLocation="CenterScreen"
+        Background="#FFFFFF"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        UseLayoutRounding="True">
+
+    <!--
+        Open WebUI 风格：白底、无重边框、大圆角、近黑主按钮。
+        这里不合并 Styles/Controls.xaml —— 那套是 Fluent 蓝调，和本窗口的
+        中性灰主题混在一起会出现两种按钮语言。本窗口的样式全部自带。
+    -->
     <Window.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="../Styles/Controls.xaml"/>
-            </ResourceDictionary.MergedDictionaries>
-            
-            <!-- Bool to Visibility 转换器 -->
-            <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
-            
-            <!-- 现代化DataGrid样式 -->
-            <Style x:Key="ModernDataGrid" TargetType="DataGrid">
-                <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
-                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-                <Setter Property="BorderThickness" Value="1"/>
-                <Setter Property="GridLinesVisibility" Value="Horizontal"/>
-                <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderBrush}"/>
-                <Setter Property="RowBackground" Value="{StaticResource SecondaryBackgroundBrush}"/>
-                <Setter Property="AlternatingRowBackground" Value="{StaticResource PrimaryBackgroundBrush}"/>
-                <Setter Property="HeadersVisibility" Value="Column"/>
-                <Setter Property="CanUserResizeRows" Value="False"/>
-                <Setter Property="SelectionMode" Value="Single"/>
-                <Setter Property="SelectionUnit" Value="FullRow"/>
-            </Style>
-            
-            <Style x:Key="ModernDataGridColumnHeader" TargetType="DataGridColumnHeader">
-                <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
-                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
-                <Setter Property="FontSize" Value="14"/>
-                <Setter Property="Padding" Value="12,8"/>
-                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-                <Setter Property="BorderThickness" Value="0,0,1,1"/>
-            </Style>
-            
-            <!-- 图像删除按钮样式 -->
-            <Style x:Key="ImageDeleteButton" TargetType="Button">
-                <Setter Property="Background" Value="#E81123"/>
-                <Setter Property="Foreground" Value="White"/>
-                <Setter Property="Width" Value="20"/>
-                <Setter Property="Height" Value="20"/>
-                <Setter Property="FontSize" Value="10"/>
-                <Setter Property="BorderThickness" Value="0"/>
-                <Setter Property="Cursor" Value="Hand"/>
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Button">
-                            <Border Background="{TemplateBinding Background}" CornerRadius="10">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <FontFamily x:Key="UIFont">Segoe UI, Microsoft YaHei UI, sans-serif</FontFamily>
+        <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas, Microsoft YaHei Mono, monospace</FontFamily>
+
+        <!-- 调色板 -->
+        <SolidColorBrush x:Key="Surface"        Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SurfaceMuted"   Color="#F9F9F9"/>
+        <SolidColorBrush x:Key="UserBubble"     Color="#F4F4F5"/>
+        <SolidColorBrush x:Key="Hairline"       Color="#ECECEC"/>
+        <SolidColorBrush x:Key="TextPrimary"    Color="#18181B"/>
+        <SolidColorBrush x:Key="TextMuted"      Color="#71717A"/>
+        <SolidColorBrush x:Key="TextFaint"      Color="#A1A1AA"/>
+        <SolidColorBrush x:Key="Ink"            Color="#18181B"/>
+        <SolidColorBrush x:Key="InkHover"       Color="#3F3F46"/>
+        <SolidColorBrush x:Key="Danger"         Color="#DC2626"/>
+        <SolidColorBrush x:Key="NoticeBg"       Color="#FFFBEB"/>
+        <SolidColorBrush x:Key="NoticeBorder"   Color="#FDE68A"/>
+        <SolidColorBrush x:Key="NoticeText"     Color="#92400E"/>
+        <SolidColorBrush x:Key="ChipBg"         Color="#EEF2FF"/>
+        <SolidColorBrush x:Key="ChipBorder"     Color="#E0E7FF"/>
+        <SolidColorBrush x:Key="ChipText"       Color="#4338CA"/>
+        <SolidColorBrush x:Key="PluginChipBg"     Color="#ECFDF5"/>
+        <SolidColorBrush x:Key="PluginChipBorder" Color="#D1FAE5"/>
+        <SolidColorBrush x:Key="PluginChipText"   Color="#047857"/>
+
+        <!-- 主按钮：Open WebUI 的近黑实心 -->
+        <Style x:Key="PrimaryAction" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource Ink}"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontFamily" Value="{StaticResource UIFont}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="18,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource InkHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 次按钮：描边 -->
+        <Style x:Key="GhostAction" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="FontFamily" Value="{StaticResource UIFont}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="#E4E4E7" BorderThickness="1"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceMuted}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 分段控件：简洁 / 完全 -->
+        <Style x:Key="SegmentToggle" TargetType="RadioButton">
+            <Setter Property="FontFamily" Value="{StaticResource UIFont}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="16,6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 消息上的图标按钮（删除等），平时隐形，悬停整条消息才浮现 -->
+        <Style x:Key="IconAction" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextFaint}"/>
+            <Setter Property="FontFamily" Value="{StaticResource UIFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F4F4F5"/>
+                                <Setter Property="Foreground" Value="{StaticResource Danger}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 无边框输入框：让编辑区看起来像正文而不是表单 -->
+        <Style x:Key="InlineEditor" TargetType="TextBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="FontFamily" Value="{StaticResource UIFont}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="SpellCheck.IsEnabled" Value="False"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CaretBrush" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="SelectionBrush" Value="#C7D2FE"/>
+        </Style>
+
+        <!-- 完全模式的原文编辑器：等宽，保留一切标记 -->
+        <Style x:Key="RawEditor" TargetType="TextBox" BasedOn="{StaticResource InlineEditor}">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="MaxHeight" Value="420"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+
+        <!-- 简洁模式的单个片段 -->
+        <DataTemplate x:Key="SegmentTemplate">
+            <StackPanel Margin="0,1">
+
+                <!-- 工具回执标头 -->
+                <Border Visibility="{Binding IsPluginResult, Converter={StaticResource BoolToVis}}"
+                        Background="{StaticResource SurfaceMuted}" CornerRadius="6"
+                        Padding="8,3" HorizontalAlignment="Left" Margin="0,0,0,6">
+                    <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"
+                               FontFamily="{StaticResource UIFont}">
+                        <Run Text="⚙"/>
+                        <Run Text="{Binding Label, Mode=OneWay}"/>
+                    </TextBlock>
+                </Border>
+
+                <!-- 可编辑正文：台词 / 裸文本 / 回执内容 -->
+                <TextBox Visibility="{Binding IsEditable, Converter={StaticResource BoolToVis}}"
+                         Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource InlineEditor}"/>
+
+                <!-- 只读命令芯片 -->
+                <Border Visibility="{Binding IsCommand, Converter={StaticResource BoolToVis}}"
+                        HorizontalAlignment="Left" Margin="0,3,0,3"
+                        CornerRadius="8" Padding="10,5"
+                        Background="{StaticResource ChipBg}"
+                        BorderBrush="{StaticResource ChipBorder}" BorderThickness="1"
+                        ToolTip="命令片段在简洁模式下只读，需要改请切到完全模式">
+                    <StackPanel>
+                        <TextBlock Text="{Binding Label, Mode=OneWay}"
+                                   FontSize="11.5" FontWeight="SemiBold"
+                                   FontFamily="{StaticResource UIFont}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource ChipText}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPluginCommand}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource PluginChipText}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding Parameters, Mode=OneWay}"
+                                   Visibility="{Binding HasParameters, Converter={StaticResource BoolToVis}}"
+                                   FontSize="11" Margin="0,2,0,0"
+                                   FontFamily="{StaticResource MonoFont}"
+                                   Foreground="{StaticResource TextMuted}"
+                                   TextWrapping="Wrap" MaxWidth="520"/>
+                    </StackPanel>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <!-- 插件调用换绿色，与桌宠自身动作区分 -->
+                                <DataTrigger Binding="{Binding IsPluginCommand}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource PluginChipBg}"/>
+                                    <Setter Property="BorderBrush" Value="{StaticResource PluginChipBorder}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- 一条消息 -->
+        <DataTemplate x:Key="MessageTemplate">
+            <Grid Margin="0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 助手头像（左） -->
+                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="8"
+                        Background="{StaticResource Ink}" VerticalAlignment="Top" Margin="0,2,10,0"
+                        Visibility="{Binding IsAssistant, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding AvatarInitial}" Foreground="White"
+                               FontFamily="{StaticResource UIFont}"
+                               FontSize="13" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <!-- 正文 -->
+                <Border Grid.Column="1" x:Name="BubbleRoot" CornerRadius="14" Padding="14,11"
+                        Background="{StaticResource Surface}"
+                        BorderBrush="{StaticResource Hairline}" BorderThickness="1">
+                    <StackPanel>
+
+                        <!-- 名字 + 悬停操作 -->
+                        <Grid Margin="0,0,0,6">
+                            <TextBlock Text="{Binding RoleDisplay}"
+                                       FontFamily="{StaticResource UIFont}"
+                                       FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextMuted}"
+                                       VerticalAlignment="Center"/>
+                            <!-- Hidden 而非 Opacity=0：透明按钮照样吃点击，
+                                 会在消息右上角留一个看不见却能误删消息的热区 -->
+                            <Button x:Name="DeleteBtn" Content="✕"
+                                    Style="{StaticResource IconAction}"
+                                    HorizontalAlignment="Right" Visibility="Hidden"
+                                    Click="DeleteMessage_Click"
+                                    ToolTip="{Binding DataContext.LocDeleteMessage, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                        </Grid>
+
+                        <!-- 简洁模式：渲染后的片段 -->
+                        <ItemsControl ItemsSource="{Binding Segments}"
+                                      ItemTemplate="{StaticResource SegmentTemplate}"
+                                      Visibility="{Binding IsSimpleMode, Converter={StaticResource BoolToVis}}"/>
+
+                        <!-- 完全模式：原文，不做任何渲染 -->
+                        <TextBox Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource RawEditor}"
+                                 Visibility="{Binding IsFullMode, Converter={StaticResource BoolToVis}}"/>
+
+                        <!-- 附图 -->
+                        <Grid HorizontalAlignment="Left" Margin="0,10,0,0"
+                              Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}">
+                            <Border CornerRadius="10" BorderBrush="{StaticResource Hairline}"
+                                    BorderThickness="1" Padding="3" Background="{StaticResource SurfaceMuted}">
+                                <Image Source="{Binding ThumbnailSource}"
+                                       MaxHeight="120" MaxWidth="200" Stretch="Uniform"
+                                       Cursor="Hand" MouseLeftButtonUp="Thumbnail_Click"
+                                       ToolTip="{Binding DataContext.LocViewImage, RelativeSource={RelativeSource AncestorType=Window}}"/>
                             </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#F1707A"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-        </ResourceDictionary>
+                            <Button Content="✕" Style="{StaticResource IconAction}"
+                                    Width="22" Height="22"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    Margin="0,-8,-8,0" Background="{StaticResource Surface}"
+                                    Click="RemoveImage_Click"
+                                    ToolTip="{Binding DataContext.LocRemoveImage, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 用户头像（右） -->
+                <Border Grid.Column="2" Width="30" Height="30" CornerRadius="8"
+                        Background="#E4E4E7" VerticalAlignment="Top" Margin="10,2,0,0"
+                        Visibility="{Binding IsUser, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding AvatarInitial}" Foreground="{StaticResource TextPrimary}"
+                               FontFamily="{StaticResource UIFont}"
+                               FontSize="13" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </Grid>
+
+            <DataTemplate.Triggers>
+                <!-- 用户消息用浅灰气泡、不描边，助手消息用白底描边 -->
+                <DataTrigger Binding="{Binding IsUser}" Value="True">
+                    <Setter TargetName="BubbleRoot" Property="Background" Value="{StaticResource UserBubble}"/>
+                    <Setter TargetName="BubbleRoot" Property="BorderThickness" Value="0"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                    <Setter TargetName="DeleteBtn" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
     </Window.Resources>
-    
-    <Grid Margin="20">
+
+    <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
-        <Border Grid.Row="0" Style="{StaticResource CardContainer}" Margin="0,0,0,16">
-            <DataGrid AutoGenerateColumns="False" 
-                      CanUserAddRows="False" 
-                      ItemsSource="{Binding DisplayHistory}" 
-                      x:Name="DataGrid_Context"
-                      Style="{StaticResource ModernDataGrid}"
-                      ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
-                      ScrollViewer.CanContentScroll="False"
-                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                      ScrollViewer.VerticalScrollBarVisibility="Auto">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="角色" 
-                                        Binding="{Binding Role}" 
-                                        Width="80" 
-                                        IsReadOnly="True" 
-                                        x:Name="Column_Role">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Padding" Value="12,8"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="FontWeight" Value="Medium"/>
-                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-                    
-                    <!-- 图像列 -->
-                    <DataGridTemplateColumn Header="图像" Width="90" x:Name="Column_Image" IsReadOnly="True">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Grid Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}"
-                                      Margin="4">
-                                    <Border Background="#2D2D2D" CornerRadius="4" Padding="2">
-                                        <Image Source="{Binding ThumbnailSource}" 
-                                               MaxHeight="50" MaxWidth="70"
-                                               Stretch="Uniform"
-                                               Cursor="Hand"
-                                               MouseLeftButtonUp="Thumbnail_Click"
-                                               ToolTip="点击查看大图"/>
-                                    </Border>
-                                    <Button Content="✕" 
-                                            Style="{StaticResource ImageDeleteButton}"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Top"
-                                            Margin="0,-2,-2,0"
-                                            ToolTip="删除图像"
-                                            Click="RemoveImage_Click"/>
-                                </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    
-                    <DataGridTextColumn Header="内容" 
-                                        Binding="{Binding Content}" 
-                                        Width="*" 
-                                        x:Name="Column_Content">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Padding" Value="12,8"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="TextWrapping" Value="Wrap"/>
-                                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                        <DataGridTextColumn.EditingElementStyle>
-                            <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
-                                <Setter Property="TextWrapping" Value="Wrap"/>
-                                <Setter Property="AcceptsReturn" Value="True"/>
-                                <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
-                            </Style>
-                        </DataGridTextColumn.EditingElementStyle>
-                    </DataGridTextColumn>
-                </DataGrid.Columns>
-            </DataGrid>
+
+        <!-- 顶栏 -->
+        <Border Grid.Row="0" Background="{StaticResource Surface}"
+                BorderBrush="{StaticResource Hairline}" BorderThickness="0,0,0,1"
+                Padding="20,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock x:Name="Text_Title" Text="上下文编辑器"
+                               FontFamily="{StaticResource UIFont}"
+                               FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock x:Name="Text_Stats" Margin="0,3,0,0"
+                               FontFamily="{StaticResource UIFont}"
+                               FontSize="11.5" Foreground="{StaticResource TextMuted}"/>
+                </StackPanel>
+
+                <Border Grid.Column="1" Background="{StaticResource SurfaceMuted}"
+                        CornerRadius="8" Padding="3" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="Radio_Simple" Style="{StaticResource SegmentToggle}"
+                                     Content="简洁模式" IsChecked="True"
+                                     Checked="Mode_Changed"/>
+                        <RadioButton x:Name="Radio_Full" Style="{StaticResource SegmentToggle}"
+                                     Content="完全模式"
+                                     Checked="Mode_Changed"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Border>
-        
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="Button_Add" 
-                    Content="添加行" 
-                    Click="Button_Add_Click" 
-                    Margin="0,0,10,0"
-                    Style="{StaticResource SecondaryButton}"/>
-            <Button x:Name="Button_Delete" 
-                    Content="删除行" 
-                    Click="Button_Delete_Click" 
-                    Margin="0,0,10,0"
-                    Style="{StaticResource SecondaryButton}"/>
-            <Button x:Name="Button_Save" 
-                    Content="保存" 
-                    Click="Button_Save_Click" 
-                    Margin="0,0,10,0"
-                    Style="{StaticResource ModernButton}"/>
-            <Button x:Name="Button_Cancel" 
-                    Content="取消" 
-                    Click="Button_Cancel_Click"
-                    Style="{StaticResource SecondaryButton}"/>
-        </StackPanel>
+
+        <!-- 提示条：系统提示词不在此出现 -->
+        <Border Grid.Row="1" Background="{StaticResource NoticeBg}"
+                BorderBrush="{StaticResource NoticeBorder}" BorderThickness="0,0,0,1"
+                Padding="20,9">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="🔒" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock x:Name="Text_Notice" VerticalAlignment="Center"
+                           FontFamily="{StaticResource UIFont}"
+                           FontSize="11.5" TextWrapping="Wrap"
+                           Foreground="{StaticResource NoticeText}"
+                           Text="系统提示词与人设不在此展示，也不会被本窗口修改。"/>
+            </StackPanel>
+        </Border>
+
+        <!-- 消息列表 -->
+        <Grid Grid.Row="2">
+            <ListBox x:Name="List_Messages"
+                     ItemsSource="{Binding Items}"
+                     ItemTemplate="{StaticResource MessageTemplate}"
+                     Background="{StaticResource Surface}"
+                     BorderThickness="0"
+                     Padding="20,14"
+                     HorizontalContentAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.CanContentScroll="True"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     VirtualizingPanel.ScrollUnit="Pixel">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Focusable" Value="False"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter/>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+            </ListBox>
+
+            <!-- 空历史占位 -->
+            <TextBlock x:Name="Text_Empty"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       FontFamily="{StaticResource UIFont}"
+                       FontSize="13" Foreground="{StaticResource TextFaint}"
+                       Visibility="Collapsed"
+                       Text="还没有对话记录"/>
+        </Grid>
+
+        <!-- 底栏 -->
+        <Border Grid.Row="3" Background="{StaticResource Surface}"
+                BorderBrush="{StaticResource Hairline}" BorderThickness="0,1,0,0"
+                Padding="20,12">
+            <Grid>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <Button x:Name="Button_AddUser" Content="+ 用户消息"
+                            Style="{StaticResource GhostAction}" Margin="0,0,8,0"
+                            Click="AddUserMessage_Click"/>
+                    <Button x:Name="Button_AddAssistant" Content="+ 助手消息"
+                            Style="{StaticResource GhostAction}"
+                            Click="AddAssistantMessage_Click"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="Button_Cancel" Content="取消"
+                            Style="{StaticResource GhostAction}" Margin="0,0,8,0"
+                            Click="Button_Cancel_Click"/>
+                    <Button x:Name="Button_Save" Content="保存"
+                            Style="{StaticResource PrimaryAction}"
+                            Click="Button_Save_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

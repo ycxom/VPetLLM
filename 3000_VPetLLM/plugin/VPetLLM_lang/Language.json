@@ -1609,6 +1609,78 @@
       "zh-hans": "删除",
       "zh-hant": "刪除",
       "jp": "削除"
+    },
+    "SimpleMode": {
+      "en": "Simple",
+      "zh-hans": "简洁模式",
+      "zh-hant": "簡潔模式",
+      "jp": "シンプル"
+    },
+    "FullMode": {
+      "en": "Raw",
+      "zh-hans": "完全模式",
+      "zh-hant": "完全模式",
+      "jp": "完全モード"
+    },
+    "Notice": {
+      "en": "The system prompt and persona are neither shown nor modified here.",
+      "zh-hans": "系统提示词与人设不在此展示，也不会被本窗口修改。",
+      "zh-hant": "系統提示詞與人設不在此展示，也不會被本視窗修改。",
+      "jp": "システムプロンプトとペルソナはここには表示されず、変更されません。"
+    },
+    "AddUser": {
+      "en": "+ User message",
+      "zh-hans": "+ 用户消息",
+      "zh-hant": "+ 使用者訊息",
+      "jp": "+ ユーザーメッセージ"
+    },
+    "AddAssistant": {
+      "en": "+ Assistant message",
+      "zh-hans": "+ 助手消息",
+      "zh-hant": "+ 助手訊息",
+      "jp": "+ アシスタントメッセージ"
+    },
+    "DeleteMessage": {
+      "en": "Delete this message",
+      "zh-hans": "删除这条消息",
+      "zh-hant": "刪除這條訊息",
+      "jp": "このメッセージを削除"
+    },
+    "ViewImage": {
+      "en": "Click to view full image",
+      "zh-hans": "点击查看大图",
+      "zh-hant": "點擊查看大圖",
+      "jp": "クリックして拡大表示"
+    },
+    "RemoveImage": {
+      "en": "Remove image",
+      "zh-hans": "移除图像",
+      "zh-hant": "移除圖像",
+      "jp": "画像を削除"
+    },
+    "Empty": {
+      "en": "No conversation history yet",
+      "zh-hans": "还没有对话记录",
+      "zh-hant": "還沒有對話記錄",
+      "jp": "会話履歴はまだありません"
+    },
+    "Stats": {
+      "en": "{0} messages · ~{1} tokens",
+      "zh-hans": "{0} 条消息 · 约 {1} tokens",
+      "zh-hant": "{0} 條訊息 · 約 {1} tokens",
+      "jp": "{0} 件 · 約 {1} tokens"
+    },
+    "UnsavedTitle": {
+      "en": "Discard changes",
+      "zh-hans": "放弃改动",
+      "zh-hant": "放棄變更",
+      "jp": "変更を破棄"
+    },
+    "UnsavedBody": {
+      "en": "There are unsaved changes. Discard them?",
+      "zh-hans": "有未保存的改动，确定要放弃吗？",
+      "zh-hant": "有未儲存的變更，確定要放棄嗎？",
+      "jp": "未保存の変更があります。破棄しますか？"
     }
   },
   "RecordEditor": {
