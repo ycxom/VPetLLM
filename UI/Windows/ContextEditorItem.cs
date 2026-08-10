@@ -16,7 +16,7 @@ namespace VPetLLM.UI.Windows
     public class ContextEditorItem : INotifyPropertyChanged
     {
         /// <summary>历史里的原始消息对象。只有在用户点保存时才会被写入。</summary>
-        public Message OriginalMessage { get; }
+        public Message OriginalMessage { get; private set; }
 
         /// <summary>
         /// 被摘出去的强调提示词尾巴（<c>[System: ...]</c>）。
@@ -24,7 +24,10 @@ namespace VPetLLM.UI.Windows
         /// ChatCoreBase.CreateUserMessage 会把强调提示词直接拼在用户消息正文末尾并落库，
         /// 它是提示词而不是用户说的话——两种模式都不展示，保存时原样接回去。
         /// </summary>
-        private readonly string _emphasisSuffix;
+        private string _emphasisSuffix;
+        private bool _suppressDirty;
+        private bool _isLoaded = true;
+        private bool _isDirty;
 
         public ContextEditorItem(Message originalMessage)
         {
@@ -39,6 +42,88 @@ namespace VPetLLM.UI.Windows
             _hasImage = originalMessage.HasImage;
 
             RebuildSegments();
+        }
+
+        public ContextEditorItem(int index, string role)
+        {
+            Index = index;
+            OriginalMessage = new Message { Role = role, Content = "" };
+            _role = role;
+            _content = "";
+            _emphasisSuffix = "";
+            _isLoaded = false;
+        }
+
+        public int Index { get; private set; }
+        public void SetIndex(int index) => Index = index;
+        public bool IsLoaded
+        {
+            get => _isLoaded;
+            private set
+            {
+                if (_isLoaded != value)
+                {
+                    _isLoaded = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsLoading));
+                }
+            }
+        }
+
+        public bool IsLoading => !IsLoaded;
+        public bool IsDirty => _isDirty;
+        public bool IsDeleted { get; private set; }
+
+        public void MarkDeleted()
+        {
+            IsDeleted = true;
+            _isDirty = true;
+            OnPropertyChanged(nameof(IsDeleted));
+        }
+
+        public void LoadFrom(Message message)
+        {
+            _suppressDirty = true;
+            OriginalMessage = message;
+            _role = message.Role ?? "user";
+            var raw = message.Content ?? "";
+            (_content, _emphasisSuffix) = SplitEmphasis(raw);
+            _hasImage = message.HasImage;
+            _thumbnailSource = null;
+            _thumbnailAttempted = false;
+            IsLoaded = true;
+            RebuildSegments();
+            OnPropertyChanged(nameof(Role));
+            OnPropertyChanged(nameof(Content));
+            OnPropertyChanged(nameof(HasImage));
+            OnPropertyChanged(nameof(IsAssistant));
+            OnPropertyChanged(nameof(IsUser));
+            OnPropertyChanged(nameof(RoleDisplay));
+            OnPropertyChanged(nameof(AvatarInitial));
+            _suppressDirty = false;
+        }
+
+        public void Unload()
+        {
+            if (!IsLoaded || IsDirty)
+            {
+                return;
+            }
+
+            OriginalMessage = new Message { Role = Role, Content = "" };
+            _content = "";
+            _hasImage = false;
+            Segments.Clear();
+            _thumbnailSource = null;
+            _thumbnailAttempted = false;
+            IsLoaded = false;
+            OnPropertyChanged(nameof(Content));
+            OnPropertyChanged(nameof(HasImage));
+        }
+
+        public void MarkClean()
+        {
+            _isDirty = false;
         }
 
         /// <summary>
@@ -76,6 +161,7 @@ namespace VPetLLM.UI.Windows
                 if (_role != value)
                 {
                     _role = value;
+                    if (!_suppressDirty && IsLoaded) _isDirty = true;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsAssistant));
                     OnPropertyChanged(nameof(IsUser));
@@ -126,6 +212,7 @@ namespace VPetLLM.UI.Windows
                 if (_content != value)
                 {
                     _content = value;
+                    if (!_suppressDirty && IsLoaded) _isDirty = true;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsEmpty));
                 }
@@ -209,6 +296,7 @@ namespace VPetLLM.UI.Windows
             if (!HasImage) return;
 
             ImageRemoved = true;
+            _isDirty = true;
             HasImage = false;
             _thumbnailSource = null;
             OnPropertyChanged(nameof(ThumbnailSource));
@@ -223,8 +311,9 @@ namespace VPetLLM.UI.Windows
         {
             get
             {
-                if (_thumbnailSource is null && HasImage && !_thumbnailAttempted)
+                if (!IsLoaded || (_thumbnailSource is null && HasImage && !_thumbnailAttempted))
                 {
+                    if (!IsLoaded) return null;
                     _thumbnailAttempted = true;
                     _thumbnailSource = CreateThumbnail(OriginalMessage.ImageData, 96);
                 }
@@ -233,7 +322,7 @@ namespace VPetLLM.UI.Windows
         }
 
         /// <summary>点开大图时才需要完整数据</summary>
-        public byte[]? GetFullImage() => HasImage ? OriginalMessage.ImageData : null;
+        public byte[]? GetFullImage() => IsLoaded && HasImage ? OriginalMessage.ImageData : null;
 
         private static BitmapSource? CreateThumbnail(byte[]? imageData, int maxSize)
         {
@@ -266,6 +355,10 @@ namespace VPetLLM.UI.Windows
         /// <summary>把编辑结果写回真正的 Message 对象。仅在用户确认保存时调用。</summary>
         public void ApplyTo()
         {
+            if (!IsLoaded)
+            {
+                throw new InvalidOperationException("Cannot apply an unloaded context item.");
+            }
             OriginalMessage.Role = Role;
 
             // 强调提示词接回原位：它没在界面上出现过，用户也就无从决定它的去留，
