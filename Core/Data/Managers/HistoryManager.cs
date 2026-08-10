@@ -45,6 +45,15 @@ namespace VPetLLM.Core.Data.Managers
 
         public List<Message> GetHistory() => _history;
 
+        public int GetEditingMessageCount()
+            => _database.GetEditingMessageCount(_providerName, _settings.SeparateChatByProvider);
+
+        public List<Message> GetEditingMessagesPage(int offset, int limit)
+            => _database.GetEditingMessagesPage(_providerName, _settings.SeparateChatByProvider, offset, limit);
+
+        public List<Message> GetSystemMessagesForEditing()
+            => _database.GetSystemMessages(_providerName, _settings.SeparateChatByProvider);
+
         public int GetCurrentTokenCount() => EstimateTokenCount();
 
         public void LoadHistory()

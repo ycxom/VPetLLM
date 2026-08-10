@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using VPetLLM.Utils.Localization;
 
 namespace VPetLLM.UI.Windows
@@ -27,8 +28,12 @@ namespace VPetLLM.UI.Windows
         private readonly List<Message> _systemMessages;
 
         /// <summary>打开编辑器那一刻的内容快照，用于判断是否有未保存改动</summary>
-        private readonly List<string> _contentSnapshot;
         private readonly int _snapshotCount;
+        private readonly CancellationTokenSource _loadCts = new();
+        private readonly HashSet<int> _loadingPages = new();
+        private readonly object _loadingPagesLock = new();
+        private const int PageSize = 24;
+        private bool _closing;
 
         private bool _initialized;
         private bool _saved;
@@ -48,31 +53,20 @@ namespace VPetLLM.UI.Windows
 
             InitializeComponent();
 
-            // GetChatHistory 返回的是 HistoryManager 内部那个活列表本身。
-            // 必须先拷一份再操作，否则"添加/删除消息"会立刻改到真实上下文，
-            // 用户点取消也收不回来。
-            var liveHistory = _plugin.ChatCore.GetChatHistory().ToList();
-
-            _systemMessages = liveHistory
-                .Where(m => string.Equals(m.NormalizedRole, "system", StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            var historyManager = _plugin.ChatCore.HistoryManager;
+            _systemMessages = new List<Message>();
 
             var aiName = _plugin.Settings?.AiName ?? "Assistant";
             var userName = _plugin.Settings?.UserName ?? "You";
 
-            foreach (var message in liveHistory)
+            var messageCount = historyManager.GetEditingMessageCount();
+            for (var index = 0; index < messageCount; index++)
             {
-                if (string.Equals(message.NormalizedRole, "system", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var item = new ContextEditorItem(message);
+                var item = new ContextEditorItem(index, "user");
                 item.SetDisplayNames(aiName, userName);
                 Items.Add(item);
             }
 
-            _contentSnapshot = Items.Select(i => i.Content).ToList();
             _snapshotCount = Items.Count;
 
             DataContext = this;
@@ -81,6 +75,20 @@ namespace VPetLLM.UI.Windows
             ApplyLocalization();
             ApplyMode(simple: true);
             UpdateStats();
+            Loaded += Window_Loaded;
+            Closed += Window_Closed;
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => _ = EnsurePageLoadedAsync(0)));
+        }
+
+        private void Window_Closed(object? sender, EventArgs e)
+        {
+            _closing = true;
+            _loadCts.Cancel();
+            _loadCts.Dispose();
         }
 
         // ── 模板里用到的本地化文案 ──────────────────────────────────────────
@@ -99,6 +107,87 @@ namespace VPetLLM.UI.Windows
             ApplyMode(simple: Radio_Simple.IsChecked == true);
         }
 
+        private void ListBoxItem_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is ListBoxItem { DataContext: ContextEditorItem item })
+            {
+                _ = EnsurePageLoadedAsync(item.Index / PageSize);
+            }
+        }
+
+        private void ListBoxItem_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is ListBoxItem { DataContext: ContextEditorItem item })
+            {
+                item.Unload();
+            }
+        }
+
+        private async Task EnsurePageLoadedAsync(int page)
+        {
+            if (_closing || page < 0) return;
+            var alreadyLoading = false;
+            lock (_loadingPagesLock) alreadyLoading = !_loadingPages.Add(page);
+            if (alreadyLoading)
+            {
+                while (!_closing && !_loadCts.IsCancellationRequested)
+                {
+                    await Task.Delay(10, _loadCts.Token);
+                    lock (_loadingPagesLock)
+                    {
+                        if (!_loadingPages.Contains(page)) return;
+                    }
+                }
+                return;
+            }
+
+            try
+            {
+                var offset = page * PageSize;
+                var messages = await Task.Run(
+                    () => _plugin.ChatCore?.HistoryManager.GetEditingMessagesPage(offset, PageSize)
+                          ?? new List<Message>(), _loadCts.Token);
+                if (_closing || _loadCts.IsCancellationRequested) return;
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    for (var i = 0; i < messages.Count && offset + i < Items.Count; i++)
+                    {
+                        var item = Items[offset + i];
+                        if (item.IsLoaded || item.IsDirty)
+                        {
+                            continue;
+                        }
+                        item.LoadFrom(messages[i]);
+                        item.SetDisplayNames(_plugin.Settings?.AiName ?? "Assistant", _plugin.Settings?.UserName ?? "You");
+                        item.IsSimpleMode = Radio_Simple.IsChecked == true;
+                        item.MarkClean();
+                    }
+                    UpdateStats();
+                });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"上下文编辑器: 分页加载失败: {ex.Message}");
+            }
+            finally
+            {
+                lock (_loadingPagesLock) _loadingPages.Remove(page);
+            }
+        }
+
+        private async Task EnsureAllItemsLoadedAsync()
+        {
+            var pages = (Items.Count + PageSize - 1) / PageSize;
+            for (var page = 0; page < pages; page++)
+            {
+                await EnsurePageLoadedAsync(page);
+            }
+        }
+
         /// <summary>
         /// 切模式前必须把当前模式的编辑成果落到另一边，否则用户在简洁模式改的台词
         /// 一切到完全模式就"消失"了（因为完全模式读的是 Content）。
@@ -107,6 +196,7 @@ namespace VPetLLM.UI.Windows
         {
             foreach (var item in Items)
             {
+                if (!item.IsLoaded) continue;
                 if (simple)
                 {
                     // 完全模式可能整段重写过原文，片段必须按新原文重新解析
@@ -137,6 +227,7 @@ namespace VPetLLM.UI.Windows
             item.IsSimpleMode = Radio_Simple.IsChecked == true;
 
             Items.Add(item);
+            ReindexItems();
             UpdateStats();
 
             List_Messages.ScrollIntoView(item);
@@ -146,9 +237,14 @@ namespace VPetLLM.UI.Windows
         {
             if (sender is Button { DataContext: ContextEditorItem item })
             {
-                Items.Remove(item);
+                item.MarkDeleted();
                 UpdateStats();
             }
+        }
+
+        private void ReindexItems()
+        {
+            for (var i = 0; i < Items.Count; i++) Items[i].SetIndex(i);
         }
 
         // ── 滚轮 ────────────────────────────────────────────────────────────
@@ -266,7 +362,7 @@ namespace VPetLLM.UI.Windows
 
         // ── 保存 / 取消 ─────────────────────────────────────────────────────
 
-        private void Button_Save_Click(object sender, RoutedEventArgs e)
+        private async void Button_Save_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin.ChatCore is null)
             {
@@ -278,12 +374,15 @@ namespace VPetLLM.UI.Windows
 
             try
             {
+                await EnsureAllItemsLoadedAsync();
+                _systemMessages.Clear();
+                _systemMessages.AddRange(_plugin.ChatCore.HistoryManager.GetSystemMessagesForEditing());
                 // 简洁模式下真相在片段里，先合回原文再落库
                 if (Radio_Simple.IsChecked == true)
                 {
                     foreach (var item in Items)
                     {
-                        item.SyncToContent();
+                        if (item.IsLoaded) item.SyncToContent();
                     }
                 }
 
@@ -292,6 +391,7 @@ namespace VPetLLM.UI.Windows
 
                 foreach (var item in Items)
                 {
+                    if (item.IsDeleted) continue;
                     item.ApplyTo();
                     newHistory.Add(item.OriginalMessage);
                 }
@@ -344,7 +444,7 @@ namespace VPetLLM.UI.Windows
             {
                 foreach (var item in Items)
                 {
-                    item.SyncToContent();
+                    if (item.IsLoaded) item.SyncToContent();
                 }
             }
 
@@ -355,12 +455,7 @@ namespace VPetLLM.UI.Windows
 
             for (var i = 0; i < Items.Count; i++)
             {
-                if (!string.Equals(Items[i].Content, _contentSnapshot[i], StringComparison.Ordinal))
-                {
-                    return true;
-                }
-
-                if (Items[i].ImageRemoved)
+                if (Items[i].IsDirty)
                 {
                     return true;
                 }
@@ -385,9 +480,10 @@ namespace VPetLLM.UI.Windows
             }
 
             var template = LanguageHelper.Get("ContextEditor.Stats", _langCode, "{0} 条消息 · 约 {1} tokens");
-            Text_Stats.Text = string.Format(template, Items.Count, tokens);
+            var activeCount = Items.Count(item => !item.IsDeleted);
+            Text_Stats.Text = string.Format(template, activeCount, tokens);
 
-            Text_Empty.Visibility = Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            Text_Empty.Visibility = activeCount == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ApplyLocalization()

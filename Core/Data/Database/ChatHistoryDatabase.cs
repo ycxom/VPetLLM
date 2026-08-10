@@ -366,6 +366,128 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
+        /// Returns the number of editable messages without materializing their content.
+        /// System messages are kept outside of the editor's virtualized list.
+        /// </summary>
+        public int GetEditingMessageCount(string provider, bool separateByProvider)
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = separateByProvider
+                    ? "SELECT COUNT(*) FROM chat_history WHERE provider = @provider AND LOWER(role) <> 'system'"
+                    : "SELECT COUNT(*) FROM chat_history WHERE LOWER(role) <> 'system'";
+                if (separateByProvider)
+                {
+                    command.Parameters.AddWithValue("@provider", provider);
+                }
+                return Convert.ToInt32(command.ExecuteScalar());
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"获取可编辑消息数量失败: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Reads one virtualized page of editable messages.
+        /// </summary>
+        public List<Message> GetEditingMessagesPage(string provider, bool separateByProvider, int offset, int limit)
+        {
+            var messages = new List<Message>();
+            if (offset < 0 || limit <= 0)
+            {
+                return messages;
+            }
+
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = separateByProvider
+                    ? @"SELECT role, content, unix_time, status_info, image_id
+                       FROM chat_history
+                       WHERE provider = @provider AND LOWER(role) <> 'system'
+                       ORDER BY id ASC LIMIT @limit OFFSET @offset"
+                    : @"SELECT role, content, unix_time, status_info, image_id
+                       FROM chat_history
+                       WHERE LOWER(role) <> 'system'
+                       ORDER BY id ASC LIMIT @limit OFFSET @offset";
+                if (separateByProvider)
+                {
+                    command.Parameters.AddWithValue("@provider", provider);
+                }
+                command.Parameters.AddWithValue("@limit", limit);
+                command.Parameters.AddWithValue("@offset", offset);
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    var message = new Message
+                    {
+                        Role = reader.GetString(0),
+                        Content = reader.GetString(1),
+                        UnixTime = reader.IsDBNull(2) ? null : reader.GetInt64(2),
+                        StatusInfo = reader.IsDBNull(3) ? null : reader.GetString(3)
+                    };
+                    if (!reader.IsDBNull(4))
+                    {
+                        message.AttachStoredImage(reader.GetString(4), LoadImageFile);
+                    }
+                    messages.Add(message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"分页读取上下文消息失败: {ex.Message}");
+            }
+
+            return messages;
+        }
+
+        public List<Message> GetSystemMessages(string provider, bool separateByProvider)
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = separateByProvider
+                    ? @"SELECT role, content, unix_time, status_info, image_id FROM chat_history
+                       WHERE provider = @provider AND LOWER(role) = 'system' ORDER BY id ASC"
+                    : @"SELECT role, content, unix_time, status_info, image_id FROM chat_history
+                       WHERE LOWER(role) = 'system' ORDER BY id ASC";
+                if (separateByProvider)
+                {
+                    command.Parameters.AddWithValue("@provider", provider);
+                }
+                using var reader = command.ExecuteReader();
+                var result = new List<Message>();
+                while (reader.Read())
+                {
+                    var message = new Message
+                    {
+                        Role = reader.GetString(0), Content = reader.GetString(1),
+                        UnixTime = reader.IsDBNull(2) ? null : reader.GetInt64(2),
+                        StatusInfo = reader.IsDBNull(3) ? null : reader.GetString(3)
+                    };
+                    if (!reader.IsDBNull(4)) message.AttachStoredImage(reader.GetString(4), LoadImageFile);
+                    result.Add(message);
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"读取 system 消息失败: {ex.Message}");
+                return new List<Message>();
+            }
+        }
+
+        /// <summary>
         /// 清除指定提供商的历史记录
         /// </summary>
         public void ClearHistory(string provider)

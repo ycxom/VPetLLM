@@ -243,7 +243,7 @@
 
         <!-- 一条消息 -->
         <DataTemplate x:Key="MessageTemplate">
-            <Grid Margin="0,6">
+            <Grid x:Name="MessageRoot" Margin="0,6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -265,6 +265,11 @@
                         Background="{StaticResource Surface}"
                         BorderBrush="{StaticResource Hairline}" BorderThickness="1">
                     <StackPanel>
+                        <TextBlock Text="加载中..."
+                                   Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"
+                                   Foreground="{StaticResource TextFaint}"
+                                   FontFamily="{StaticResource UIFont}"
+                                   MinHeight="22"/>
 
                         <!-- 名字 + 悬停操作 -->
                         <Grid Margin="0,0,0,6">
@@ -328,6 +333,9 @@
                 <DataTrigger Binding="{Binding IsUser}" Value="True">
                     <Setter TargetName="BubbleRoot" Property="Background" Value="{StaticResource UserBubble}"/>
                     <Setter TargetName="BubbleRoot" Property="BorderThickness" Value="0"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsDeleted}" Value="True">
+                    <Setter TargetName="MessageRoot" Property="Visibility" Value="Collapsed"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
                     <Setter TargetName="DeleteBtn" Property="Visibility" Value="Visible"/>
@@ -423,6 +431,8 @@
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
+                        <EventSetter Event="Loaded" Handler="ListBoxItem_Loaded"/>
+                        <EventSetter Event="Unloaded" Handler="ListBoxItem_Unloaded"/>
                     </Style>
                 </ListBox.ItemContainerStyle>
             </ListBox>
