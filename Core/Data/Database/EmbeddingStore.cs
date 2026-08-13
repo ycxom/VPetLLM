@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
+using VPetLLM.Utils.Data;
 
 namespace VPetLLM.Core.Data.Database
 {
@@ -16,17 +17,18 @@ namespace VPetLLM.Core.Data.Database
     public sealed class EmbeddingStore
     {
         private readonly string _connectionString;
+        private readonly string _dbPath;
 
         public EmbeddingStore(string dbPath)
         {
-            _connectionString = $"Data Source={dbPath}";
+            _connectionString = SQLiteHelper.BuildConnectionString(dbPath);
+            _dbPath = dbPath;
             Initialize();
         }
 
         private void Initialize()
         {
-            using var connection = new SqliteConnection(_connectionString);
-            connection.Open();
+            using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
             var cmd = connection.CreateCommand();
             cmd.CommandText = @"
@@ -62,8 +64,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 // SQLite 参数上限 999，分批查询
                 foreach (var chunk in Chunk(hashes, 400))
@@ -109,8 +110,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 using var transaction = connection.BeginTransaction();
 
                 foreach (var (hash, vector) in items)
@@ -148,8 +148,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 var cmd = connection.CreateCommand();
                 if (modelKey is null)
                 {

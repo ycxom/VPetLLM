@@ -40,7 +40,7 @@ namespace VPetLLM.Handlers.Core
             if (plugin.IsVPetTTSPluginDetected)
             {
                 _vpetTTSIntegration = new VPetTTSIntegrationManager(plugin);
-                Logger.Log("SmartMessageProcessor: VPetTTS 集成管理器已初始化");
+                Logger.LogVerbose("SmartMessageProcessor: VPetTTS 集成管理器已初始化");
             }
             
             // 创建 TTSProviderFactory（传递集成管理器的协调器）
@@ -62,7 +62,7 @@ namespace VPetLLM.Handlers.Core
             try
             {
                 animationCache.Initialize();
-                Logger.Log("SmartMessageProcessor: 动画兼容性缓存初始化完成");
+                Logger.LogVerbose("SmartMessageProcessor: 动画兼容性缓存初始化完成");
             }
             catch (Exception ex)
             {
@@ -78,14 +78,14 @@ namespace VPetLLM.Handlers.Core
             if (plugin.TTSService is not null)
             {
                 _unifiedTTSProcessor = new UnifiedTTSProcessor(plugin.TTSService);
-                Logger.Log("SmartMessageProcessor: 统一TTS处理器已初始化");
+                Logger.LogVerbose("SmartMessageProcessor: 统一TTS处理器已初始化");
             }
             else
             {
-                Logger.Log("SmartMessageProcessor: TTSService未初始化，跳过统一TTS处理器");
+                Logger.LogVerbose("SmartMessageProcessor: TTSService未初始化，跳过统一TTS处理器");
             }
 
-            Logger.Log("SmartMessageProcessor: 初始化完成，使用UnifiedBubbleFacade系统和TTSProviderFactory（支持独占会话和预加载）");
+            Logger.LogVerbose("SmartMessageProcessor: 初始化完成，使用UnifiedBubbleFacade系统和TTSProviderFactory（支持独占会话和预加载）");
         }
 
         /// <summary>
@@ -102,12 +102,12 @@ namespace VPetLLM.Handlers.Core
                 if (File.Exists(mpvPath))
                 {
                     var mpvPlayer = new MpvPlayer(mpvPath);
-                    Logger.Log($"SmartMessageProcessor: mpv 播放器初始化成功: {mpvPath}");
+                    Logger.LogVerbose($"SmartMessageProcessor: mpv 播放器初始化成功: {mpvPath}");
                     return mpvPlayer;
                 }
                 else
                 {
-                    Logger.Log($"SmartMessageProcessor: mpv.exe 未找到: {mpvPath}");
+                    Logger.LogVerbose($"SmartMessageProcessor: mpv.exe 未找到: {mpvPath}");
                     return null;
                 }
             }
@@ -210,7 +210,7 @@ namespace VPetLLM.Handlers.Core
                 try
                 {
                     _vpetTTSIntegration = new VPetTTSIntegrationManager(_plugin);
-                    Logger.Log("SmartMessageProcessor: VPetTTS 集成管理器已延迟初始化");
+                    Logger.LogVerbose("SmartMessageProcessor: VPetTTS 集成管理器已延迟初始化");
                 }
                 catch (Exception ex)
                 {
@@ -247,7 +247,7 @@ namespace VPetLLM.Handlers.Core
             // 如果传入了外部会话 ID，直接使用现有会话
             if (!string.IsNullOrEmpty(existingSessionId))
             {
-                Logger.Log($"SmartMessageProcessor: 使用外部独占会话 ID: {existingSessionId}");
+                Logger.LogVerbose($"SmartMessageProcessor: 使用外部独占会话 ID: {existingSessionId}");
                 await ProcessMessageInternalAsync(response, skipInitialization, autoSetIdleOnComplete, existingSessionId);
                 return;
             }
@@ -260,7 +260,7 @@ namespace VPetLLM.Handlers.Core
 
             try
             {
-                Logger.Log($"SmartMessageProcessor: 处理消息，SkipInit={skipInitialization}，" +
+                Logger.LogVerbose($"SmartMessageProcessor: 处理消息，SkipInit={skipInitialization}，" +
                            $"自建会话: {ownedSessionId ?? "无"}");
                 await ProcessMessageInternalAsync(response, skipInitialization, autoSetIdleOnComplete, ownedSessionId);
             }
@@ -308,7 +308,7 @@ namespace VPetLLM.Handlers.Core
                 if (TTSCoordinationSettings.Instance.EnablePreload)
                 {
                     var preloaded = await integration.PreloadTextsAsync(talkTexts);
-                    Logger.Log($"SmartMessageProcessor: 自建会话预加载完成 {preloaded}/{talkTexts.Count}");
+                    Logger.LogVerbose($"SmartMessageProcessor: 自建会话预加载完成 {preloaded}/{talkTexts.Count}");
                 }
 
                 return sessionId;
@@ -370,12 +370,12 @@ namespace VPetLLM.Handlers.Core
             // 开始消息处理会话，防止状态灯过早切换为Idle
             // 无论是否跳过初始化，都需要维护会话（确保会话计数正确）
             _plugin?.FloatingSidebarManager?.BeginActiveSession("SmartMessageProcessor");
-            Logger.Log("SmartMessageProcessor: 开始消息处理会话");
+            Logger.LogVerbose("SmartMessageProcessor: 开始消息处理会话");
             bool sessionStarted = true;
 
             try
             {
-                Logger.Log($"SmartMessageProcessor: 开始处理消息: {response}, 跳过初始化: {skipInitialization}");
+                Logger.LogVerbose($"SmartMessageProcessor: 开始处理消息: {response}, 跳过初始化: {skipInitialization}");
 
                 // 设置状态灯为输出中（无论是首次响应还是后续命令）
                 try
@@ -395,7 +395,7 @@ namespace VPetLLM.Handlers.Core
                     bool isInUserInteractionAnim = IsInProtectedHostAnimation();
                     if (isInUserInteractionAnim)
                     {
-                        Logger.Log("SmartMessageProcessor: Protected host animation is active; waiting before Clear");
+                        Logger.LogVerbose("SmartMessageProcessor: Protected host animation is active; waiting before Clear");
                         // 短暂等待；后续 Say/Action handler 仍会再次执行保护检查。
                         int waited = 0;
                         while (waited < 2000 && !InterruptManager.IsInterrupted && IsInProtectedHostAnimation())
@@ -403,18 +403,18 @@ namespace VPetLLM.Handlers.Core
                             await InterruptManager.Delay(50).ConfigureAwait(false);
                             waited += 50;
                         }
-                        Logger.Log($"SmartMessageProcessor: Protected animation wait completed after {waited}ms");
+                        Logger.LogVerbose($"SmartMessageProcessor: Protected animation wait completed after {waited}ms");
                     }
 
                     // 使用统一的BubbleFacade清理状态
                     _unifiedBubbleFacade.Clear();
-                    Logger.Log("SmartMessageProcessor: 使用UnifiedBubbleFacade清理状态");
+                    Logger.LogVerbose("SmartMessageProcessor: 使用UnifiedBubbleFacade清理状态");
 
                     // 立即停止思考动画，防止覆盖正常气泡
                     try
                     {
                         _plugin?.TalkBox?.StopThinkingAnimationWithoutHide();
-                        Logger.Log("SmartMessageProcessor: 已停止思考动画");
+                        Logger.LogVerbose("SmartMessageProcessor: 已停止思考动画");
                     }
                     catch (Exception ex)
                     {
@@ -427,7 +427,7 @@ namespace VPetLLM.Handlers.Core
                     if (delayMs > 0)
                     {
                         await InterruptManager.Delay(delayMs);
-                        Logger.Log($"SmartMessageProcessor: 延迟 {delayMs}ms 完成，思考动画已完全停止");
+                        Logger.LogVerbose($"SmartMessageProcessor: 延迟 {delayMs}ms 完成，思考动画已完全停止");
                     }
                 }
 
@@ -441,11 +441,11 @@ namespace VPetLLM.Handlers.Core
                 // 解析消息，提取文本片段和动作指令
                 var messageSegments = ParseMessage(response);
 
-                Logger.Log($"SmartMessageProcessor: 解析出 {messageSegments.Count} 个消息片段");
+                Logger.LogVerbose($"SmartMessageProcessor: 解析出 {messageSegments.Count} 个消息片段");
 
                 // 修复：不再在此处预加载，避免与 StreamingCommandProcessor 的预下载冲突
                 // 预加载逻辑已移至 ProcessTalkSegmentWithPreloadAsync 中按需处理
-                Logger.Log("SmartMessageProcessor: 跳过批量预加载，使用按需预加载策略");
+                Logger.LogVerbose("SmartMessageProcessor: 跳过批量预加载，使用按需预加载策略");
 
                 // 按顺序处理每个片段，使用智能等待机制（优化：不阻塞UI线程）
                 int talkIndex = 0;
@@ -456,7 +456,7 @@ namespace VPetLLM.Handlers.Core
                         // 中断在段边界生效：已经播出去的那一段让它自然结束，后面的不再输出
                         if (InterruptManager.IsInterrupted)
                         {
-                            Logger.Log("SmartMessageProcessor: 检测到中断，停止处理剩余片段");
+                            Logger.LogVerbose("SmartMessageProcessor: 检测到中断，停止处理剩余片段");
                             break;
                         }
 
@@ -477,9 +477,9 @@ namespace VPetLLM.Handlers.Core
 
                     // 先统一Flush一次本次会话内所有聚合结果，确保只回灌一次
                     // 修复：使用异步版本并等待完成，确保 Plugin 回灌完成后再结束会话
-                    Logger.Log("SmartMessageProcessor: 等待 ResultAggregator 回灌完成...");
+                    Logger.LogVerbose("SmartMessageProcessor: 等待 ResultAggregator 回灌完成...");
                     await global::VPetLLM.Utils.Common.ResultAggregator.FlushSessionAsync(_sessionId);
-                    Logger.Log("SmartMessageProcessor: ResultAggregator 回灌已完成");
+                    Logger.LogVerbose("SmartMessageProcessor: ResultAggregator 回灌已完成");
 
                     // 退出本次会话，恢复上下文
                     if (global::VPetLLM.Utils.System.ExecutionContext.CurrentMessageId.Value == _sessionId)
@@ -498,7 +498,7 @@ namespace VPetLLM.Handlers.Core
                 if (sessionStarted)
                 {
                     _plugin?.FloatingSidebarManager?.EndActiveSession("SmartMessageProcessor");
-                    Logger.Log("SmartMessageProcessor: 结束消息处理会话");
+                    Logger.LogVerbose("SmartMessageProcessor: 结束消息处理会话");
                 }
 
                 // 只有在autoSetIdleOnComplete为true时才自动设置Idle状态
@@ -508,13 +508,13 @@ namespace VPetLLM.Handlers.Core
                     try
                     {
                         _plugin.FloatingSidebarManager?.SetIdleStatus();
-                        Logger.Log("SmartMessageProcessor: 处理完成，状态灯已切换回Idle");
+                        Logger.LogVerbose("SmartMessageProcessor: 处理完成，状态灯已切换回Idle");
                         
                         // 通知生命周期插件：处理完成
                         try
                         {
                             await _plugin.ProcessingLifecycleManager?.NotifyProcessingCompleteAsync();
-                            Logger.Log("SmartMessageProcessor: 已通知生命周期插件处理完成");
+                            Logger.LogVerbose("SmartMessageProcessor: 已通知生命周期插件处理完成");
                         }
                         catch (Exception lifecycleEx)
                         {
@@ -528,7 +528,7 @@ namespace VPetLLM.Handlers.Core
                 }
                 else
                 {
-                    Logger.Log("SmartMessageProcessor: 处理完成，状态灯由调用方管理（流式处理模式）");
+                    Logger.LogVerbose("SmartMessageProcessor: 处理完成，状态灯由调用方管理（流式处理模式）");
                 }
             }
         }
@@ -543,7 +543,7 @@ namespace VPetLLM.Handlers.Core
         {
             var segments = new List<MessageSegment>();
 
-            Logger.Log($"SmartMessageProcessor: 开始解析消息，长度: {message.Length}");
+            Logger.LogVerbose($"SmartMessageProcessor: 开始解析消息，长度: {message.Length}");
 
             // 预处理：移除可能影响解析的多余空白字符（但保留引号内的内容）
             message = NormalizeMessage(message);
@@ -552,7 +552,7 @@ namespace VPetLLM.Handlers.Core
             var commands = CommandFormatParser.Parse(message);
             var format = CommandFormatParser.DetectFormat(message);
 
-            Logger.Log($"SmartMessageProcessor: 检测到格式: {format}, 找到 {commands.Count} 个命令");
+            Logger.LogVerbose($"SmartMessageProcessor: 检测到格式: {format}, 找到 {commands.Count} 个命令");
 
             foreach (var command in commands)
             {
@@ -560,7 +560,7 @@ namespace VPetLLM.Handlers.Core
                 string actionValue = command.Parameters;
                 string fullMatch = command.FullMatch;
 
-                Logger.Log($"SmartMessageProcessor: 解析到动作指令 - 类型: {actionType}, 格式: {command.Format}, 值长度: {actionValue.Length}");
+                Logger.LogVerbose($"SmartMessageProcessor: 解析到动作指令 - 类型: {actionType}, 格式: {command.Format}, 值长度: {actionValue.Length}");
 
                 segments.Add(new MessageSegment
                 {
@@ -579,11 +579,11 @@ namespace VPetLLM.Handlers.Core
                     Type = SegmentType.Text,
                     Content = message.Trim()
                 });
-                Logger.Log($"SmartMessageProcessor: 没有找到动作指令，作为纯文本处理");
+                Logger.LogVerbose($"SmartMessageProcessor: 没有找到动作指令，作为纯文本处理");
             }
             else
             {
-                Logger.Log($"SmartMessageProcessor: 解析完成，共 {segments.Count} 个片段");
+                Logger.LogVerbose($"SmartMessageProcessor: 解析完成，共 {segments.Count} 个片段");
             }
 
             return segments;
@@ -654,7 +654,7 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task ProcessTalkSegmentWithPreloadAsync(MessageSegment segment, int talkIndex)
         {
-            Logger.Log($"SmartMessageProcessor: 处理talk动作 #{talkIndex}: {segment.Content}");
+            Logger.LogVerbose($"SmartMessageProcessor: 处理talk动作 #{talkIndex}: {segment.Content}");
 
             // 解析talk动作中的文本内容
             var talkText = ExtractTalkText(segment.ActionValue);
@@ -667,12 +667,12 @@ namespace VPetLLM.Handlers.Core
                 {
                     // 实时检测VPetTTS插件状态（确保检测到后加载的插件）
                     var vpetTTSDetected = _plugin.IsVPetTTSPluginDetected;
-                    Logger.Log($"SmartMessageProcessor: VPetTTS插件检测状态: {vpetTTSDetected}");
+                    Logger.LogVerbose($"SmartMessageProcessor: VPetTTS插件检测状态: {vpetTTSDetected}");
                     
                     // 检查是否有VPetTTS插件，如果有则使用序列化处理
                     if (vpetTTSDetected)
                     {
-                        Logger.Log($"SmartMessageProcessor: 检测到VPetTTS插件，使用TTS序列化处理");
+                        Logger.LogVerbose($"SmartMessageProcessor: 检测到VPetTTS插件，使用TTS序列化处理");
 
                         // 使用TTS请求序列化器确保按顺序处理
                         var success = await _ttsSerializer.ProcessTTSRequestAsync(talkText, segment.Content);
@@ -680,7 +680,7 @@ namespace VPetLLM.Handlers.Core
                         if (success)
                         {
                             var serializationDuration = (int)(DateTime.Now - operationStartTime).TotalMilliseconds;
-                            Logger.Log($"SmartMessageProcessor: TTS序列化处理成功，总耗时: {serializationDuration}ms");
+                            Logger.LogVerbose($"SmartMessageProcessor: TTS序列化处理成功，总耗时: {serializationDuration}ms");
                         }
                         else
                         {
@@ -703,13 +703,13 @@ namespace VPetLLM.Handlers.Core
                     if (shouldUseTTS && _unifiedTTSProcessor is not null)
                     {
                         // 使用统一TTS处理器获取音频
-                        Logger.Log($"SmartMessageProcessor: 从统一TTS处理器获取音频 #{talkIndex}");
+                        Logger.LogVerbose($"SmartMessageProcessor: 从统一TTS处理器获取音频 #{talkIndex}");
                         audioFile = await _unifiedTTSProcessor.GetAudioAsync(talkText, talkIndex);
                         ttsSucceeded = !string.IsNullOrEmpty(audioFile);
 
                         if (ttsSucceeded)
                         {
-                            Logger.Log($"SmartMessageProcessor: 音频获取成功: {audioFile}");
+                            Logger.LogVerbose($"SmartMessageProcessor: 音频获取成功: {audioFile}");
                         }
                         else
                         {
@@ -718,31 +718,31 @@ namespace VPetLLM.Handlers.Core
                     }
                     else
                     {
-                        Logger.Log($"SmartMessageProcessor: 所有TTS功能都关闭，跳过音频获取");
+                        Logger.LogVerbose($"SmartMessageProcessor: 所有TTS功能都关闭，跳过音频获取");
                     }
 
                     // 如果TTS成功，播放音频和显示气泡
                     if (ttsSucceeded && !string.IsNullOrEmpty(audioFile))
                     {
-                        Logger.Log($"SmartMessageProcessor: 内置TTS音频准备就绪: {audioFile}");
+                        Logger.LogVerbose($"SmartMessageProcessor: 内置TTS音频准备就绪: {audioFile}");
                         
                         // 触发下一个音频的预下载
                         _unifiedTTSProcessor?.OnAudioPlayStart(talkIndex);
-                        Logger.Log($"SmartMessageProcessor: 已触发音频 #{talkIndex + 1} 的预下载");
+                        Logger.LogVerbose($"SmartMessageProcessor: 已触发音频 #{talkIndex + 1} 的预下载");
                         
                         // 先等待前一个音频播放完成，再显示气泡，确保气泡和音频同步
-                        Logger.Log($"SmartMessageProcessor: 等待前一个音频播放完成...");
+                        Logger.LogVerbose($"SmartMessageProcessor: 等待前一个音频播放完成...");
                         await _plugin.TTSService.WaitForCurrentPlaybackAsync().ConfigureAwait(false);
-                        Logger.Log($"SmartMessageProcessor: 前一个音频已播放完成");
+                        Logger.LogVerbose($"SmartMessageProcessor: 前一个音频已播放完成");
                         
                         // 使用 ExecuteActionAsync 执行完整命令，保留动画参数
-                        Logger.Log($"SmartMessageProcessor: 执行完整命令以保留动画参数");
+                        Logger.LogVerbose($"SmartMessageProcessor: 执行完整命令以保留动画参数");
                         await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
                         
                         // 播放音频
-                        Logger.Log($"SmartMessageProcessor: 开始播放内置TTS音频");
+                        Logger.LogVerbose($"SmartMessageProcessor: 开始播放内置TTS音频");
                         await _plugin.TTSService.PlayAudioFileAsync(audioFile).ConfigureAwait(false);
-                        Logger.Log($"SmartMessageProcessor: 内置TTS音频播放完成");
+                        Logger.LogVerbose($"SmartMessageProcessor: 内置TTS音频播放完成");
                         
                         // 通知播放完成
                         _unifiedTTSProcessor?.OnAudioPlayComplete(talkIndex);
@@ -750,10 +750,10 @@ namespace VPetLLM.Handlers.Core
                     else
                     {
                         // TTS失败或未启用
-                        Logger.Log($"SmartMessageProcessor: TTS未成功（启用: {shouldUseTTS}, 成功: {ttsSucceeded}）");
+                        Logger.LogVerbose($"SmartMessageProcessor: TTS未成功（启用: {shouldUseTTS}, 成功: {ttsSucceeded}）");
                         
                         // 使用 ExecuteActionAsync 执行完整命令，保留动画参数
-                        Logger.Log($"SmartMessageProcessor: 执行完整命令以保留动画参数（无TTS模式）");
+                        Logger.LogVerbose($"SmartMessageProcessor: 执行完整命令以保留动画参数（无TTS模式）");
                         await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
                         
                         // 等待气泡显示完成
@@ -761,13 +761,13 @@ namespace VPetLLM.Handlers.Core
                         if (msgBar is not null)
                         {
                             int maxWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(talkText);
-                            Logger.Log($"SmartMessageProcessor: 等待气泡显示完成，预估时间: {maxWaitMs}ms");
+                            Logger.LogVerbose($"SmartMessageProcessor: 等待气泡显示完成，预估时间: {maxWaitMs}ms");
                             await MessageBarHelper.WaitForPrintCompleteAsync(msgBar, maxWaitMs).ConfigureAwait(false);
                         }
                     }
 
                     var totalDuration = (int)(DateTime.Now - operationStartTime).TotalMilliseconds;
-                    Logger.Log($"SmartMessageProcessor: 处理音频 #{talkIndex} 完成，总耗时: {totalDuration}ms");
+                    Logger.LogVerbose($"SmartMessageProcessor: 处理音频 #{talkIndex} 完成，总耗时: {totalDuration}ms");
                 }
                 catch (Exception ex)
                 {
@@ -782,7 +782,7 @@ namespace VPetLLM.Handlers.Core
             else
             {
                 // 如果没有文本内容，直接执行动作（保持原有逻辑）
-                Logger.Log($"SmartMessageProcessor: Talk动作 #{talkIndex} 无文本内容，直接执行动作");
+                Logger.LogVerbose($"SmartMessageProcessor: Talk动作 #{talkIndex} 无文本内容，直接执行动作");
                 await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
             }
         }
@@ -797,11 +797,11 @@ namespace VPetLLM.Handlers.Core
             // 开始TTS播放会话，确保等待播放完成
             // 注意：这会与 ProcessMessageAsync 的会话嵌套，但这是正确的行为
             _plugin?.FloatingSidebarManager?.BeginActiveSession("SmartMessageProcessor.TTS");
-            Logger.Log("SmartMessageProcessor: 开始TTS播放会话");
+            Logger.LogVerbose("SmartMessageProcessor: 开始TTS播放会话");
 
             try
             {
-                Logger.Log("SmartMessageProcessor: 开始等待外置TTS播放完成...");
+                Logger.LogVerbose("SmartMessageProcessor: 开始等待外置TTS播放完成...");
 
                 // 优先使用集成管理器的状态监控器（完全依赖进度检测，不传入超时参数）
                 // 延迟初始化：插件检测可能晚于本类构造
@@ -812,14 +812,14 @@ namespace VPetLLM.Handlers.Core
                     && TTSCoordinationSettings.Instance.EnableStateMonitor
                     && _vpetTTSIntegration.HasStateMonitor)
                 {
-                    Logger.Log("SmartMessageProcessor: 使用VPetTTS集成管理器等待播放完成（基于进度检测）");
+                    Logger.LogVerbose("SmartMessageProcessor: 使用VPetTTS集成管理器等待播放完成（基于进度检测）");
                     // 不传入超时参数，使用默认的5分钟最大超时作为安全保护
                     // 实际完成判断完全依赖进度检测：3秒内进度无变化才判断失败
                     var completed = await _vpetTTSIntegration.WaitForPlaybackCompleteAsync();
 
                     if (completed)
                     {
-                        Logger.Log("SmartMessageProcessor: VPetTTS播放完成");
+                        Logger.LogVerbose("SmartMessageProcessor: VPetTTS播放完成");
                     }
                     else
                     {
@@ -829,7 +829,7 @@ namespace VPetLLM.Handlers.Core
                 else
                 {
                     // 回退到传统的 VPet 语音等待
-                    Logger.Log("SmartMessageProcessor: 状态监控器不可用，使用传统等待");
+                    Logger.LogVerbose("SmartMessageProcessor: 状态监控器不可用，使用传统等待");
                     await WaitForVPetVoiceCompleteAsync(text).ConfigureAwait(false);
                 }
             }
@@ -848,7 +848,7 @@ namespace VPetLLM.Handlers.Core
                     Logger.Log($"SmartMessageProcessor: 传统等待也失败: {fallbackEx.Message}");
                     // 最后的回退：动态计算等待时间而非硬编码
                     int fallbackWaitMs = CalculateDynamicWaitTime(text, baseMs: 1000);
-                    Logger.Log($"SmartMessageProcessor: 使用动态回退延迟: {fallbackWaitMs}ms");
+                    Logger.LogVerbose($"SmartMessageProcessor: 使用动态回退延迟: {fallbackWaitMs}ms");
                     await InterruptManager.Delay(fallbackWaitMs).ConfigureAwait(false);
                 }
             }
@@ -856,7 +856,7 @@ namespace VPetLLM.Handlers.Core
             {
                 // 确保TTS播放会话结束
                 _plugin?.FloatingSidebarManager?.EndActiveSession("SmartMessageProcessor.TTS");
-                Logger.Log("SmartMessageProcessor: 结束TTS播放会话");
+                Logger.LogVerbose("SmartMessageProcessor: 结束TTS播放会话");
             }
         }
 
@@ -867,7 +867,7 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task ShowBubbleWithoutTTSAsync(string text)
         {
-            Logger.Log("SmartMessageProcessor: TTS未成功，使用智能过渡逻辑显示气泡");
+            Logger.LogVerbose("SmartMessageProcessor: TTS未成功，使用智能过渡逻辑显示气泡");
             
             try
             {
@@ -887,7 +887,7 @@ namespace VPetLLM.Handlers.Core
                         // 检查当前是否在思考状态
                         if (_plugin.MW.Main.DisplayType.Name == "think")
                         {
-                            Logger.Log("SmartMessageProcessor: 检测到思考状态，执行智能过渡");
+                            Logger.LogVerbose("SmartMessageProcessor: 检测到思考状态，执行智能过渡");
                             
                             // 查找思考结束动画
                             var thinkEndAnimations = _plugin.MW.Core.Graph.FindGraphs(
@@ -904,7 +904,7 @@ namespace VPetLLM.Handlers.Core
                             {
                                 _isBubbleDisplayed = true;
                                 _plugin.MW.Main.Say(text, null, true);
-                                Logger.Log("SmartMessageProcessor: 思考结束动画完成，气泡已显示（强制模式）");
+                                Logger.LogVerbose("SmartMessageProcessor: 思考结束动画完成，气泡已显示（强制模式）");
                             };
 
                             // 如果找到思考结束动画，播放它
@@ -912,24 +912,24 @@ namespace VPetLLM.Handlers.Core
                             {
                                 var selectedAnimation = thinkEndAnimations[VPet_Simulator.Core.Function.Rnd.Next(thinkEndAnimations.Count)];
                                 _plugin.MW.Main.Display(selectedAnimation, onAnimationComplete);
-                                Logger.Log($"SmartMessageProcessor: 播放思考结束动画，共 {thinkEndAnimations.Count} 个可选");
+                                Logger.LogVerbose($"SmartMessageProcessor: 播放思考结束动画，共 {thinkEndAnimations.Count} 个可选");
                             }
                             else
                             {
                                 // 没有思考结束动画，直接显示气泡
                                 onAnimationComplete();
-                                Logger.Log("SmartMessageProcessor: 未找到思考结束动画，直接显示气泡");
+                                Logger.LogVerbose("SmartMessageProcessor: 未找到思考结束动画，直接显示气泡");
                             }
 
                             // 启动超时保护机制（动态超时，避免硬编码延迟）
                             Task.Run(async () =>
                             {
                                 int timeoutMs = CalculateDynamicWaitTime(text, baseMs: 2000);
-                                Logger.Log($"SmartMessageProcessor: 启动超时保护，超时时间: {timeoutMs}ms");
+                                Logger.LogVerbose($"SmartMessageProcessor: 启动超时保护，超时时间: {timeoutMs}ms");
                                 await InterruptManager.Delay(timeoutMs);
                                 if (!_isBubbleDisplayed)
                                 {
-                                    Logger.Log("SmartMessageProcessor: 超时保护触发，强制显示气泡");
+                                    Logger.LogVerbose("SmartMessageProcessor: 超时保护触发，强制显示气泡");
                                     await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                                     {
                                         _plugin.MW.Main.Say(text, null, false);
@@ -943,7 +943,7 @@ namespace VPetLLM.Handlers.Core
                             // 不在思考状态，直接显示气泡
                             _plugin.MW.Main.Say(text, null, false);
                             _isBubbleDisplayed = true;
-                            Logger.Log($"SmartMessageProcessor: 非思考状态，直接显示气泡 - 文本长度: {text.Length}");
+                            Logger.LogVerbose($"SmartMessageProcessor: 非思考状态，直接显示气泡 - 文本长度: {text.Length}");
                         }
                     }
                     catch (Exception ex)
@@ -969,7 +969,7 @@ namespace VPetLLM.Handlers.Core
                 else
                 {
                     // TTS 全部关闭：通过反射检测VPet MessageBar的Timer状态来判断气泡是否显示完成
-                    Logger.Log("SmartMessageProcessor: TTS关闭，使用MessageBar Timer状态检测等待气泡显示完成");
+                    Logger.LogVerbose("SmartMessageProcessor: TTS关闭，使用MessageBar Timer状态检测等待气泡显示完成");
                     await WaitForMessageBarCompleteAsync(text).ConfigureAwait(false);
                 }
             }
@@ -1005,7 +1005,7 @@ namespace VPetLLM.Handlers.Core
                 var msgBar = _plugin.MW?.Main?.MsgBar;
                 if (msgBar == null)
                 {
-                    Logger.Log("SmartMessageProcessor: MessageBar为null，使用固定等待时间");
+                    Logger.LogVerbose("SmartMessageProcessor: MessageBar为null，使用固定等待时间");
                     int fallbackWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(text);
                     await InterruptManager.Delay(fallbackWaitMs).ConfigureAwait(false);
                     return;
@@ -1019,13 +1019,13 @@ namespace VPetLLM.Handlers.Core
                 // Timer 状态经 MessageBarHelper 的缓存反射获取
                 if (Utils.UI.MessageBarHelper.GetFieldValue<System.Timers.Timer>(msgBar, "ShowTimer") is null)
                 {
-                    Logger.Log("SmartMessageProcessor: 无法获取MessageBar Timer字段，使用固定等待时间");
+                    Logger.LogVerbose("SmartMessageProcessor: 无法获取MessageBar Timer字段，使用固定等待时间");
                     int fallbackWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(text);
                     await InterruptManager.Delay(fallbackWaitMs).ConfigureAwait(false);
                     return;
                 }
 
-                Logger.Log("SmartMessageProcessor: 开始监控MessageBar Timer状态");
+                Logger.LogVerbose("SmartMessageProcessor: 开始监控MessageBar Timer状态");
 
                 bool hasSeenTimerRunning = false; // 跟踪是否见过 Timer 运行
 
@@ -1062,7 +1062,7 @@ namespace VPetLLM.Handlers.Core
                     {
                         // 所有Timer都已停止，气泡显示完成
                         var actualWaitMs = (int)(DateTime.Now - waitStartTime).TotalMilliseconds;
-                        Logger.Log($"SmartMessageProcessor: MessageBar Timer全部停止，气泡显示完成，实际等待时间: {actualWaitMs}ms");
+                        Logger.LogVerbose($"SmartMessageProcessor: MessageBar Timer全部停止，气泡显示完成，实际等待时间: {actualWaitMs}ms");
                         return;
                     }
 
@@ -1071,7 +1071,7 @@ namespace VPetLLM.Handlers.Core
                 }
 
                 // 超时
-                Logger.Log($"SmartMessageProcessor: 等待MessageBar完成超时({maxWaitMs}ms)，继续执行");
+                Logger.LogVerbose($"SmartMessageProcessor: 等待MessageBar完成超时({maxWaitMs}ms)，继续执行");
             }
             catch (Exception ex)
             {
@@ -1080,7 +1080,7 @@ namespace VPetLLM.Handlers.Core
                 
                 // 发生异常时使用固定等待时间作为回退
                 int fallbackWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(text);
-                Logger.Log($"SmartMessageProcessor: 使用固定等待时间作为回退: {fallbackWaitMs}ms");
+                Logger.LogVerbose($"SmartMessageProcessor: 使用固定等待时间作为回退: {fallbackWaitMs}ms");
                 await InterruptManager.Delay(fallbackWaitMs).ConfigureAwait(false);
             }
         }
@@ -1098,20 +1098,20 @@ namespace VPetLLM.Handlers.Core
                 // 检查是否启用了 VPetLLM 的 TTS 且没有检测到外部 TTS 插件
                 if (_plugin.Settings.TTS.IsEnabled && !_plugin.IsVPetTTSPluginDetected)
                 {
-                    Logger.Log("SmartMessageProcessor: VPetLLM 内置 TTS 已启用且无外部 TTS 插件，跳过 VPet 语音等待");
+                    Logger.LogVerbose("SmartMessageProcessor: VPetLLM 内置 TTS 已启用且无外部 TTS 插件，跳过 VPet 语音等待");
                     return;
                 }
 
                 // 如果检测到外部 TTS 插件（如 VPetTTS），需要等待其播放完成
                 if (_plugin.IsVPetTTSPluginDetected)
                 {
-                    Logger.Log("SmartMessageProcessor: 检测到外部 TTS 插件，等待其播放完成");
+                    Logger.LogVerbose("SmartMessageProcessor: 检测到外部 TTS 插件，等待其播放完成");
                 }
 
                 // 检查 VPet 主程序是否正在播放语音
                 if (_plugin.MW?.Main is null)
                 {
-                    Logger.Log("SmartMessageProcessor: MW.Main 为 null，无法检查语音状态");
+                    Logger.LogVerbose("SmartMessageProcessor: MW.Main 为 null，无法检查语音状态");
                     return;
                 }
 
@@ -1138,7 +1138,7 @@ namespace VPetLLM.Handlers.Core
                 int checkInterval = 200;
                 int elapsedTime = 0;
 
-                Logger.Log("SmartMessageProcessor: 开始智能等待VPet语音播放完成");
+                Logger.LogVerbose("SmartMessageProcessor: 开始智能等待VPet语音播放完成");
 
                 // 第零阶段：等待语音"开始"播放（外置 TTS 需先合成音频，PlayingVoice 变 true 有延迟）
                 // 不加这个宽限期会产生竞态：检查瞬间语音未起播 → 误判"无语音" → 只按文本估算 →
@@ -1154,7 +1154,7 @@ namespace VPetLLM.Handlers.Core
                 bool voiceStarted = _plugin.MW.Main.PlayingVoice;
                 if (voiceStarted && startupWaited > 0)
                 {
-                    Logger.Log($"SmartMessageProcessor: 语音起播确认，等待起播耗时: {startupWaited}ms");
+                    Logger.LogVerbose($"SmartMessageProcessor: 语音起播确认，等待起播耗时: {startupWaited}ms");
                 }
 
                 // 第一阶段：等待VPet主程序的PlayingVoice状态结束
@@ -1168,21 +1168,21 @@ namespace VPetLLM.Handlers.Core
 
                 if (elapsedTime >= maxWaitTime)
                 {
-                    Logger.Log("SmartMessageProcessor: 等待 VPet 语音播放超时");
+                    Logger.LogVerbose("SmartMessageProcessor: 等待 VPet 语音播放超时");
                 }
                 else if (actualPlaybackTracked)
                 {
-                    Logger.Log($"SmartMessageProcessor: VPet 语音播放完成，等待时间: {elapsedTime}ms");
+                    Logger.LogVerbose($"SmartMessageProcessor: VPet 语音播放完成，等待时间: {elapsedTime}ms");
                 }
                 else
                 {
-                    Logger.Log("SmartMessageProcessor: 宽限期内语音未起播，回退文本长度估算");
+                    Logger.LogVerbose("SmartMessageProcessor: 宽限期内语音未起播，回退文本长度估算");
                 }
 
                 // 第二阶段：如果检测到VPetTTS插件，使用集成管理器进行精确检测
                 if (_plugin.IsVPetTTSPluginDetected && EnsureVPetTTSIntegration() != null)
                 {
-                    Logger.Log("SmartMessageProcessor: 检测到VPetTTS插件，使用集成管理器检测播放完成");
+                    Logger.LogVerbose("SmartMessageProcessor: 检测到VPetTTS插件，使用集成管理器检测播放完成");
 
                     int ttsWaitTime = 0;
                     int ttsMaxWait = 15000; // VPetTTS专用等待时间：最多15秒
@@ -1196,13 +1196,13 @@ namespace VPetLLM.Handlers.Core
 
                     if (ttsWaitTime > 0)
                     {
-                        Logger.Log($"SmartMessageProcessor: VPetTTS播放完成，等待时间: {ttsWaitTime}ms");
+                        Logger.LogVerbose($"SmartMessageProcessor: VPetTTS播放完成，等待时间: {ttsWaitTime}ms");
                     }
                     else if (!actualPlaybackTracked)
                     {
                         // 仅在完全未观测到实际播放时才用文本长度估算
                         int calculatedWaitTime = CalculateTTSWaitTime(text);
-                        Logger.Log($"SmartMessageProcessor: VPetTTS未在播放，根据文本长度计算等待时间: {calculatedWaitTime}ms");
+                        Logger.LogVerbose($"SmartMessageProcessor: VPetTTS未在播放，根据文本长度计算等待时间: {calculatedWaitTime}ms");
                         await InterruptManager.Delay(calculatedWaitTime).ConfigureAwait(false);
                     }
                 }
@@ -1215,7 +1215,7 @@ namespace VPetLLM.Handlers.Core
                 {
                     // 完全未观测到播放（宽限期内未起播）：回退文本长度估算
                     int calculatedWaitTime = CalculateTTSWaitTime(text);
-                    Logger.Log($"SmartMessageProcessor: 为外置TTS添加基于文本长度的等待时间: {calculatedWaitTime}ms");
+                    Logger.LogVerbose($"SmartMessageProcessor: 为外置TTS添加基于文本长度的等待时间: {calculatedWaitTime}ms");
                     await InterruptManager.Delay(calculatedWaitTime).ConfigureAwait(false);
                 }
             }
@@ -1255,7 +1255,7 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task ProcessSegmentAsync(MessageSegment segment, Dictionary<string, string> audioCache = null)
         {
-            Logger.Log($"SmartMessageProcessor: 处理片段类型: {segment.Type}, 内容: {segment.Content}");
+            Logger.LogVerbose($"SmartMessageProcessor: 处理片段类型: {segment.Type}, 内容: {segment.Content}");
 
             switch (segment.Type)
             {
@@ -1279,14 +1279,14 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task ProcessTextSegmentAsync(string text)
         {
-            Logger.Log($"SmartMessageProcessor: 处理文本片段: {text}");
+            Logger.LogVerbose($"SmartMessageProcessor: 处理文本片段: {text}");
 
             // 检查是否包含talk指令，如果是则提取其中的文本内容
             string actualText = text;
             if (text.Contains("[:talk(") || text.Contains("[:say("))
             {
                 actualText = ExtractTextFromTalkCommand(text);
-                Logger.Log($"SmartMessageProcessor: 从talk指令中提取文本: '{actualText}'");
+                Logger.LogVerbose($"SmartMessageProcessor: 从talk指令中提取文本: '{actualText}'");
             }
 
             // 如果提取到了有效文本
@@ -1298,7 +1298,7 @@ namespace VPetLLM.Handlers.Core
                     if (BubbleFacade is not null)
                     {
                         // 使用BubbleFacade的TTS同步功能
-                        Logger.Log("SmartMessageProcessor: 使用BubbleFacade处理文本片段TTS");
+                        Logger.LogVerbose("SmartMessageProcessor: 使用BubbleFacade处理文本片段TTS");
 
                         var ttsOptions = new TTSOptions
                         {
@@ -1354,7 +1354,7 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task ProcessTalkSegmentWithSayInfoAsync(MessageSegment segment, Dictionary<string, string> audioCache = null)
         {
-            Logger.Log($"SmartMessageProcessor: 处理talk动作（优化版）: {segment.Content}");
+            Logger.LogVerbose($"SmartMessageProcessor: 处理talk动作（优化版）: {segment.Content}");
 
             // 解析talk动作中的文本内容
             var talkText = ExtractTalkText(segment.ActionValue);
@@ -1364,14 +1364,14 @@ namespace VPetLLM.Handlers.Core
                 // 如果启用了TTS，音频和气泡同步显示
                 if (_plugin.Settings.TTS.IsEnabled)
                 {
-                    Logger.Log($"SmartMessageProcessor: TTS和气泡同步播放: {talkText}");
+                    Logger.LogVerbose($"SmartMessageProcessor: TTS和气泡同步播放: {talkText}");
 
                     try
                     {
                         if (BubbleFacade is not null)
                         {
                             // 使用BubbleFacade的TTS同步功能
-                            Logger.Log("SmartMessageProcessor: 使用BubbleFacade TTS同步功能");
+                            Logger.LogVerbose("SmartMessageProcessor: 使用BubbleFacade TTS同步功能");
 
                             // 使用内置TTS
                             var ttsOptions = new TTSOptions
@@ -1380,23 +1380,23 @@ namespace VPetLLM.Handlers.Core
                             };
 
                             await BubbleFacade.DisplayWithTTSAsync(talkText, ttsOptions).ConfigureAwait(false);
-                            Logger.Log($"SmartMessageProcessor: BubbleFacade TTS处理完成");
+                            Logger.LogVerbose($"SmartMessageProcessor: BubbleFacade TTS处理完成");
                         }
                         else
                         {
                             // 回退到直接气泡管理器
-                            Logger.Log("SmartMessageProcessor: 使用DirectBubbleManager显示气泡");
+                            Logger.LogVerbose("SmartMessageProcessor: 使用DirectBubbleManager显示气泡");
 
                             // 使用直接气泡管理器显示气泡
                             await DirectBubbleManager.ShowBubbleAsync(_plugin, talkText);
-                            Logger.Log($"SmartMessageProcessor: 气泡显示完成");
+                            Logger.LogVerbose($"SmartMessageProcessor: 气泡显示完成");
 
                             // 播放音频（等待播放完成）
                             await _plugin.TTSService.PlayTextAsync(talkText);
-                            Logger.Log($"SmartMessageProcessor: TTS播放完成");
+                            Logger.LogVerbose($"SmartMessageProcessor: TTS播放完成");
 
                             // TTS启用时不需要等待气泡显示完成，音频播放完成即可继续
-                            Logger.Log($"SmartMessageProcessor: TTS播放完成，不等待气泡消失");
+                            Logger.LogVerbose($"SmartMessageProcessor: TTS播放完成，不等待气泡消失");
                         }
                     }
                     catch (Exception ex)
@@ -1417,7 +1417,7 @@ namespace VPetLLM.Handlers.Core
             else
             {
                 // 如果没有文本内容，直接执行动作（保持原有逻辑）
-                Logger.Log("SmartMessageProcessor: 无文本内容，执行原始动作");
+                Logger.LogVerbose("SmartMessageProcessor: 无文本内容，执行原始动作");
                 await ExecuteActionAsync(segment.Content);
             }
         }
@@ -1427,13 +1427,13 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task ProcessActionSegmentAsync(MessageSegment segment)
         {
-            Logger.Log($"SmartMessageProcessor: 处理动作片段: {segment.Content}");
-            Logger.Log($"SmartMessageProcessor: ActionType = '{segment.ActionType}', 检查plugin条件...");
+            Logger.LogVerbose($"SmartMessageProcessor: 处理动作片段: {segment.Content}");
+            Logger.LogVerbose($"SmartMessageProcessor: ActionType = '{segment.ActionType}', 检查plugin条件...");
 
             // 中断后连状态灯和过渡延迟都不用走了，直接不进这一段
             if (InterruptManager.IsInterrupted)
             {
-                Logger.Log("SmartMessageProcessor: 已中断，跳过该动作片段");
+                Logger.LogVerbose("SmartMessageProcessor: 已中断，跳过该动作片段");
                 return;
             }
 
@@ -1442,7 +1442,7 @@ namespace VPetLLM.Handlers.Core
             bool isPluginAction = string.Equals(segment.ActionType, "plugin", StringComparison.OrdinalIgnoreCase)
                 || (segment.ActionType?.StartsWith("plugin_", StringComparison.OrdinalIgnoreCase) ?? false);
 
-            Logger.Log($"SmartMessageProcessor: isPluginAction = {isPluginAction}");
+            Logger.LogVerbose($"SmartMessageProcessor: isPluginAction = {isPluginAction}");
 
             if (isPluginAction)
             {
@@ -1452,13 +1452,13 @@ namespace VPetLLM.Handlers.Core
                 if (transitionDelayMs > 0)
                 {
                     await InterruptManager.Delay(transitionDelayMs);
-                    Logger.Log($"SmartMessageProcessor: say->plugin 过渡延迟 {transitionDelayMs}ms 完成");
+                    Logger.LogVerbose($"SmartMessageProcessor: say->plugin 过渡延迟 {transitionDelayMs}ms 完成");
                 }
 
                 try
                 {
                     _plugin.FloatingSidebarManager?.SetPluginExecutingStatus();
-                    Logger.Log($"SmartMessageProcessor: 检测到plugin命令({segment.ActionType})，状态灯切换为蓝色");
+                    Logger.LogVerbose($"SmartMessageProcessor: 检测到plugin命令({segment.ActionType})，状态灯切换为蓝色");
 
                     // 如果宠物正在思考状态，立即停止思考动画
                     // Plugin 执行不需要显示思考动画
@@ -1474,7 +1474,7 @@ namespace VPetLLM.Handlers.Core
                 if (delayMs > 0)
                 {
                     await InterruptManager.Delay(delayMs);
-                    Logger.Log($"SmartMessageProcessor: Plugin执行前延迟 {delayMs}ms 完成，状态灯已更新");
+                    Logger.LogVerbose($"SmartMessageProcessor: Plugin执行前延迟 {delayMs}ms 完成，状态灯已更新");
                 }
             }
 
@@ -1490,7 +1490,7 @@ namespace VPetLLM.Handlers.Core
                 if (delayMs > 0)
                 {
                     await InterruptManager.Delay(delayMs);
-                    Logger.Log($"SmartMessageProcessor: Plugin执行后延迟 {delayMs}ms 完成，确保UI处理完成");
+                    Logger.LogVerbose($"SmartMessageProcessor: Plugin执行后延迟 {delayMs}ms 完成，确保UI处理完成");
                 }
             }
         }
@@ -1508,7 +1508,7 @@ namespace VPetLLM.Handlers.Core
                     // 检查宠物是否正在思考状态
                     if (_plugin.MW?.Main?.DisplayType?.Name == "think")
                     {
-                        Logger.Log("SmartMessageProcessor: 检测到思考动画，Plugin执行前停止");
+                        Logger.LogVerbose("SmartMessageProcessor: 检测到思考动画，Plugin执行前停止");
 
                         // 查找思考结束动画
                         var thinkEndAnimations = _plugin.MW.Core.Graph.FindGraphs(
@@ -1523,15 +1523,15 @@ namespace VPetLLM.Handlers.Core
                             var selectedAnimation = thinkEndAnimations[VPet_Simulator.Core.Function.Rnd.Next(thinkEndAnimations.Count)];
                             _plugin.MW.Main.Display(selectedAnimation, () =>
                             {
-                                Logger.Log("SmartMessageProcessor: 思考结束动画播放完成（Plugin模式）");
+                                Logger.LogVerbose("SmartMessageProcessor: 思考结束动画播放完成（Plugin模式）");
                             });
-                            Logger.Log($"SmartMessageProcessor: 播放思考结束动画（共 {thinkEndAnimations.Count} 个可选）");
+                            Logger.LogVerbose($"SmartMessageProcessor: 播放思考结束动画（共 {thinkEndAnimations.Count} 个可选）");
                         }
                         else
                         {
                             // 没有思考结束动画，直接切换到默认状态
                             _plugin.MW.Main.DisplayToNomal();
-                            Logger.Log("SmartMessageProcessor: 未找到思考结束动画，切换到默认状态");
+                            Logger.LogVerbose("SmartMessageProcessor: 未找到思考结束动画，切换到默认状态");
                         }
                     }
                 });
@@ -1549,14 +1549,14 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task PlayTTSAndShowBubbleAsync(string text)
         {
-            Logger.Log($"SmartMessageProcessor: 开始TTS处理: {text}");
+            Logger.LogVerbose($"SmartMessageProcessor: 开始TTS处理: {text}");
 
             try
             {
                 if (BubbleFacade is not null)
                 {
                     // 使用BubbleFacade的TTS同步功能
-                    Logger.Log("SmartMessageProcessor: 使用BubbleFacade TTS同步功能");
+                    Logger.LogVerbose("SmartMessageProcessor: 使用BubbleFacade TTS同步功能");
 
                     var ttsOptions = new TTSOptions
                     {
@@ -1564,7 +1564,7 @@ namespace VPetLLM.Handlers.Core
                     };
 
                     await BubbleFacade.DisplayWithTTSAsync(text, ttsOptions).ConfigureAwait(false);
-                    Logger.Log($"SmartMessageProcessor: BubbleFacade TTS处理完成");
+                    Logger.LogVerbose($"SmartMessageProcessor: BubbleFacade TTS处理完成");
                 }
                 else
                 {
@@ -1572,19 +1572,19 @@ namespace VPetLLM.Handlers.Core
                     // 优先请求TTS音频
                     if (_plugin.TTSService is not null)
                     {
-                        Logger.Log($"SmartMessageProcessor: 请求TTS音频...");
+                        Logger.LogVerbose($"SmartMessageProcessor: 请求TTS音频...");
                         await _plugin.TTSService.PlayTextAsync(text);
-                        Logger.Log($"SmartMessageProcessor: TTS音频播放完成");
+                        Logger.LogVerbose($"SmartMessageProcessor: TTS音频播放完成");
                     }
 
                     // TTS完成（成功或失败）后显示气泡，但不等待气泡消失
-                    Logger.Log($"SmartMessageProcessor: 显示气泡: {text}");
+                    Logger.LogVerbose($"SmartMessageProcessor: 显示气泡: {text}");
 
                     // 使用直接气泡管理器
                     await DirectBubbleManager.ShowBubbleAsync(_plugin, text);
 
                     // TTS启用时不等待气泡显示时间，让气泡自然显示和消失
-                    Logger.Log($"SmartMessageProcessor: TTS处理完成，不等待气泡消失");
+                    Logger.LogVerbose($"SmartMessageProcessor: TTS处理完成，不等待气泡消失");
                 }
             }
             catch (Exception ex)
@@ -1601,13 +1601,13 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task ExecuteActionAsync(string actionContent)
         {
-            Logger.Log($"SmartMessageProcessor: 执行动作指令: {actionContent}");
+            Logger.LogVerbose($"SmartMessageProcessor: 执行动作指令: {actionContent}");
 
             // 中断后不再启动任何动作。插件动作尤其重要：一旦调下去就是一次外部调用
             // （联网、写文件、买东西），结果还会回灌给 AI 触发新一轮请求
             if (InterruptManager.IsInterrupted)
             {
-                Logger.Log("SmartMessageProcessor: 已中断，跳过动作执行");
+                Logger.LogVerbose("SmartMessageProcessor: 已中断，跳过动作执行");
                 return;
             }
 
@@ -1620,7 +1620,7 @@ namespace VPetLLM.Handlers.Core
                     // 一条命令可能展开成多个动作，逐个再确认一次
                     if (InterruptManager.IsInterrupted)
                     {
-                        Logger.Log("SmartMessageProcessor: 已中断，停止执行剩余动作");
+                        Logger.LogVerbose("SmartMessageProcessor: 已中断，停止执行剩余动作");
                         break;
                     }
 

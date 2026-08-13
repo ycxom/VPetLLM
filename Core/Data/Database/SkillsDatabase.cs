@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using VPetLLM.Utils.Data;
 using VPetLLM.Core.Data.Models;
 
 namespace VPetLLM.Core.Data.Database
@@ -14,7 +15,7 @@ namespace VPetLLM.Core.Data.Database
         public SkillsDatabase(string dbPath)
         {
             _dbPath = dbPath;
-            _connectionString = $"Data Source={dbPath}";
+            _connectionString = SQLiteHelper.BuildConnectionString(dbPath);
             InitializeSkillsTable();
         }
 
@@ -25,8 +26,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var createTableCommand = connection.CreateCommand();
                 createTableCommand.CommandText = @"
@@ -70,8 +70,7 @@ namespace VPetLLM.Core.Data.Database
                     return -1;
                 }
 
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 // Check for duplicate name
                 var checkCommand = connection.CreateCommand();
@@ -119,8 +118,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -149,8 +147,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -181,8 +178,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -214,8 +210,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -244,8 +239,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var setClauses = new List<string>();
                 var command = connection.CreateCommand();
@@ -313,8 +307,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = "DELETE FROM skills WHERE id = @id";
@@ -345,8 +338,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = "DELETE FROM skills WHERE LOWER(name) = LOWER(@name)";
@@ -377,8 +369,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"

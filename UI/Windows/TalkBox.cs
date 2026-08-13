@@ -219,11 +219,11 @@ namespace VPetLLM.UI.Windows
                 // 用户已中断本轮：在途的流式片段一律丢弃，不再进入输出管线
                 if (InterruptManager.IsInterrupted)
                 {
-                    Logger.Log("HandleResponse: 本轮已被中断，丢弃该回复片段");
+                    Logger.LogVerbose("HandleResponse: 本轮已被中断，丢弃该回复片段");
                     return;
                 }
 
-                Logger.Log($"HandleResponse: 收到AI回复: {response}");
+                Logger.LogVerbose($"HandleResponse: 收到AI回复: {response}");
 
                 // 使用状态机管理流式处理
                 lock (_stateLock)
@@ -265,7 +265,7 @@ namespace VPetLLM.UI.Windows
                     // 检查是否为完整消息（非流式模式的特征：包含多个完整命令）
                     if (IsCompleteMessage(response))
                     {
-                        Logger.Log($"HandleResponse: 检测到完整消息，使用统一流式处理器拆分处理");
+                        Logger.LogVerbose($"HandleResponse: 检测到完整消息，使用统一流式处理器拆分处理");
 
                         // 等待前一个回复处理完成，保证回复间的命令顺序
                         await _responseLock.WaitAsync();

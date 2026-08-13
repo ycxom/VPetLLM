@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using VPetLLM.Utils.Data;
 
 namespace VPetLLM.Core.Data.Database
 {
@@ -15,7 +16,7 @@ namespace VPetLLM.Core.Data.Database
         public OverflowDatabase(string dbPath)
         {
             _dbPath = dbPath;
-            _connectionString = $"Data Source={dbPath}";
+            _connectionString = SQLiteHelper.BuildConnectionString(dbPath);
             InitializeTables();
         }
 
@@ -23,8 +24,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 // 步骤1：只建表（含不引用 provider 的索引）。
                 // 注意：引用 provider / threshold 的索引不能放这里 —— 旧库的
@@ -113,8 +113,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
@@ -148,8 +147,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 using var transaction = connection.BeginTransaction();
                 var cmd = connection.CreateCommand();
@@ -195,8 +193,7 @@ namespace VPetLLM.Core.Data.Database
             var results = new List<OverflowSummaryRecord>();
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
@@ -242,8 +239,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
@@ -272,8 +268,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
@@ -319,8 +314,7 @@ namespace VPetLLM.Core.Data.Database
             var results = new List<OverflowSegmentRecord>();
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
@@ -361,8 +355,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = "UPDATE overflow_summaries SET summary_text = @text WHERE id = @id";
@@ -384,8 +377,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 using var transaction = connection.BeginTransaction();
                 var cmd = connection.CreateCommand();
@@ -412,8 +404,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = "SELECT COALESCE(SUM(token_count), 0) FROM overflow_summaries WHERE provider = @provider";
@@ -434,8 +425,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
                     SELECT COALESCE(MAX(segment_end_index), 0) FROM overflow_summaries
@@ -459,8 +449,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
                     SELECT summary_text FROM overflow_summaries
@@ -485,8 +474,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"

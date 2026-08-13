@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Reflection;
+using Microsoft.Data.Sqlite;
 
 namespace VPetLLM.Utils.Data
 {
@@ -105,6 +106,40 @@ namespace VPetLLM.Utils.Data
         public static bool IsLoaded()
         {
             return _loadSuccess;
+        }
+
+        /// <summary>
+        /// 统一的连接串。刻意不开 Cache=Shared：共享缓存下的表级冲突返回的是
+        /// SQLITE_LOCKED，busy_timeout 只覆盖 SQLITE_BUSY，管不到它 —— 进程内多线程
+        /// 同时读写同一个库就会直接抛 "database table is locked"。并发靠下面的
+        /// WAL + busy_timeout 解决，那条路才是可重试的。
+        /// </summary>
+        public static string BuildConnectionString(string dbPath)
+        {
+            return new SqliteConnectionStringBuilder
+            {
+                DataSource = dbPath,
+                Mode = SqliteOpenMode.ReadWriteCreate,
+                DefaultTimeout = 5
+            }.ToString();
+        }
+
+        /// <summary>
+        /// WAL 让读写互不阻塞，busy_timeout 给写写冲突留出重试窗口。
+        /// </summary>
+        public static void ConfigureConnection(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA synchronous=NORMAL;";
+            cmd.ExecuteNonQuery();
+        }
+
+        public static SqliteConnection OpenConnection(string dbPath)
+        {
+            var connection = new SqliteConnection(BuildConnectionString(dbPath));
+            connection.Open();
+            ConfigureConnection(connection);
+            return connection;
         }
 
         /// <summary>

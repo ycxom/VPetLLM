@@ -26,8 +26,8 @@ namespace VPetLLM.Infrastructure.Services
             _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
             _logger = logger;
 
-            // 启动健康检查定时器（每30秒检查一次）
-            _healthCheckTimer = new Timer(PerformHealthChecks, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+            // 没有登记服务时不必空转健康检查
+            _healthCheckTimer = new Timer(PerformHealthChecks, null, Timeout.Infinite, Timeout.Infinite);
 
             _logger?.LogInformation("ServiceManager initialized");
         }
@@ -67,6 +67,8 @@ namespace VPetLLM.Infrastructure.Services
                     CreatedAt = DateTime.UtcNow,
                     LastHealthCheck = DateTime.UtcNow
                 };
+                if (_services.Count == 1)
+                    _healthCheckTimer.Change(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
 
                 _logger?.LogInformation("Service created", new { ServiceType = typeof(T).Name });
                 OnServiceStatusChanged(new ServiceStatusChangedEventArgs(typeof(T).Name, InfraServiceStatus.NotInitialized, InfraServiceStatus.Created));

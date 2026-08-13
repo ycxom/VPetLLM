@@ -206,32 +206,8 @@ namespace VPetLLM.Infrastructure.Logging
 
         private string GetCallerInfo()
         {
-            try
-            {
-                var stackTrace = new StackTrace(true);
-                var frames = stackTrace.GetFrames();
-
-                // 跳过日志框架的帧，找到实际调用者
-                for (int i = 0; i < frames.Length; i++)
-                {
-                    var frame = frames[i];
-                    var method = frame.GetMethod();
-                    var declaringType = method.DeclaringType;
-
-                    if (declaringType is not null &&
-                        !declaringType.Namespace.StartsWith("VPetLLM.Infrastructure.Logging") &&
-                        !declaringType.Name.Contains("Logger"))
-                    {
-                        return $"{declaringType.Name}.{method.Name}";
-                    }
-                }
-            }
-            catch
-            {
-                // 忽略获取调用者信息的异常
-            }
-
-            return "Unknown";
+            // 每条日志走 StackTrace(true) 会在启动和健康检查路径上造成明显 CPU 开销
+            return string.Empty;
         }
 
         private void FlushLogs(object state)

@@ -845,8 +845,7 @@ namespace VPetLLM.Core.Abstractions.Base
         /// </summary>
         public virtual void UpdateHistory(List<Message> editedHistory)
         {
-            HistoryManager.GetHistory().Clear();
-            HistoryManager.GetHistory().AddRange(editedHistory);
+            HistoryManager.ReplaceHistory(editedHistory);
             OverflowManager?.NotifyHistoryReplaced(editedHistory.Count);
 
             // 更新到数据库
@@ -879,8 +878,7 @@ namespace VPetLLM.Core.Abstractions.Base
         /// </summary>
         public virtual void SetChatHistory(List<Message> history)
         {
-            HistoryManager.GetHistory().Clear();
-            HistoryManager.GetHistory().AddRange(history);
+            HistoryManager.ReplaceHistory(history);
             OverflowManager?.NotifyHistoryReplaced(history.Count);
 
             // 更新到数据库

@@ -114,18 +114,10 @@ namespace VPetLLM.Core.Providers.Chat
 
                     // 本轮这条消息带的是本次截的全部图；Message 只有一个图像槽位，
                     // 所以多图不能靠 msg.ImageData 取，得直接用手上的 base64Images。
+                    // 历史图不再回放：和其它通道一致，只发当轮图，避免每轮把旧截图读盘+Base64。
                     if (ReferenceEquals(msg, tempUserMessage))
                     {
                         messageObj["images"] = base64Images;
-                    }
-                    // 历史消息里的图可能是早先存下的，尺寸未必受控，所以再钳一次。
-                    else if (msg.HasImage)
-                    {
-                        var historyImage = Utils.Common.ImageDownscaler.ClampToMaxDimension(msg.ImageData);
-                        if (historyImage is not null)
-                        {
-                            messageObj["images"] = new[] { Convert.ToBase64String(historyImage) };
-                        }
                     }
 
                     messages.Add(messageObj);

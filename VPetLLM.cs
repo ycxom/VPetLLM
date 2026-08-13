@@ -316,8 +316,21 @@ namespace VPetLLM
                 FreeConfigCleaner.CleanUnencryptedConfigs();
                 // 同步等待配置初始化完成
                 var configTask = FreeConfigManager.InitializeConfigsAsync();
-                configTask.Wait();
-                Logger.Log($"Free配置初始化完成: {configTask.Result}");
+                if (!configTask.Wait(TimeSpan.FromSeconds(8)))
+                {
+                    Logger.Log("Free配置初始化超时，后台继续拉取");
+                    _ = configTask.ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            Logger.Log($"Free配置后台初始化失败: {t.Exception?.GetBaseException().Message}");
+                        else
+                            Logger.Log($"Free配置后台初始化完成: {t.Result}");
+                    }, TaskScheduler.Default);
+                }
+                else
+                {
+                    Logger.Log($"Free配置初始化完成: {configTask.Result}");
+                }
 
                 // 初始化 Free ASR/TTS 认证委托
                 InitializeFreeAuthProviders();
@@ -515,14 +528,19 @@ namespace VPetLLM
 
         private void SyncNames(object sender, System.Timers.ElapsedEventArgs e)
         {
-            if (Settings.FollowVPetName)
+            if (!Settings.FollowVPetName)
+                return;
+
+            var aiName = MW.Core.Save.Name;
+            var userName = MW.Core.Save.HostName;
+            if (Settings.AiName == aiName && Settings.UserName == userName)
+                return;
+
+            Application.Current.Dispatcher.Invoke(() =>
             {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    Settings.AiName = MW.Core.Save.Name;
-                    Settings.UserName = MW.Core.Save.HostName;
-                });
-            }
+                Settings.AiName = aiName;
+                Settings.UserName = userName;
+            });
         }
 
         private void InitializeLegacyTTSService()
@@ -564,7 +582,18 @@ namespace VPetLLM
         {
             try
             {
-                var asrConfig = new Infrastructure.Configuration.Configurations.ASRConfiguration();
+                var asr = Settings.ASR;
+                var asrConfig = new Infrastructure.Configuration.Configurations.ASRConfiguration
+                {
+                    IsEnabled = asr.IsEnabled,
+                    Provider = asr.Provider,
+                    HotkeyModifiers = asr.HotkeyModifiers,
+                    HotkeyKey = asr.HotkeyKey,
+                    Language = asr.Language,
+                    AutoSend = asr.AutoSend,
+                    ShowTranscriptionWindow = asr.ShowTranscriptionWindow,
+                    RecordingDeviceNumber = asr.RecordingDeviceNumber
+                };
                 _voiceInputService = new Infrastructure.Services.ApplicationServices.VoiceInputService(this, asrConfig, _logger, _eventBus);
 
                 _screenshotService = new Services.ScreenshotService(this, Settings);
@@ -702,8 +731,8 @@ namespace VPetLLM
                 // 加载聊天历史
                 ChatCore?.LoadHistory();
 
-                // 启动所有服务
-                _serviceManager.StartAsync().Wait();
+                // 当前没有登记到 ServiceManager 的 IService，这里只是走空启动，不要堵 UI 线程
+                _ = _serviceManager.StartAsync();
 
                 // 订阅事件
                 SubscribeToEvents();
@@ -1228,6 +1257,8 @@ namespace VPetLLM
                 // 停止定时器
                 _syncTimer?.Stop();
                 _syncTimer?.Dispose();
+                _freeConfigTimer?.Stop();
+                _freeConfigTimer?.Dispose();
 
                 // 停止所有服务。
                 //

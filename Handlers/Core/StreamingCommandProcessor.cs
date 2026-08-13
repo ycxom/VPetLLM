@@ -13,7 +13,9 @@ namespace VPetLLM.Handlers.Core
         private readonly Action<string> _onCompleteCommand;
         private int _lastProcessedIndex = 0;
         private readonly Queue<string> _commandQueue = new Queue<string>();
+        private readonly Queue<string> _incomingChunks = new Queue<string>();
         private bool _isProcessing = false;
+        private bool _pumpRunning;
         private readonly object _lock = new object();
         private readonly VPetLLM _plugin;
         private readonly PluginTakeoverManager _takeoverManager = new PluginTakeoverManager();
@@ -22,8 +24,20 @@ namespace VPetLLM.Handlers.Core
         private CommandBatcher _commandBatcher;
         // 中断丢弃日志只打一次的标记（上游是逐字符投喂）
         private bool _interruptLogged;
+        private bool _oldFormatWarned;
         private bool _useBatching = false;
         private int _batchWindowMs = 100;
+        private int _pluginScanFrom;
+        // 已确认"插件名完整但查无此插件"的位置，回扫不再越过它，
+        // 免得一个不存在的插件名把后续每一片都拖成全量正则扫描
+        private int _pluginScanFloor;
+        // 缓冲区里还有没扫完的命令开头：命令以 "|>" 收尾，收尾那个 chunk 往往不含 '<'，
+        // 只看单个 chunk 会错过命令刚补全的那一刻
+        private bool _hasPendingOpen;
+
+        private static readonly Regex PluginBeginRegex = new(
+            @"<\|\s*plugin\s*_begin\s*\|>\s*(\w+)",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         // 存活实例登记表。处理器是各 Provider / TalkBox 按请求现场 new 出来的局部对象，
         // 外面拿不到引用，中断时没法逐个通知；用弱引用登记既能广播中断，又不会把
@@ -88,7 +102,7 @@ namespace VPetLLM.Handlers.Core
             if (_useBatching)
             {
                 _commandBatcher = new CommandBatcher(_batchWindowMs, OnBatchReady);
-                Logger.Log($"StreamingCommandProcessor: 批处理模式已启用，窗口: {_batchWindowMs}ms");
+                Logger.LogVerbose($"StreamingCommandProcessor: 批处理模式已启用，窗口: {_batchWindowMs}ms");
             }
         }
 
@@ -99,7 +113,7 @@ namespace VPetLLM.Handlers.Core
         {
             if (commands is null || commands.Count == 0) return;
 
-            Logger.Log($"StreamingCommandProcessor: 批处理回调，命令数: {commands.Count}");
+            Logger.LogVerbose($"StreamingCommandProcessor: 批处理回调，命令数: {commands.Count}");
 
             // 将命令添加到队列
             lock (_lock)
@@ -118,29 +132,13 @@ namespace VPetLLM.Handlers.Core
         /// 添加新的文本片段并检测完整的命令
         /// 优先检测接管请求，确保流式接管能够正常工作
         /// </summary>
-        public async void AddChunk(string chunk)
-        {
-            try
-            {
-                await AddChunkCoreAsync(chunk);
-            }
-            catch (Exception ex)
-            {
-                // async void：异常外泄会击穿线程池崩掉宿主进程，必须就地兜底
-                Logger.Log($"StreamingCommandProcessor: AddChunk error: {ex.Message}");
-            }
-        }
-
-        private async Task AddChunkCoreAsync(string chunk)
+        public void AddChunk(string chunk)
         {
             if (string.IsNullOrEmpty(chunk))
                 return;
 
-            // 中断后新到的片段一律不再解析：接管中的插件也不能再喂内容，
-            // 否则中断只挡住了气泡，插件那条线还在继续跑
             if (InterruptManager.IsInterrupted)
             {
-                // 上游可能是逐字符投喂的，每个字符打一行日志会把日志刷爆，只记第一次
                 if (!_interruptLogged)
                 {
                     _interruptLogged = true;
@@ -149,66 +147,162 @@ namespace VPetLLM.Handlers.Core
                 return;
             }
 
-            // 先添加到缓冲区
-            _buffer.Append(chunk);
-
-            // 优先检测接管请求（在处理完整命令之前）
-            if (!_takeoverManager.IsTakingOver)
+            lock (_lock)
             {
-                var currentBuffer = _buffer.ToString();
+                _incomingChunks.Enqueue(chunk);
+                if (_pumpRunning)
+                    return;
+                _pumpRunning = true;
+            }
 
-                // 检查是否有 plugin 接管请求 (只支持新格式)
-                Match takeoverMatch = null;
-                string pluginName = null;
-                int pluginStartIndex = -1;
+            _ = PumpChunksAsync();
+        }
 
-                // 尝试新格式
-                var newFormatMatch = Regex.Match(currentBuffer, @"<\|\s*plugin\s*_begin\s*\|>\s*(\w+)");
-                if (newFormatMatch.Success)
+        /// <summary>
+        /// 确保队列里剩下的片段有人消费：泵没在跑就重新拉起来，
+        /// 在跑（多半是挂在接管插件的 await 上）就交给它按序处理。
+        /// </summary>
+        private void DrainPendingChunks()
+        {
+            lock (_lock)
+            {
+                if (_incomingChunks.Count == 0 || _pumpRunning)
+                    return;
+                _pumpRunning = true;
+            }
+
+            _ = PumpChunksAsync();
+        }
+
+        private async Task PumpChunksAsync()
+        {
+            try
+            {
+                while (true)
                 {
-                    takeoverMatch = newFormatMatch;
-                    pluginName = newFormatMatch.Groups[1].Value;
-                    pluginStartIndex = newFormatMatch.Index;
-                }
-
-                if (takeoverMatch is not null && !string.IsNullOrEmpty(pluginName))
-                {
-                    // 查找支持接管的插件
-                    var plugin = _plugin?.Plugins.Find(p =>
-                        p.Name.Replace(" ", "_").Equals(pluginName, StringComparison.OrdinalIgnoreCase) &&
-                        p is IPluginTakeover takeover && takeover.SupportsTakeover);
-
-                    if (plugin is IPluginTakeover)
+                    string chunk;
+                    lock (_lock)
                     {
-                        // 提取从 plugin 开始到当前的内容
-                        var pluginContent = currentBuffer.Substring(pluginStartIndex);
-
-                        Logger.Log($"StreamingCommandProcessor: 检测到支持接管的插件 {pluginName}，准备启动接管");
-
-                        // 启动接管（传递完整的 plugin 命令内容）
-                        var processedChunk = await _takeoverManager.ProcessChunkAsync(pluginContent);
-
-                        // 如果接管成功，从缓冲区移除已接管的内容
-                        if (_takeoverManager.IsTakingOver)
+                        if (_incomingChunks.Count == 0)
                         {
-                            _buffer.Clear();
-                            _buffer.Append(currentBuffer.Substring(0, pluginStartIndex));
-                            _lastProcessedIndex = 0;
-                            Logger.Log($"StreamingCommandProcessor: 插件 {_takeoverManager.CurrentTakeoverPlugin} 开始接管");
+                            _pumpRunning = false;
                             return;
                         }
+                        chunk = _incomingChunks.Dequeue();
                     }
+
+                    await ProcessIncomingChunkAsync(chunk).ConfigureAwait(false);
                 }
             }
-            else
+            catch (Exception ex)
             {
-                // 如果正在接管中，继续传递内容给接管插件
-                await _takeoverManager.ProcessChunkAsync(chunk);
+                Logger.Log($"StreamingCommandProcessor: AddChunk error: {ex.Message}");
+                lock (_lock)
+                {
+                    _pumpRunning = false;
+                }
+            }
+        }
+
+        private async Task ProcessIncomingChunkAsync(string chunk)
+        {
+            if (InterruptManager.IsInterrupted)
+                return;
+
+            if (_takeoverManager.IsTakingOver)
+            {
+                await _takeoverManager.ProcessChunkAsync(chunk).ConfigureAwait(false);
                 return;
             }
 
-            // 只有在没有接管的情况下，才处理完整命令
-            ProcessCompleteCommands();
+            bool maybeCommand;
+            lock (_lock)
+            {
+                _buffer.Append(chunk);
+                // 命令跨 chunk 到达：'<' 在前面的 chunk 里，收尾的 "|>" 在后面的 chunk 里。
+                // 所以判据是"缓冲区里还有没扫完的 '<'"，只看本次 chunk 会把刚补全的命令漏到
+                // 下一个 '<' 才发出去，最后一条更是永远发不出去。
+                maybeCommand = _hasPendingOpen || chunk.IndexOf('<') >= 0 || chunk.Contains("[:");
+                _hasPendingOpen = maybeCommand;
+            }
+
+            if (await TryBeginPluginTakeoverAsync().ConfigureAwait(false))
+                return;
+
+            if (maybeCommand)
+                ProcessCompleteCommands();
+        }
+
+        private async Task<bool> TryBeginPluginTakeoverAsync()
+        {
+            string currentBuffer;
+            Match match;
+            lock (_lock)
+            {
+                var scanFrom = Math.Max(0, Math.Min(_pluginScanFrom, _buffer.Length));
+                if (scanFrom >= _buffer.Length)
+                    return false;
+
+                currentBuffer = _buffer.ToString();
+
+                // Regex.Match(input, startat) 要求匹配的"起点"不早于 startat。而
+                // <|plugin_begin|>Name 几乎必然被切在两个 chunk 中间（TalkBox 逐字符投喂，
+                // Provider 是 token 级 delta），起点一旦落在上轮扫描位置之前就永远匹配不上。
+                // 回退到缓冲区里最后一个 '<'：任何尚未闭合的标记都从那里开始。
+                // 但不越过 _pluginScanFloor —— 那之前的标记已经判定过"查无此插件"。
+                var lastOpen = currentBuffer.LastIndexOf('<', Math.Max(0, scanFrom - 1));
+                if (lastOpen >= 0 && lastOpen < scanFrom)
+                    scanFrom = Math.Max(lastOpen, _pluginScanFloor);
+
+                match = PluginBeginRegex.Match(currentBuffer, scanFrom);
+                _pluginScanFrom = currentBuffer.Length;
+            }
+
+            if (!match.Success)
+                return false;
+
+            var pluginName = match.Groups[1].Value;
+            var plugin = _plugin?.Plugins.Find(p =>
+                p.Name.Replace(" ", "_").Equals(pluginName, StringComparison.OrdinalIgnoreCase) &&
+                p is IPluginTakeover takeover && takeover.SupportsTakeover);
+
+            if (plugin is not IPluginTakeover)
+            {
+                // 匹配尾部还贴着缓冲区末尾时，\w+ 可能只吃到插件名的前半截（逐字符投喂下必然如此），
+                // 名字还会变长，不能就此判死。只有名字已被非单词字符终结、仍然查不到，
+                // 才把地板推过去，让后续片不再重复扫描这个死标记。
+                var matchEnd = match.Index + match.Length;
+                if (matchEnd < currentBuffer.Length)
+                {
+                    lock (_lock)
+                    {
+                        _pluginScanFloor = Math.Max(_pluginScanFloor, matchEnd);
+                    }
+                }
+                return false;
+            }
+
+            var pluginStartIndex = match.Index;
+            var pluginContent = currentBuffer.Substring(pluginStartIndex);
+            Logger.Log($"StreamingCommandProcessor: 检测到支持接管的插件 {pluginName}，准备启动接管");
+
+            await _takeoverManager.ProcessChunkAsync(pluginContent).ConfigureAwait(false);
+            if (!_takeoverManager.IsTakingOver)
+                return false;
+
+            lock (_lock)
+            {
+                var kept = currentBuffer.Substring(0, pluginStartIndex);
+                _buffer.Clear();
+                _buffer.Append(kept);
+                _lastProcessedIndex = 0;
+                _pluginScanFrom = _buffer.Length;
+                _pluginScanFloor = 0;
+                _hasPendingOpen = HasPendingCommandStart(kept, 0);
+            }
+
+            Logger.Log($"StreamingCommandProcessor: 插件 {_takeoverManager.CurrentTakeoverPlugin} 开始接管");
+            return true;
         }
 
         /// <summary>
@@ -216,7 +310,10 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         public string GetFullText()
         {
-            return _buffer.ToString();
+            lock (_lock)
+            {
+                return _buffer.ToString();
+            }
         }
 
         /// <summary>
@@ -225,59 +322,86 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private void ProcessCompleteCommands()
         {
-            var text = _buffer.ToString();
-            int index = _lastProcessedIndex;
+            var found = new List<(string FullCommand, string CommandType)>();
 
-            // 检测并警告旧格式
-            if (text.Contains("[:"))
+            lock (_lock)
             {
-                Logger.Log("StreamingCommandProcessor: 警告 - 检测到旧格式命令 [:，已弃用。请使用新格式: <|command_type_begin|> ... <|command_type_end|>");
-            }
+                var text = _buffer.ToString();
+                int index = _lastProcessedIndex;
 
-            while (index < text.Length)
-            {
-                // 只查找新格式命令: <|xxx_begin|>
-                int startIndex = text.IndexOf("<|", index);
-
-                if (startIndex == -1)
-                    break;
-
-                // 跳过已处理的命令
-                if (startIndex < _lastProcessedIndex)
+                if (!_oldFormatWarned && text.Contains("[:"))
                 {
-                    index = startIndex + 2;
-                    continue;
+                    _oldFormatWarned = true;
+                    Logger.Log("StreamingCommandProcessor: 警告 - 检测到旧格式命令 [:，已弃用。请使用新格式: <|command_type_begin|> ... <|command_type_end|>");
                 }
 
-                // 解析新格式
-                var command = ParseNewFormatCommand(text, startIndex);
-                if (command is null)
-                    break; // 不完整的命令，等待更多数据
+                while (index < text.Length)
+                {
+                    int startIndex = text.IndexOf("<|", index);
+                    if (startIndex == -1)
+                        break;
 
-                string fullCommand = command.FullMatch;
-                string commandType = command.CommandType;
-                _lastProcessedIndex = command.EndIndex + 1;
+                    if (startIndex < _lastProcessedIndex)
+                    {
+                        index = startIndex + 2;
+                        continue;
+                    }
 
-                // 记录检测到的命令
-                Logger.Log($"StreamingCommandProcessor: 检测到完整命令类型: {commandType}, 格式: 新格式, 命令: {fullCommand.Substring(0, Math.Min(fullCommand.Length, 100))}...");
+                    var command = ParseNewFormatCommand(text, startIndex);
+                    if (command is null)
+                        break;
 
-                // 根据是否启用批处理选择处理方式
-                if (_useBatching && _commandBatcher is not null)
+                    _lastProcessedIndex = command.EndIndex + 1;
+                    found.Add((command.FullMatch, command.CommandType));
+                    index = _lastProcessedIndex;
+                }
+
+                var tail = Math.Min(Math.Max(_lastProcessedIndex, 0), text.Length);
+                _hasPendingOpen = HasPendingCommandStart(text, tail);
+            }
+
+            if (found.Count == 0)
+                return;
+
+            foreach (var (fullCommand, commandType) in found)
+            {
+                Logger.LogVerbose($"StreamingCommandProcessor: 检测到完整命令类型: {commandType}, 格式: 新格式, 命令: {fullCommand.Substring(0, Math.Min(fullCommand.Length, 100))}...");
+            }
+
+            if (_useBatching && _commandBatcher is not null)
+            {
+                foreach (var (fullCommand, _) in found)
                 {
                     _commandBatcher.AddCommand(fullCommand);
                 }
-                else
-                {
-                    lock (_lock)
-                    {
-                        _commandQueue.Enqueue(fullCommand);
-                    }
-                    _ = ProcessQueueAsync();
-                }
-
-                // 移动到下一个位置
-                index = _lastProcessedIndex;
+                return;
             }
+
+            // 整批一次性入队：Complete() 与泵可能并发跑到这里，逐条入队会让两批命令交错，
+            // 顺序就乱了。ProcessQueueAsync 自己会把队列抽干，踢一次就够。
+            lock (_lock)
+            {
+                foreach (var (fullCommand, _) in found)
+                {
+                    _commandQueue.Enqueue(fullCommand);
+                }
+            }
+
+            _ = ProcessQueueAsync();
+        }
+
+        /// <summary>
+        /// 判断 <paramref name="from"/> 之后是否还有可能长成命令的开头。
+        /// 只认 "&lt;|"，或缓冲区正好以 '&lt;' 结尾（'|' 可能在下一片里）——
+        /// 正文里的裸 '&lt;'（"a &lt; b"）不该让后续每一片都触发全量扫描。
+        /// </summary>
+        private static bool HasPendingCommandStart(string text, int from)
+        {
+            if (from >= text.Length)
+                return false;
+
+            return text.IndexOf("<|", from, StringComparison.Ordinal) >= 0
+                || text[text.Length - 1] == '<';
         }
 
         /// <summary>
@@ -379,14 +503,14 @@ namespace VPetLLM.Handlers.Core
 
                                     if (hasActivity)
                                     {
-                                        Logger.Log("StreamingCommandProcessor: 检测到新活动，退出Idle等待");
+                                        Logger.LogVerbose("StreamingCommandProcessor: 检测到新活动，退出Idle等待");
                                         return;
                                     }
 
                                     var activeSessionCount = pluginInstance?.FloatingSidebarManager?.ActiveSessionCount ?? 0;
                                     if (activeSessionCount > 0)
                                     {
-                                        Logger.Log($"StreamingCommandProcessor: 检测到活动会话({activeSessionCount})，继续等待");
+                                        Logger.LogVerbose($"StreamingCommandProcessor: 检测到活动会话({activeSessionCount})，继续等待");
                                         await InterruptManager.Delay(500).ConfigureAwait(false);
                                         elapsedMs += 500;
                                         continue;
@@ -413,7 +537,7 @@ namespace VPetLLM.Handlers.Core
                                 var finalActiveSessionCount = pluginInstance?.FloatingSidebarManager?.ActiveSessionCount ?? 0;
                                 if (finalActiveSessionCount > 0)
                                 {
-                                    Logger.Log($"StreamingCommandProcessor: 最终检查发现活动会话({finalActiveSessionCount})，跳过设置Idle");
+                                    Logger.LogVerbose($"StreamingCommandProcessor: 最终检查发现活动会话({finalActiveSessionCount})，跳过设置Idle");
                                     return;
                                 }
 
@@ -422,17 +546,17 @@ namespace VPetLLM.Handlers.Core
                                     var processor = pluginInstance?.TalkBox?.MessageProcessor;
                                     if (processor is null || !processor.IsProcessing)
                                     {
-                                        Logger.Log("StreamingCommandProcessor: 所有命令处理完成，设置状态灯为Idle");
+                                        Logger.LogVerbose("StreamingCommandProcessor: 所有命令处理完成，设置状态灯为Idle");
                                         pluginInstance?.FloatingSidebarManager?.SetIdleStatus();
                                     }
                                     else
                                     {
-                                        Logger.Log("StreamingCommandProcessor: SmartMessageProcessor仍在处理中，跳过设置Idle");
+                                        Logger.LogVerbose("StreamingCommandProcessor: SmartMessageProcessor仍在处理中，跳过设置Idle");
                                     }
                                 }
                                 else
                                 {
-                                    Logger.Log("StreamingCommandProcessor: 检测到新命令或正在处理，跳过设置Idle");
+                                    Logger.LogVerbose("StreamingCommandProcessor: 检测到新命令或正在处理，跳过设置Idle");
                                 }
                             });
 
@@ -442,7 +566,7 @@ namespace VPetLLM.Handlers.Core
                     }
 
                     // 执行命令
-                    Logger.Log($"StreamingCommandProcessor: 开始处理命令: {command}");
+                    Logger.LogVerbose($"StreamingCommandProcessor: 开始处理命令: {command}");
                     _onCompleteCommand?.Invoke(command);
 
                     // 检查是否启用实况模式
@@ -450,13 +574,13 @@ namespace VPetLLM.Handlers.Core
 
                     if (isLiveMode)
                     {
-                        Logger.Log($"StreamingCommandProcessor: 实况模式 - 命令已发送，不等待完成: {command}");
+                        Logger.LogVerbose($"StreamingCommandProcessor: 实况模式 - 命令已发送，不等待完成: {command}");
                     }
                     else
                     {
-                        Logger.Log($"StreamingCommandProcessor: 队列模式 - 开始等待命令完成: {command}");
+                        Logger.LogVerbose($"StreamingCommandProcessor: 队列模式 - 开始等待命令完成: {command}");
                         await WaitForCommandCompleteAsync(command).ConfigureAwait(false);
-                        Logger.Log($"StreamingCommandProcessor: 队列模式 - 命令处理完成: {command}");
+                        Logger.LogVerbose($"StreamingCommandProcessor: 队列模式 - 命令处理完成: {command}");
                     }
                 }
             }
@@ -474,7 +598,7 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         private async Task WaitForCommandCompleteAsync(string command)
         {
-            Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: 进入方法，命令: {command}");
+            Logger.LogVerbose($"StreamingCommandProcessor.WaitForCommandCompleteAsync: 进入方法，命令: {command}");
 
             if (string.IsNullOrEmpty(command))
             {
@@ -491,17 +615,16 @@ namespace VPetLLM.Handlers.Core
             }
             
             var commandType = match.Groups[1].Value.ToLower();
-            Logger.Log($"StreamingCommandProcessor.WaitForCommandCompleteAsync: 命令类型: {commandType}");
+            Logger.LogVerbose($"StreamingCommandProcessor.WaitForCommandCompleteAsync: 命令类型: {commandType}");
 
             var pluginInstance = _plugin ?? VPetLLM.Instance;
 
             // 对于plugin和tool命令，使用特殊的等待逻辑
             if (commandType == "plugin" || commandType == "tool")
             {
-                Logger.Log($"StreamingCommandProcessor: 检测到{commandType}命令，使用特殊等待逻辑");
-                // 优化：移除不必要的双重延迟，用单一动态超时替代
+                Logger.LogVerbose($"StreamingCommandProcessor: 检测到{commandType}命令，使用特殊等待逻辑");
                 await WaitForPluginCommandAsync().ConfigureAwait(false);
-                Logger.Log($"StreamingCommandProcessor: {commandType}命令等待完成");
+                Logger.LogVerbose($"StreamingCommandProcessor: {commandType}命令等待完成");
                 return;
             }
 
@@ -530,7 +653,7 @@ namespace VPetLLM.Handlers.Core
             else
             {
                 // 如果无法访问 MessageProcessor，使用传统的等待策略
-                Logger.Log("StreamingCommandProcessor: 无法访问 MessageProcessor，使用传统等待策略");
+                Logger.LogVerbose("StreamingCommandProcessor: 无法访问 MessageProcessor，使用传统等待策略");
 
                 switch (commandType)
                 {
@@ -595,8 +718,13 @@ namespace VPetLLM.Handlers.Core
                 dropped = _commandQueue.Count;
                 _buffer.Clear();
                 _lastProcessedIndex = 0;
+                _pluginScanFrom = 0;
+                _pluginScanFloor = 0;
+                _hasPendingOpen = false;
+                _incomingChunks.Clear();
                 _commandQueue.Clear();
                 _isProcessing = false;
+                _pumpRunning = false;
             }
 
             _commandBatcher?.Clear();
@@ -628,8 +756,13 @@ namespace VPetLLM.Handlers.Core
             {
                 _buffer.Clear();
                 _lastProcessedIndex = 0;
+                _pluginScanFrom = 0;
+                _pluginScanFloor = 0;
+                _hasPendingOpen = false;
+                _incomingChunks.Clear();
                 _commandQueue.Clear();
                 _isProcessing = false;
+                _pumpRunning = false;
             }
             _takeoverManager.Reset();
             _commandBatcher?.Clear();
@@ -654,14 +787,14 @@ namespace VPetLLM.Handlers.Core
             if (enabled && _commandBatcher is null)
             {
                 _commandBatcher = new CommandBatcher(windowMs, OnBatchReady);
-                Logger.Log($"StreamingCommandProcessor: 批处理模式已启用，窗口: {windowMs}ms");
+                Logger.LogVerbose($"StreamingCommandProcessor: 批处理模式已启用，窗口: {windowMs}ms");
             }
             else if (!enabled && _commandBatcher is not null)
             {
                 _commandBatcher.Flush();
                 _commandBatcher.Dispose();
                 _commandBatcher = null;
-                Logger.Log("StreamingCommandProcessor: 批处理模式已禁用");
+                Logger.LogVerbose("StreamingCommandProcessor: 批处理模式已禁用");
             }
         }
 
@@ -691,19 +824,21 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         public void Complete()
         {
-            Logger.Log("StreamingCommandProcessor: Complete() 调用 - 统一流式处理完成");
+            Logger.LogVerbose("StreamingCommandProcessor: Complete() 调用 - 统一流式处理完成");
 
-            // 刷新批处理器
+            // 泵可能还挂在接管插件的 await 上。积压的片段必须走原路径由泵消费：
+            // 接管期间这些内容属于插件，直接 Append 进 _buffer 会被当成普通文本吞掉。
+            DrainPendingChunks();
+
             if (_useBatching && _commandBatcher is not null)
             {
                 _commandBatcher.Flush();
-                Logger.Log("StreamingCommandProcessor: 批处理器已刷新");
+                Logger.LogVerbose("StreamingCommandProcessor: 批处理器已刷新");
             }
 
-            // 处理任何剩余的完整命令
             ProcessCompleteCommands();
 
-            Logger.Log("StreamingCommandProcessor: 统一流式处理完成");
+            Logger.LogVerbose("StreamingCommandProcessor: 统一流式处理完成");
         }
     }
 }

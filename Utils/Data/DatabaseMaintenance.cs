@@ -20,9 +20,7 @@ namespace VPetLLM.Utils.Data
                     return;
                 }
 
-                var connectionString = $"Data Source={dbPath}";
-                using var connection = new SqliteConnection(connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = "VACUUM";
@@ -102,9 +100,7 @@ namespace VPetLLM.Utils.Data
                     return stats;
                 }
 
-                var connectionString = $"Data Source={dbPath}";
-                using var connection = new SqliteConnection(connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(dbPath);
 
                 // 获取总消息数
                 var countCommand = connection.CreateCommand();

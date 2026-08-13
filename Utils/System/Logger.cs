@@ -11,6 +11,24 @@ namespace VPetLLM.Utils.System
     {
         public static ObservableCollection<string> Logs { get; } = new ObservableCollection<string>();
 
+        private static WeakReference<ScrollViewer>? _cachedLogScroller;
+        private static DateTime _lastScrollUtc = DateTime.MinValue;
+        private static readonly TimeSpan ScrollThrottle = TimeSpan.FromMilliseconds(250);
+
+        /// <summary>
+        /// 角色设定含 VPetLLM_DeBug 时才写热路径明细。
+        /// </summary>
+        public static bool VerboseEnabled =>
+            VPetLLM.Instance?.Settings is not null
+            && ErrorMessageHelper.IsDebugMode(VPetLLM.Instance.Settings);
+
+        public static void LogVerbose(string message)
+        {
+            if (!VerboseEnabled)
+                return;
+            Log(message);
+        }
+
         public static void Log(string message)
         {
             // 使用 BeginInvoke 异步调度，避免阻塞调用线程
@@ -24,47 +42,77 @@ namespace VPetLLM.Utils.System
             {
                 Logs.Add(formattedMessage);
 
-                // 如果超过最大日志数量，移除最早的日志
-                if (VPetLLM.Instance is not null && VPetLLM.Instance.Settings is not null && Logs.Count > VPetLLM.Instance.Settings.MaxLogCount)
+                var settings = VPetLLM.Instance?.Settings;
+                // 上限 <= 0 一律回落到默认值：设置页只做 int.TryParse，0 和负数都存得进来，
+                // 当成"不裁剪"会让 Logs 无限增长，把设置页的 ListBox 拖死。
+                var maxCount = settings?.MaxLogCount ?? 1000;
+                if (maxCount <= 0)
+                    maxCount = 1000;
+
+                if (Logs.Count > maxCount)
                 {
-                    while (Logs.Count > VPetLLM.Instance.Settings.MaxLogCount)
+                    var excess = Logs.Count - maxCount;
+                    // RemoveAt(0) 每次 O(n)，超限时按批裁，避免一条条挪数组
+                    var remove = Math.Min(excess + Math.Max(32, maxCount / 20), Logs.Count - 1);
+                    for (var i = 0; i < remove; i++)
                     {
                         Logs.RemoveAt(0);
                     }
                 }
 
-                // 如果启用自动滚动，滚动到最新条目
-                if (VPetLLM.Instance is not null && VPetLLM.Instance.Settings is not null && VPetLLM.Instance.Settings.LogAutoScroll && Logs.Count > 0)
-                {
-                    // 滚动操作已经在 UI 线程中，使用 BeginInvoke 延迟执行确保 UI 已更新
-                    app.Dispatcher.BeginInvoke(SystemWindows.Threading.DispatcherPriority.Background, new Action(() =>
-                    {
-                        // 线程安全检查：确保集合仍然有元素
-                        if (Logs.Count == 0) return;
-
-                        // 查找当前活动的设置窗口并滚动日志框
-                        var windows = app.Windows;
-                        foreach (SystemWindows.Window window in windows)
-                        {
-                            var settingWindow = window as winSettingNew;
-                            if (settingWindow is not null)
-                            {
-                                var logBox = (ListBox)settingWindow.FindName("LogBox");
-                                if (logBox is not null)
-                                {
-                                    // 使用 ScrollViewer 进行平滑滚动，而不是按条目跳转
-                                    var scrollViewer = FindScrollViewer(logBox);
-                                    if (scrollViewer is not null)
-                                    {
-                                        scrollViewer.ScrollToEnd();
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }));
-                }
+                if (settings?.LogAutoScroll == true && Logs.Count > 0)
+                    TryScrollLogBox(app);
             }));
+        }
+
+        private static void TryScrollLogBox(SystemWindows.Application app)
+        {
+            var now = DateTime.UtcNow;
+            if (now - _lastScrollUtc < ScrollThrottle)
+                return;
+            _lastScrollUtc = now;
+
+            if (_cachedLogScroller is not null
+                && _cachedLogScroller.TryGetTarget(out var cached)
+                && cached.IsLoaded)
+            {
+                ScrollAfterLayout(app, cached);
+                return;
+            }
+
+            ScrollViewer? scrollViewer = null;
+            foreach (SystemWindows.Window window in app.Windows)
+            {
+                if (window is not winSettingNew settingWindow || !settingWindow.IsLoaded)
+                    continue;
+
+                if (settingWindow.FindName("LogBox") is ListBox logBox)
+                    scrollViewer = FindScrollViewer(logBox);
+
+                if (scrollViewer is not null)
+                    break;
+            }
+
+            if (scrollViewer is null)
+                return;
+
+            _cachedLogScroller = new WeakReference<ScrollViewer>(scrollViewer);
+            ScrollAfterLayout(app, scrollViewer);
+        }
+
+        /// <summary>
+        /// 必须等布局跑完再滚：此刻刚 Add 进 Logs 的那条还没被 ItemsPanel 实现，
+        /// ScrollToEnd 读到的 ExtentHeight 是旧值，直接调会永远停在倒数第二条。
+        /// </summary>
+        private static void ScrollAfterLayout(SystemWindows.Application app, ScrollViewer scrollViewer)
+        {
+            app.Dispatcher.BeginInvoke(
+                SystemWindows.Threading.DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    if (Logs.Count > 0)
+                        scrollViewer.ScrollToEnd();
+                }));
         }
 
         /// <summary>

@@ -25,6 +25,11 @@ namespace VPetLLM.Utils.UI
         private static string _currentDeviceHash = null;
         private static DevicePerformanceProfile _cachedProfile = null;
 
+        // CPU 跑分：实测时长（短，别拖慢启动）与打分门槛所依据的基准时长。
+        // 两者不一致时按比例折算，门槛本身不用动。
+        private const int CpuTestMs = 200;
+        private const int BaselineTestMs = 3000;
+
         /// <summary>
         /// 获取设置数据库路径（复用现有的 settings.db）
         /// </summary>
@@ -228,10 +233,9 @@ namespace VPetLLM.Utils.UI
                         TestDate = DateTime.Now
                     };
 
-                    Logger.Log("BubbleDelayController: 开始CPU计算能力测试（3秒圆周率运算）...");
+                    Logger.Log($"BubbleDelayController: 开始CPU计算能力测试（{CpuTestMs}ms，按 {BaselineTestMs}ms 基准折算）...");
 
-                    // 执行3秒的圆周率计算测试
-                    var cpuScore = PerformPiCalculationTest(3000); // 3秒测试
+                    var cpuScore = PerformPiCalculationTest(CpuTestMs);
                     Logger.Log($"BubbleDelayController: CPU计算得分: {cpuScore}");
 
                     // 内存测试
@@ -338,6 +342,11 @@ namespace VPetLLM.Utils.UI
 
                 Logger.Log($"BubbleDelayController: π计算完成 - 迭代次数: {iterations:N0}, 计算结果: {pi:F10}");
 
+                // 下面的门槛是按 3 秒基准标定的绝对迭代数，测试时长一旦缩短就必须折算回
+                // 同一基准再比，否则高端机会被算成低端（200ms 的迭代数只有 3s 的 1/15）。
+                var elapsedMs = Math.Max(1, stopwatch.ElapsedMilliseconds);
+                var normalized = iterations * (BaselineTestMs / (double)elapsedMs);
+
                 // 根据迭代次数计算得分
                 // 现代CPU在3秒内通常能完成数亿次迭代
                 // 高端: > 500M 迭代/3秒 = 500分
@@ -345,19 +354,19 @@ namespace VPetLLM.Utils.UI
                 // 低端: < 100M 迭代/3秒 = 100-200分
 
                 int score;
-                if (iterations > 500_000_000)
+                if (normalized > 500_000_000)
                 {
                     score = 500; // 高端CPU
                 }
-                else if (iterations > 300_000_000)
+                else if (normalized > 300_000_000)
                 {
                     score = 400; // 中高端CPU
                 }
-                else if (iterations > 150_000_000)
+                else if (normalized > 150_000_000)
                 {
                     score = 300; // 中端CPU
                 }
-                else if (iterations > 50_000_000)
+                else if (normalized > 50_000_000)
                 {
                     score = 200; // 中低端CPU
                 }
@@ -366,7 +375,7 @@ namespace VPetLLM.Utils.UI
                     score = 100; // 低端CPU
                 }
 
-                Logger.Log($"BubbleDelayController: CPU性能等级 - 迭代: {iterations:N0}, 得分: {score}");
+                Logger.Log($"BubbleDelayController: CPU性能等级 - 迭代: {iterations:N0}/{elapsedMs}ms, 折算 {BaselineTestMs}ms 基准: {normalized:N0}, 得分: {score}");
 
                 return score;
             }
@@ -426,9 +435,7 @@ namespace VPetLLM.Utils.UI
                 Directory.CreateDirectory(directory);
             }
 
-            var connectionString = $"Data Source={_dbFilePath}";
-            var connection = new SqliteConnection(connectionString);
-            connection.Open();
+            var connection = global::VPetLLM.Utils.Data.SQLiteHelper.OpenConnection(_dbFilePath);
 
             // 确保表存在
             EnsureTablesExist(connection);
@@ -719,11 +726,18 @@ namespace VPetLLM.Utils.UI
         /// </summary>
         public static void ApplyUIDelay()
         {
-            if (_minDelayMs > 0)
+            if (_minDelayMs <= 0)
+                return;
+
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher is not null && dispatcher.CheckAccess())
             {
-                Logger.Log($"BubbleDelayController: 应用UI延迟 {_minDelayMs}ms");
-                global::System.Threading.Thread.Sleep(_minDelayMs);
+                // UI 线程上 Sleep 会整窗卡顿，延迟的本意是错开瞬时压力，不能堵 Dispatcher
+                return;
             }
+
+            Logger.LogVerbose($"BubbleDelayController: 应用UI延迟 {_minDelayMs}ms");
+            global::System.Threading.Thread.Sleep(_minDelayMs);
         }
 
         /// <summary>

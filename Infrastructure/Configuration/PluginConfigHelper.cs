@@ -28,8 +28,7 @@ public static class PluginConfigHelper
         {
             if (File.Exists(DatabasePath))
             {
-                using var connection = new SqliteConnection($"Data Source={DatabasePath}");
-                connection.Open();
+                using var connection = global::VPetLLM.Utils.Data.SQLiteHelper.OpenConnection(DatabasePath);
 
                 var pluginService = new PluginDataService(connection);
                 var config = pluginService.GetPluginConfigByName<T>(pluginName, "Plugin");
@@ -69,8 +68,7 @@ public static class PluginConfigHelper
                 return false;
             }
 
-            using var connection = new SqliteConnection($"Data Source={DatabasePath}");
-            connection.Open();
+            using var connection = global::VPetLLM.Utils.Data.SQLiteHelper.OpenConnection(DatabasePath);
 
             var pluginService = new PluginDataService(connection);
             pluginService.UpsertPluginByName(pluginName, "Plugin", config, enabled: true);
@@ -97,8 +95,7 @@ public static class PluginConfigHelper
             if (!File.Exists(DatabasePath))
                 return false;
 
-            using var connection = new SqliteConnection($"Data Source={DatabasePath}");
-            connection.Open();
+            using var connection = global::VPetLLM.Utils.Data.SQLiteHelper.OpenConnection(DatabasePath);
 
             var pluginService = new PluginDataService(connection);
             var plugin = pluginService.GetPluginByName(pluginName, "Plugin");

@@ -5,6 +5,7 @@ namespace VPetLLM.Core.Data.Managers
     public class HistoryManager
     {
         private List<Message> _history = new List<Message>();
+        private readonly object _historyLock = new object();
         private readonly Setting _settings;
         private readonly string _providerName;
         private readonly ChatCoreBase _chatCore;
@@ -43,7 +44,21 @@ namespace VPetLLM.Core.Data.Managers
         /// </summary>
         public OverflowManager? GetOverflowManager() => _overflowManager;
 
-        public List<Message> GetHistory() => _history;
+        public List<Message> GetHistory()
+        {
+            lock (_historyLock)
+            {
+                return _history.ToList();
+            }
+        }
+
+        public void ReplaceHistory(IEnumerable<Message> messages)
+        {
+            lock (_historyLock)
+            {
+                _history = messages?.ToList() ?? new List<Message>();
+            }
+        }
 
         public int GetEditingMessageCount()
             => _database.GetEditingMessageCount(_providerName, _settings.SeparateChatByProvider);
@@ -60,21 +75,24 @@ namespace VPetLLM.Core.Data.Managers
         {
             try
             {
-                if (_settings.SeparateChatByProvider)
+                var loaded = _settings.SeparateChatByProvider
+                    ? _database.GetHistory(_providerName)
+                    : _database.GetAllHistory();
+
+                lock (_historyLock)
                 {
-                    _history = _database.GetHistory(_providerName);
-                }
-                else
-                {
-                    _history = _database.GetAllHistory();
+                    _history = loaded;
                 }
 
-                Logger.Log($"从数据库加载了 {_history.Count} 条历史记录");
+                Logger.Log($"从数据库加载了 {loaded.Count} 条历史记录");
             }
             catch (Exception ex)
             {
                 Logger.Log($"加载历史记录失败: {ex.Message}");
-                _history = new List<Message>();
+                lock (_historyLock)
+                {
+                    _history = new List<Message>();
+                }
             }
         }
 
@@ -99,11 +117,15 @@ namespace VPetLLM.Core.Data.Managers
         /// <returns>true 表示已追加</returns>
         public bool AppendToLastMessage(string suffix)
         {
-            if (string.IsNullOrEmpty(suffix) || _history.Count == 0)
-                return false;
+            Message last;
+            lock (_historyLock)
+            {
+                if (string.IsNullOrEmpty(suffix) || _history.Count == 0)
+                    return false;
 
-            var last = _history[_history.Count - 1];
-            last.Content = (last.Content ?? "") + suffix;
+                last = _history[_history.Count - 1];
+                last.Content = (last.Content ?? "") + suffix;
+            }
 
             try
             {
@@ -145,7 +167,10 @@ namespace VPetLLM.Core.Data.Managers
                 }
             }
 
-            _history.Add(message);
+            lock (_historyLock)
+            {
+                _history.Add(message);
+            }
 
             // 实时保存到数据库
             try
@@ -160,31 +185,43 @@ namespace VPetLLM.Core.Data.Managers
 
         private bool ShouldCompress()
         {
+            int count;
+            lock (_historyLock)
+            {
+                count = _history.Count;
+            }
+
             switch (_settings.CompressionMode)
             {
                 case Setting.CompressionTriggerMode.MessageCount:
-                    return _history.Count >= _settings.HistoryCompressionThreshold;
+                    return count >= _settings.HistoryCompressionThreshold;
 
                 case Setting.CompressionTriggerMode.TokenCount:
                     return EstimateTokenCount() >= _settings.HistoryCompressionTokenThreshold;
 
                 case Setting.CompressionTriggerMode.Both:
-                    return _history.Count >= _settings.HistoryCompressionThreshold ||
+                    return count >= _settings.HistoryCompressionThreshold ||
                            EstimateTokenCount() >= _settings.HistoryCompressionTokenThreshold;
 
                 default:
-                    return _history.Count >= _settings.HistoryCompressionThreshold;
+                    return count >= _settings.HistoryCompressionThreshold;
             }
         }
 
         private int EstimateTokenCount()
         {
-            return TokenCounter.EstimateMessagesTokenCount(_history);
+            lock (_historyLock)
+            {
+                return TokenCounter.EstimateMessagesTokenCount(_history);
+            }
         }
 
         public void ClearHistory()
         {
-            _history.Clear();
+            lock (_historyLock)
+            {
+                _history.Clear();
+            }
 
             // 从数据库中清除
             try
@@ -209,7 +246,13 @@ namespace VPetLLM.Core.Data.Managers
 
         private async Task CompressHistory()
         {
-            var validHistory = _history.Where(m => !string.IsNullOrWhiteSpace(m.Content)).ToList();
+            List<Message> snapshot;
+            lock (_historyLock)
+            {
+                snapshot = _history.ToList();
+            }
+
+            var validHistory = snapshot.Where(m => !string.IsNullOrWhiteSpace(m.Content)).ToList();
 
             // 计算保留消息数
             var retainCount = Math.Max(1, _settings.CompressionRetainCount);
@@ -263,12 +306,22 @@ namespace VPetLLM.Core.Data.Managers
                 new Message { Role = "assistant", Content = summary }
             };
             newHistory.AddRange(messagesToKeep);
-            _history = newHistory;
+
+            List<Message> toPersist;
+            lock (_historyLock)
+            {
+                _history = newHistory;
+                // 递给数据库的必须是快照：UpdateHistory 内部是 foreach + DELETE/INSERT 事务，
+                // 直接把活列表传进去，期间来一条 AddMessage 就在 DELETE 之后、Commit 之前抛
+                // "集合已修改" —— 事务回滚，内存已压缩、库里还是旧的全量，下次 LoadHistory
+                // 一读这次压缩就白做了。
+                toPersist = _history.ToList();
+            }
 
             // 更新数据库
             try
             {
-                _database.UpdateHistory(_providerName, _history);
+                _database.UpdateHistory(_providerName, toPersist);
             }
             catch (Exception ex)
             {

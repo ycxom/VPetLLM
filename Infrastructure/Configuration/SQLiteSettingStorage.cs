@@ -169,16 +169,7 @@ public class SQLiteSettingStorage : ISettingStorage
             }
 
             // Create connection string
-            var connectionString = new SqliteConnectionStringBuilder
-            {
-                DataSource = _databasePath,
-                Mode = SqliteOpenMode.ReadWriteCreate,
-                Cache = SqliteCacheMode.Shared
-            }.ToString();
-
-            // Open connection
-            _connection = new SqliteConnection(connectionString);
-            _connection.Open();
+            _connection = global::VPetLLM.Utils.Data.SQLiteHelper.OpenConnection(_databasePath);
 
             // Check schema version
             var currentVersion = _schemaManager.GetSchemaVersion(_connection);

@@ -46,14 +46,10 @@ namespace VPetLLM.Core.Providers.Chat
 
             LoadConfig();
 
-            // 使用基类的代理设置逻辑
-            var handler = CreateHttpClientHandler();
-            _httpClient = new HttpClient(handler);
-
-            // 使用配置的超时时间
             var timeoutSeconds = setting?.LLMRequestTimeoutSeconds ?? 30;
             if (timeoutSeconds <= 0) timeoutSeconds = 30;
-            _httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+            _httpClient = Utils.Network.HttpHandlerPool.CreateClient(
+                CreateHttpClientHandler, TimeSpan.FromSeconds(timeoutSeconds));
 
             // 设置API密钥
             _httpClient.DefaultRequestHeaders.Authorization =

@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using VPetLLM.Utils.Data;
 
 namespace VPetLLM.Core.Data.Database
 {
@@ -13,7 +14,7 @@ namespace VPetLLM.Core.Data.Database
         public ImportantRecordsDatabase(string dbPath)
         {
             _dbPath = dbPath;
-            _connectionString = $"Data Source={dbPath}";
+            _connectionString = SQLiteHelper.BuildConnectionString(dbPath);
             InitializeRecordsTable();
         }
 
@@ -24,8 +25,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var createTableCommand = connection.CreateCommand();
                 createTableCommand.CommandText = @"
@@ -113,8 +113,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 using var transaction = connection.BeginTransaction();
 
                 var updated = 0;
@@ -162,8 +161,7 @@ namespace VPetLLM.Core.Data.Database
                 // Clamp weight to valid range
                 weight = Math.Clamp(weight, 0, 10);
 
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -200,8 +198,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = $@"
@@ -234,8 +231,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = $@"
@@ -272,8 +268,7 @@ namespace VPetLLM.Core.Data.Database
                 // Clamp weight to valid range
                 newWeight = Math.Clamp(newWeight, 0, 10);
 
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -333,8 +328,7 @@ namespace VPetLLM.Core.Data.Database
                 // Clamp weight to valid range
                 weight = Math.Clamp(weight, 0, 10);
 
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -450,8 +444,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 using var transaction = connection.BeginTransaction();
 
@@ -517,8 +510,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = "DELETE FROM important_records WHERE id = @id";
@@ -552,8 +544,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = "DELETE FROM important_records WHERE weight <= 0";
@@ -578,8 +569,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = "DELETE FROM important_records";
@@ -606,8 +596,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = $@"
@@ -640,8 +629,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = "SELECT COUNT(*) FROM important_records";
@@ -665,8 +653,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = $@"
@@ -708,8 +695,7 @@ namespace VPetLLM.Core.Data.Database
                     return 0;
                 }
 
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 // First, count total records
                 var countCommand = connection.CreateCommand();

@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using VPetLLM.Utils.Data;
 
 namespace VPetLLM.Core.Data.Database
 {
@@ -43,7 +44,7 @@ namespace VPetLLM.Core.Data.Database
             }
 
             _dbPath = dbPath;
-            _connectionString = $"Data Source={dbPath}";
+            _connectionString = SQLiteHelper.BuildConnectionString(dbPath);
 
             // 设置图像存储目录
             var dbDirectory = Path.GetDirectoryName(dbPath);
@@ -105,8 +106,7 @@ namespace VPetLLM.Core.Data.Database
                     Directory.CreateDirectory(directory);
                 }
 
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var createTableCommand = connection.CreateCommand();
                 createTableCommand.CommandText = @"
@@ -165,8 +165,7 @@ namespace VPetLLM.Core.Data.Database
                     imageId = EnsureImageSaved(message);
                 }
 
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -202,8 +201,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -229,8 +227,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 using var transaction = connection.BeginTransaction();
 
@@ -278,8 +275,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -327,8 +323,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = @"
@@ -373,8 +368,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 using var command = connection.CreateCommand();
                 command.CommandText = separateByProvider
                     ? "SELECT COUNT(*) FROM chat_history WHERE provider = @provider AND LOWER(role) <> 'system'"
@@ -405,8 +399,7 @@ namespace VPetLLM.Core.Data.Database
 
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 using var command = connection.CreateCommand();
                 command.CommandText = separateByProvider
                     ? @"SELECT role, content, unix_time, status_info, image_id
@@ -453,8 +446,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 using var command = connection.CreateCommand();
                 command.CommandText = separateByProvider
                     ? @"SELECT role, content, unix_time, status_info, image_id FROM chat_history
@@ -494,8 +486,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 // 先获取要删除的图像ID列表
                 var getImagesCommand = connection.CreateCommand();
@@ -544,8 +535,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 // 先获取所有图像ID
                 var getImagesCommand = connection.CreateCommand();
@@ -592,8 +582,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 // 先获取旧的图像ID列表
                 var getOldImagesCommand = connection.CreateCommand();
@@ -685,8 +674,7 @@ namespace VPetLLM.Core.Data.Database
         {
             try
             {
-                using var connection = new SqliteConnection(_connectionString);
-                connection.Open();
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var command = connection.CreateCommand();
                 command.CommandText = "SELECT COUNT(*) FROM chat_history WHERE provider = @provider";

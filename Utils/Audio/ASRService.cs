@@ -1,6 +1,4 @@
 using NAudio.Wave;
-using System.Net;
-using System.Net.Http;
 
 namespace VPetLLM.Utils.Audio
 {
@@ -9,7 +7,6 @@ namespace VPetLLM.Utils.Audio
         private Setting _settings;
         private Setting.ASRSetting _asrSettings;
         private Setting.ProxySetting _proxySettings;
-        private HttpClient _httpClient;
         private WaveInEvent? _waveIn;
         private MemoryStream? _recordingStream;
         private WaveFileWriter? _waveWriter;
@@ -38,7 +35,6 @@ namespace VPetLLM.Utils.Audio
             _settings = settings;
             _asrSettings = settings.ASR;
             _proxySettings = settings.Proxy;
-            _httpClient = CreateHttpClient();
             InitializeASRCore();
         }
 
@@ -61,88 +57,11 @@ namespace VPetLLM.Utils.Audio
             }
         }
 
-        private HttpClient CreateHttpClient()
-        {
-            HttpClientHandler handler = new HttpClientHandler();
-
-            // 检查是否应该使用代理
-            bool useProxy = false;
-
-            if (_proxySettings is not null && _proxySettings.IsEnabled)
-            {
-                // 如果ForAllAPI为true，则对所有API使用代理
-                if (_proxySettings.ForAllAPI)
-                {
-                    useProxy = true;
-                    Logger.Log($"ASR: 配置代理设置 (ForAllAPI: {_proxySettings.ForAllAPI})");
-                }
-                else
-                {
-                    // 如果ForAllAPI为false，则根据ForASR设置决定
-                    useProxy = _proxySettings.ForASR;
-                    Logger.Log($"ASR: 配置代理设置 (ForASR: {_proxySettings.ForASR})");
-                }
-            }
-
-            if (useProxy)
-            {
-                if (_proxySettings.FollowSystemProxy)
-                {
-                    handler.UseProxy = true;
-                    handler.UseDefaultCredentials = true;
-                    Logger.Log($"ASR: 使用系统代理");
-                }
-                else if (!string.IsNullOrWhiteSpace(_proxySettings.Address))
-                {
-                    try
-                    {
-                        // 确保协议格式正确
-                        var protocol = _proxySettings.Protocol?.ToLower() ?? "http";
-                        if (protocol != "http" && protocol != "https" &&
-                            protocol != "socks4" && protocol != "socks4a" && protocol != "socks5")
-                        {
-                            protocol = "http"; // 默认使用http
-                        }
-
-                        var proxyUri = new Uri($"{protocol}://{_proxySettings.Address}");
-                        handler.Proxy = new WebProxy(proxyUri);
-                        handler.UseProxy = true;
-                        Logger.Log($"ASR: 使用自定义代理: {proxyUri} (协议: {protocol})");
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"ASR: 代理配置错误: {ex.Message}，将不使用代理");
-                        handler.UseProxy = false;
-                    }
-                }
-            }
-            else
-            {
-                Logger.Log($"ASR: 不使用代理 (代理未启用或ASR代理被禁用)");
-                // 明确禁用代理，防止使用系统默认代理
-                handler.UseProxy = false;
-                handler.Proxy = null;
-            }
-
-            var client = new HttpClient(handler)
-            {
-                Timeout = TimeSpan.FromSeconds(60) // 增加到 60 秒以支持较大的音频文件
-            };
-
-            return client;
-        }
-
         public void UpdateSettings(Setting settings)
         {
             _settings = settings;
             _asrSettings = settings.ASR;
             _proxySettings = settings.Proxy;
-
-            // 重新创建 HttpClient 以应用新的代理设置
-            _httpClient?.Dispose();
-            _httpClient = CreateHttpClient();
-
-            // 重新初始化 ASR Core
             InitializeASRCore();
         }
 
@@ -533,7 +452,6 @@ namespace VPetLLM.Utils.Audio
         public void Dispose()
         {
             CleanupRecording();
-            _httpClient?.Dispose();
         }
     }
 }
