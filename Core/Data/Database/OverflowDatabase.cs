@@ -235,6 +235,83 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
+        /// Count summaries for a provider. Excludes legacy threshold-marker rows,
+        /// 与 <see cref="GetSummariesPage"/> 用同一套过滤条件，页数才算得准。
+        /// </summary>
+        public int GetSummaryCount(string provider)
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT COUNT(*)
+                    FROM overflow_summaries
+                    WHERE provider = @provider
+                      AND summary_text NOT LIKE '[threshold marker:%'
+                ";
+                cmd.Parameters.AddWithValue("@provider", provider ?? "");
+                return Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to count overflow summaries: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Get one page of summaries, newest first.
+        /// </summary>
+        public List<OverflowSummaryRecord> GetSummariesPage(string provider, int offset, int limit)
+        {
+            var results = new List<OverflowSummaryRecord>();
+            if (limit <= 0) return results;
+
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT id, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at
+                    FROM overflow_summaries
+                    WHERE provider = @provider
+                      AND summary_text NOT LIKE '[threshold marker:%'
+                    ORDER BY id DESC
+                    LIMIT @limit OFFSET @offset
+                ";
+                cmd.Parameters.AddWithValue("@provider", provider ?? "");
+                cmd.Parameters.AddWithValue("@limit", limit);
+                cmd.Parameters.AddWithValue("@offset", Math.Max(0, offset));
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    results.Add(new OverflowSummaryRecord
+                    {
+                        Id = reader.GetInt32(0),
+                        SummaryText = reader.GetString(1),
+                        SegmentStartIndex = reader.GetInt32(2),
+                        SegmentEndIndex = reader.GetInt32(3),
+                        TokenCount = reader.GetInt32(4),
+                        Threshold = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                        CreatedAt = reader.GetDateTime(6)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to get overflow summaries page: {ex.Message}");
+            }
+
+            return results;
+        }
+
+        /// <summary>
         /// Get segments for a specific summary.
         /// </summary>
         public List<OverflowSegmentRecord> GetSegmentsForSummary(int summaryId)

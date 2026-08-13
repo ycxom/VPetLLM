@@ -288,6 +288,38 @@ namespace VPetLLM.Core.Data.Managers
         }
 
         /// <summary>
+        /// Count records for the editor's pager
+        /// </summary>
+        public int GetRecordCountForEditing()
+        {
+            try
+            {
+                return _database.GetRecordCount();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"RecordManager: Failed to count records for editing: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Get one page of records for editing
+        /// </summary>
+        public List<ImportantRecord> GetRecordsPageForEditing(int offset, int limit)
+        {
+            try
+            {
+                return _database.GetRecordsPage(offset, limit);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"RecordManager: Failed to get records page for editing: {ex.Message}");
+                return new List<ImportantRecord>();
+            }
+        }
+
+        /// <summary>
         /// Update a record
         /// </summary>
         public bool UpdateRecord(ImportantRecord record)

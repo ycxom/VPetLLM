@@ -94,6 +94,10 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceMuted}"/>
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.4"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -372,17 +376,39 @@
                                FontSize="11.5" Foreground="{StaticResource TextMuted}"/>
                 </StackPanel>
 
-                <Border Grid.Column="1" Background="{StaticResource SurfaceMuted}"
-                        CornerRadius="8" Padding="3" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="Radio_Simple" Style="{StaticResource SegmentToggle}"
-                                     Content="简洁模式" IsChecked="True"
-                                     Checked="Mode_Changed"/>
-                        <RadioButton x:Name="Radio_Full" Style="{StaticResource SegmentToggle}"
-                                     Content="完全模式"
-                                     Checked="Mode_Changed"/>
-                    </StackPanel>
-                </Border>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- 渲染模式：正文怎么显示 -->
+                    <Border Background="{StaticResource SurfaceMuted}"
+                            CornerRadius="8" Padding="3" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="Radio_Simple" Style="{StaticResource SegmentToggle}"
+                                         GroupName="RenderMode"
+                                         Content="简洁模式" IsChecked="True"
+                                         Checked="Mode_Changed"/>
+                            <RadioButton x:Name="Radio_Full" Style="{StaticResource SegmentToggle}"
+                                         GroupName="RenderMode"
+                                         Content="完全模式"
+                                         Checked="Mode_Changed"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 加载模式：一次把多少条放进列表 -->
+                    <Border Background="{StaticResource SurfaceMuted}"
+                            CornerRadius="8" Padding="3">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="Radio_Continuous" Style="{StaticResource SegmentToggle}"
+                                         GroupName="LoadMode"
+                                         Content="连续" IsChecked="True"
+                                         Checked="LoadMode_Changed"
+                                         ToolTip="停在最新消息，向上滚动继续载入更早的"/>
+                            <RadioButton x:Name="Radio_Paged" Style="{StaticResource SegmentToggle}"
+                                         GroupName="LoadMode"
+                                         Content="分页"
+                                         Checked="LoadMode_Changed"
+                                         ToolTip="每页 40 条，用底部翻页按钮切换"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -417,7 +443,8 @@
                      VirtualizingPanel.ScrollUnit="Pixel"
                      VirtualizingPanel.CacheLength="0.75,0.75"
                      VirtualizingPanel.CacheLengthUnit="Page"
-                     PreviewMouseWheel="List_PreviewMouseWheel">
+                     PreviewMouseWheel="List_PreviewMouseWheel"
+                     ScrollViewer.ScrollChanged="List_ScrollChanged">
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="Padding" Value="0"/>
@@ -436,6 +463,22 @@
                     </Style>
                 </ListBox.ItemContainerStyle>
             </ListBox>
+
+            <!--
+                连续模式的顶部提示条。悬在列表上方而不是塞进列表里：
+                当成一个列表项的话，它会跟着虚拟化一起被回收，而且每次向上补数据
+                都要在集合头部反复插删，滚动位置补偿会更难算。
+            -->
+            <Border x:Name="Panel_OlderHint"
+                    VerticalAlignment="Top" HorizontalAlignment="Center"
+                    Margin="0,10,0,0" Padding="12,5"
+                    CornerRadius="12" Visibility="Collapsed"
+                    Background="{StaticResource SurfaceMuted}"
+                    BorderBrush="{StaticResource Hairline}" BorderThickness="1">
+                <TextBlock x:Name="Text_OlderHint"
+                           FontFamily="{StaticResource UIFont}"
+                           FontSize="11.5" Foreground="{StaticResource TextMuted}"/>
+            </Border>
 
             <!-- 空历史占位 -->
             <TextBlock x:Name="Text_Empty"
@@ -458,6 +501,28 @@
                     <Button x:Name="Button_AddAssistant" Content="+ 助手消息"
                             Style="{StaticResource GhostAction}"
                             Click="AddAssistantMessage_Click"/>
+                </StackPanel>
+
+                <!-- 翻页条：只在分页模式出现 -->
+                <StackPanel x:Name="Panel_Pager" Orientation="Horizontal"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Visibility="Collapsed">
+                    <Button x:Name="Button_FirstPage" Content="«"
+                            Style="{StaticResource GhostAction}" Padding="10,8"
+                            Click="FirstPage_Click"/>
+                    <Button x:Name="Button_PrevPage" Content="‹"
+                            Style="{StaticResource GhostAction}" Padding="10,8" Margin="4,0,0,0"
+                            Click="PrevPage_Click"/>
+                    <TextBlock x:Name="Text_PageInfo" VerticalAlignment="Center"
+                               Margin="12,0" MinWidth="88" TextAlignment="Center"
+                               FontFamily="{StaticResource UIFont}"
+                               FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                    <Button x:Name="Button_NextPage" Content="›"
+                            Style="{StaticResource GhostAction}" Padding="10,8" Margin="0,0,4,0"
+                            Click="NextPage_Click"/>
+                    <Button x:Name="Button_LastPage" Content="»"
+                            Style="{StaticResource GhostAction}" Padding="10,8"
+                            Click="LastPage_Click"/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

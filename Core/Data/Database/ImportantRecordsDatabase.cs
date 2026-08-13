@@ -633,6 +633,66 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
+        /// Count all records (including those with weight 0).
+        /// 编辑器分页用：先拿总数算出页数，再按页取，不必把整表读进内存。
+        /// </summary>
+        public int GetRecordCount()
+        {
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                var command = connection.CreateCommand();
+                command.CommandText = "SELECT COUNT(*) FROM important_records";
+                return Convert.ToInt32(command.ExecuteScalar() ?? 0);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to count records: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Get one page of records, newest first —— 与 <see cref="GetAllRecords"/> 同序，
+        /// 所以 offset 在两者之间是可比的。
+        /// </summary>
+        public List<ImportantRecord> GetRecordsPage(int offset, int limit)
+        {
+            var records = new List<ImportantRecord>();
+            if (limit <= 0) return records;
+
+            try
+            {
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
+
+                var command = connection.CreateCommand();
+                command.CommandText = $@"
+                    SELECT {RecordColumns}
+                    FROM important_records
+                    ORDER BY id DESC
+                    LIMIT @limit OFFSET @offset
+                ";
+                command.Parameters.AddWithValue("@limit", limit);
+                command.Parameters.AddWithValue("@offset", Math.Max(0, offset));
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    records.Add(ReadRecord(reader));
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to get records page: {ex.Message}");
+            }
+
+            return records;
+        }
+
+        /// <summary>
         /// Enforce maximum records limit by removing records with lowest weight
         /// If weights are equal, older records are removed first
         /// </summary>

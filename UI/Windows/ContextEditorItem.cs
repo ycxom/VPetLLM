@@ -74,6 +74,14 @@ namespace VPetLLM.UI.Windows
         public bool IsDirty => _isDirty;
         public bool IsDeleted { get; private set; }
 
+        /// <summary>
+        /// 已有一次取数在飞、正等着往这条上写。
+        ///
+        /// 用它做去重：滚动时同一批壳会被多个容器的 Loaded 同时点名，
+        /// 没有这个标记就会对同一段发出好几次重复查询。
+        /// </summary>
+        public bool LoadRequested { get; set; }
+
         public void MarkDeleted()
         {
             IsDeleted = true;

@@ -5,212 +5,362 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VPetLLM"
         mc:Ignorable="d"
-        Title="记忆/溢出管理" Height="650" Width="1100"
-        Background="{DynamicResource PrimaryBackgroundBrush}">
+        Title="记忆管理" Height="680" Width="1080"
+        MinHeight="480" MinWidth="820"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource PrimaryBackgroundBrush}"
+        TextOptions.TextFormattingMode="Ideal"
+        UseLayoutRounding="True">
+
+    <!--
+        版面规矩（上一版乱就乱在没守住这几条）：
+        · 操作按钮只出现在它作用的那一层——只影响某个表的放在该表工具栏，
+          影响整窗的（保存/取消）才放窗口底栏。上一版两处各有一个"删除选中"。
+        · 单元格外观集中成几个具名样式，不再每列内联一份。
+        · 强调手段只用一种：横向分隔线。斑马纹、竖网格线、卡片阴影全部去掉。
+    -->
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="../Styles/Controls.xaml"/>
             </ResourceDictionary.MergedDictionaries>
-            
+
+            <!-- ── 表格 ──────────────────────────────────────────────── -->
+
             <Style x:Key="ModernDataGrid" TargetType="DataGrid">
                 <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
-                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderThickness" Value="0"/>
                 <Setter Property="GridLinesVisibility" Value="Horizontal"/>
                 <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderBrush}"/>
-                <Setter Property="RowBackground" Value="{StaticResource SecondaryBackgroundBrush}"/>
-                <Setter Property="AlternatingRowBackground" Value="{StaticResource PrimaryBackgroundBrush}"/>
+                <Setter Property="RowBackground" Value="Transparent"/>
                 <Setter Property="HeadersVisibility" Value="Column"/>
                 <Setter Property="CanUserResizeRows" Value="False"/>
                 <Setter Property="SelectionMode" Value="Single"/>
                 <Setter Property="SelectionUnit" Value="FullRow"/>
+                <Setter Property="MinRowHeight" Value="40"/>
+                <Setter Property="RowHeaderWidth" Value="0"/>
+                <Setter Property="VerticalContentAlignment" Value="Top"/>
             </Style>
-            
+
             <Style x:Key="ModernDataGridColumnHeader" TargetType="DataGridColumnHeader">
-                <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
-                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
-                <Setter Property="FontSize" Value="14"/>
-                <Setter Property="Padding" Value="12,8"/>
+                <Setter Property="FontSize" Value="12.5"/>
+                <Setter Property="Padding" Value="12,10"/>
                 <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                <!-- 只留底边：竖线和横向分隔线并存会把表格切得很碎 -->
+                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            </Style>
+
+            <Style x:Key="ModernDataGridRow" TargetType="DataGridRow">
+                <Setter Property="Background" Value="Transparent"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{StaticResource HoverBrush}"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="#E5F1FB"/>
+                        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- ── 单元格：四种，够用了 ──────────────────────────────── -->
+
+            <Style x:Key="Cell" TargetType="TextBlock">
+                <Setter Property="Padding" Value="12,10"/>
+                <Setter Property="VerticalAlignment" Value="Top"/>
+                <Setter Property="FontSize" Value="13.5"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+            </Style>
+
+            <!-- 正文列：折行，但限高——一条几百字的记忆能把整页撑得没法扫读。
+                 完整内容进 ToolTip，双击进编辑框也看得到全部。 -->
+            <Style x:Key="CellWrap" TargetType="TextBlock" BasedOn="{StaticResource Cell}">
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="MaxHeight" Value="76"/>
+                <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                <Setter Property="ToolTipService.InitialShowDelay" Value="400"/>
+            </Style>
+
+            <Style x:Key="CellMuted" TargetType="TextBlock" BasedOn="{StaticResource Cell}">
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                <Setter Property="FontSize" Value="12.5"/>
+            </Style>
+
+            <Style x:Key="CellNumber" TargetType="TextBlock" BasedOn="{StaticResource CellMuted}">
+                <Setter Property="TextAlignment" Value="Right"/>
+                <Setter Property="Padding" Value="8,10,16,10"/>
+            </Style>
+
+            <Style x:Key="CellEditor" TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="AcceptsReturn" Value="True"/>
+                <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+                <Setter Property="MaxHeight" Value="160"/>
+            </Style>
+
+            <!-- ── 表格外框 & 底部翻页条 ─────────────────────────────── -->
+
+            <Style x:Key="GridFrame" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="6"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+            </Style>
+
+            <Style x:Key="PagerBar" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="0,1,0,0"/>
+                <Setter Property="Padding" Value="12,8"/>
+                <Setter Property="CornerRadius" Value="0,0,5,5"/>
+            </Style>
+
+            <Style x:Key="PagerButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                <Setter Property="Padding" Value="8,4"/>
+                <Setter Property="MinWidth" Value="34"/>
+                <Setter Property="FontSize" Value="14"/>
+            </Style>
+
+            <Style x:Key="PagerLabel" TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="FontSize" Value="12.5"/>
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+            </Style>
+
+            <!-- 工具栏上那句解释这张表是什么的话 -->
+            <Style x:Key="PaneHint" TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="FontSize" Value="12.5"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+            </Style>
+
+            <Style x:Key="TabHeaderText" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Margin" Value="4,2"/>
             </Style>
         </ResourceDictionary>
     </Window.Resources>
-    
-    <Grid Margin="20">
+
+    <Grid Margin="20,16,20,16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
-        <TabControl Grid.Row="0" x:Name="TabControl_Main" Margin="0,0,0,16">
-            <!-- Tab 1: Important Records -->
+
+        <TabControl Grid.Row="0" x:Name="TabControl_Main" Background="Transparent" BorderThickness="0">
+
+            <!-- ══ 重要记忆 ══════════════════════════════════════════ -->
             <TabItem x:Name="TabItem_Records">
                 <TabItem.Header>
-                    <TextBlock Text="重要记忆 (Important Records)" FontSize="14" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="Text_Tab_Records" Text="重要记忆"
+                               Style="{StaticResource TabHeaderText}"/>
                 </TabItem.Header>
-                <Border Style="{StaticResource CardContainer}">
-                    <DataGrid AutoGenerateColumns="False" 
-                              CanUserAddRows="False" 
-                              ItemsSource="{Binding DisplayRecords}" 
-                              x:Name="DataGrid_Records"
-                              Style="{StaticResource ModernDataGrid}"
-                              ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
-                              ScrollViewer.CanContentScroll="False"
-                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                              ScrollViewer.VerticalScrollBarVisibility="Auto">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="60" IsReadOnly="True" x:Name="Column_Id">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Padding" Value="12,8"/>
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="FontWeight" Value="Medium"/>
-                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="内容" Binding="{Binding Content}" Width="*" x:Name="Column_Content">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Padding" Value="12,8"/>
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="TextWrapping" Value="Wrap"/>
-                                        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                                <DataGridTextColumn.EditingElementStyle>
-                                    <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
-                                        <Setter Property="TextWrapping" Value="Wrap"/>
-                                        <Setter Property="AcceptsReturn" Value="True"/>
-                                        <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
-                                    </Style>
-                                </DataGridTextColumn.EditingElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="权重" Binding="{Binding Weight}" Width="80" x:Name="Column_Weight">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Padding" Value="12,8"/>
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                                <DataGridTextColumn.EditingElementStyle>
-                                    <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}"/>
-                                </DataGridTextColumn.EditingElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="创建时间" Binding="{Binding CreatedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="160" IsReadOnly="True" x:Name="Column_CreatedAt">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Padding" Value="12,8"/>
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Border>
+
+                <Grid Margin="0,14,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 工具栏：左边说明这张表是什么，右边放只影响这张表的操作 -->
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" x:Name="Text_Records_Hint"
+                                   Style="{StaticResource PaneHint}" Margin="2,0,16,0"
+                                   Text="桌宠长期记住的事实，每轮对话都会随提示词一起带上。权重越高越优先保留。"/>
+
+                        <Button Grid.Column="1" x:Name="Button_Delete" Content="删除选中"
+                                Click="Button_Delete_Click"
+                                Style="{StaticResource SecondaryButton}"/>
+                    </Grid>
+
+                    <Border Grid.Row="1" Style="{StaticResource GridFrame}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <DataGrid Grid.Row="0" x:Name="DataGrid_Records"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      ItemsSource="{Binding DisplayRecords}"
+                                      Style="{StaticResource ModernDataGrid}"
+                                      ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+                                      RowStyle="{StaticResource ModernDataGridRow}"
+                                      ScrollViewer.CanContentScroll="False"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn x:Name="Column_Id" Header="ID"
+                                                        Binding="{Binding Id}" Width="64" IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CellNumber}"/>
+                                    <DataGridTextColumn x:Name="Column_Content" Header="内容"
+                                                        Binding="{Binding Content}" Width="*"
+                                                        ElementStyle="{StaticResource CellWrap}"
+                                                        EditingElementStyle="{StaticResource CellEditor}"/>
+                                    <DataGridTextColumn x:Name="Column_Weight" Header="权重"
+                                                        Binding="{Binding Weight}" Width="76"
+                                                        ElementStyle="{StaticResource CellNumber}"
+                                                        EditingElementStyle="{StaticResource ModernTextBox}"/>
+                                    <DataGridTextColumn x:Name="Column_CreatedAt" Header="创建时间"
+                                                        Binding="{Binding CreatedAt, StringFormat='yyyy-MM-dd HH:mm'}"
+                                                        Width="140" IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CellMuted}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <Border Grid.Row="1" Style="{StaticResource PagerBar}">
+                                <Grid>
+                                    <TextBlock x:Name="Text_Records_Count" HorizontalAlignment="Left"
+                                               Style="{StaticResource PagerLabel}"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <Button x:Name="Button_Records_First" Content="«"
+                                                Style="{StaticResource PagerButton}"
+                                                Click="RecordsFirstPage_Click"/>
+                                        <Button x:Name="Button_Records_Prev" Content="‹" Margin="6,0,0,0"
+                                                Style="{StaticResource PagerButton}"
+                                                Click="RecordsPrevPage_Click"/>
+                                        <TextBlock x:Name="Text_Records_Page" Margin="14,0" MinWidth="92"
+                                                   TextAlignment="Center"
+                                                   Style="{StaticResource PagerLabel}"/>
+                                        <Button x:Name="Button_Records_Next" Content="›" Margin="0,0,6,0"
+                                                Style="{StaticResource PagerButton}"
+                                                Click="RecordsNextPage_Click"/>
+                                        <Button x:Name="Button_Records_Last" Content="»"
+                                                Style="{StaticResource PagerButton}"
+                                                Click="RecordsLastPage_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
             </TabItem>
 
-            <!-- Tab 2: Overflow Summaries -->
+            <!-- ══ 溢出总结 ══════════════════════════════════════════ -->
             <TabItem x:Name="TabItem_Overflow">
                 <TabItem.Header>
-                    <TextBlock Text="溢出总结 (Overflow Summaries)" FontSize="14" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="Text_Tab_Overflow" Text="溢出总结"
+                               Style="{StaticResource TabHeaderText}"/>
                 </TabItem.Header>
-                <Border Style="{StaticResource CardContainer}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <DataGrid AutoGenerateColumns="False" 
-                                  CanUserAddRows="False" 
-                                  x:Name="DataGrid_Overflow"
-                                  Style="{StaticResource ModernDataGrid}"
-                                  ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
-                                  ScrollViewer.CanContentScroll="False"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                  Grid.Row="0">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="60" IsReadOnly="True" x:Name="Column_Overflow_Id">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Padding" Value="12,8"/>
-                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Header="总结内容" Binding="{Binding SummaryText}" Width="*" x:Name="Column_Overflow_Summary">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Padding" Value="12,8"/>
-                                            <Setter Property="TextWrapping" Value="Wrap"/>
-                                            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                    <DataGridTextColumn.EditingElementStyle>
-                                        <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
-                                            <Setter Property="TextWrapping" Value="Wrap"/>
-                                            <Setter Property="AcceptsReturn" Value="True"/>
-                                            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
-                                        </Style>
-                                    </DataGridTextColumn.EditingElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Header="消息范围" Binding="{Binding RangeDisplay}" Width="120" IsReadOnly="True" x:Name="Column_Overflow_Range">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Padding" Value="12,8"/>
-                                            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Header="Token" Binding="{Binding TokenCount}" Width="80" IsReadOnly="True" x:Name="Column_Overflow_Tokens">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Padding" Value="12,8"/>
-                                            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Header="创建时间" Binding="{Binding CreatedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="160" IsReadOnly="True" x:Name="Column_Overflow_CreatedAt">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Padding" Value="12,8"/>
-                                            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                        
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-                            <Button x:Name="Button_Overflow_Delete" Content="删除选中" Click="Button_OverflowDelete_Click" Margin="0,0,10,0" Style="{StaticResource SecondaryButton}"/>
-                            <Button x:Name="Button_Overflow_ClearAll" Content="清空全部溢出总结" Click="Button_OverflowClearAll_Click" Margin="0,0,10,0" Style="{StaticResource SecondaryButton}"/>
+
+                <Grid Margin="0,14,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" x:Name="Text_Overflow_Hint"
+                                   Style="{StaticResource PaneHint}" Margin="2,0,16,0"
+                                   Text="上下文超出长度上限时，被压缩归档的旧对话。删除会连带回滚对应的检查点。"/>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="Button_Overflow_Delete" Content="删除选中"
+                                    Click="Button_OverflowDelete_Click" Margin="0,0,8,0"
+                                    Style="{StaticResource SecondaryButton}"/>
+                            <Button x:Name="Button_Overflow_ClearAll" Content="全部清空"
+                                    Click="Button_OverflowClearAll_Click"
+                                    Style="{StaticResource SecondaryButton}"/>
                         </StackPanel>
                     </Grid>
-                </Border>
+
+                    <Border Grid.Row="1" Style="{StaticResource GridFrame}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <DataGrid Grid.Row="0" x:Name="DataGrid_Overflow"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      Style="{StaticResource ModernDataGrid}"
+                                      ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+                                      RowStyle="{StaticResource ModernDataGridRow}"
+                                      ScrollViewer.CanContentScroll="False"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn x:Name="Column_Overflow_Id" Header="ID"
+                                                        Binding="{Binding Id}" Width="64" IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CellNumber}"/>
+                                    <DataGridTextColumn x:Name="Column_Overflow_Summary" Header="总结内容"
+                                                        Binding="{Binding SummaryText}" Width="*"
+                                                        ElementStyle="{StaticResource CellWrap}"
+                                                        EditingElementStyle="{StaticResource CellEditor}"/>
+                                    <DataGridTextColumn x:Name="Column_Overflow_Range" Header="消息范围"
+                                                        Binding="{Binding RangeDisplay}" Width="110" IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CellMuted}"/>
+                                    <DataGridTextColumn x:Name="Column_Overflow_Tokens" Header="Token"
+                                                        Binding="{Binding TokenCount}" Width="80" IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CellNumber}"/>
+                                    <DataGridTextColumn x:Name="Column_Overflow_CreatedAt" Header="创建时间"
+                                                        Binding="{Binding CreatedAt, StringFormat='yyyy-MM-dd HH:mm'}"
+                                                        Width="140" IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CellMuted}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <Border Grid.Row="1" Style="{StaticResource PagerBar}">
+                                <Grid>
+                                    <TextBlock x:Name="Text_Overflow_Count" HorizontalAlignment="Left"
+                                               Style="{StaticResource PagerLabel}"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <Button x:Name="Button_Overflow_First" Content="«"
+                                                Style="{StaticResource PagerButton}"
+                                                Click="OverflowFirstPage_Click"/>
+                                        <Button x:Name="Button_Overflow_Prev" Content="‹" Margin="6,0,0,0"
+                                                Style="{StaticResource PagerButton}"
+                                                Click="OverflowPrevPage_Click"/>
+                                        <TextBlock x:Name="Text_Overflow_Page" Margin="14,0" MinWidth="92"
+                                                   TextAlignment="Center"
+                                                   Style="{StaticResource PagerLabel}"/>
+                                        <Button x:Name="Button_Overflow_Next" Content="›" Margin="0,0,6,0"
+                                                Style="{StaticResource PagerButton}"
+                                                Click="OverflowNextPage_Click"/>
+                                        <Button x:Name="Button_Overflow_Last" Content="»"
+                                                Style="{StaticResource PagerButton}"
+                                                Click="OverflowLastPage_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
             </TabItem>
         </TabControl>
-        
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="Button_Delete" 
-                    Content="删除选中"
-                    Click="Button_Delete_Click" 
-                    Margin="0,0,10,0"
-                    Style="{StaticResource SecondaryButton}"/>
-            <Button x:Name="Button_Save" 
-                    Content="保存" 
-                    Click="Button_Save_Click" 
-                    Margin="0,0,10,0"
-                    Style="{StaticResource ModernButton}"/>
-            <Button x:Name="Button_Cancel" 
-                    Content="取消" 
-                    Click="Button_Cancel_Click"
-                    Style="{StaticResource SecondaryButton}"/>
-        </StackPanel>
+
+        <!-- 底栏只放影响整个窗口的两个动作 -->
+        <Grid Grid.Row="1" Margin="0,16,0,0">
+            <TextBlock x:Name="Text_DirtyHint" HorizontalAlignment="Left" VerticalAlignment="Center"
+                       Style="{StaticResource PagerLabel}"/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="Button_Cancel" Content="取消"
+                        Click="Button_Cancel_Click" Margin="0,0,8,0"
+                        Style="{StaticResource SecondaryButton}"/>
+                <Button x:Name="Button_Save" Content="保存"
+                        Click="Button_Save_Click"
+                        Style="{StaticResource PrimaryButton}"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

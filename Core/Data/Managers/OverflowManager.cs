@@ -425,6 +425,17 @@ namespace VPetLLM.Core.Data.Managers
             => _database.SearchSummaries(EffectiveProvider, keyword, limit);
 
         /// <summary>
+        /// Count summaries for the editor's pager.
+        /// </summary>
+        public int GetSummaryCount() => _database.GetSummaryCount(EffectiveProvider);
+
+        /// <summary>
+        /// Get one page of summaries, newest first.
+        /// </summary>
+        public List<OverflowSummaryRecord> GetSummariesPage(int offset, int limit)
+            => _database.GetSummariesPage(EffectiveProvider, offset, limit);
+
+        /// <summary>
         /// Get segments associated with a summary.
         /// </summary>
         public List<OverflowSegmentRecord> GetSegmentsForSummary(int summaryId)
