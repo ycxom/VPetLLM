@@ -1692,6 +1692,13 @@ namespace VPetLLM.Handlers.Core
                 if (displayType is null) return false;
                 if (global::VPetLLM.Core.Services.VPetMovementPolicy.IsAnimationProtected(displayType.Type))
                     return true;
+
+                // 宿主延迟甩出的一次性 Work/Sleep 动画（如生日蛋糕答错后的「假装工作」）。
+                // 只在这里拦：本方法最多等 2 秒就继续，不会像 MoveHandler /
+                // CanExecuteStateTransition 那样直接否决动作，所以拦错了代价也只是慢一拍。
+                if (global::VPetLLM.Core.Services.VPetMovementPolicy.IsTransientHostAnimation(_plugin.MW))
+                    return true;
+
                 var name = displayType.Name?.ToLower();
                 return name?.Contains("touch") == true || name?.Contains("pinch") == true;
             }

@@ -85,6 +85,9 @@ namespace VPetLLM.Handlers.Core
             _handlerRegistry.Register("say", new SayHandler());
             _handlerRegistry.Register("plugin", new PluginHandler());
 
+            // 累积统计查询：宿主没提供统计时 Execute 会自己兜底，无需外部依赖
+            _handlerRegistry.Register("pet_stats", new PetStatsHandler());
+
             // Add RecordCommandHandler if RecordManager is available
             if (_recordManager is not null)
             {
