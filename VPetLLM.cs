@@ -192,6 +192,11 @@ namespace VPetLLM
         private bool _startupVersionCheckRan = false;
         private Task<VersionCheckResult>? _versionCheckTask;
 
+        /// <summary>
+        /// 更新提示的停留时长。VPet 自己的照片解锁提示用 5 秒，这里要读版本号，略放宽。
+        /// </summary>
+        private const int UpdateNoticeDurationMs = 6000;
+
         public int ConsecutiveAIFailureCount
         {
             get { lock (_failureCountLock) { return _consecutiveAIFailureCount; } }
@@ -1798,31 +1803,43 @@ namespace VPetLLM
                 return;
             }
 
+            // 更新由 Steam 推送，用户什么都不用做，所以不再弹模态框问「要不要去 GitHub」——
+            // 那是个必须点掉才能继续的打断。改用 VPet 自己在用的 NoticeBox（照片解锁提示同款）：
+            // 非模态、到点自动消失、不抢焦点，因此每次启动都提示也不烦人。
             var lang = Settings?.Language ?? "zh-hans";
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                var title = lang.StartsWith("zh") ? "发现 VPetLLM 新版本" : "VPetLLM Update Available";
-                var message = lang.StartsWith("zh")
-                    ? $"发现新版本 {result.LatestVersion.DisplayText}（当前版本 {result.CurrentVersion.DisplayText}）。\n\n是否打开 GitHub 项目页面？"
-                    : $"Version {result.LatestVersion.DisplayText} is available (current: {result.CurrentVersion.DisplayText}).\n\nOpen the GitHub project page?";
+            var title = LanguageHelper.Get("UpdateNotice.Title", lang, "VPetLLM Update Available");
+            var message = LanguageHelper.Get(
+                    "UpdateNotice.Body", lang,
+                    "{Latest} (current {Current})")
+                .Replace("{Latest}", result.LatestVersion.DisplayText)
+                .Replace("{Current}", result.CurrentVersion.DisplayText);
 
-                if (MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Information)
-                    == MessageBoxResult.Yes)
-                {
-                    try
-                    {
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = "https://github.com/ycxom/VPetLLM",
-                            UseShellExecute = true
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"VersionCheck: failed to open GitHub: {ex.Message}");
-                    }
-                }
-            });
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher is null)
+            {
+                // 正常走不到：启动检查是在插件初始化的 Dispatcher 块之后才起的。
+                // 显式记一笔，免得提示悄无声息地丢了还查不出原因。
+                Logger.Log($"VersionCheck: 无可用 Dispatcher，跳过新版本提示 {result.LatestVersion.DisplayText}");
+                return;
+            }
+
+            try
+            {
+                // NoticeBox 是 WPF 控件，必须回 UI 线程；这里是后台任务，得自己派发
+                dispatcher.Invoke(() =>
+                    Panuon.WPF.UI.NoticeBox.Show(
+                        message,
+                        title,
+                        Panuon.WPF.UI.MessageBoxIcon.Info,
+                        true,
+                        UpdateNoticeDurationMs));
+
+                Logger.Log($"VersionCheck: 已提示新版本 {result.LatestVersion.DisplayText}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"VersionCheck: 显示更新提示失败: {ex.Message}");
+            }
         }
 
         /// <summary>

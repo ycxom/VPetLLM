@@ -4545,6 +4545,20 @@
       "jp": "推奨: "
     }
   },
+  "UpdateNotice": {
+    "Title": {
+      "en": "VPetLLM Update Available",
+      "zh-hans": "VPetLLM 有新版本",
+      "zh-hant": "VPetLLM 有新版本",
+      "jp": "VPetLLM の新しいバージョン"
+    },
+    "Body": {
+      "en": "{Latest} (current {Current})\nSteam delivers the update automatically — just close the game.",
+      "zh-hans": "{Latest}（当前 {Current}）\nSteam 会自动推送更新，关闭游戏即可自动更新",
+      "zh-hant": "{Latest}（目前 {Current}）\nSteam 會自動推送更新，關閉遊戲即可自動更新",
+      "jp": "{Latest}（現在 {Current}）\nSteam が自動で更新を配信します。ゲームを終了すれば自動更新されます。"
+    }
+  },
   "Embedding": {
     "Tab": {
       "en": "Vector Search",
