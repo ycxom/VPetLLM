@@ -66,10 +66,28 @@ namespace VPetLLM.Core.Engine
 
             var preprocessing = new global::VPetLLM.Services.PreprocessingMultimodal(_settings, _plugin);
 
-            // 用户显式选过视觉节点就用那些；没选则退回主聊天渠道
-            var result = preprocessing.HasAvailableProvider()
-                ? await preprocessing.AnalyzeImageAsync(imageData, prompt)
-                : await preprocessing.AnalyzeWithMainProviderAsync(imageData, prompt);
+            global::VPetLLM.Services.PreprocessingResult result;
+
+            if (preprocessing.HasAvailableProvider())
+            {
+                // 用户显式选过视觉节点，用那些
+                result = await preprocessing.AnalyzeImageAsync(imageData, prompt);
+            }
+            else if (_settings.Screenshot?.ProcessingMode == ScreenshotProcessingMode.PreprocessingMultimodal)
+            {
+                // 前置多模态的语义就是「先把图翻译成文字，别把图本身交给主模型」。
+                // 此时若退回主聊天渠道，等于绕过用户的选择偷偷做了原生多模态——
+                // 主渠道恰好开着视觉时还会「成功」，用户根本发现不了图已经发出去了。
+                // 宁可失败也不能走这条路。
+                Logger.Log("OCREngine: 前置多模态未配置可用视觉渠道，拒绝回退到主聊天渠道");
+                throw new InvalidOperationException(
+                    "OCR 失败: 前置多模态没有可用的视觉渠道，请在「截图与模型视觉」里配置多模态提供商");
+            }
+            else
+            {
+                // OCR / 原生多模态模式下没选节点，退回主聊天渠道是合理的降级
+                result = await preprocessing.AnalyzeWithMainProviderAsync(imageData, prompt);
+            }
 
             if (!result.Success || string.IsNullOrWhiteSpace(result.ImageDescription))
             {

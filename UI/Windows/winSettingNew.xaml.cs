@@ -8373,10 +8373,16 @@ namespace VPetLLM.UI.Windows
 
             try
             {
-                // 确保窗口已完全加载
-                if (!_isReadyToSave)
+                // 这里原本有 `if (!_isReadyToSave) return;`。但 _isReadyToSave 要等初始化派发队列的
+                // 最后一项才置真，而本方法的三个调用点（初始化的 LoadScreenshotSettings、
+                // 处理模式 SelectionChanged、面板刷新）都排在它前面，于是每次都直接早退——
+                // 视觉节点列表和勾选状态永远加载不出来，用户看到的是一个空列表，
+                // 只能被迫留在「Free」默认提供商上。
+                // 控件是否存在下面各处都有 null 判断，加载期间的误保存由
+                // _isLoadingMultimodalSettings 拦截，这个守卫既多余又有害，去掉。
+                if (_plugin.Settings.Screenshot is null)
                 {
-                    return;
+                    _plugin.Settings.Screenshot = new Configuration.ScreenshotSettings();
                 }
 
                 var comboBoxProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_Multimodal_Provider");
@@ -8418,6 +8424,10 @@ namespace VPetLLM.UI.Windows
                 // 加载并设置视觉节点
                 RefreshVisionNodesList();
                 UpdateMultimodalProviderPanel();
+
+                // 打开面板时就把「Free 没开视觉」「一个视觉节点都没选」这类问题红字标出来，
+                // 否则用户要等到实际截图失败（甚至更糟：悄悄走了主渠道）才会发现配错了
+                ValidateConfiguration();
             }
             catch (Exception ex)
             {

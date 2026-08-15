@@ -124,11 +124,16 @@ public class SchemaManager
                 cmd.ExecuteNonQuery();
             }
 
+            // Tables introduced by later migrations must be created here too:
+            // a fresh database is stamped with CurrentSchemaVersion right away, so
+            // UpgradeSchema will never run those migrations for it.
+            CreateModelCacheTables(connection);
+
             // Set schema version
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-                    INSERT OR REPLACE INTO metadata (key, value) 
+                    INSERT OR REPLACE INTO metadata (key, value)
                     VALUES ('schema_version', @version);
                 ";
                 cmd.Parameters.AddWithValue("@version", CurrentSchemaVersion.ToString());
@@ -671,7 +676,14 @@ public class SchemaManager
     private void ApplyMigrationV6(SqliteConnection connection)
     {
         Logger.Log("Applying migration to version 6: Creating model_cache table");
+        CreateModelCacheTables(connection);
+    }
 
+    /// <summary>
+    /// Create the model cache tables (schema version 6). Idempotent.
+    /// </summary>
+    private void CreateModelCacheTables(SqliteConnection connection)
+    {
         // Create model_cache table
         using (var cmd = connection.CreateCommand())
         {
@@ -685,7 +697,6 @@ public class SchemaManager
                 );
             ";
             cmd.ExecuteNonQuery();
-            Logger.Log("Created model_cache table");
         }
 
         // Create channel_cache_links table
@@ -699,7 +710,25 @@ public class SchemaManager
                 );
             ";
             cmd.ExecuteNonQuery();
-            Logger.Log("Created channel_cache_links table");
+        }
+    }
+
+    /// <summary>
+    /// 补齐当前 schema 版本应有、但库里缺失的表。
+    /// 老版本的 CreateSchema 建完基础表就把版本号盖成了 CurrentSchemaVersion，
+    /// 导致后续迁移建的表（model_cache 等）在全新安装的库里一直不存在，
+    /// 而版本号又已达标、UpgradeSchema 不会再跑。这里每次启动无条件补一次，
+    /// 把这些已经装坏的库修回来。全是 CREATE TABLE IF NOT EXISTS，可重复执行。
+    /// </summary>
+    public void EnsureSchemaComplete(SqliteConnection connection)
+    {
+        try
+        {
+            CreateModelCacheTables(connection);
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Failed to ensure schema completeness: {ex.Message}");
         }
     }
 }

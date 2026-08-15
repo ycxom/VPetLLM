@@ -186,6 +186,10 @@ public class SQLiteSettingStorage : ISettingStorage
                 _schemaManager.UpgradeSchema(_connection, currentVersion);
             }
 
+            // Repair databases that were stamped at the current version without ever
+            // getting the tables the later migrations create (see EnsureSchemaComplete)
+            _schemaManager.EnsureSchemaComplete(_connection);
+
             // Always check for plugin config files to migrate (similar to VPetLLM.json handling)
             // This ensures that if JSON files exist, they will be migrated/updated in database
             _schemaManager.MigratePluginConfigFiles(_connection);

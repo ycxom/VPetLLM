@@ -164,8 +164,19 @@ namespace VPetLLM.Handlers.Actions
             // 根本不进本方法。
             if (!preprocessing.HasAvailableProvider())
             {
-                Logger.Log("SeeScreenHandler: 前置多模态未配置可用视觉节点，改用 OCR");
-                return await AnalyzeWithOcrAsync(imageData);
+                // OCR 只有在用户单独配了端点时才算另一条链路。否则它复用的就是这套没配好的
+                // 视觉节点，打过去必然同样失败；更糟的是它的最终兜底是主聊天渠道，
+                // 那等于绕过用户「不要把图交给主模型」的选择偷偷做原生多模态。
+                var fallbackOcr = new OCREngine(_settings, VPetLLM.Instance);
+                if (fallbackOcr.UsesDedicatedEndpoint)
+                {
+                    Logger.Log("SeeScreenHandler: 前置多模态未配置可用视觉节点，改用独立 OCR 端点");
+                    return await AnalyzeWithOcrAsync(imageData);
+                }
+
+                Logger.Log("SeeScreenHandler: 前置多模态未配置可用视觉节点，且无独立 OCR 端点，放弃识图");
+                return "[屏幕内容] 这次没能看清屏幕（前置多模态还没有配置可用的视觉渠道）。如实告诉用户你暂时看不了屏幕，" +
+                       "建议他打开设置的「截图与模型视觉」，把多模态提供商配置好，不要重复请求。";
             }
 
             Logger.Log("SeeScreenHandler: 前置多模态，使用配置的视觉节点识图");

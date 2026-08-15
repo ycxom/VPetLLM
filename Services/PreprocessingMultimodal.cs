@@ -263,7 +263,10 @@ namespace VPetLLM.Services
 
                             if (geminiNode is not null && geminiNode.EnableVision)
                             {
-                                chatCore = new GeminiChatCore(_settings.Gemini, _settings, mainWindow, null!);
+                                // 必须传 geminiNode 本身：传整份 _settings.Gemini 的话，
+                                // GeminiChatCore 会用 GetCurrentGeminiSetting() 另选主聊天当前的节点，
+                                // 上面挑出来的视觉节点就只剩「校验」作用，请求实际打去了别处
+                                chatCore = new GeminiChatCore(geminiNode, _settings, mainWindow, null!);
                             }
                         }
                         break;
@@ -277,7 +280,10 @@ namespace VPetLLM.Services
                         break;
 
                     case "LMStudio":
-                        var lmNode = _settings.LMStudio?.GetCurrentLMStudioSetting();
+                        var lmNode = node is not null
+                            ? _settings.LMStudio?.LMStudioNodes?.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
+                            : _settings.LMStudio?.GetCurrentLMStudioSetting();
+
                         if (lmNode is not null && lmNode.EnableVision)
                         {
                             chatCore = new LMStudioChatCore(lmNode, _settings, mainWindow, null!);
@@ -349,6 +355,20 @@ namespace VPetLLM.Services
                     nodes.Add(new VisionNodeIdentifier
                     {
                         ProviderType = "Gemini",
+                        NodeName = node.Name,
+                        Model = node.Model ?? ""
+                    });
+                }
+            }
+
+            // 收集 LMStudio 视觉节点
+            if (_settings.LMStudio?.LMStudioNodes is not null)
+            {
+                foreach (var node in _settings.LMStudio.LMStudioNodes.Where(n => n.Enabled && n.EnableVision))
+                {
+                    nodes.Add(new VisionNodeIdentifier
+                    {
+                        ProviderType = "LMStudio",
                         NodeName = node.Name,
                         Model = node.Model ?? ""
                     });

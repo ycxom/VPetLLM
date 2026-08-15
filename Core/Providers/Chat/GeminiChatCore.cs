@@ -45,6 +45,28 @@ namespace VPetLLM.Core.Providers.Chat
             _setting = setting;
         }
 
+        /// <summary>
+        /// 指定单个节点构造（与 OpenAIChatCore / LMStudioChatCore 同形）。
+        /// 前置多模态要把图发给用户挑定的那个视觉节点，若传整份 GeminiSetting，
+        /// GetCurrentGeminiSetting() 会按主聊天的轮换规则另选一个，用户的选择就失效了。
+        /// </summary>
+        public GeminiChatCore(Setting.GeminiNodeSetting geminiNodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
+            : base(setting, mainWindow, actionProcessor)
+        {
+            _geminiSetting = new Setting.GeminiSetting
+            {
+                ApiKey = geminiNodeSetting.ApiKey,
+                Model = geminiNodeSetting.Model,
+                Url = geminiNodeSetting.Url,
+                Temperature = geminiNodeSetting.Temperature,
+                MaxTokens = geminiNodeSetting.MaxTokens,
+                EnableAdvanced = geminiNodeSetting.EnableAdvanced,
+                EnableStreaming = geminiNodeSetting.EnableStreaming,
+                GeminiNodes = new List<Setting.GeminiNodeSetting> { geminiNodeSetting }
+            };
+            _setting = setting;
+        }
+
         protected override Setting.ChannelProxyMode GetChannelProxyMode()
         {
             var node = _geminiSetting.GetCurrentGeminiSetting();
