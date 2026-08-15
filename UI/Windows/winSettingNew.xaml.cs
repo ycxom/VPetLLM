@@ -478,6 +478,7 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_UserName")).TextChanged += Control_TextChanged;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Role")).TextChanged += Control_TextChanged;
+            ((CheckBox)this.FindName("CheckBox_EnableAppearance")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_Emphasis")).TextChanged += Control_TextChanged;
             // Ollama/Free/LMStudio/OpenAI/Gemini - 使用统一UI管理，暂不处理单一配置
             // OpenAI多节点配置 - 事件处理已移至多节点管理界面
@@ -927,6 +928,12 @@ namespace VPetLLM.UI.Windows
             ((TextBox)this.FindName("TextBox_UserName")).Text = _plugin.Settings.UserName;
             ((CheckBox)this.FindName("CheckBox_FollowVPetName")).IsChecked = _plugin.Settings.FollowVPetName;
             ((TextBox)this.FindName("TextBox_Role")).Text = _plugin.Settings.Role;
+            // 换过皮肤的话先让样貌开关按新皮肤重置，再显示给用户，避免勾选状态和实际注入行为不一致
+            if (AppearancePolicy.SyncWithPetGraph(_plugin.Settings, _plugin.MW))
+            {
+                _plugin.Settings.Save();
+            }
+            ((CheckBox)this.FindName("CheckBox_EnableAppearance")).IsChecked = _plugin.Settings.EnableAppearance;
             var emphasisValue = _plugin.Settings.Emphasis switch
             {
                 null => "",  // 用户主动停用
@@ -1480,6 +1487,8 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.AiName = aiNameTextBox.Text;
             _plugin.Settings.UserName = userNameTextBox.Text;
             _plugin.Settings.Role = roleTextBox.Text;
+            var enableAppearanceCheckBox = (CheckBox)this.FindName("CheckBox_EnableAppearance");
+            _plugin.Settings.EnableAppearance = enableAppearanceCheckBox.IsChecked ?? true;
             var emphasisTextBox = (TextBox)this.FindName("TextBox_Emphasis");
             var emphasisText = emphasisTextBox.Text.Trim();
             var emphasisDefaultZh = PromptHelper.Get("Emphasis", "zh");
@@ -3162,6 +3171,7 @@ namespace VPetLLM.UI.Windows
             if (FindName("Label_UserName") is Label labelUserName) labelUserName.Content = LanguageHelper.Get("LLM_Settings.UserName", langCode);
             if (FindName("CheckBox_FollowVPetName") is CheckBox checkBoxFollowVPetName) checkBoxFollowVPetName.Content = LanguageHelper.Get("LLM_Settings.FollowVPetName", langCode);
             if (FindName("Label_Role") is Label labelRole) labelRole.Content = LanguageHelper.Get("LLM_Settings.Role", langCode);
+            if (FindName("CheckBox_EnableAppearance") is CheckBox checkBoxEnableAppearance) checkBoxEnableAppearance.Content = LanguageHelper.Get("LLM_Settings.EnableAppearance", langCode);
             if (FindName("Label_Emphasis") is Label labelEmphasis) labelEmphasis.Content = LanguageHelper.Get("LLM_Settings.Emphasis", langCode);
             if (FindName("Label_ContextControl") is Label labelContextControl) labelContextControl.Content = LanguageHelper.Get("LLM_Settings.ContextControl", langCode);
             if (FindName("CheckBox_KeepContext") is CheckBox checkBoxKeepContext) checkBoxKeepContext.Content = LanguageHelper.Get("LLM_Settings.KeepContext", langCode);

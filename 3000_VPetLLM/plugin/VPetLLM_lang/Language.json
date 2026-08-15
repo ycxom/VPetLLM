@@ -106,6 +106,12 @@
       "zh-hant": "角色設定",
       "jp": "役割設定"
     },
+    "EnableAppearance": {
+      "en": "Tell the AI what it looks like",
+      "zh-hans": "告诉 AI 自己的样貌",
+      "zh-hant": "告訴 AI 自己的樣貌",
+      "jp": "AI に自分の外見を伝える"
+    },
     "Emphasis": {
       "en": "Emphasis",
       "zh-hans": "强调",

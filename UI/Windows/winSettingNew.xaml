@@ -434,6 +434,10 @@
                                         Width="300"
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernTextBox}"/>
+                                <CheckBox x:Name="CheckBox_EnableAppearance"
+                                        Content="{utils:Localize KeyPath=LLM_Settings.EnableAppearance}"
+                                        Margin="0,0,0,16"
+                                        Style="{StaticResource ModernCheckBox}"/>
                                 <Label Content="{utils:Localize KeyPath=LLM_Settings.Emphasis}"
                                         VerticalAlignment="Top"
                                         Margin="0,0,0,0"

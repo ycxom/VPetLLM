@@ -182,6 +182,29 @@ namespace VPetLLM.Core.Services
                            .Replace("{UserName}", _settings.UserName)
            };
 
+            // 样貌设定：模型默认不知道自己长什么样，用户问起时会瞎编，这里显式告诉它。
+            // 描述对应的是默认皮肤，换皮肤后 AppearancePolicy 会把开关默认关掉。
+            try
+            {
+                if (AppearancePolicy.SyncWithPetGraph(_settings, _mainWindow))
+                {
+                    _settings.Save();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"SystemMessageProvider: 同步样貌开关失败: {ex.Message}");
+            }
+
+            if (_settings.EnableAppearance)
+            {
+                var appearance = PromptHelper.Get("Appearance", lang);
+                if (!string.IsNullOrWhiteSpace(appearance) && !appearance.StartsWith("[Prompt "))
+                {
+                    parts.Add(appearance);
+                }
+            }
+
             // 只有在EnableAction开启时才添加自定义Role
             if (_settings.EnableAction)
             {

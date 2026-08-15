@@ -23,6 +23,18 @@ namespace VPetLLM
         /// "" = 跟随 Prompt.json 语言切换使用默认值；null = 用户主动清空停用；非空字符串 = 用户自定义。
         /// </summary>
         public string? Emphasis { get; set; } = "";
+
+        /// <summary>
+        /// 是否把样貌描述（Prompt.json 的 Appearance）注入系统提示词。
+        /// 换皮肤时由 <see cref="Core.Services.AppearancePolicy"/> 自动重置：默认皮肤开、其他皮肤关。
+        /// </summary>
+        public bool EnableAppearance { get; set; } = true;
+
+        /// <summary>
+        /// 上次为 <see cref="EnableAppearance"/> 做自动判断时的桌宠皮肤名，和当前皮肤不一致即视为换过皮肤。
+        /// </summary>
+        public string AppearancePetGraph { get; set; } = "";
+
         public bool FollowVPetName { get; set; } = true;
         public bool KeepContext { get; set; } = true;
         public bool SeparateChatByProvider { get; set; } = false;
