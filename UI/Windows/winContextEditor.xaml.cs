@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 using VPetLLM.Utils.Localization;
 
@@ -176,6 +177,7 @@ namespace VPetLLM.UI.Windows
         public string LocDeleteMessage { get; private set; } = "删除这条消息";
         public string LocViewImage { get; private set; } = "点击查看大图";
         public string LocRemoveImage { get; private set; } = "移除图像";
+        public string LocExpandMessage { get; private set; } = "点击展开／收起这条消息";
 
         // 翻页条/提示条上的文案带占位符，取一次留着用
         private string _locPageInfo = "第 {0} / {1} 页";
@@ -763,6 +765,21 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+        /// <summary>
+        /// 点名字行或收起态摘要：展开／收起这条消息。
+        ///
+        /// 只对"能收纳"的消息生效（系统灌入 + 简洁模式），所以点用户消息、助手消息
+        /// 以及完全模式下的任何消息都不会有反应 —— 判断在 <see cref="ContextEditorItem.CanCollapse"/>。
+        /// </summary>
+        private void MessageHeader_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement { DataContext: ContextEditorItem item } && item.CanCollapse)
+            {
+                item.ToggleCollapsed();
+                e.Handled = true;
+            }
+        }
+
         private void ReindexItems()
         {
             for (var i = 0; i < _allItems.Count; i++) _allItems[i].SetIndex(i);
@@ -1059,10 +1076,12 @@ namespace VPetLLM.UI.Windows
             LocDeleteMessage = LanguageHelper.Get("ContextEditor.DeleteMessage", _langCode, "删除这条消息");
             LocViewImage = LanguageHelper.Get("ContextEditor.ViewImage", _langCode, "点击查看大图");
             LocRemoveImage = LanguageHelper.Get("ContextEditor.RemoveImage", _langCode, "移除图像");
+            LocExpandMessage = LanguageHelper.Get("ContextEditor.ExpandMessage", _langCode, "点击展开／收起这条消息");
 
             OnPropertyChanged(nameof(LocDeleteMessage));
             OnPropertyChanged(nameof(LocViewImage));
             OnPropertyChanged(nameof(LocRemoveImage));
+            OnPropertyChanged(nameof(LocExpandMessage));
         }
 
         private void ShowError(string message)

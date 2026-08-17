@@ -275,13 +275,24 @@
                                    FontFamily="{StaticResource UIFont}"
                                    MinHeight="22"/>
 
-                        <!-- 名字 + 悬停操作 -->
-                        <Grid Margin="0,0,0,6">
-                            <TextBlock Text="{Binding RoleDisplay}"
-                                       FontFamily="{StaticResource UIFont}"
-                                       FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextMuted}"
-                                       VerticalAlignment="Center"/>
+                        <!-- 名字 + 悬停操作。整行可点：系统灌入的消息点名字就能展开／收起 -->
+                        <Grid x:Name="HeaderRow" Margin="0,0,0,6" Background="Transparent"
+                              MouseLeftButtonUp="MessageHeader_Click">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- 收纳箭头只在"能收纳"时出现（系统灌入 + 简洁模式） -->
+                                <TextBlock Text="{Binding CollapseGlyph}"
+                                           Visibility="{Binding CanCollapse, Converter={StaticResource BoolToVis}}"
+                                           FontFamily="{StaticResource UIFont}"
+                                           FontSize="10"
+                                           Foreground="{StaticResource TextFaint}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,5,0"/>
+                                <TextBlock Text="{Binding RoleDisplay}"
+                                           FontFamily="{StaticResource UIFont}"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextMuted}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
                             <!-- Hidden 而非 Opacity=0：透明按钮照样吃点击，
                                  会在消息右上角留一个看不见却能误删消息的热区 -->
                             <Button x:Name="DeleteBtn" Content="✕"
@@ -291,19 +302,30 @@
                                     ToolTip="{Binding DataContext.LocDeleteMessage, RelativeSource={RelativeSource AncestorType=Window}}"/>
                         </Grid>
 
-                        <!-- 简洁模式：渲染后的片段 -->
+                        <!-- 收起态：一行摘要。整行可点，点它展开 -->
+                        <TextBlock Text="{Binding CollapsedPreview}"
+                                   Visibility="{Binding IsCollapsedView, Converter={StaticResource BoolToVis}}"
+                                   FontFamily="{StaticResource UIFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextFaint}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Cursor="Hand"
+                                   MouseLeftButtonUp="MessageHeader_Click"
+                                   ToolTip="{Binding DataContext.LocExpandMessage, RelativeSource={RelativeSource AncestorType=Window}}"/>
+
+                        <!-- 简洁模式：渲染后的片段。收起时让位给上面那行摘要 -->
                         <ItemsControl ItemsSource="{Binding Segments}"
                                       ItemTemplate="{StaticResource SegmentTemplate}"
-                                      Visibility="{Binding IsSimpleMode, Converter={StaticResource BoolToVis}}"/>
+                                      Visibility="{Binding ShowSegments, Converter={StaticResource BoolToVis}}"/>
 
-                        <!-- 完全模式：原文，不做任何渲染 -->
+                        <!-- 完全模式：原文，不做任何渲染。这个模式一律不收纳 -->
                         <TextBox Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource RawEditor}"
                                  Visibility="{Binding IsFullMode, Converter={StaticResource BoolToVis}}"/>
 
-                        <!-- 附图 -->
+                        <!-- 附图。收起时一并藏掉，否则"收起"了还占一大块缩略图 -->
                         <Grid HorizontalAlignment="Left" Margin="0,10,0,0"
-                              Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}">
+                              Visibility="{Binding ShowImage, Converter={StaticResource BoolToVis}}">
                             <Border CornerRadius="10" BorderBrush="{StaticResource Hairline}"
                                     BorderThickness="1" Padding="3" Background="{StaticResource SurfaceMuted}">
                                 <Image Source="{Binding ThumbnailSource}"
@@ -321,10 +343,10 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 用户头像（右） -->
+                <!-- 用户头像（右）。系统灌入不画头像，中间那列自动撑满成通栏通知 -->
                 <Border Grid.Column="2" Width="30" Height="30" CornerRadius="8"
                         Background="#E4E4E7" VerticalAlignment="Top" Margin="10,2,0,0"
-                        Visibility="{Binding IsUser, Converter={StaticResource BoolToVis}}">
+                        Visibility="{Binding ShowUserAvatar, Converter={StaticResource BoolToVis}}">
                     <TextBlock Text="{Binding AvatarInitial}" Foreground="{StaticResource TextPrimary}"
                                FontFamily="{StaticResource UIFont}"
                                FontSize="13" FontWeight="SemiBold"
@@ -343,6 +365,25 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
                     <Setter TargetName="DeleteBtn" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+                <!-- 系统灌入：换成描边的浅底，和用户真正说过的话在视觉上分开。
+                     放在 IsUser 那条之后，故意覆盖它设的用户气泡底色 -->
+                <DataTrigger Binding="{Binding IsSystemGenerated}" Value="True">
+                    <Setter TargetName="BubbleRoot" Property="Background" Value="{StaticResource SurfaceMuted}"/>
+                    <Setter TargetName="BubbleRoot" Property="BorderThickness" Value="1"/>
+                </DataTrigger>
+
+                <!-- 可收纳的那些，名字行给手型，明示"这行能点" -->
+                <DataTrigger Binding="{Binding CanCollapse}" Value="True">
+                    <Setter TargetName="HeaderRow" Property="Cursor" Value="Hand"/>
+                </DataTrigger>
+
+                <!-- 收起态压扁：一屏往往堆着十几条插件回执，
+                     留着展开态的内边距和行距会把列表撑得极其松散 -->
+                <DataTrigger Binding="{Binding IsCollapsedView}" Value="True">
+                    <Setter TargetName="MessageRoot" Property="Margin" Value="0,2"/>
+                    <Setter TargetName="BubbleRoot" Property="Padding" Value="12,6"/>
+                    <Setter TargetName="HeaderRow" Property="Margin" Value="0,0,0,2"/>
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>

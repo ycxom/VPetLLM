@@ -1664,6 +1664,12 @@
       "zh-hant": "移除圖像",
       "jp": "画像を削除"
     },
+    "ExpandMessage": {
+      "en": "Click to expand / collapse this message",
+      "zh-hans": "点击展开／收起这条消息",
+      "zh-hant": "點擊展開／收起這條訊息",
+      "jp": "クリックしてこのメッセージを展開／折りたたみ"
+    },
     "Empty": {
       "en": "No conversation history yet",
       "zh-hans": "还没有对话记录",

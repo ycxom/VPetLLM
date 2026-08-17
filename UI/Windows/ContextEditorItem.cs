@@ -41,6 +41,7 @@ namespace VPetLLM.UI.Windows
             // 一开编辑器就把整段历史里的所有截图拉进内存。
             _hasImage = originalMessage.HasImage;
 
+            ClassifySource();
             RebuildSegments();
         }
 
@@ -66,6 +67,8 @@ namespace VPetLLM.UI.Windows
                     _isLoaded = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsLoading));
+                    // 壳子阶段没有正文可判来源，收纳开关也不该出现
+                    NotifyCollapseChanged();
                 }
             }
         }
@@ -100,12 +103,15 @@ namespace VPetLLM.UI.Windows
             _thumbnailSource = null;
             _thumbnailAttempted = false;
             IsLoaded = true;
+            // 先分类再建片段：分类会重置收纳初值，而 CanCollapse 依赖 IsLoaded
+            ClassifySource();
             RebuildSegments();
             OnPropertyChanged(nameof(Role));
             OnPropertyChanged(nameof(Content));
             OnPropertyChanged(nameof(HasImage));
             OnPropertyChanged(nameof(IsAssistant));
             OnPropertyChanged(nameof(IsUser));
+            OnPropertyChanged(nameof(ShowUserAvatar));
             OnPropertyChanged(nameof(RoleDisplay));
             OnPropertyChanged(nameof(AvatarInitial));
             _suppressDirty = false;
@@ -124,9 +130,18 @@ namespace VPetLLM.UI.Windows
             Segments.Clear();
             _thumbnailSource = null;
             _thumbnailAttempted = false;
+            // 卸载后正文为空，判定结果必须一起清掉：否则滚回来的壳子会顶着
+            // 上一条的来源名，而正文还没载入
+            _isSystemGenerated = false;
+            _sourceName = "";
+            _isCollapsed = false;
             IsLoaded = false;
             OnPropertyChanged(nameof(Content));
             OnPropertyChanged(nameof(HasImage));
+            OnPropertyChanged(nameof(IsSystemGenerated));
+            OnPropertyChanged(nameof(ShowUserAvatar));
+            OnPropertyChanged(nameof(RoleDisplay));
+            OnPropertyChanged(nameof(AvatarInitial));
         }
 
         public void MarkClean()
@@ -173,6 +188,7 @@ namespace VPetLLM.UI.Windows
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsAssistant));
                     OnPropertyChanged(nameof(IsUser));
+                    OnPropertyChanged(nameof(ShowUserAvatar));
                     OnPropertyChanged(nameof(RoleDisplay));
                     OnPropertyChanged(nameof(AvatarInitial));
                 }
@@ -186,6 +202,16 @@ namespace VPetLLM.UI.Windows
 
         public bool IsUser => !IsAssistant;
 
+        /// <summary>
+        /// 是否画用户头像。
+        ///
+        /// 系统灌入的消息虽然也是 user 角色，但不该挂用户头像、也不该贴在用户那一侧 ——
+        /// 两个头像都不画时中间那列自动撑满，于是它自成一条通栏的"通知"，
+        /// 一眼就能和"用户说的"/"桌宠说的"区分开。这样做不必改 <see cref="IsUser"/>，
+        /// 它还被气泡配色、保存逻辑等处依赖。
+        /// </summary>
+        public bool ShowUserAvatar => IsUser && !IsSystemGenerated;
+
         /// <summary>气泡上方显示的名字，由窗口注入（AI 名 / 用户名）</summary>
         private string _aiName = "Assistant";
         private string _userName = "You";
@@ -197,7 +223,17 @@ namespace VPetLLM.UI.Windows
             OnPropertyChanged(nameof(AvatarInitial));
         }
 
-        public string RoleDisplay => IsAssistant ? _aiName : _userName;
+        /// <summary>
+        /// 气泡上方的名字。
+        ///
+        /// user 角色里混着两种东西：用户真正打的字，和插件回执／看屏幕／触摸事件这类
+        /// 系统灌入。后者挂用户名是错的——那些话用户从没说过，标成他的名字会让人
+        /// 在编辑器里以为自己说过，也无法一眼看出这条是谁产生的。所以系统灌入显示
+        /// 来源名（插件名或功能名）。
+        /// </summary>
+        public string RoleDisplay => IsAssistant
+            ? _aiName
+            : (IsSystemGenerated ? _sourceName : _userName);
 
         public string AvatarInitial
         {
@@ -206,6 +242,98 @@ namespace VPetLLM.UI.Windows
                 var name = RoleDisplay;
                 return string.IsNullOrEmpty(name) ? "?" : name.Substring(0, 1).ToUpperInvariant();
             }
+        }
+
+        // ── 来源识别与收纳 ──────────────────────────────────────────────────
+
+        private bool _isSystemGenerated;
+        private string _sourceName = "";
+
+        /// <summary>
+        /// 这条 user 消息是系统／插件灌入的，不是用户打的字。
+        /// </summary>
+        public bool IsSystemGenerated => _isSystemGenerated;
+
+        /// <summary>
+        /// 判定用的是**载入时**的原文，之后用户在完全模式怎么改都不重新判定。
+        /// 否则边打字边变名字、边折叠，光标还会因为模板切换而丢。
+        /// </summary>
+        private void ClassifySource()
+        {
+            var previousSystem = _isSystemGenerated;
+            var previousName = _sourceName;
+
+            (_isSystemGenerated, _sourceName) = IsAssistant
+                ? (false, "")
+                : ContextSourceClassifier.Classify(_content);
+
+            // 收纳的初值跟着判定走：系统灌入默认收起，用户消息不收
+            _isCollapsed = _isSystemGenerated;
+
+            if (previousSystem != _isSystemGenerated || previousName != _sourceName)
+            {
+                OnPropertyChanged(nameof(IsSystemGenerated));
+                OnPropertyChanged(nameof(ShowUserAvatar));
+                OnPropertyChanged(nameof(RoleDisplay));
+                OnPropertyChanged(nameof(AvatarInitial));
+            }
+
+            NotifyCollapseChanged();
+        }
+
+        private bool _isCollapsed;
+
+        /// <summary>
+        /// 用户点过展开／收起。仅对系统灌入的消息有意义。
+        /// </summary>
+        public bool IsCollapsed
+        {
+            get => _isCollapsed;
+            set
+            {
+                if (_isCollapsed != value)
+                {
+                    _isCollapsed = value;
+                    OnPropertyChanged();
+                    NotifyCollapseChanged();
+                }
+            }
+        }
+
+        public void ToggleCollapsed() => IsCollapsed = !IsCollapsed;
+
+        /// <summary>
+        /// 是否给这条提供收纳开关。
+        ///
+        /// 完全模式一律不收纳：那个模式的用途就是直面原文，把内容藏起来与它相悖，
+        /// 而且原文编辑框正在双向绑定 Content，藏掉它等于让用户改不了。
+        /// </summary>
+        public bool CanCollapse => IsSystemGenerated && IsSimpleMode && IsLoaded;
+
+        /// <summary>当前是否以收起形态显示（只出一行摘要）</summary>
+        public bool IsCollapsedView => CanCollapse && IsCollapsed;
+
+        /// <summary>简洁模式下是否展示渲染后的片段</summary>
+        public bool ShowSegments => IsSimpleMode && !IsCollapsedView;
+
+        /// <summary>收起时附图也一起藏掉，否则"收起"了却还占着一大块缩略图</summary>
+        public bool ShowImage => HasImage && !IsCollapsedView;
+
+        public string CollapseGlyph => IsCollapsed ? "▸" : "▾";
+
+        /// <summary>
+        /// 收起时显示的一行摘要：去掉来源标记本身，压平换行，截断到 ~80 字。
+        /// </summary>
+        public string CollapsedPreview => ContextSourceClassifier.BuildPreview(_content);
+
+        private void NotifyCollapseChanged()
+        {
+            OnPropertyChanged(nameof(CanCollapse));
+            OnPropertyChanged(nameof(IsCollapsedView));
+            OnPropertyChanged(nameof(ShowSegments));
+            OnPropertyChanged(nameof(ShowImage));
+            OnPropertyChanged(nameof(CollapseGlyph));
+            OnPropertyChanged(nameof(CollapsedPreview));
         }
 
         // ── 内容 ────────────────────────────────────────────────────────────
@@ -269,6 +397,8 @@ namespace VPetLLM.UI.Windows
                     _isSimpleMode = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsFullMode));
+                    // 完全模式不收纳，所以模式一变，收纳相关的可见性全要重算
+                    NotifyCollapseChanged();
                 }
             }
         }
