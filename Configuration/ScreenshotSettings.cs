@@ -148,6 +148,17 @@ namespace VPetLLM.Configuration
         public List<VisionNodeIdentifier> SelectedNodes { get; set; } = new();
 
         /// <summary>
+        /// 前置识图请求是否强制走流式，忽略所选节点的 EnableStreaming。
+        ///
+        /// 默认 false —— 尊重用户在节点上的选择。识图本身不做逐字回显（结果整段取走
+        /// 再回灌），流式与否对显示没有影响，但对网络协议形态有影响：非流式请求在整段
+        /// 内容生成完之前不返回任何字节，途中任何按"等响应头"设超时的网关都可能把它
+        /// 掐掉（表现为请求发出十几秒后收到 5xx、body 为空）。遇到这种情况再打开本项，
+        /// 即可让识图绕开那类超时，而不必改动主对话的流式偏好。
+        /// </summary>
+        public bool ForceStreamingForVision { get; set; } = false;
+
+        /// <summary>
         /// 默认图片描述提示词（备用）
         /// </summary>
         public const string DefaultImageDescriptionPrompt =

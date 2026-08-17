@@ -8258,6 +8258,28 @@ namespace VPetLLM.UI.Windows
             }
         }
 
+        /// <summary>
+        /// 「识图请求强制使用流式」勾选变化。Checked/Unchecked 共用：
+        /// 取值在 SaveMultimodalProviderSettings 里按 IsChecked 读，不必分方向处理。
+        /// </summary>
+        private void CheckBox_Screenshot_ForceStreamingForVision_Changed(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!_isReadyToSave || _isLoadingMultimodalSettings)
+                {
+                    return;
+                }
+
+                SaveMultimodalProviderSettings();
+                ScheduleAutoSave(true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error in force-streaming-for-vision checkbox changed: {ex.Message}");
+            }
+        }
+
         private void UpdateMultimodalProviderPanel()
         {
             try
@@ -8421,6 +8443,13 @@ namespace VPetLLM.UI.Windows
                     Logger.Log("Warning: ComboBox_Screenshot_Main_Multimodal_Provider not found during load");
                 }
 
+                // 识图强制流式
+                if (this.FindName("CheckBox_Screenshot_Main_ForceStreamingForVision") is CheckBox checkBoxForceStreaming)
+                {
+                    checkBoxForceStreaming.IsChecked =
+                        _plugin.Settings.Screenshot.MultimodalProvider.ForceStreamingForVision;
+                }
+
                 // 加载并设置视觉节点
                 RefreshVisionNodesList();
                 UpdateMultimodalProviderPanel();
@@ -8477,6 +8506,13 @@ namespace VPetLLM.UI.Windows
                         ? Configuration.MultimodalProviderType.VisionChannels
                         : Configuration.MultimodalProviderType.Free;
                     Logger.Log($"SaveMultimodalProviderSettings: ProviderType = {providerType}");
+                }
+
+                // 保存「识图强制流式」
+                if (this.FindName("CheckBox_Screenshot_Main_ForceStreamingForVision") is CheckBox checkBoxForceStreaming)
+                {
+                    _plugin.Settings.Screenshot.MultimodalProvider.ForceStreamingForVision =
+                        checkBoxForceStreaming.IsChecked ?? false;
                 }
 
                 // 保存选中的节点

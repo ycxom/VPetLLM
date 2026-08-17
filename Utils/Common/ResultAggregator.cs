@@ -208,11 +208,14 @@ namespace VPetLLM.Utils.Common
                             // 原生多模态：走手动截图那条既有链路，图片真实进入主模型请求体。
                             // 这里不新起一套发送逻辑，只是把回灌时机接到已有入口上。
                             VPetLLMUtils.Logger.Log($"ResultAggregator: 携带 {images.Count} 张图片回灌（原生多模态）");
-                            await VPetLLM.Instance.TalkBox.SendChatWithImages(aggregated, images);
+                            await VPetLLM.Instance.TalkBox.SendChatWithImages(aggregated, images, newRound: false);
                         }
                         else
                         {
-                            await VPetLLM.Instance.ChatCore.Chat(aggregated, true);
+                            // 过调度器：本轮的回执可能与用户新说的话、别的插件回执撞在一起，
+                            // 交给它并成一次请求，而不是各自唤起一次 LLM
+                            await ChatDispatcher.SubmitAsync(
+                                aggregated, ChatPriority.Plugin, source: "ResultAggregator", isRetry: true);
                         }
                     }
                     finally

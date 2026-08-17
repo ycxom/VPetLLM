@@ -99,6 +99,24 @@ namespace VPetLLM
         // 流式传输批处理优化设置
         public bool EnableStreamingBatch { get; set; } = true;
         public int StreamingBatchWindowMs { get; set; } = 100;
+
+        /// <summary>
+        /// 是否合并短时间内的多路灌入（触摸、插件回执、用户输入、语音…）为一次 LLM 请求。
+        /// 关掉即回到各入口各自直接调用 ChatCore 的旧行为（会并发），仅用于排障。
+        /// 见 <see cref="Utils.Common.ChatDispatcher"/>。
+        /// </summary>
+        public bool EnableChatCoalescing { get; set; } = true;
+
+        /// <summary>
+        /// 灌入合并的静默窗口（毫秒）：这么久没有新灌入就收批发出，窗口内每来一条就重新计时。
+        /// 0 表示不等待，只做串行化。
+        /// </summary>
+        public int ChatCoalesceWindowMs { get; set; } = 200;
+
+        /// <summary>
+        /// 灌入持续不断时的收批上限（毫秒），防止静默窗口被无限续期导致请求永远发不出去。
+        /// </summary>
+        public int ChatCoalesceMaxWaitMs { get; set; } = 1000;
         public RateLimiterSetting RateLimiter { get; set; } = new RateLimiterSetting();
         public ASRSetting ASR { get; set; } = new ASRSetting();
         public RecordSettings Records { get; set; } = new RecordSettings();

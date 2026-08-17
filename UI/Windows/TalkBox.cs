@@ -1,4 +1,4 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Windows;
 using VPetLLM.Utils.Localization;
 
@@ -337,13 +337,10 @@ namespace VPetLLM.UI.Windows
             // 注意：不在这里调用 BeginActiveSession()，会话跟踪由 StreamingCommandProcessor 和 ResultAggregator 管理
             try
             {
-                // 新一轮提问：换发取消令牌，清除上一轮可能留下的中断标记
-                InterruptManager.BeginSession();
-
+                // 换令牌、重置流式状态放到 ChatDispatcher 真正派发这条消息时才做：
+                // 上一轮很可能还在飞，此刻动这些会掐断它的中断链路、把它剩下的分片
+                // 当成新回复的开头
                 _plugin.FloatingSidebarManager?.SetProcessingStatus();
-
-                // 重置流式处理状态，为新对话做准备
-                ResetStreamingState();
             }
             catch (Exception ex)
             {
@@ -359,6 +356,9 @@ namespace VPetLLM.UI.Windows
                 {
                     Logger.Log("=== Debug 模式已激活 ===");
                     Logger.Log($"用户输入将直接作为 LLM 输出处理: {text}");
+
+                    // 不经过调度器的旁路，新一轮的令牌/流式状态得自己开
+                    ChatDispatcher.BeginRound();
 
                     // 直接将用户输入作为 LLM 的输出处理
                     HandleResponse(text);
@@ -414,7 +414,13 @@ namespace VPetLLM.UI.Windows
                     return;
                 }
                 
-                await Task.Run(() => _plugin.ChatCore.Chat(text));
+                // 经调度器过闸：触摸/插件/语音几路同时到达时先并成一条再发，
+                // 不再各自唤起一次 LLM（见 ChatDispatcher）
+                await ChatDispatcher.SubmitAsync(
+                    text,
+                    isBodyInteraction ? ChatPriority.Interaction : ChatPriority.User,
+                    source: "TalkBox.Responded",
+                    newRound: true);
 
                 // 已中断就不再触发用户配置的工具回调，那是本轮的一部分
                 if (InterruptManager.IsInterrupted)
@@ -481,17 +487,18 @@ namespace VPetLLM.UI.Windows
         /// 注意：动画状态由 SmartMessageProcessor 在处理完成后自动管理
         /// </summary>
         /// <param name="text">消息文本</param>
-        public async Task SendChat(string text)
+        /// <param name="newRound">
+        /// 是否开启新一轮对话。插件回执回灌时传 false —— 它是上一轮的延续，
+        /// 换令牌会把这一轮的中断链路断开。
+        /// </param>
+        public async Task SendChat(string text, bool newRound = true)
         {
             if (string.IsNullOrWhiteSpace(text)) return;
 
             Logger.Log($"SendChat called with text: {text}");
 
-            // 新一轮提问：换发取消令牌，清除上一轮可能留下的中断标记
-            InterruptManager.BeginSession();
-
-            // 重置流式处理状态
-            ResetStreamingState();
+            // 换令牌与重置流式状态由 ChatDispatcher 在真正派发这条消息时执行，
+            // 避免打断可能仍在进行的上一轮
 
             try
             {
@@ -513,7 +520,12 @@ namespace VPetLLM.UI.Windows
                 // SmartMessageProcessor 会在处理完成后自动管理动画状态
                 if (_plugin.ChatCore is not null)
                 {
-                    await _plugin.ChatCore.Chat(text);
+                    await ChatDispatcher.SubmitAsync(
+                        text,
+                        newRound ? ChatPriority.User : ChatPriority.Plugin,
+                        source: "TalkBox.SendChat",
+                        isRetry: !newRound,
+                        newRound: newRound);
                 }
                 // 注意：不在这里停止思考动画，由 SmartMessageProcessor 处理
             }
@@ -548,23 +560,24 @@ namespace VPetLLM.UI.Windows
         /// <summary>
         /// 发送带多张图片的聊天消息（一次请求内一并送出）
         /// </summary>
-        public async Task SendChatWithImages(string text, IReadOnlyList<byte[]> images)
+        /// <param name="newRound">
+        /// 是否开启新一轮对话。插件回执带图回灌时传 false —— 它是上一轮的延续，
+        /// 换令牌会把这一轮的中断链路断开。
+        /// </param>
+        public async Task SendChatWithImages(string text, IReadOnlyList<byte[]> images, bool newRound = true)
         {
             images = images?.Where(i => i is not null && i.Length > 0).ToList() ?? new List<byte[]>();
 
             if (images.Count == 0)
             {
-                await SendChat(text);
+                await SendChat(text, newRound);
                 return;
             }
 
             Logger.Log($"SendChatWithImages called with text: {text}, images: {images.Count}, total {images.Sum(i => i.Length)} bytes");
 
-            // 新一轮提问：换发取消令牌，清除上一轮可能留下的中断标记
-            InterruptManager.BeginSession();
-
-            // 重置流式处理状态
-            ResetStreamingState();
+            // 换令牌与重置流式状态由 ChatDispatcher 在真正派发这条消息时执行，
+            // 避免打断可能仍在进行的上一轮
 
             try
             {
@@ -586,7 +599,13 @@ namespace VPetLLM.UI.Windows
                 // SmartMessageProcessor 会在处理完成后自动管理动画状态
                 if (_plugin.ChatCore is not null)
                 {
-                    await _plugin.ChatCore.ChatWithImages(text, images);
+                    await ChatDispatcher.SubmitAsync(
+                        text,
+                        newRound ? ChatPriority.User : ChatPriority.Plugin,
+                        images,
+                        "TalkBox.SendChatWithImages",
+                        isRetry: !newRound,
+                        newRound: newRound);
                 }
                 // 注意：不在这里停止思考动画，由 SmartMessageProcessor 处理
             }

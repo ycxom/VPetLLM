@@ -80,6 +80,8 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }).ToList();
 
+                var useStreaming = UseStreaming(_lmStudioSetting.EnableStreaming);
+
                 object data;
                 if (_lmStudioSetting.EnableAdvanced)
                 {
@@ -89,7 +91,7 @@ namespace VPetLLM.Core.Providers.Chat
                         messages = messages,
                         temperature = _lmStudioSetting.Temperature,
                         max_tokens = _lmStudioSetting.MaxTokens,
-                        stream = _lmStudioSetting.EnableStreaming
+                        stream = useStreaming
                     };
                 }
                 else
@@ -98,7 +100,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         model = _lmStudioSetting.Model ?? "local-model",
                         messages = messages,
-                        stream = _lmStudioSetting.EnableStreaming
+                        stream = useStreaming
                     };
                 }
 
@@ -110,7 +112,7 @@ namespace VPetLLM.Core.Providers.Chat
                     var apiUrl = GetCurrentApiUrl();
                     SystemLogger.Log($"LM Studio: 请求 URL = {apiUrl}");
 
-                    if (_lmStudioSetting.EnableStreaming)
+                    if (useStreaming)
                     {
                         SystemLogger.Log("LM Studio: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)

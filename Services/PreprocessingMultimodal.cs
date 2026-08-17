@@ -210,11 +210,17 @@ namespace VPetLLM.Services
         {
             string? capturedResponse = null;
 
-            // 创建临时的响应处理器来捕获结果
+            // 创建临时的响应处理器来捕获结果（非流式分支：整段一次性回调）
             Action<string> responseHandler = (response) =>
             {
                 capturedResponse = response;
             };
+
+            // 流式分支不走 ResponseHandler —— 那条路由 StreamingCommandProcessor 按
+            // 「检测到完整命令」逐条回调，而图片描述是纯文本、不含 <|xxx_begin|>，
+            // 很可能一次都不触发，只靠 capturedResponse 会拿到空描述。
+            // StreamingChunkHandler 是逐 delta 的原始回调，两种分支都能兜住。
+            var streamedText = new System.Text.StringBuilder();
 
             IChatCore? chatCore = null;
 
@@ -296,8 +302,31 @@ namespace VPetLLM.Services
                     throw new InvalidOperationException($"无法创建 {providerType} 的 ChatCore 实例");
                 }
 
-                // 清除临时 ChatCore 的上下文，确保不使用主上下文的历史
-                chatCore.ClearContext();
+                // 不使用主上下文的历史：靠上面的 KeepContext = false 即可 ——
+                // GetCoreHistoryCommonAsync 在 KeepContext 为假时只发系统消息，压根不读历史。
+                //
+                // 这里绝不能调 chatCore.ClearContext()：HistoryManager / OverflowManager 是按
+                // provider 名共享同一个 SQLite 库的，临时 core 和主 core 指向同一份数据，
+                // 那一下会把用户真实的聊天历史和溢出总结全部删掉（日志里表现为每次识图都跟着
+                // 一条「清除了所有历史记录，共 N 条」）。
+
+                // 默认跟随所选节点的 EnableStreaming —— 那是用户的选择，不在这里替他改。
+                // 只有用户显式打开「识图强制流式」时才覆盖：非流式请求在整段生成完之前不返回
+                // 任何字节，途中按"等响应头"设超时的网关会把它掐掉（发出十几秒后收到空 body 的
+                // 5xx）。该开关是给撞上这种网关的用户的出路，不必为此改动主对话的流式偏好。
+                if (chatCore is Core.Abstractions.Base.ChatCoreBase coreBase)
+                {
+                    var forceStreaming = _settings.Screenshot?.MultimodalProvider?.ForceStreamingForVision ?? false;
+                    if (forceStreaming)
+                    {
+                        coreBase.ForceStreaming = true;
+                        Logger.Log("PreprocessingMultimodal: 识图强制流式（用户已开启该选项）");
+                    }
+
+                    // 无论走哪条分支都挂上：流式时它是唯一能拿到完整描述的通道，
+                    // 非流式时它不会被调用、缓冲为空，取值处自然退回 ResponseHandler。
+                    coreBase.SetStreamingChunkHandler(chunk => streamedText.Append(chunk));
+                }
 
                 // 设置响应处理器
                 chatCore.SetResponseHandler(responseHandler);
@@ -305,7 +334,7 @@ namespace VPetLLM.Services
                 // 调用 ChatWithImage
                 await chatCore.ChatWithImage(prompt, imageData);
 
-                // 失败时 capturedResponse 里装的是错误文本（例如「API调用失败: Forbidden ...」）。
+                // 失败时错误文本会走 ResponseHandler（例如「API调用失败: Forbidden ...」）。
                 // 它非空，若直接返回就会被当成图片描述判成功——节点容灾也就永远轮不到第二个节点。
                 if (chatCore.LastCallFailed)
                 {
@@ -313,7 +342,8 @@ namespace VPetLLM.Services
                     return "";
                 }
 
-                return capturedResponse ?? "";
+                // 流式优先：整段 delta 拼出来的才是完整描述；非流式时它为空，退回 ResponseHandler。
+                return streamedText.Length > 0 ? streamedText.ToString() : (capturedResponse ?? "");
             }
             finally
             {

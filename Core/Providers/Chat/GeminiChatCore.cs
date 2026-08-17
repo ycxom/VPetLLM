@@ -139,6 +139,8 @@ namespace VPetLLM.Core.Providers.Chat
             }
             requestMessages.Add(new { role = "user", content = userContent });
 
+            var useStreaming = UseStreaming(node.EnableStreaming);
+
             object data;
             if (node.EnableAdvanced)
             {
@@ -148,7 +150,7 @@ namespace VPetLLM.Core.Providers.Chat
                     messages = requestMessages,
                     temperature = node.Temperature,
                     max_tokens = node.MaxTokens,
-                    stream = node.EnableStreaming
+                    stream = useStreaming
                 };
             }
             else
@@ -158,7 +160,7 @@ namespace VPetLLM.Core.Providers.Chat
                     model = node.Model,
                     messages = requestMessages,
                     max_tokens = 4096,
-                    stream = node.EnableStreaming
+                    stream = useStreaming
                 };
             }
 
@@ -173,7 +175,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     AddAuthHeaders(client, node);
 
-                    if (node.EnableStreaming)
+                    if (useStreaming)
                     {
                         Logger.Log("Gemini (OpenAI兼容): 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl) { Content = content };
@@ -308,7 +310,8 @@ namespace VPetLLM.Core.Providers.Chat
 
             var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
 
-            var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model, node.EnableStreaming);
+            var useStreaming = UseStreaming(node.EnableStreaming);
+            var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model, useStreaming);
 
             string message;
             try
@@ -317,7 +320,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     AddAuthHeaders(client, node);
 
-                    if (node.EnableStreaming)
+                    if (useStreaming)
                     {
                         Logger.Log("Gemini ChatWithImage: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint) { Content = content };

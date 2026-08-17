@@ -3597,6 +3597,18 @@
         "zh-hant": "啟用視覺的渠道需要在 LLM 設置中為相應節點啟用 EnableVision",
         "jp": "ビジョン対応チャネルは、LLM設定で対応するノードのEnableVisionを有効にする必要があります"
       },
+      "ForceStreaming": {
+        "en": "Force streaming for vision requests",
+        "zh-hans": "识图请求强制使用流式",
+        "zh-hant": "識圖請求強制使用流式",
+        "jp": "画像認識リクエストでストリーミングを強制する"
+      },
+      "ForceStreamingTip": {
+        "en": "Off by default, following the streaming setting of the selected node. If vision requests consistently fail about ten seconds after being sent (5xx with an empty body), a gateway along the way is timing out on \"waiting for response headers\" — a non-streaming request returns its first byte only after the whole description has been generated, so it gets killed every time. Turning this on lets vision requests bypass that timeout without touching the streaming setting of your main conversation.",
+        "zh-hans": "默认关闭，跟随所选节点的流式设置。若识图请求总在发出十几秒后失败（返回 5xx 且内容为空），说明途中有网关按“等响应头”判超时——非流式请求要等整段描述生成完才返回首字节，必然被误杀。打开本项可让识图绕开该超时，不影响主对话的流式设置。",
+        "zh-hant": "預設關閉，跟隨所選節點的流式設置。若識圖請求總在發出十幾秒後失敗（返回 5xx 且內容為空），說明途中有網關按「等響應頭」判超時——非流式請求要等整段描述生成完才返回首位元組，必然被誤殺。打開本項可讓識圖繞開該超時，不影響主對話的流式設置。",
+        "jp": "既定はオフで、選択したノードのストリーミング設定に従います。画像認識リクエストが送信から十数秒後に必ず失敗する（本文が空の 5xx が返る）場合、経路上のゲートウェイが「レスポンスヘッダー待ち」でタイムアウトしています。非ストリーミングのリクエストは説明文が生成し終わるまで最初のバイトを返さないため、必ず切られます。この項目を有効にすると、メイン会話のストリーミング設定を変えずに画像認識だけそのタイムアウトを回避できます。"
+      },
       "SelectNodes": {
         "en": "Select Vision Nodes (Multi-select)",
         "zh-hans": "选择视觉节点（可多选）",

@@ -43,8 +43,14 @@ namespace VPetLLM.Core
                 Logger.Log($"[LLM Call] {caller} calling LLM");
                 Logger.Log($"[LLM Call] Message: {TruncateForLog(message, 200)}");
 
-                // 使用现有的 Chat 方法，isRetry=true 表示不修改历史
-                var response = await _vpetLLM.ChatCore.Chat(message, isRetry: true);
+                // 过调度器串行化，避免与正在跑的那一轮并发读写同一份历史。
+                // exclusive：调用方要的是"自己这条"的回复，不能与别人合并成一次请求
+                var response = await Utils.Common.ChatDispatcher.SubmitAsync(
+                    message,
+                    Utils.Common.ChatPriority.Plugin,
+                    source: caller,
+                    exclusive: true,
+                    isRetry: true);
 
                 // 计算耗时
                 var duration = DateTime.UtcNow - startTime;

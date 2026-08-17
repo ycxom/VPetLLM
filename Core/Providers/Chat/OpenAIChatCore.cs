@@ -302,6 +302,8 @@ namespace VPetLLM.Core.Providers.Chat
             // 添加带图像的用户消息
             requestMessages.Add(new { role = "user", content = userContent });
 
+            var useStreaming = UseStreaming(currentNode.EnableStreaming);
+
             object data;
             bool useResponses = IsResponsesApi(apiUrl);
             if (_openAISetting.EnableAdvanced)
@@ -314,7 +316,7 @@ namespace VPetLLM.Core.Providers.Chat
                         input = requestMessages,
                         temperature = _openAISetting.Temperature,
                         max_output_tokens = _openAISetting.MaxTokens,
-                        stream = currentNode.EnableStreaming
+                        stream = useStreaming
                     };
                 }
                 else
@@ -325,7 +327,7 @@ namespace VPetLLM.Core.Providers.Chat
                         messages = requestMessages,
                         temperature = _openAISetting.Temperature,
                         max_tokens = _openAISetting.MaxTokens,
-                        stream = currentNode.EnableStreaming
+                        stream = useStreaming
                     };
                 }
             }
@@ -338,7 +340,7 @@ namespace VPetLLM.Core.Providers.Chat
                         model = currentNode.Model,
                         input = requestMessages,
                         max_output_tokens = 4096,
-                        stream = currentNode.EnableStreaming
+                        stream = useStreaming
                     };
                 }
                 else
@@ -348,7 +350,7 @@ namespace VPetLLM.Core.Providers.Chat
                         model = currentNode.Model,
                         messages = requestMessages,
                         max_tokens = 4096,
-                        stream = currentNode.EnableStreaming
+                        stream = useStreaming
                     };
                 }
             }
@@ -365,7 +367,7 @@ namespace VPetLLM.Core.Providers.Chat
                         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                     }
 
-                    if (currentNode.EnableStreaming)
+                    if (useStreaming)
                     {
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
                         {

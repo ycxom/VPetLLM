@@ -123,11 +123,13 @@ namespace VPetLLM.Core.Providers.Chat
                     messages.Add(messageObj);
                 }
 
+                var useStreaming = UseStreaming(_ollamaSetting.EnableStreaming);
+
                 var data = new
                 {
                     model = _ollamaSetting.Model,
                     messages = messages,
-                    stream = _ollamaSetting.EnableStreaming,
+                    stream = useStreaming,
                     options = _ollamaSetting.EnableAdvanced ? new
                     {
                         temperature = _ollamaSetting.Temperature,
@@ -141,7 +143,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
 
-                    if (_ollamaSetting.EnableStreaming)
+                    if (useStreaming)
                     {
                         // 流式传输模式
                         Logger.Log("Ollama ChatWithImage: 使用流式传输模式");

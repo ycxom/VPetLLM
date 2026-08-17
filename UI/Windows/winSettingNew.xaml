@@ -2105,6 +2105,17 @@
                                             Visibility="Collapsed"
                                             Margin="0,0,0,16"/>
 
+                                    <!-- 识图强制流式：撞上按"等响应头"设超时的网关时的出路 -->
+                                    <CheckBox x:Name="CheckBox_Screenshot_Main_ForceStreamingForVision"
+                                            Content="{utils:Localize KeyPath=Screenshot.Multimodal.ForceStreaming, Default=识图请求强制使用流式}"
+                                            Margin="0,0,0,4"
+                                            Style="{StaticResource ModernCheckBox}"
+                                            Checked="CheckBox_Screenshot_ForceStreamingForVision_Changed"
+                                            Unchecked="CheckBox_Screenshot_ForceStreamingForVision_Changed"/>
+                                    <TextBlock Text="{utils:Localize KeyPath=Screenshot.Multimodal.ForceStreamingTip, Default=默认关闭，跟随所选节点的流式设置。若识图请求总在发出十几秒后失败（返回 5xx 且内容为空），说明途中有网关按“等响应头”判超时——非流式请求要等整段描述生成完才返回首字节，必然被误杀。打开本项可让识图绕开该超时，不影响主对话的流式设置。}"
+                                            Style="{StaticResource DescriptionText}"
+                                            Margin="0,0,0,16"/>
+
                                     <!-- 视觉节点列表（仅当选择 VisionChannels 时显示） -->
                                     <StackPanel x:Name="Panel_Screenshot_Main_VisionNodes"
                                             Visibility="Collapsed">

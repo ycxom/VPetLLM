@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using VPet_Simulator.Windows.Interface;
@@ -1415,7 +1415,9 @@ namespace VPetLLM
                             }
                             else if (ChatCore is not null)
                             {
-                                await ChatCore.ChatWithImages(args.Prompt, args.Images);
+                                await ChatDispatcher.SubmitAsync(
+                                    args.Prompt, ChatPriority.User, args.Images, "Screenshot.Editor",
+                                    newRound: true);
                             }
                         }
                         else
@@ -1428,7 +1430,9 @@ namespace VPetLLM
                                 }
                                 else if (ChatCore is not null)
                                 {
-                                    await ChatCore.Chat(args.Prompt);
+                                    await ChatDispatcher.SubmitAsync(
+                                        args.Prompt, ChatPriority.User, source: "Screenshot.Editor",
+                                        newRound: true);
                                 }
                             }
                         }
@@ -1495,7 +1499,9 @@ namespace VPetLLM
                                 }
                                 else if (ChatCore is not null)
                                 {
-                                    await ChatCore.Chat(args.Prompt);
+                                    await ChatDispatcher.SubmitAsync(
+                                        args.Prompt, ChatPriority.User, source: "Screenshot.Editor",
+                                        newRound: true);
                                 }
                             }
                         }
@@ -1537,7 +1543,9 @@ namespace VPetLLM
                         {
                             if (ChatCore is not null && !string.IsNullOrWhiteSpace(e.CombinedMessage))
                             {
-                                await ChatCore.Chat(e.CombinedMessage);
+                                await ChatDispatcher.SubmitAsync(
+                                    e.CombinedMessage, ChatPriority.User, source: "Screenshot.Preprocessed",
+                                    newRound: true);
                             }
                         }
                         catch (Exception ex)
@@ -1578,7 +1586,7 @@ namespace VPetLLM
                     {
                         if (Settings.Screenshot.AutoSend)
                         {
-                            _ = ChatCore?.Chat(text);
+                            _ = ChatDispatcher.SubmitAsync(text, ChatPriority.User, source: "Screenshot.OCR", newRound: true);
                         }
                         else
                         {
@@ -1620,7 +1628,8 @@ namespace VPetLLM
             try
             {
                 PromptHelper.ReloadPrompts();
-                var response = await ChatCore.Chat(prompt);
+                var response = await ChatDispatcher.SubmitAsync(
+                    prompt, ChatPriority.User, source: "VPetLLM.SendChat", newRound: true);
                 RecordAISuccess();
                 return response;
             }

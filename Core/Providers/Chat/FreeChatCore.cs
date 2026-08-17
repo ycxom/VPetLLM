@@ -186,20 +186,22 @@ namespace VPetLLM.Core.Providers.Chat
                 // 添加带图像的用户消息
                 requestMessages.Add(new { role = "user", content = userContent });
 
+                var useStreaming = UseStreaming(_freeSetting.EnableStreaming);
+
                 var requestBody = new
                 {
                     model = _model,
                     messages = requestMessages,
                     temperature = _freeSetting.Temperature,
                     max_tokens = Math.Min(_freeSetting.MaxTokens, _maxTokensLimit),
-                    stream = _freeSetting.EnableStreaming
+                    stream = useStreaming
                 };
 
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 string message;
-                if (_freeSetting.EnableStreaming)
+                if (useStreaming)
                 {
                     // 流式传输模式
                     Logger.Log("Free ChatWithImage: 使用流式传输模式");

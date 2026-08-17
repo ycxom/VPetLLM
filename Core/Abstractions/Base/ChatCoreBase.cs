@@ -116,6 +116,25 @@ namespace VPetLLM.Core.Abstractions.Base
         }
 
         /// <summary>
+        /// 强制本 ChatCore 用流式发请求，忽略节点上的 EnableStreaming。
+        ///
+        /// EnableStreaming 的语义是"气泡要不要逐字显示"，那是给用户看的偏好；但它同时
+        /// 决定了网络协议形态，于是像前置识图这种"只要整段结果、根本不回显"的内部调用
+        /// 也被拖着走非流式。非流式请求在整段生成完之前不返回任何字节，任何按"等响应头"
+        /// 设超时的中间层都会把它误杀（我们自己的网关就踩过：见 standalone/proxy 的注释），
+        /// 表现为"开流式正常、关流式必挂"。
+        ///
+        /// 这些内部调用把它设为 true，即可与用户的显示偏好解耦、不再受中间层超时摆布。
+        /// </summary>
+        public bool ForceStreaming { get; set; }
+
+        /// <summary>
+        /// 本次请求最终是否走流式：节点开了、或调用方强制要求。
+        /// </summary>
+        protected bool UseStreaming(bool nodeEnableStreaming)
+            => ForceStreaming || nodeEnableStreaming;
+
+        /// <summary>
         /// 用户中断时追加到助手消息末尾的标记。
         ///
         /// 被中断的那半句仍然入库，且带上这个标记 —— 模型下一轮能看到自己"说到哪被打断了"，
