@@ -11,6 +11,18 @@ namespace VPetLLM.Utils.Plugin
         public static List<FailedPlugin> FailedPlugins { get; } = new List<FailedPlugin>();
         private static readonly Dictionary<string, AssemblyLoadContext> _pluginContexts = new();
         private static readonly Dictionary<string, string> _shadowCopyDirectories = new();
+
+        // SHA256 结果缓存。插件列表每刷新一次就要把每个插件 DLL 从头哈一遍，
+        // 而这活儿是在 UI 线程上干的——插件一多、刷新一频繁就直接卡住窗口。
+        // 用 (长度, 最后写入时间) 当版本戳：文件被换掉戳就变，自然失效，不需要手动清。
+        private static readonly Dictionary<string, (long Length, long TicksUtc, string Hash)> _sha256Cache =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        // UpdatePlugin 会连着改 Plugins / _pluginContexts / _shadowCopyDirectories 三个共享集合，
+        // 中间还夹着 await（卸载 ALC、等 GC、删影子目录）。两个更新叠在一起跑，
+        // 这些没上锁的 List/Dictionary 会被写坏——轻则插件列表错乱，重则字典内部成环、查找时死循环。
+        // 用异步闸串起来：等的时候不占线程，也就不会把 UI 线程堵死。
+        private static readonly SemaphoreSlim _updateGate = new(1, 1);
         public static string PluginPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
 
         public static void LoadPlugins(IChatCore chatCore)
@@ -688,6 +700,8 @@ namespace VPetLLM.Utils.Plugin
                 return false;
             }
 
+            // 同一时刻只允许一个更新在改共享集合。见 _updateGate 上的说明。
+            await _updateGate.WaitAsync();
             try
             {
                 // 查找需要更新的插件
@@ -761,6 +775,10 @@ namespace VPetLLM.Utils.Plugin
             {
                 VPetLLMUtils.Logger.Log($"Failed to update plugin {pluginFilePath}: {ex.Message}");
                 return false;
+            }
+            finally
+            {
+                _updateGate.Release();
             }
         }
 
@@ -995,11 +1013,55 @@ namespace VPetLLM.Utils.Plugin
             }
         }
 
+        /// <summary>
+        /// 主动作废某个文件的哈希缓存。
+        /// 用在「刚把新 DLL 写下去、马上要校验它」这种地方：那次校验是安全检查，
+        /// 必须真读文件，不能拿缓存糊弄——两次写入间隔短且长度恰好相同时，
+        /// (长度, 最后写入时间) 这个版本戳理论上认不出变化（系统时钟粒度约 15ms）。
+        /// </summary>
+        public static void InvalidateSha256Cache(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath)) return;
+            lock (_sha256Cache) { _sha256Cache.Remove(filePath); }
+        }
+
         public static string GetFileSha256(string filePath)
         {
-            if (!File.Exists(filePath))
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
+                // 文件没了，顺手把缓存条目也清掉，别让字典跟着删掉的插件一直长。
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    lock (_sha256Cache) { _sha256Cache.Remove(filePath); }
+                }
                 return null;
+            }
+
+            // 先看缓存：同一个文件只要长度和最后写入时间没变，就还是上次那个哈希。
+            // 更新插件会重写文件，两者必变，所以不会拿到过期结果。
+            long length, ticks;
+            try
+            {
+                var info = new FileInfo(filePath);
+                length = info.Length;
+                ticks = info.LastWriteTimeUtc.Ticks;
+            }
+            catch (Exception)
+            {
+                length = -1;
+                ticks = -1;
+            }
+
+            if (length >= 0)
+            {
+                lock (_sha256Cache)
+                {
+                    if (_sha256Cache.TryGetValue(filePath, out var cached) &&
+                        cached.Length == length && cached.TicksUtc == ticks)
+                    {
+                        return cached.Hash;
+                    }
+                }
             }
 
             // 重试机制，防止文件被锁定
@@ -1013,6 +1075,15 @@ namespace VPetLLM.Utils.Plugin
                         {
                             var hash = sha256.ComputeHash(stream);
                             var result = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+
+                            if (length >= 0)
+                            {
+                                lock (_sha256Cache)
+                                {
+                                    _sha256Cache[filePath] = (length, ticks, result);
+                                }
+                            }
+
                             return result;
                         }
                     }

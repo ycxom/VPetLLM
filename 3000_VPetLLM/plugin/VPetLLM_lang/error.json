@@ -286,5 +286,23 @@
         "zh-hant": "LM Studio未啟用視覺能力，請在設置中啟用 EnableVision",
         "en": "LM Studio vision capability not enabled. Please enable EnableVision in settings.",
         "jp": "LM Studioのビジョン機能有効になっていません。設定でEnableVisionを有効にしてください。"
+    },
+    "PluginBatch.Header": {
+        "zh-hans": "本次共处理 {0} 个插件",
+        "zh-hant": "本次共處理 {0} 個外掛",
+        "en": "Processed {0} plugins",
+        "jp": "{0} 件のプラグインを処理しました"
+    },
+    "PluginBatch.Succeeded": {
+        "zh-hans": "成功",
+        "zh-hant": "成功",
+        "en": "Succeeded",
+        "jp": "成功"
+    },
+    "PluginBatch.Failed": {
+        "zh-hans": "失败",
+        "zh-hant": "失敗",
+        "en": "Failed",
+        "jp": "失敗"
     }
 }

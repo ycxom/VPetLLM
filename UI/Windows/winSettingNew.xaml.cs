@@ -344,6 +344,17 @@ namespace VPetLLM.UI.Windows
         private bool _isSaving = false;
         private bool _uiSettingsChanged = false;
 
+        // 插件安装/更新/卸载的串行队列：连点多个「更新」时把它们排成一列依次跑，
+        // 批次结束只弹一个汇总框、只刷一次列表。详见 PluginOperationQueue。
+        private PluginOperationQueue? _pluginOpQueue;
+
+        // 刷新插件列表的重入闸。程序化刷新传进来的 sender 是窗口不是按钮，
+        // 原来那句「button.IsEnabled 防重复点击」对它一点用都没有，
+        // 于是一次批量更新能把整表重算十几遍——每遍都在 UI 线程上给每个插件算 SHA256。
+        private bool _isRefreshingPluginList = false;
+        // 刷新在跑的时候又来了请求：不丢，记一笔，跑完补刷一次。
+        private bool _pluginListRefreshQueued = false;
+
         // TTS服务
         private UtilsTTSService? _ttsService;
         // 随机选择器（负载均衡随机用）
@@ -388,6 +399,7 @@ namespace VPetLLM.UI.Windows
         {
             InitializeComponent();
             _plugin = plugin;
+            _pluginOpQueue = new PluginOperationQueue(OnPluginBatchCompletedAsync);
 
             // 初始化触摸反馈设置控件
             InitializeTouchFeedbackSettings();
@@ -3634,6 +3646,22 @@ namespace VPetLLM.UI.Windows
             if (button is not null && !button.IsEnabled)
                 return;
 
+            // 真正的重入闸。上面那句只挡得住「用户手点刷新按钮」；
+            // 代码内部的刷新传的 sender 是窗口，button 为 null，一路畅通。
+            // 刷新一次要在 UI 线程上给每个插件文件算一遍 SHA256、再整表重建 ItemsSource，
+            // 批量更新时叠十几次就是肉眼可见的卡顿。
+            if (_isRefreshingPluginList)
+            {
+                // 不能直接丢——丢了列表就停在旧状态。记一笔，等当前这次跑完补刷一次，
+                // 中间来多少次请求都只补这一次。
+                _pluginListRefreshQueued = true;
+                Logger.Log("插件列表正在刷新中，本次请求合并到下一轮");
+                return;
+            }
+            _isRefreshingPluginList = true;
+            _pluginListRefreshQueued = false;
+            var onlineRefreshStarted = false;
+
             StartButtonLoadingAnimation(button);
 
             try
@@ -3883,7 +3911,13 @@ namespace VPetLLM.UI.Windows
                             System.Diagnostics.Debug.WriteLine("[PluginStore] 当前为离线模式，仅显示本地插件");
                         });
                     }
+                    finally
+                    {
+                        // 联网比对跑完（成功或失败）才算这次刷新真的结束，此时才放行下一次。
+                        Dispatcher.Invoke(() => ReleasePluginListRefreshGate());
+                    }
                 });
+                onlineRefreshStarted = true;
             }
             catch (Exception ex)
             {
@@ -3892,53 +3926,78 @@ namespace VPetLLM.UI.Windows
             }
             finally
             {
+                // 联网那段没起来（本地部分就抛了），闸得在这里放，否则永远卡住不再刷新。
+                if (!onlineRefreshStarted) ReleasePluginListRefreshGate();
                 StopButtonLoadingAnimation(button);
             }
+        }
+
+        /// <summary>
+        /// 放开刷新闸。如果这期间有请求被合并掉了，就在这里补跑一次（只补一次）。
+        /// 必须在 UI 线程上调用。
+        /// </summary>
+        private void ReleasePluginListRefreshGate()
+        {
+            _isRefreshingPluginList = false;
+
+            if (!_pluginListRefreshQueued) return;
+            _pluginListRefreshQueued = false;
+
+            // 用 Background 优先级排队，别在当前这轮回调里直接递归回去。
+            Dispatcher.BeginInvoke(new Action(() => Button_RefreshPlugins_Click(this, new RoutedEventArgs())),
+                DispatcherPriority.Background);
         }
 
         private async void Button_PluginAction_Click(object sender, RoutedEventArgs e)
         {
-            var button = sender as Button;
-            StartButtonLoadingAnimation(button);
+            if (sender is not Button button || button.DataContext is not UnifiedPluginItem plugin)
+                return;
 
-            try
-            {
-                if (((Button)sender).DataContext is UnifiedPluginItem plugin)
-                {
-                    var langCode = _plugin.Settings.Language;
-                    string action = plugin.ActionText;
+            var langCode = _plugin.Settings.Language;
+            string action = plugin.ActionText;
 
-                    if (action == LanguageHelper.Get("Plugin.Delete", langCode))
-                    {
-                        await HandleDeletePlugin(plugin);
-                    }
-                    else if (action == LanguageHelper.Get("Plugin.UnloadPlugin", langCode))
-                    {
-                        await HandleUninstallPlugin(plugin);
-                    }
-                    else if (action == LanguageHelper.Get("PluginStore.Install", langCode) || action == LanguageHelper.Get("Plugin.Update", langCode))
-                    {
-                        await HandleInstallOrUpdatePlugin(plugin);
-                    }
-                }
-            }
-            finally
-            {
-                StopButtonLoadingAnimation(button);
-            }
+            Func<Task<PluginOperationResult>>? operation = null;
+            if (action == LanguageHelper.Get("Plugin.Delete", langCode))
+                operation = () => HandleDeletePlugin(plugin);
+            else if (action == LanguageHelper.Get("Plugin.UnloadPlugin", langCode))
+                operation = () => HandleUninstallPlugin(plugin);
+            else if (action == LanguageHelper.Get("PluginStore.Install", langCode) || action == LanguageHelper.Get("Plugin.Update", langCode))
+                operation = () => HandleInstallOrUpdatePlugin(plugin);
+
+            if (operation is null) return;
+
+            await RunPluginOperationAsync(button, plugin, operation);
         }
 
         private async void Button_UninstallPlugin_Click(object sender, RoutedEventArgs e)
         {
-            var button = sender as Button;
-            StartButtonLoadingAnimation(button);
+            if (sender is not Button button || button.DataContext is not UnifiedPluginItem plugin)
+                return;
 
+            await RunPluginOperationAsync(button, plugin, () => HandleUninstallPlugin(plugin));
+        }
+
+        /// <summary>
+        /// 所有插件操作按钮的统一入口：按下就转圈，操作本身丢进串行队列。
+        /// 连点 N 个按钮 = N 颗按钮同时转圈 + 后台一条一条跑，不再是 N 条流水线互相踩。
+        /// 返回的 Task 只等「自己这一条」，所以每颗按钮转圈的时长仍然对得上它自己的操作。
+        /// </summary>
+        private async Task RunPluginOperationAsync(Button button, UnifiedPluginItem plugin, Func<Task<PluginOperationResult>> operation)
+        {
+            var queue = _pluginOpQueue;
+            var displayName = plugin.Name ?? plugin.OriginalName ?? plugin.Id ?? "?";
+
+            StartButtonLoadingAnimation(button);
             try
             {
-                if (((Button)sender).DataContext is UnifiedPluginItem plugin)
+                if (queue is null)
                 {
-                    await HandleUninstallPlugin(plugin);
+                    // 理论上到不了这里（构造函数就建好了），留个直跑的兜底，别静默什么都不做。
+                    await operation();
+                    return;
                 }
+
+                await queue.EnqueueAsync(displayName, operation);
             }
             finally
             {
@@ -3946,7 +4005,85 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private async Task HandleUninstallPlugin(UnifiedPluginItem plugin)
+        /// <summary>
+        /// 一个批次（用户这一串连点）全部跑完后调一次：统一刷新列表 + 汇总成一个提示框。
+        /// 以前是每个插件跑完各弹一个框，5 个插件就是 5 个模态框摞在一起——
+        /// MessageBox 在 UI 线程上开的是嵌套消息循环，后面的续体又在这个循环里接着弹，
+        /// 表现出来就是窗口点不动、像卡死了。
+        /// </summary>
+        private async Task OnPluginBatchCompletedAsync(PluginBatchReport report)
+        {
+            // 整批只刷这一次列表（每刷一次都要给所有插件文件算 SHA256，很贵）。
+            RefreshPluginList();
+
+            // 让上面那次刷新先把本地部分渲染出来，再弹汇总框；
+            // 否则模态框一开，用户看到的还是刷新前的旧状态。
+            await Task.Delay(150);
+
+            ShowPluginBatchSummary(report);
+        }
+
+        /// <summary>把整批结果压成一个提示框。</summary>
+        private void ShowPluginBatchSummary(PluginBatchReport report)
+        {
+            if (report.Total == 0) return;
+
+            var lang = _plugin.Settings.Language;
+
+            // 只有一个插件且成功：保持老文案，用户看到的和以前一模一样。
+            if (report.Total == 1 && report.AllSucceeded)
+            {
+                MessageBox.Show(
+                    ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", lang, "插件安装/更新成功！"),
+                    ErrorMessageHelper.GetLocalizedTitle("Success", lang, "成功"),
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // 只有一个插件且失败：同样保持老文案（原来就是一个失败框）。
+            if (report.Total == 1 && report.Failed.Count == 1)
+            {
+                var only = report.Failed[0];
+                MessageBox.Show(
+                    $"{ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Fail", lang, "安装插件失败")}\n{only.Name}: {only.Reason}",
+                    ErrorMessageHelper.GetLocalizedTitle("Error", lang, "错误"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var okLabel = ErrorMessageHelper.GetLocalizedMessage("PluginBatch.Succeeded", lang, "成功");
+            var failLabel = ErrorMessageHelper.GetLocalizedMessage("PluginBatch.Failed", lang, "失败");
+            var header = ErrorMessageHelper.GetLocalizedMessage("PluginBatch.Header", lang, "本次共处理 {0} 个插件");
+
+            var sb = new global::System.Text.StringBuilder();
+            sb.AppendLine(string.Format(header, report.Total));
+            sb.AppendLine();
+            sb.AppendLine($"{okLabel}: {report.Succeeded.Count}");
+            foreach (var name in report.Succeeded)
+                sb.AppendLine($"  · {name}");
+
+            if (report.Failed.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"{failLabel}: {report.Failed.Count}");
+                foreach (var f in report.Failed)
+                    sb.AppendLine($"  · {f.Name}: {f.Reason}");
+            }
+
+            MessageBox.Show(
+                sb.ToString().TrimEnd(),
+                report.AllSucceeded
+                    ? ErrorMessageHelper.GetLocalizedTitle("Success", lang, "成功")
+                    : ErrorMessageHelper.GetLocalizedTitle("Error", lang, "错误"),
+                MessageBoxButton.OK,
+                report.AllSucceeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+
+        /// <summary>
+        /// 卸载插件。只做事、不弹框、不刷列表——刷新和提示都留给批次结束时统一做，
+        /// 由 <see cref="PluginOperationQueue"/> 串行调用。
+        /// </summary>
+        private async Task<PluginOperationResult> HandleUninstallPlugin(UnifiedPluginItem plugin)
         {
             // 直接执行卸载，不再显示确认弹窗
             bool uninstalled = false;
@@ -4010,20 +4147,22 @@ namespace VPetLLM.UI.Windows
                 }
             }
 
-            // 刷新UI显示
-            Button_RefreshPlugins_Click(this, new RoutedEventArgs());
-
             if (!uninstalled)
             {
                 string fileName = !string.IsNullOrEmpty(plugin.LocalFilePath)
                     ? Path.GetFileName(plugin.LocalFilePath)
                     : pluginNameToFind;
-                MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {fileName}"),
-                                ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return PluginOperationResult.Fail(
+                    ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {fileName}"));
             }
+
+            return PluginOperationResult.Ok();
         }
 
-        private async Task HandleDeletePlugin(UnifiedPluginItem plugin)
+        /// <summary>
+        /// 删除一个加载失败的插件文件。同样只做事、不弹框、不刷列表。
+        /// </summary>
+        private async Task<PluginOperationResult> HandleDeletePlugin(UnifiedPluginItem plugin)
         {
             string pluginFilePath = plugin.FailedPlugin.FilePath;
             bool deleted = await _plugin.DeletePluginFile(pluginFilePath);
@@ -4035,16 +4174,22 @@ namespace VPetLLM.UI.Windows
                 Logger.Log($"Removed failed plugin from memory: {plugin.FailedPlugin.Name}");
             }
 
-            Button_RefreshPlugins_Click(this, new RoutedEventArgs());
-
             if (!deleted)
             {
-                MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"),
-                               ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return PluginOperationResult.Fail(
+                    ErrorMessageHelper.GetLocalizedMessage("Uninstall.DeleteFail", _plugin.Settings.Language, $"无法删除插件文件: {Path.GetFileName(pluginFilePath)}"));
             }
+
+            return PluginOperationResult.Ok();
         }
 
-        private async Task HandleInstallOrUpdatePlugin(UnifiedPluginItem plugin)
+        /// <summary>
+        /// 下载并安装/更新一个插件。只做事，成败以返回值报给队列，
+        /// 由批次结束时统一刷新列表 + 统一弹一个汇总框。
+        /// 唯一保留的模态框是「哈希不匹配、要不要强装」——那是安全确认，必须当场问，
+        /// 而队列保证了同一时刻最多只有这一个框。
+        /// </summary>
+        private async Task<PluginOperationResult> HandleInstallOrUpdatePlugin(UnifiedPluginItem plugin)
         {
             try
             {
@@ -4119,7 +4264,8 @@ namespace VPetLLM.UI.Windows
 
                         if (result == MessageBoxResult.No)
                         {
-                            return;
+                            // 用户自己按的取消，不算失败，也别再进汇总里烦他一次。
+                            return PluginOperationResult.Cancelled();
                         }
                         else
                         {
@@ -4139,9 +4285,7 @@ namespace VPetLLM.UI.Windows
                             catch (Exception ex)
                             {
                                 Logger.Log($"Assembly validation failed: {ex.Message}");
-                                MessageBox.Show($"下载的文件不是有效的.NET程序集！\n错误: {ex.Message}\n\n为了安全起见，安装已取消。",
-                                    "文件格式错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                                return;
+                                return PluginOperationResult.Fail($"下载的文件不是有效的 .NET 程序集: {ex.Message}");
                             }
                         }
                     }
@@ -4171,6 +4315,10 @@ namespace VPetLLM.UI.Windows
                     File.WriteAllBytes(filePath, data);
                     Logger.Log($"Plugin file written to: {filePath}");
 
+                    // 下面两处校验是安全检查，必须真读文件——先把哈希缓存作废，
+                    // 不给它任何拿旧值糊弄过去的机会。
+                    PluginManager.InvalidateSha256Cache(filePath);
+
                     // 确保文件写入完成并释放文件句柄
                     await Task.Delay(200);
 
@@ -4184,17 +4332,13 @@ namespace VPetLLM.UI.Windows
                         if (actualFileHash != downloadedFileHash)
                         {
                             Logger.Log($"Error: File hash mismatch after update. Expected: {downloadedFileHash}, Got: {actualFileHash}");
-                            MessageBox.Show($"插件更新验证失败！\n期望: {downloadedFileHash}\n实际: {actualFileHash}",
-                                "更新验证失败", MessageBoxButton.OK, MessageBoxImage.Warning);
-                            return;
+                            return PluginOperationResult.Fail($"更新验证失败（期望 {downloadedFileHash}，实际 {actualFileHash}）");
                         }
                     }
                     catch (Exception ex)
                     {
                         Logger.Log($"Error verifying updated plugin file: {ex.Message}");
-                        MessageBox.Show($"无法验证更新后的插件文件: {ex.Message}",
-                            "验证失败", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
+                        return PluginOperationResult.Fail($"无法验证更新后的插件文件: {ex.Message}");
                     }
 
                     // 如果是更新操作，使用专门的更新方法
@@ -4220,69 +4364,26 @@ namespace VPetLLM.UI.Windows
                     }
                     Logger.Log($"Plugins reloaded after install/update");
 
-                    // 等待插件加载完成
-                    await Task.Delay(800);
-
-                    // 再次验证加载后的状态
+                    // 这里原本还有 800ms 空转 + 立即刷一遍列表 + 1000ms 空转 + 读 DataGrid 自检，
+                    // 自检不过再刷一遍 + 再等 1500ms。单个插件就是 3.3 秒纯等待、两次全表重算；
+                    // 而 UpdatePlugin/LoadPlugins 本身已经等过文件句柄和 GC 了，这些padding 是叠着加的。
+                    // 现在只留一次落盘校验，刷新交给批次结束时统一做一次。
                     var reloadedHash = PluginManager.GetFileSha256(filePath);
                     Logger.Log($"Post-reload verification - Expected: {downloadedFileHash}, Actual: {reloadedHash}");
 
-                    // 强制刷新UI显示 - 让系统重新计算所有版本信息
-                    Logger.Log($"Refreshing UI to update plugin status...");
-                    Button_RefreshPlugins_Click(this, new RoutedEventArgs());
-
-                    // 等待UI刷新完成后再次检查
-                    await Task.Delay(1000);
-
-                    // 查找更新后的插件项并验证状态
-                    var dataGrid = (DataGrid)this.FindName("DataGrid_Plugins");
-                    if (dataGrid?.ItemsSource is IEnumerable<UnifiedPluginItem> currentItems)
+                    if (!string.IsNullOrEmpty(reloadedHash) &&
+                        !string.Equals(reloadedHash, downloadedFileHash, StringComparison.OrdinalIgnoreCase))
                     {
-                        var updatedItem = currentItems.FirstOrDefault(p => p.Id == plugin.Id || p.OriginalName == plugin.OriginalName);
-                        if (updatedItem is not null)
-                        {
-                            Logger.Log($"Updated plugin item found - Name: {updatedItem.Name}");
-                            Logger.Log($"  Local Version (SHA256): {updatedItem.Version}");
-                            Logger.Log($"  Remote Version (SHA256): {updatedItem.SHA256}");
-                            Logger.Log($"  IsUpdatable: {updatedItem.IsUpdatable}");
-                            Logger.Log($"  ActionText: {updatedItem.ActionText}");
-
-                            if (updatedItem.IsUpdatable)
-                            {
-                                Logger.Log($"Warning: Plugin still shows as updatable after update!");
-                                Logger.Log($"  This suggests the file hash comparison is not working correctly.");
-
-                                // 尝试再次强制刷新
-                                Logger.Log($"Attempting additional UI refresh...");
-                                await Task.Delay(500);
-                                Button_RefreshPlugins_Click(this, new RoutedEventArgs());
-                                await Task.Delay(1000);
-                            }
-                            else
-                            {
-                                Logger.Log($"Success: Plugin no longer shows as updatable. Update completed successfully.");
-                            }
-                        }
-                        else
-                        {
-                            Logger.Log($"Warning: Could not find updated plugin item in UI list");
-                            Logger.Log($"  Searching for plugin with Id: {plugin.Id} or OriginalName: {plugin.OriginalName}");
-                            Logger.Log($"  Available items: {string.Join(", ", currentItems.Select(p => $"{p.Id}({p.OriginalName})"))}");
-                        }
-                    }
-                    else
-                    {
-                        Logger.Log($"Warning: Could not access DataGrid ItemsSource for verification");
+                        return PluginOperationResult.Fail($"加载后文件校验不一致（期望 {downloadedFileHash}，实际 {reloadedHash}）");
                     }
 
-                    MessageBox.Show(ErrorMessageHelper.GetLocalizedMessage("InstallPlugin.Success", _plugin.Settings.Language, "插件安装/更新成功！"),
-                        ErrorMessageHelper.GetLocalizedTitle("Success", _plugin.Settings.Language, "成功"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    return PluginOperationResult.Ok();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ErrorMessageHelper.GetLocalizedError("InstallPlugin.Fail", _plugin.Settings.Language, "安装插件失败", ex),
-                    ErrorMessageHelper.GetLocalizedTitle("Error", _plugin.Settings.Language, "错误"), MessageBoxButton.OK, MessageBoxImage.Error);
+                Logger.Log($"安装/更新插件失败 [{plugin.Name}]: {ex.Message}");
+                return PluginOperationResult.Fail(ex.Message);
             }
         }
 
