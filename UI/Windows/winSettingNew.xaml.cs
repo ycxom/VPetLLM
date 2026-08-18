@@ -3747,6 +3747,8 @@ namespace VPetLLM.UI.Windows
                         Logger.Log($"云端插件商店连接成功，发现 {remotePlugins.Count} 个在线插件");
                         System.Diagnostics.Debug.WriteLine($"[PluginStore] 在线插件加载成功，数量: {remotePlugins.Count}");
 
+                        var hiddenCount = 0;
+
                         // 更新本地插件的远程信息
                         foreach (var item in remotePlugins)
                         {
@@ -3754,6 +3756,17 @@ namespace VPetLLM.UI.Windows
                             var remoteInfo = item.Value;
                             var remoteSha256 = remoteInfo["SHA256"]?.ToString() ?? string.Empty;
                             var pluginName = remoteInfo["Name"]?.ToString() ?? string.Empty;
+
+                            // Published: false 的条目是"占位不上线"——用来在插件列表里给还没做完的插件
+                            // 先占住 ID，但不出现在商店里。整条跳过：既不作为在线插件展示，
+                            // 也不给本地已装的同名插件推更新（半成品不该被推给已经装了的人）。
+                            // 没写这个字段一律按上线处理，老条目不受影响。
+                            if (!IsPluginPublished(remoteInfo, id))
+                            {
+                                hiddenCount++;
+                                System.Diagnostics.Debug.WriteLine($"[PluginStore] 跳过未上线插件: {pluginName} (ID: {id})");
+                                continue;
+                            }
 
                             // 查找对应的本地插件 - 支持多种匹配方式
                             var localItem = pluginItems.Values.FirstOrDefault(p =>
@@ -3856,7 +3869,8 @@ namespace VPetLLM.UI.Windows
 #pragma warning restore CS4014
 
                         var updatableCount = pluginItems.Values.Count(p => p.IsUpdatable);
-                        Logger.Log($"插件列表刷新完成 - 总计 {pluginItems.Count} 个插件，其中 {updatableCount} 个可更新");
+                        Logger.Log($"插件列表刷新完成 - 总计 {pluginItems.Count} 个插件，其中 {updatableCount} 个可更新"
+                                   + (hiddenCount > 0 ? $"，另有 {hiddenCount} 个未上线条目已跳过" : string.Empty));
                     }
                     catch (Exception ex)
                     {
@@ -4695,6 +4709,39 @@ namespace VPetLLM.UI.Windows
             {
                 Logger.Log($"OnTTSServiceAvailabilityChanged: 处理TTS可用性变化事件失败: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 判断插件商店条目是否已上线。<c>Published: false</c> 表示"占位不上线"：
+        /// 条目留在 PluginList.json 里占住 ID，但不出现在商店中。
+        ///
+        /// 没写这个字段的一律算上线——现存条目都没写，不能因为加了这个功能就集体消失。
+        /// 写了但不是布尔值（比如手写成字符串 "false"）会记一条日志：这种笔误的后果是
+        /// 半成品插件照常上线，比误藏一个成品严重得多，不能让它悄无声息地过去。
+        /// </summary>
+        private static bool IsPluginPublished(JObject remoteInfo, string id)
+        {
+            var token = remoteInfo["Published"];
+            if (token is null || token.Type == JTokenType.Null)
+            {
+                return true;
+            }
+
+            if (token.Type == JTokenType.Boolean)
+            {
+                return token.Value<bool>();
+            }
+
+            if (bool.TryParse(token.ToString(), out var parsed))
+            {
+                Logger.Log($"插件商店: 条目 {id} 的 Published 写成了字符串 \"{token}\"，" +
+                           $"已按 {parsed} 处理；请改成不带引号的 true/false");
+                return parsed;
+            }
+
+            Logger.Log($"插件商店: 条目 {id} 的 Published 值 \"{token}\" 无法识别为布尔值，" +
+                       $"按已上线处理；如果本意是不上线，请写 \"Published\": false");
+            return true;
         }
 
         private string GetPluginStoreUrl(string originalUrl)
