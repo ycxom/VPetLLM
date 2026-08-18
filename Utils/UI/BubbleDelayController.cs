@@ -722,12 +722,43 @@ namespace VPetLLM.Utils.UI
         }
 
         /// <summary>
+        /// 当前流程是否在"气泡跟着语音起播走"的作用域里。
+        ///
+        /// 用 AsyncLocal 而不是静态 bool：多条回复可能并发处理，一个全局开关会互相串，
+        /// 别人的气泡会莫名其妙跟着免掉延迟。AsyncLocal 随 await 流转，只影响本条链路。
+        /// </summary>
+        private static readonly global::System.Threading.AsyncLocal<bool> _audioAlignedScope = new();
+
+        /// <summary>
+        /// 标记接下来的气泡显示是对齐语音起播的，期间跳过所有错峰延迟。
+        /// 与 using 搭配使用，离开作用域自动复位。
+        /// </summary>
+        public static IDisposable BeginAudioAlignedScope()
+        {
+            _audioAlignedScope.Value = true;
+            return new AudioAlignedScope();
+        }
+
+        private sealed class AudioAlignedScope : IDisposable
+        {
+            public void Dispose() => _audioAlignedScope.Value = false;
+        }
+
+        /// <summary>
         /// 应用UI操作延迟（减少瞬时性能压力）
         /// </summary>
         public static void ApplyUIDelay()
         {
             if (_minDelayMs <= 0)
                 return;
+
+            if (_audioAlignedScope.Value)
+            {
+                // 调用方已经等过语音起播了，这里再 Sleep 就是稳定让字晚于声音 ——
+                // 错峰的收益远抵不上把气泡和语音重新拉开的代价
+                Logger.LogVerbose("BubbleDelayController: 气泡正对齐语音起播，跳过UI延迟");
+                return;
+            }
 
             var dispatcher = Application.Current?.Dispatcher;
             if (dispatcher is not null && dispatcher.CheckAccess())
@@ -806,11 +837,11 @@ namespace VPetLLM.Utils.UI
                 {
                     if (!string.IsNullOrEmpty(animation))
                     {
-                        plugin.MW.Main.Say(text, animation, true);
+                        plugin.MW.Main.SayGuarded(text, animation, true);
                     }
                     else
                     {
-                        plugin.MW.Main.Say(text, null, false);
+                        plugin.MW.Main.SayGuarded(text, null, false);
                     }
                     return true;
                 }
@@ -831,7 +862,7 @@ namespace VPetLLM.Utils.UI
             {
                 try
                 {
-                    var msgBar = plugin?.MW?.Main?.MsgBar;
+                    var msgBar = BubbleGuard.RealMsgBar;
                     if (msgBar != null)
                     {
                         MessageBarHelper.ShowBubbleQuick(msgBar, thinkingText, plugin.MW.Core.Save.Name);

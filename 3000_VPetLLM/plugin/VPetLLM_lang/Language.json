@@ -724,6 +724,18 @@
       "zh-hant": "啟用後，工具和插件返回結果時會直接返回，不等待上一個動作完成。禁用時（默認），結果會進入隊列模式，配合聚合等待順序執行。",
       "jp": "有効にすると、ツールやプラグインの結果が前のアクションの完了を待たずに即座に返されます。無効（デフォルト）の場合、結果はキューに入り、集約と共に順次処理されます。"
     },
+    "EnableBubbleExclusive": {
+      "en": "Exclusive Bubble While Replying",
+      "zh-hans": "回复期间独占气泡",
+      "zh-hant": "回覆期間獨佔氣泡",
+      "jp": "応答中は吹き出しを占有する"
+    },
+    "EnableBubbleExclusiveToolTip": {
+      "en": "When enabled (default), bubble requests from other plugins and from the game itself are silently discarded while the pet is speaking a reply, so nothing can overwrite it midway. Discarded calls still return normally, so other mods never see an error. Turn it off if another mod must be able to interrupt replies.",
+      "zh-hans": "启用后（默认），桌宠正在念回复的这段时间里，其它插件以及游戏自身发起的气泡会被静默丢弃，回复不会被中途顶掉。被丢弃的调用照常正常返回，其它 mod 不会因此报错或卡住。需要让别的 mod 能打断回复时再关掉。",
+      "zh-hant": "啟用後（預設），桌寵正在唸回覆的這段時間裡，其它插件以及遊戲自身發起的氣泡會被靜默丟棄，回覆不會被中途頂掉。被丟棄的呼叫照常正常返回，其它 mod 不會因此報錯或卡住。需要讓別的 mod 能打斷回覆時再關掉。",
+      "jp": "有効（デフォルト）にすると、ペットが応答を読み上げている間、他のプラグインやゲーム自体からの吹き出し要求は静かに破棄され、応答が途中で上書きされません。破棄された呼び出しも正常に返るため、他のMODがエラーになることはありません。応答を中断させたい場合のみ無効にしてください。"
+    },
     "LimitStateChanges": {
       "en": "Limit Excessive Pet State Changes",
       "zh-hans": "限制宠物过高修改状态",

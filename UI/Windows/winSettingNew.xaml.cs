@@ -502,6 +502,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableTime")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableBubbleExclusive")).Click += Control_Click;
             // 上下文模式选择（替代旧的 CheckBox_EnableHistoryCompression）
             if (this.FindName("ComboBox_ContextMode") is ComboBox cmbCtxMode)
             {
@@ -1024,6 +1025,7 @@ namespace VPetLLM.UI.Windows
             ((CheckBox)this.FindName("CheckBox_EnableBuyFeedback")).IsChecked = _plugin.Settings.EnableBuyFeedback;
             ((CheckBox)this.FindName("CheckBox_EnableLiveMode")).IsChecked = _plugin.Settings.EnableLiveMode;
             ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).IsChecked = _plugin.Settings.LimitStateChanges;
+            ((CheckBox)this.FindName("CheckBox_EnableBubbleExclusive")).IsChecked = _plugin.Settings.EnableBubbleExclusive;
 
             // 加载上下文模式（替代旧的 CheckBox_EnableHistoryCompression 和 CheckBox_EnableOverflowMode）
             var contextModeComboBox = (ComboBox)this.FindName("ComboBox_ContextMode");
@@ -1538,6 +1540,8 @@ namespace VPetLLM.UI.Windows
             _plugin.Settings.EnableBuyFeedback = enableBuyFeedbackCheckBox.IsChecked ?? true;
             _plugin.Settings.EnableLiveMode = enableLiveModeCheckBox.IsChecked ?? false;
             _plugin.Settings.LimitStateChanges = ((CheckBox)this.FindName("CheckBox_LimitStateChanges")).IsChecked ?? false;
+            // 默认开启：读不到勾选状态时也按开启处理，与 BubbleGuard.IsEnabled 的兜底一致
+            _plugin.Settings.EnableBubbleExclusive = ((CheckBox)this.FindName("CheckBox_EnableBubbleExclusive")).IsChecked ?? true;
 
             // 保存上下文模式（ComboBox_ContextMode 替代旧的 CheckBox_EnableHistoryCompression + CheckBox_EnableOverflowMode）
             // EnableHistoryCompression 在 Overflow 模式下也需要为 true（兼容旧逻辑）
@@ -3243,6 +3247,15 @@ namespace VPetLLM.UI.Windows
                 if (checkBoxEnableLiveMode.ToolTip is ToolTip toolTip && toolTip.Content is TextBlock textBlock)
                 {
                     textBlock.Text = LanguageHelper.Get("Advanced_Options.EnableLiveModeToolTip", langCode);
+                }
+            }
+            if (FindName("CheckBox_EnableBubbleExclusive") is CheckBox checkBoxEnableBubbleExclusive)
+            {
+                checkBoxEnableBubbleExclusive.Content = LanguageHelper.Get("Advanced_Options.EnableBubbleExclusive", langCode);
+                if (checkBoxEnableBubbleExclusive.ToolTip is ToolTip bubbleExclusiveToolTip
+                    && bubbleExclusiveToolTip.Content is TextBlock bubbleExclusiveTip)
+                {
+                    bubbleExclusiveTip.Text = LanguageHelper.Get("Advanced_Options.EnableBubbleExclusiveToolTip", langCode);
                 }
             }
             if (FindName("CheckBox_EnableHistoryCompression") is CheckBox checkBoxEnableHistoryCompression) checkBoxEnableHistoryCompression.Content = LanguageHelper.Get("Advanced_Options.EnableHistoryCompression", langCode);

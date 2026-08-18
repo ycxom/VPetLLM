@@ -444,7 +444,10 @@ namespace VPetLLM.UI.Windows
                 // 这两个标志要盖住随后那一轮布局：Unloaded 和补偿滚动的 ScrollChanged
                 // 都在 Loaded 优先级抛出来，Input 比它低一档，正好排在后面。
                 // 放 finally 里是为了半路抛异常也一定能解开，否则位置记录会就此僵死。
-                Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+                //
+                // 丢弃返回的 DispatcherOperation 是刻意的：这里要的就是"排到队尾以后再解锁"，
+                // await 它等于把本方法挂到那一轮布局之后，解锁反而不会按时发生。
+                _ = Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
                 {
                     _suppressUnload = false;
                     _restoringPosition = false;

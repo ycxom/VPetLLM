@@ -42,6 +42,10 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否初始化成功</returns>
         public static bool Initialize(object msgBar)
         {
+            // 兜底解包：这里反射的是宿主 MessageBar 的私有字段，拿到 BubbleGuard 的装饰器
+            // 会一个字段都找不到，还会把"不支持精细控制"的结论缓存进静态字段，
+            // 之后整个进程的气泡都降级运行。调用方本该传真气泡，这里再兜一道
+            msgBar = BubbleGuard.Real(msgBar)!;
             if (msgBar is null) return false;
 
             lock (_initLock)
@@ -146,6 +150,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>字段值，失败返回默认值</returns>
         public static T GetFieldValue<T>(object msgBar, string fieldName)
         {
+            msgBar = BubbleGuard.Real(msgBar)!;   // 兜底解包，理由见 Initialize
             if (msgBar is null) return default;
 
             if (!_isInitialized)
@@ -194,6 +199,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否设置成功</returns>
         public static bool SetFieldValue(object msgBar, string fieldName, object value)
         {
+            msgBar = BubbleGuard.Real(msgBar)!;   // 兜底解包，理由见 Initialize
             if (msgBar is null) return false;
 
             if (!_isInitialized)

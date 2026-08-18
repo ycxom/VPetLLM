@@ -77,11 +77,11 @@ namespace VPetLLM.Utils.UI
                     {
                         if (!string.IsNullOrEmpty(animation))
                         {
-                            plugin.MW.Main.Say(text, animation, true);
+                            plugin.MW.Main.SayGuarded(text, animation, true);
                         }
                         else
                         {
-                            plugin.MW.Main.Say(text, null, false);
+                            plugin.MW.Main.SayGuarded(text, null, false);
                         }
                     }
                     catch (Exception ex)
@@ -133,11 +133,11 @@ namespace VPetLLM.Utils.UI
                 // 直接调用VPet原生API
                 if (!string.IsNullOrEmpty(animation))
                 {
-                    plugin.MW.Main.Say(text, animation, true);
+                    plugin.MW.Main.SayGuarded(text, animation, true);
                 }
                 else
                 {
-                    plugin.MW.Main.Say(text, null, false);
+                    plugin.MW.Main.SayGuarded(text, null, false);
                 }
 
                 Logger.Log($"DirectBubbleManager: 直接显示气泡成功 - 文本长度: {text.Length}");
@@ -180,7 +180,7 @@ namespace VPetLLM.Utils.UI
                     try
                     {
                         // 直接使用MessageBarHelper，移除UnifiedBubbleFacade抽象层
-                        var msgBar = plugin.MW?.Main?.MsgBar;
+                        var msgBar = BubbleGuard.RealMsgBar;
                         if (msgBar is not null)
                         {
                             MessageBarHelper.ShowBubbleQuick(msgBar, thinkingText, plugin.MW.Core.Save.Name);
@@ -230,7 +230,7 @@ namespace VPetLLM.Utils.UI
                     try
                     {
                         // 直接使用MessageBarHelper，移除UnifiedBubbleFacade抽象层
-                        var msgBar = plugin.MW?.Main?.MsgBar;
+                        var msgBar = BubbleGuard.RealMsgBar;
                         if (msgBar is not null)
                         {
                             MessageBarHelper.SetVisibility(msgBar, false);
@@ -280,7 +280,7 @@ namespace VPetLLM.Utils.UI
                     try
                     {
                         // 直接使用MessageBarHelper，移除UnifiedBubbleFacade抽象层
-                        var msgBar = plugin.MW?.Main?.MsgBar;
+                        var msgBar = BubbleGuard.RealMsgBar;
                         if (msgBar is not null)
                         {
                             MessageBarHelper.ClearStreamState(msgBar);

@@ -152,6 +152,68 @@ namespace VPetLLM.Utils.Common
         }
 
         /// <summary>
+        /// 判断一条命令是不是"要说的话"。say 和 talk 是同一件事的两种写法。
+        /// </summary>
+        public static bool IsSayCommand(string commandType)
+        {
+            return string.Equals(commandType, "say", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(commandType, "talk", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 从 say/talk 命令的参数里取出要说的文本。
+        ///
+        /// 这是全项目唯一一份"say 文本怎么取"的实现，显示气泡和 TTS 预加载都必须走它。
+        /// 两边各写一套的代价是真出过问题：预加载那份曾经要求参数必须是 \w+、文本必须带引号，
+        /// 于是带引号的文本、三个及以上参数的命令都提取不到，那条消息就不开独占会话，
+        /// 气泡照常显示而语音退回事后捕获 —— 表现为"同样的设置偏偏某几句不同步"。
+        /// </summary>
+        /// <param name="parameters">命令标记之间的原始参数文本</param>
+        /// <returns>要说的文本；取不到返回空字符串</returns>
+        public static string ExtractSayText(string parameters)
+        {
+            if (string.IsNullOrEmpty(parameters))
+                return string.Empty;
+
+            // 解析 say("text", animation) 格式
+            var match = Regex.Match(parameters, @"say\s*\(\s*""([^""]*)""\s*(?:,\s*([^)]*))?\s*\)");
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+
+            // 解析简单的 "text" 格式
+            match = Regex.Match(parameters, @"""([^""]*)""");
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// 取出一条消息里所有要说的话，按出现顺序。用于批量预加载和"要不要开独占会话"的判断。
+        /// 与显示气泡走同一套解析，见 <see cref="ExtractSayText"/>。
+        /// </summary>
+        public static List<string> ExtractAllSayTexts(string text)
+        {
+            var texts = new List<string>();
+
+            foreach (var command in Parse(text))
+            {
+                if (!IsSayCommand(command.CommandType))
+                    continue;
+
+                var sayText = ExtractSayText(command.Parameters);
+                if (!string.IsNullOrWhiteSpace(sayText))
+                    texts.Add(sayText);
+            }
+
+            return texts;
+        }
+
+        /// <summary>
         /// Logs a deprecation warning when legacy format is detected
         /// </summary>
         /// <param name="text">Text containing legacy format</param>

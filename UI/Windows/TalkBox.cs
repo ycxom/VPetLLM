@@ -49,7 +49,7 @@ namespace VPetLLM.UI.Windows
                 {
                     try
                     {
-                        var msgBar = _plugin.MW?.Main?.MsgBar;
+                        var msgBar = BubbleGuard.RealMsgBar;
                         if (msgBar is not null)
                         {
                             MessageBarHelper.PreInitialize(msgBar);
@@ -116,7 +116,7 @@ namespace VPetLLM.UI.Windows
                 var main = _plugin.MW?.Main;
                 if (main is null) return;
 
-                try { FastForwardBubbleClose(main.MsgBar); }
+                try { FastForwardBubbleClose(BubbleGuard.Real(main.MsgBar)); }
                 catch (Exception ex) { Logger.Log($"TalkBox: 收起气泡失败: {ex.Message}"); }
 
                 try { RestoreAnimationToNormal(main); }
@@ -837,7 +837,7 @@ namespace VPetLLM.UI.Windows
                 {
                     try
                     {
-                        var msgBar = _plugin.MW.Main.MsgBar;
+                        var msgBar = BubbleGuard.RealMsgBar;
                         if (msgBar is not null)
                         {
                             // 只清除流式输出缓冲区（outputtext/outputtextsample），不清除 oldsaysstream

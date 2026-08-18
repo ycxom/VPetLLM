@@ -41,14 +41,24 @@ namespace VPetLLM.Handlers.TTS
         {
             var request = new TTSRequest { Text = text, ActionContent = actionContent };
 
+            // 入队和"由我来排空"必须在同一把锁里定下。
+            // 分开做的话有一个窗口：排空循环刚看到队列空、还没把 _isProcessing 置回 false 时，
+            // 新请求入队并读到 _isProcessing 仍为 true，于是不启动新的排空；紧接着排空循环退出
+            // 并置 false —— 这个请求就永远躺在队列里，调用方 await 一个不会完成的任务，
+            // 表现为偶发某一句既不出声也不出字。
+            bool startDrain;
             lock (_lockObject)
             {
                 _requestQueue.Enqueue(request);
+                startDrain = !_isProcessing;
+                if (startDrain)
+                {
+                    _isProcessing = true;
+                }
                 Logger.Log($"TTSRequestSerializer: 请求已入队 {request.Id}, 队列长度: {_requestQueue.Count}");
             }
 
-            // 如果当前没有在处理，启动处理
-            if (!_isProcessing)
+            if (startDrain)
             {
                 _ = Task.Run(ProcessQueueAsync);
             }
@@ -57,27 +67,25 @@ namespace VPetLLM.Handlers.TTS
         }
 
         /// <summary>
-        /// 处理队列中的请求（私有方法）
+        /// 处理队列中的请求（私有方法）。
+        ///
+        /// 调用方（<see cref="ProcessTTSRequestAsync"/>）已经在入队的同一把锁里把
+        /// <c>_isProcessing</c> 置为 true，这里不再自行抢占；退出时只在"看到队列已空"的
+        /// 那把锁里置回 false，保证"队列非空 ⟹ 有排空任务在跑或即将跑"这个不变式成立。
         /// </summary>
         private async Task ProcessQueueAsync()
         {
-            lock (_lockObject)
-            {
-                if (_isProcessing) return;
-                _isProcessing = true;
-            }
-
             try
             {
                 while (true)
                 {
                     TTSRequest request;
 
-                    // 中断：排队等着说的话不用再说了。必须逐个把 CompletionSource 结掉，
-                    // 否则提交这些请求的调用方会一直 await 一个永远不会完成的任务
-                    if (InterruptManager.IsInterrupted)
+                    lock (_lockObject)
                     {
-                        lock (_lockObject)
+                        // 中断：排队等着说的话不用再说了。必须逐个把 CompletionSource 结掉，
+                        // 否则提交这些请求的调用方会一直 await 一个永远不会完成的任务
+                        if (InterruptManager.IsInterrupted)
                         {
                             var dropped = _requestQueue.Count;
                             while (_requestQueue.Count > 0)
@@ -87,13 +95,17 @@ namespace VPetLLM.Handlers.TTS
                             _currentRequest = null;
                             if (dropped > 0)
                                 Logger.Log($"TTSRequestSerializer: 已中断，丢弃 {dropped} 个排队请求");
-                        }
-                        break;
-                    }
 
-                    lock (_lockObject)
-                    {
-                        if (_requestQueue.Count == 0) break;
+                            _isProcessing = false;
+                            return;
+                        }
+
+                        if (_requestQueue.Count == 0)
+                        {
+                            _isProcessing = false;
+                            return;
+                        }
+
                         request = _requestQueue.Dequeue();
                         _currentRequest = request;
                     }
@@ -109,12 +121,12 @@ namespace VPetLLM.Handlers.TTS
                         var duration = (DateTime.Now - startTime).TotalMilliseconds;
                         Logger.Log($"TTSRequestSerializer: 请求 {request.Id} 处理完成，耗时: {duration}ms");
 
-                        request.CompletionSource.SetResult(true);
+                        request.CompletionSource.TrySetResult(true);
                     }
                     catch (Exception ex)
                     {
                         Logger.Log($"TTSRequestSerializer: 请求 {request.Id} 处理失败: {ex.Message}");
-                        request.CompletionSource.SetResult(false);
+                        request.CompletionSource.TrySetResult(false);
                     }
                     finally
                     {
@@ -122,10 +134,15 @@ namespace VPetLLM.Handlers.TTS
                     }
                 }
             }
-            finally
+            catch (Exception ex)
             {
+                // 循环体本身出意外（锁外的日志、Task.Run 调度等）也必须交还排空权，
+                // 否则 _isProcessing 永远留在 true，后续请求再也没有人来排空
+                Logger.Log($"TTSRequestSerializer: 队列排空异常终止: {ex.Message}");
+
                 lock (_lockObject)
                 {
+                    _currentRequest = null;
                     _isProcessing = false;
                 }
             }
@@ -166,14 +183,26 @@ namespace VPetLLM.Handlers.TTS
                 // 等语音真正出声，再放气泡 —— 这是气泡/语音同步的关键一步。
                 // 提交只是把请求排进 VPetTTS 的队列，音频可能还在合成、或在等前一句播完；
                 // 在这里显示气泡，字就会比声音早几百毫秒到几秒。
-                await WaitForPlaybackStartAsync(vpetTTSIntegration, ttsRequestId);
+                var playbackStarted = await WaitForPlaybackStartAsync(vpetTTSIntegration, ttsRequestId);
 
                 // 标记播放开始
                 _operationTracker.MarkPlaybackStart(request.Id);
 
                 // 执行动作指令（显示气泡等）
-                // 气泡自身的打字速度和停留时长一律沿用宿主默认（按字数计时），不做干预
-                await ExecuteActionAsync(request.ActionContent);
+                // 气泡自身的打字速度和停留时长一律沿用宿主默认（按字数计时），不做干预。
+                // 起播已经等到了的话，这段路上的"错峰"延迟要全部让开：那些延迟本来是为了
+                // 摊平低配机器上的瞬时压力，但放在这里就是纯粹让字晚于声音。
+                if (playbackStarted)
+                {
+                    using (BubbleDelayController.BeginAudioAlignedScope())
+                    {
+                        await ExecuteActionAsync(request.ActionContent);
+                    }
+                }
+                else
+                {
+                    await ExecuteActionAsync(request.ActionContent);
+                }
 
                 // 等待TTS完成
                 if (useExclusiveSession && !string.IsNullOrEmpty(ttsRequestId) && vpetTTSIntegration != null)
@@ -215,24 +244,25 @@ namespace VPetLLM.Handlers.TTS
 
         /// <summary>
         /// 等语音真正出声，之后调用方才把气泡放出来。
+        /// 返回是否确实等到了起播信号。
         ///
         /// 等不到不算异常，一律照常显示气泡：不在独占会话、对方是旧版插件、
         /// 合成失败、被中断、或等超时了 —— 没出声也得出字，否则用户面对的是
         /// 一只既不说话也不显示的桌宠。等到与否只影响起点是否对齐，
         /// 气泡自身的节奏始终沿用宿主默认。
         /// </summary>
-        private async Task WaitForPlaybackStartAsync(
+        private async Task<bool> WaitForPlaybackStartAsync(
             VPetTTSIntegrationManager vpetTTSIntegration, string ttsRequestId)
         {
             if (vpetTTSIntegration is null || string.IsNullOrEmpty(ttsRequestId))
             {
-                return;
+                return false;
             }
 
             if (!TTSCoordinationSettings.Instance.EnablePlaybackStartSync)
             {
                 Logger.Log("TTSRequestSerializer: 起播同步已关闭，沿用旧时序（气泡可能早于语音）");
-                return;
+                return false;
             }
 
             var timeoutMs = TTSCoordinationSettings.Instance.PlaybackStartTimeoutMs;
@@ -245,6 +275,8 @@ namespace VPetLLM.Handlers.TTS
             Logger.Log(durationMs >= 0
                 ? $"TTSRequestSerializer: 语音已起播（等待 {waited}ms，音频时长 {durationMs}ms），现在显示气泡"
                 : $"TTSRequestSerializer: 等待 {waited}ms 未检测到起播，直接显示气泡");
+
+            return durationMs >= 0;
         }
 
         /// <summary>

@@ -2311,6 +2311,16 @@
                                     </ToolTip>
                                 </CheckBox.ToolTip>
                             </CheckBox>
+                            <CheckBox x:Name="CheckBox_EnableBubbleExclusive"
+                                    Content="{utils:Localize KeyPath=Advanced_Options.EnableBubbleExclusive}"
+                                    IsChecked="True"
+                                    Style="{StaticResource AdvancedCheckBox}">
+                                <CheckBox.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableBubbleExclusiveToolTip}"/>
+                                    </ToolTip>
+                                </CheckBox.ToolTip>
+                            </CheckBox>
 
                             <!-- 上下文管理 -->
                             <Separator Style="{StaticResource AdvancedDivider}"/>

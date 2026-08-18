@@ -290,7 +290,7 @@ namespace VPetLLM.Handlers.Actions
                         if (graphStart is not null)
                         {
                             // 有A_Start动画，使用VPet原生Say API（支持A_Start→B_Loop→C_End完整流程）
-                            mainWindow.Main.Say(text, animName, true);
+                            mainWindow.Main.SayGuarded(text, animName, true);
                             Logger.Log($"SayHandler: 显示完成(A_Start模式) - 文本: \"{text}\", 动画: {animName}, 模式: {currentMode}");
                         }
                         else
@@ -355,7 +355,7 @@ namespace VPetLLM.Handlers.Actions
                         Utils.UI.BubbleDelayController.ApplyUIDelay();
                         
                         // 直接使用VPet原生API
-                        mainWindow.Main.Say(text, null, false);
+                        mainWindow.Main.SayGuarded(text, null, false);
 
                         Logger.Log($"SayHandler: 气泡显示完成（使用VPet原生API）");
                     }
@@ -363,7 +363,7 @@ namespace VPetLLM.Handlers.Actions
                     {
                         Logger.Log("SayHandler: VPetLLM实例不可用，回退到API调用");
                         // 回退到标准API调用
-                        mainWindow.Main.Say(text, null, false);
+                        mainWindow.Main.SayGuarded(text, null, false);
                     }
                 }
                 catch (Exception ex)

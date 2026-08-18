@@ -47,7 +47,7 @@ namespace VPetLLM.Core.Services
                 Logger.Log($"VPetAPIWrapper: Calling Say with text='{text}', graphname='{graphname}', force={force}");
 
                 // Direct call to VPet's Say method - no reflection needed
-                _mainWindow.Main.Say(text, graphname, force);
+                _mainWindow.Main.SayGuarded(text, graphname, force);
 
                 Logger.Log("VPetAPIWrapper: Say method called successfully");
             }
@@ -85,7 +85,7 @@ namespace VPetLLM.Core.Services
                 // Use VPet's Say method with SayInfo
                 await Task.Run(() =>
                 {
-                    _mainWindow.Main.Say(sayInfo);
+                    _mainWindow.Main.SayGuarded(sayInfo);
                 });
 
                 Logger.Log("VPetAPIWrapper: SayInfoWithOutStream displayed successfully");
@@ -124,7 +124,7 @@ namespace VPetLLM.Core.Services
                 // Start the streaming display
                 await Task.Run(() =>
                 {
-                    _mainWindow.Main.Say(sayInfo);
+                    _mainWindow.Main.SayGuarded(sayInfo);
                 });
 
                 // Update the text content

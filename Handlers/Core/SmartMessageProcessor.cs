@@ -244,6 +244,11 @@ namespace VPetLLM.Handlers.Core
         /// <param name="existingSessionId">外部已启动的独占会话 ID（如果有）</param>
         public async Task ProcessMessageAsync(string response, bool skipInitialization = false, bool autoSetIdleOnComplete = true, string existingSessionId = null)
         {
+            // 整段演出期间独占气泡：这中间别的插件（以及宿主自己的闲置说话、打工播报）
+            // 再说话，就会把桌宠正在念的这段直接顶掉——文字没了，语音还在放。
+            // 守卫会把那些请求静默吞掉，调用方看到的仍是一次正常返回的调用。
+            using var bubbleScope = BubbleGuard.BeginReply();
+
             // 如果传入了外部会话 ID，直接使用现有会话
             if (!string.IsNullOrEmpty(existingSessionId))
             {
@@ -274,11 +279,18 @@ namespace VPetLLM.Handlers.Core
         /// 在外层没有独占会话时自建一个，让本条消息的语音走"提交-起播-完成"的受控链路，
         /// 而不是退化成 VPetTTS 事后捕获宿主 Say 文本（那条路上气泡必然早于语音）。
         ///
-        /// 拿不到会话不是错误：没装 VPetTTS、独占模式关闭、消息里根本没有要说的话、
-        /// 或已经有别人的会话在跑 —— 一律返回 null 走原来的路径。
+        /// 已经有别人的会话在跑时是"加入"而不是跳过：加入的一方同样计入参与者，
+        /// 会话要等所有参与者收尾才关。早先的做法是直接返回 null 不管，先说完的那条
+        /// 一收尾就把会话连同别人挂着的起播等待一起清掉，后一条的气泡当场弹出、
+        /// 语音还在合成 —— 这正是"偶发气泡早于语音好几秒"的来源。
+        ///
+        /// 拿不到会话不是错误：没装 VPetTTS、独占模式关闭、消息里根本没有要说的话 ——
+        /// 一律返回 null 走原来的路径。
         /// </summary>
         private async Task<string> TryStartOwnedExclusiveSessionAsync(string response)
         {
+            string sessionId = null;
+
             try
             {
                 var integration = EnsureVPetTTSIntegration();
@@ -287,21 +299,16 @@ namespace VPetLLM.Handlers.Core
                     return null;
                 }
 
-                // 已经有会话在跑（外层建的、或上一条还没收尾）：抢会导致
-                // ExclusiveSessionManager 抛"会话已存在"，交给现有会话即可
-                if (integration.IsInExclusiveSession())
-                {
-                    return null;
-                }
-
-                // 没有要说的话就不必开会话——开了还得收，纯属给纯动作消息添开销
+                // 没有要说的话就不必开会话——开了还得收，纯属给纯动作消息添开销。
+                // 提取走的是和显示气泡同一套解析，两边口径必须一致：口径不一致时
+                // 这里判定"没有话要说"而下面照样显示气泡，语音就退回了事后捕获
                 var talkTexts = integration.ExtractAllTalkTexts(response);
                 if (talkTexts.Count == 0)
                 {
                     return null;
                 }
 
-                var sessionId = await integration.StartExclusiveSessionAsync();
+                sessionId = await integration.StartExclusiveSessionAsync();
 
                 // 先把音频合出来放进缓存，正式提交时就能立刻起播，
                 // 气泡也就不用干等一次网络往返
@@ -316,6 +323,15 @@ namespace VPetLLM.Handlers.Core
             catch (Exception ex)
             {
                 Logger.Log($"SmartMessageProcessor: 自建独占会话失败，回退到非会话模式: {ex.Message}");
+
+                // 已经算进参与者了才失败（多半是预加载抛出来的）：必须把这一票还回去。
+                // 不还的话计数永远归不了零，会话再也关不掉 —— VPetTTS 的文本捕获会一直关着，
+                // 之后宿主自己触发的说话就彻底没有语音了。
+                if (!string.IsNullOrEmpty(sessionId))
+                {
+                    await EndOwnedExclusiveSessionAsync(sessionId);
+                }
+
                 return null;
             }
         }
@@ -757,7 +773,7 @@ namespace VPetLLM.Handlers.Core
                         await ExecuteActionAsync(segment.Content).ConfigureAwait(false);
                         
                         // 等待气泡显示完成
-                        var msgBar = _plugin.MW?.Main?.MsgBar;
+                        var msgBar = BubbleGuard.RealMsgBar;
                         if (msgBar is not null)
                         {
                             int maxWaitMs = BubbleDisplayConfig.CalculateActualDisplayTime(talkText);
@@ -877,7 +893,7 @@ namespace VPetLLM.Handlers.Core
                     try
                     {
                         // 先清空MessageBar状态，确保新气泡能正确显示
-                        var msgBar = _plugin.MW?.Main?.MsgBar;
+                        var msgBar = BubbleGuard.RealMsgBar;
                         if (msgBar is not null)
                         {
                             MessageBarHelper.StopAllTimers(msgBar);
@@ -903,7 +919,7 @@ namespace VPetLLM.Handlers.Core
                             Action onAnimationComplete = () =>
                             {
                                 _isBubbleDisplayed = true;
-                                _plugin.MW.Main.Say(text, null, true);
+                                _plugin.MW.Main.SayGuarded(text, null, true);
                                 Logger.LogVerbose("SmartMessageProcessor: 思考结束动画完成，气泡已显示（强制模式）");
                             };
 
@@ -932,7 +948,7 @@ namespace VPetLLM.Handlers.Core
                                     Logger.LogVerbose("SmartMessageProcessor: 超时保护触发，强制显示气泡");
                                     await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                                     {
-                                        _plugin.MW.Main.Say(text, null, false);
+                                        _plugin.MW.Main.SayGuarded(text, null, false);
                                         _isBubbleDisplayed = true;
                                     });
                                 }
@@ -941,7 +957,7 @@ namespace VPetLLM.Handlers.Core
                         else
                         {
                             // 不在思考状态，直接显示气泡
-                            _plugin.MW.Main.Say(text, null, false);
+                            _plugin.MW.Main.SayGuarded(text, null, false);
                             _isBubbleDisplayed = true;
                             Logger.LogVerbose($"SmartMessageProcessor: 非思考状态，直接显示气泡 - 文本长度: {text.Length}");
                         }
@@ -952,7 +968,7 @@ namespace VPetLLM.Handlers.Core
                         Logger.Log($"SmartMessageProcessor: 异常堆栈: {ex.StackTrace}");
                         
                         // 回退到简单显示
-                        _plugin.MW.Main.Say(text, null, false);
+                        _plugin.MW.Main.SayGuarded(text, null, false);
                         _isBubbleDisplayed = true;
                     }
                 });
@@ -983,7 +999,7 @@ namespace VPetLLM.Handlers.Core
                 {
                     await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                     {
-                        _plugin.MW.Main.Say(text, null, false);
+                        _plugin.MW.Main.SayGuarded(text, null, false);
                     });
                     await WaitForMessageBarCompleteAsync(text).ConfigureAwait(false);
                 }
@@ -1002,7 +1018,7 @@ namespace VPetLLM.Handlers.Core
         {
             try
             {
-                var msgBar = _plugin.MW?.Main?.MsgBar;
+                var msgBar = BubbleGuard.RealMsgBar;
                 if (msgBar == null)
                 {
                     Logger.LogVerbose("SmartMessageProcessor: MessageBar为null，使用固定等待时间");
@@ -1652,25 +1668,15 @@ namespace VPetLLM.Handlers.Core
         }
 
         /// <summary>
-        /// 从talk动作中提取文本内容 (新格式)
+        /// 从talk动作中提取文本内容 (新格式)。
+        ///
+        /// 实现放在 <see cref="CommandFormatParser.ExtractSayText"/>：预加载那条路要按
+        /// 完全相同的口径判断"这条消息有没有话要说"，两处各写一份迟早会分叉，
+        /// 而分叉的后果是整条消息退回无独占会话模式，气泡早于语音几秒。
         /// </summary>
         private string ExtractTalkText(string actionValue)
         {
-            // 解析 say("text", animation) 格式
-            var match = Regex.Match(actionValue, @"say\s*\(\s*""([^""]*)""\s*(?:,\s*([^)]*))?\s*\)");
-            if (match.Success)
-            {
-                return match.Groups[1].Value;
-            }
-
-            // 解析简单的 "text" 格式
-            match = Regex.Match(actionValue, @"""([^""]*)""");
-            if (match.Success)
-            {
-                return match.Groups[1].Value;
-            }
-
-            return string.Empty;
+            return CommandFormatParser.ExtractSayText(actionValue);
         }
 
         /// <summary>

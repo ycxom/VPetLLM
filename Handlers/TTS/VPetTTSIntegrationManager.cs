@@ -1,3 +1,4 @@
+using System.Threading;
 using VPetLLM.Utils.Audio;
 using VPetLLM.Configuration;
 
@@ -13,6 +14,24 @@ public class VPetTTSIntegrationManager
     // 非 readonly：VPetTTS 插件可能晚于本类构造才出现在 MW.Plugins 中，支持延迟获取
     private VPetTTSStateMonitor? _stateMonitor;
     private string? _currentSessionId;
+
+    /// <summary>
+    /// 会话的开合闸门。"看一眼有没有会话，没有就开一个"必须是原子的：
+    /// 流式回复是每检测到一条完整命令就派发一次，两条命令并发进来时都会看到"还没有会话"，
+    /// 于是双双去开 —— 后到的那个在 VPetTTS 侧撞上"会话已存在"异常，被吞掉后整条消息
+    /// 退回无会话路径：气泡不再等起播，语音改由事后捕获文本再合成，差一整个合成往返。
+    /// </summary>
+    private readonly SemaphoreSlim _sessionGate = new(1, 1);
+
+    /// <summary>
+    /// 当前会话的参与者数量（引用计数）。
+    ///
+    /// 会话不能谁先说完谁就关：后到的消息会把自己的 TTS 请求挂到已有会话上，
+    /// 先到的那条一收尾就 EndSession，VPetTTS 侧 ClearRequests 把还挂着的起播等待
+    /// 全部以"没播出来"放掉 —— 后一条的气泡当场弹出，音频还在合成队列里。
+    /// 计数归零（最后一个参与者离开）才真正结束会话。
+    /// </summary>
+    private int _sessionParticipants;
 
     public VPetTTSIntegrationManager(VPetLLM plugin)
     {
@@ -73,7 +92,10 @@ public class VPetTTSIntegrationManager
     }
 
     /// <summary>
-    /// 启动独占会话
+    /// 加入独占会话；当前没有会话就开一个。返回会话 ID。
+    ///
+    /// 每次调用都算一个参与者，必须与 <see cref="EndExclusiveSessionAsync"/> 成对使用 ——
+    /// 会话要等所有参与者都收尾才真正结束。
     /// </summary>
     public async Task<string> StartExclusiveSessionAsync()
     {
@@ -83,33 +105,79 @@ public class VPetTTSIntegrationManager
             throw new InvalidOperationException("VPetTTS 协调器未初始化");
         }
 
-        _currentSessionId = await coordinator.StartExclusiveSessionAsync();
-        Logger.Log($"VPetTTSIntegrationManager: 启动独占会话，会话 ID: {_currentSessionId}");
-        return _currentSessionId;
+        await _sessionGate.WaitAsync();
+        try
+        {
+            // 已有会话：加入而不是另起。抢着开会在 VPetTTS 侧是直接抛异常的，
+            // 而且就算不抛，两个会话也会互相把对方的请求表清掉
+            if (!string.IsNullOrEmpty(_currentSessionId))
+            {
+                _sessionParticipants++;
+                Logger.Log($"VPetTTSIntegrationManager: 加入已有独占会话，会话 ID: {_currentSessionId}，" +
+                           $"当前参与者: {_sessionParticipants}");
+                return _currentSessionId;
+            }
+
+            _currentSessionId = await coordinator.StartExclusiveSessionAsync();
+            _sessionParticipants = 1;
+            Logger.Log($"VPetTTSIntegrationManager: 启动独占会话，会话 ID: {_currentSessionId}");
+            return _currentSessionId;
+        }
+        finally
+        {
+            _sessionGate.Release();
+        }
     }
 
     /// <summary>
-    /// 结束独占会话
+    /// 退出独占会话。最后一个参与者离开时才真正结束会话。
     /// </summary>
     public async Task EndExclusiveSessionAsync()
     {
         var coordinator = GetCoordinator();
-        if (coordinator == null || string.IsNullOrEmpty(_currentSessionId))
+        if (coordinator == null)
         {
             return;
         }
 
+        await _sessionGate.WaitAsync();
         try
         {
-            await coordinator.EndExclusiveSessionAsync();
-            Logger.Log($"VPetTTSIntegrationManager: 结束独占会话，会话 ID: {_currentSessionId}");
-            _currentSessionId = null;
+            if (string.IsNullOrEmpty(_currentSessionId))
+            {
+                return;
+            }
+
+            if (_sessionParticipants > 1)
+            {
+                _sessionParticipants--;
+                Logger.Log($"VPetTTSIntegrationManager: 退出独占会话（仍有 {_sessionParticipants} 个参与者在用），" +
+                           $"会话 ID: {_currentSessionId} 保持开启");
+                return;
+            }
+
+            var endingSessionId = _currentSessionId;
+            try
+            {
+                await coordinator.EndExclusiveSessionAsync();
+                Logger.Log($"VPetTTSIntegrationManager: 结束独占会话，会话 ID: {endingSessionId}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"VPetTTSIntegrationManager: 结束独占会话失败: {ex.Message}");
+                throw;
+            }
+            finally
+            {
+                // 成功与否都要清干净：留着一个已经关掉（或状态不明）的会话 ID，
+                // 后续消息会误以为自己在会话里，请求提交进去只会被 VPetTTS 判定为无效
+                _currentSessionId = null;
+                _sessionParticipants = 0;
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            Logger.Log($"VPetTTSIntegrationManager: 结束独占会话失败: {ex.Message}");
-            _currentSessionId = null;
-            throw;
+            _sessionGate.Release();
         }
     }
 
@@ -333,37 +401,24 @@ public class VPetTTSIntegrationManager
     }
 
     /// <summary>
-    /// 从完整消息中提取所有 talk 文本（用于批量预加载）
+    /// 从完整消息中提取所有 talk 文本（用于批量预加载）。
+    ///
+    /// 走 <see cref="CommandFormatParser.ExtractAllSayTexts"/> —— 和真正显示气泡那条路
+    /// 同一套解析。这里曾经另写过一条正则（要求文本必须带引号、参数必须是 \w+），
+    /// 漏掉的那些消息就不会开独占会话，语音退回事后捕获，气泡因此早于语音好几秒。
     /// </summary>
     public List<string> ExtractAllTalkTexts(string message)
     {
-        var talkTexts = new List<string>();
-        
         try
         {
-            // 使用正则表达式提取所有 say/talk 命令中的文本
-            var sayPattern = @"<\|(?:say|talk)_begin\|>\s*""([^""]+)""\s*(?:,\s*\w+)?(?:\s*,\s*\w+)?\s*<\|(?:say|talk)_end\|>";
-            var matches = System.Text.RegularExpressions.Regex.Matches(message, sayPattern);
-            
-            foreach (System.Text.RegularExpressions.Match match in matches)
-            {
-                if (match.Groups.Count > 1)
-                {
-                    var text = match.Groups[1].Value;
-                    if (!string.IsNullOrWhiteSpace(text))
-                    {
-                        talkTexts.Add(text);
-                    }
-                }
-            }
-            
+            var talkTexts = CommandFormatParser.ExtractAllSayTexts(message);
             Logger.Log($"VPetTTSIntegrationManager: 从消息中提取了 {talkTexts.Count} 个 talk 文本");
+            return talkTexts;
         }
         catch (Exception ex)
         {
             Logger.Log($"VPetTTSIntegrationManager: 提取 talk 文本失败: {ex.Message}");
+            return new List<string>();
         }
-        
-        return talkTexts;
     }
 }

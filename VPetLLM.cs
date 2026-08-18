@@ -727,6 +727,10 @@ namespace VPetLLM
                 // 初始化气泡延迟控制（性能优化）
                 InitializeBubbleDelayControl();
 
+                // 装上气泡独占守卫：回复期间别人的气泡请求会被静默吞掉，顶不掉正在念的回复。
+                // 放在这里只是先占好位；宿主中途换掉气泡实例时 BubbleGuard 会自愈重装
+                Utils.UI.BubbleGuard.Install(MW);
+
                 // 检测 VPet.Plugin.VPetTTS 插件
                 DetectAndHandleVPetTTSPlugin();
 
@@ -1249,6 +1253,10 @@ namespace VPetLLM
                 {
                     UnregisterTakeItemHandleEvent();
                     UnregisterItemUseHook();
+
+                    // 把真气泡还给宿主。不还的话宿主会一直握着一个指向已卸载插件的装饰器，
+                    // 之后每次说话都要穿过我们这层已经没人维护的代码
+                    Utils.UI.BubbleGuard.Uninstall(MW);
                 }
 
                 // 清理服务

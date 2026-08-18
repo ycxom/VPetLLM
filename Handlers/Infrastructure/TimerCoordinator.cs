@@ -39,7 +39,7 @@ namespace VPetLLM.Handlers.Infrastructure
 
                 try
                 {
-                    var msgBar = _plugin?.MW?.Main?.MsgBar;
+                    var msgBar = Utils.UI.BubbleGuard.RealMsgBar;
                     if (msgBar is null) return;
 
                     // 保存当前状态
@@ -77,7 +77,7 @@ namespace VPetLLM.Handlers.Infrastructure
 
                 try
                 {
-                    var msgBar = _plugin?.MW?.Main?.MsgBar;
+                    var msgBar = Utils.UI.BubbleGuard.RealMsgBar;
                     if (msgBar is null) return;
 
                     // 根据当前配置决定启动哪个定时器
@@ -158,7 +158,7 @@ namespace VPetLLM.Handlers.Infrastructure
             {
                 try
                 {
-                    var msgBar = _plugin?.MW?.Main?.MsgBar;
+                    var msgBar = Utils.UI.BubbleGuard.RealMsgBar;
                     if (msgBar is null) return;
 
                     GetTimer(msgBar, "ShowTimer")?.Stop();
@@ -189,7 +189,7 @@ namespace VPetLLM.Handlers.Infrastructure
             {
                 try
                 {
-                    var msgBar = _plugin?.MW?.Main?.MsgBar;
+                    var msgBar = Utils.UI.BubbleGuard.RealMsgBar;
                     if (msgBar is null) return true;
 
                     var showTimer = GetTimer(msgBar, "ShowTimer");
@@ -258,7 +258,7 @@ namespace VPetLLM.Handlers.Infrastructure
             {
                 try
                 {
-                    var msgBar = _plugin?.MW?.Main?.MsgBar;
+                    var msgBar = Utils.UI.BubbleGuard.RealMsgBar;
 
                     return new TimerStateSnapshot
                     {

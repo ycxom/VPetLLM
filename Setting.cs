@@ -93,6 +93,15 @@ namespace VPetLLM
         public TouchFeedbackSettings TouchFeedback { get; set; } = new TouchFeedbackSettings();
         public bool EnableBuyFeedback { get; set; } = true;
         public bool EnableLiveMode { get; set; } = false;
+
+        /// <summary>
+        /// LLM 回复期间是否独占气泡：这段时间里其它插件（以及宿主自己的闲置说话、
+        /// 打工播报）的气泡请求会被静默吞掉，不会把正在念的回复顶掉。
+        ///
+        /// 吞掉不等于拦截——调用方看到的是一次正常返回的调用，不会因此抛异常或卡住。
+        /// 见 <see cref="Utils.UI.BubbleGuard"/>。
+        /// </summary>
+        public bool EnableBubbleExclusive { get; set; } = true;
         public bool LimitStateChanges { get; set; } = true;
         public bool EnableVPetSettingsControl { get; set; } = false;
 

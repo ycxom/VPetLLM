@@ -83,7 +83,12 @@ namespace VPetLLM.Utils.Common
         /// <summary>
         /// 替代真正 ChatCore 调用的测试替身，见 <see cref="SendAsync"/>。生产运行时恒为 null。
         /// </summary>
+        // CS0649：本程序集内确实没有任何地方给它赋值 —— 唯一的写入方是
+        // Tests/VPetLLM.ChatDispatcherChecks，它按字段名反射注入。编译器看不到那次赋值，
+        // 警告本身没说错，所以就地关掉并说明，而不是为了消警告给它加个生产代码用不到的 setter。
+#pragma warning disable CS0649
         private static Func<string, IReadOnlyList<byte[]>?, bool, Task<string>>? _sendStub;
+#pragma warning restore CS0649
 
         private static Setting? Settings => VPetLLM.Instance?.Settings;
 
