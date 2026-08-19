@@ -10,6 +10,8 @@ namespace VPetLLM.Services
         private readonly VPetLLM _plugin;
         private readonly Setting _settings;
         private readonly IPreprocessingMultimodal _preprocessingMultimodal;
+        // 处理类型（原生/前置多模态/OCR）的分发统一走它，与 SeeScreenHandler 同一份实现
+        private readonly ScreenshotAnalyzer _analyzer;
         private GlobalHotkey? _screenshotHotkey;
         private UI.Windows.winScreenshotCapture? _captureWindow;
         private ScreenshotState _currentState = ScreenshotState.Idle;
@@ -45,6 +47,7 @@ namespace VPetLLM.Services
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _preprocessingMultimodal = new PreprocessingMultimodal(settings, plugin);
+            _analyzer = new ScreenshotAnalyzer(settings, plugin, _preprocessingMultimodal);
         }
 
         /// <inheritdoc/>
@@ -131,53 +134,105 @@ namespace VPetLLM.Services
             InitializeHotkey();
         }
 
-        /// <inheritdoc/>
-        public void StartCapture()
+        /// <summary>
+        /// 唯一的抓图内核。两个公开入口（用户手动 / AI 请求）都从这里走，
+        /// 窗口生命周期、状态机、取消与超时兜底只有这一份实现。
+        ///
+        /// 分开写的时候两边能力是不对等的：AI 那条有超时和「窗口被外部关掉」的兜底，
+        /// 手动那条没有；反过来手动那条把窗口记进 _captureWindow（所以 CancelCapture /
+        /// Dispose 关得掉），AI 那条用的是局部变量 —— 插件卸载时那个选区窗口会留在屏幕上。
+        /// </summary>
+        /// <param name="reason">非空表示这是 AI 发起的请求，会显示在选区窗口上。</param>
+        /// <param name="timeoutSeconds">等待用户操作的上限；null 表示不设上限（手动截图）。</param>
+        private async Task<byte[]?> CaptureCoreAsync(string? reason, int? timeoutSeconds)
         {
+            var tcs = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
             try
             {
-                Logger.Log("Starting screenshot capture...");
-
-                if (_captureWindow is not null)
+                await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    Logger.Log("Previous capture window still exists, closing it first");
-                    try
+                    // 上一个窗口还开着就先关掉，别叠出两层选区遮罩
+                    if (_captureWindow is not null)
                     {
-                        _captureWindow.Close();
+                        Logger.Log("Previous capture window still exists, closing it first");
+                        try { _captureWindow.Close(); }
+                        catch (Exception ex) { Logger.Log($"Error closing previous window: {ex.Message}"); }
+                        _captureWindow = null;
                     }
-                    catch (Exception ex)
+
+                    SetState(ScreenshotState.Capturing);
+
+                    var window = reason is null
+                        ? new UI.Windows.winScreenshotCapture()
+                        : new UI.Windows.winScreenshotCapture(reason);
+
+                    window.ScreenshotCaptured += (s, data) => tcs.TrySetResult(data);
+                    window.CaptureCancelled += (s, e) => tcs.TrySetResult(null);
+                    // 兜底：窗口被外部关闭（宿主退出、Dispose 等）时也要让等待方解除阻塞
+                    window.Closed += (s, e) =>
                     {
-                        Logger.Log($"Error closing previous window: {ex.Message}");
-                    }
-                    _captureWindow = null;
+                        if (ReferenceEquals(_captureWindow, window)) _captureWindow = null;
+                        tcs.TrySetResult(null);
+                        Logger.Log("Screenshot capture window closed");
+                    };
+
+                    _captureWindow = window;
+                    window.Show();
+                    Logger.Log($"Screenshot capture window shown (reason={reason ?? "manual"})");
+                });
+
+                if (timeoutSeconds is null)
+                {
+                    return await tcs.Task;
                 }
 
-                SetState(ScreenshotState.Capturing);
-
-                _captureWindow = new UI.Windows.winScreenshotCapture();
-
-                _captureWindow.Closed += (s, e) =>
+                try
                 {
-                    _captureWindow = null;
-                    if (_currentState == ScreenshotState.Capturing)
+                    // WaitAsync 自己管定时器；旧的 Task.WhenAny(tcs, Task.Delay(..)) 在 tcs 先赢时
+                    // 会把那个 Delay 定时器一直武装到到期。
+                    return await tcs.Task.WaitAsync(TimeSpan.FromSeconds(Math.Max(5, timeoutSeconds.Value)));
+                }
+                catch (TimeoutException)
+                {
+                    Logger.Log($"ScreenshotService: 截图请求等待超时（{timeoutSeconds}s），自动取消");
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
                     {
-                        SetState(ScreenshotState.Idle);
-                    }
-                    Logger.Log("Screenshot capture window closed");
-                };
-
-                _captureWindow.ScreenshotCaptured += OnCaptureCompleted;
-                _captureWindow.CaptureCancelled += OnCaptureCancelled;
-
-                _captureWindow.Show();
-                Logger.Log("Screenshot capture window shown");
+                        try { _captureWindow?.Close(); } catch { }
+                    });
+                    return null;
+                }
             }
             catch (Exception ex)
             {
-                Logger.Log($"Error starting screenshot capture: {ex.Message}");
-                SetState(ScreenshotState.Idle);
+                Logger.Log($"ScreenshotService: 抓图失败: {ex.Message}");
                 ErrorOccurred?.Invoke(this, $"启动截图失败: {ex.Message}");
+                return null;
             }
+            finally
+            {
+                if (_currentState == ScreenshotState.Capturing)
+                {
+                    SetState(ScreenshotState.Idle);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public void StartCapture()
+        {
+            // 用户手动截图：不设超时（他可能盯着屏幕慢慢挑区域），结果走常规事件链。
+            _ = Task.Run(async () =>
+            {
+                var data = await CaptureCoreAsync(reason: null, timeoutSeconds: null);
+                if (data is null || data.Length == 0)
+                {
+                    Logger.Log("Screenshot capture cancelled");
+                    return;
+                }
+
+                await Application.Current.Dispatcher.InvokeAsync(() => OnCaptureCompleted(this, data));
+            });
         }
 
         private void OnCaptureCompleted(object? sender, byte[] imageData)
@@ -206,12 +261,6 @@ namespace VPetLLM.Services
             }
         }
 
-        private void OnCaptureCancelled(object? sender, EventArgs e)
-        {
-            Logger.Log("Screenshot capture cancelled");
-            SetState(ScreenshotState.Idle);
-        }
-
         /// <inheritdoc/>
         public async Task<byte[]?> RequestUserCaptureAsync(string reason, int timeoutSeconds = 60)
         {
@@ -221,51 +270,13 @@ namespace VPetLLM.Services
                 return null;
             }
 
-            var tcs = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
-            UI.Windows.winScreenshotCapture? window = null;
-
-            try
-            {
-                SetState(ScreenshotState.Capturing);
-
-                await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    window = new UI.Windows.winScreenshotCapture(reason);
-                    window.ScreenshotCaptured += (s, data) => tcs.TrySetResult(data);
-                    window.CaptureCancelled += (s, e) => tcs.TrySetResult(null);
-                    // 兜底：窗口被外部关闭（如宿主退出）时也要让等待方解除阻塞
-                    window.Closed += (s, e) => tcs.TrySetResult(null);
-                    window.Show();
-                });
-
-                var timeout = Task.Delay(TimeSpan.FromSeconds(Math.Max(5, timeoutSeconds)));
-                var finished = await Task.WhenAny(tcs.Task, timeout);
-
-                if (finished != tcs.Task)
-                {
-                    Logger.Log($"ScreenshotService: AI 截图请求等待超时（{timeoutSeconds}s），自动取消");
-                    await Application.Current.Dispatcher.InvokeAsync(() =>
-                    {
-                        try { window?.Close(); } catch { }
-                    });
-                    return null;
-                }
-
-                var result = await tcs.Task;
-                Logger.Log(result is null
-                    ? "ScreenshotService: 用户取消了 AI 的截图请求"
-                    : $"ScreenshotService: 用户已授权截图，{result.Length} 字节");
-                return result;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ScreenshotService: AI 截图请求失败: {ex.Message}");
-                return null;
-            }
-            finally
-            {
-                SetState(ScreenshotState.Idle);
-            }
+            // 与 StartCapture 的唯一区别：带上请求原因、设超时，且结果只回给调用方，
+            // 不触发 ScreenshotCaptured / 前置多模态那套常规事件链。
+            var result = await CaptureCoreAsync(reason, timeoutSeconds);
+            Logger.Log(result is null
+                ? "ScreenshotService: 用户取消了 AI 的截图请求"
+                : $"ScreenshotService: 用户已授权截图，{result.Length} 字节");
+            return result;
         }
 
         /// <inheritdoc/>
@@ -305,10 +316,22 @@ namespace VPetLLM.Services
                     {
                         try
                         {
-                            var text = await PerformOCR(imageData);
+                            // 走统一分发器而不是直接 PerformOCR：这样这条路也能享受到
+                            // 「OCR 未配独立端点时不做无谓重试」之类的判断，与其它入口一致。
+                            var analysis = await _analyzer.AnalyzeAsync(imageData);
+                            var text = analysis.Success ? analysis.Text : "";
+
                             Application.Current.Dispatcher.Invoke(() =>
                             {
-                                OCRCompleted?.Invoke(this, text);
+                                if (analysis.Success)
+                                {
+                                    OCRCompleted?.Invoke(this, text);
+                                }
+                                else
+                                {
+                                    Logger.Log($"ScreenshotService: 自动发送的 OCR 未取到文字: {analysis.ErrorMessage}");
+                                    ErrorOccurred?.Invoke(this, analysis.ErrorMessage);
+                                }
                                 SetState(ScreenshotState.Idle);
                             });
                         }
@@ -352,142 +375,75 @@ namespace VPetLLM.Services
             => ProcessWithPreprocessingAsync(new[] { imageData }, userQuestion);
 
         /// <summary>
-        /// 把一张图变成文字。OCR 模式与前置多模态走的是同一条链路，
-        /// 区别只在识别时用的提示词——所以在这里按模式分流，
-        /// 上层的单图/多图逻辑不必各自再判断一次。
+        /// 把图变成文字。模式分流、失败回落、多图编号全在 ScreenshotAnalyzer 里，
+        /// 这里只负责把结果转回旧的 PreprocessingResult 形状给上层事件用。
+        ///
+        /// 以前这里是自己判 OCRApi 再分流的，识图不带关注点、视觉失败也没有任何回落——
+        /// 同样的能力 SeeScreenHandler 那边却有一整套。现在两边同一份实现。
         /// </summary>
-        private async Task<PreprocessingResult> RecognizeImageAsync(byte[] image)
+        private async Task<PreprocessingResult> RecognizeImagesAsync(IReadOnlyList<byte[]> images, string? focus)
         {
-            if (_settings.Screenshot?.ProcessingMode != ScreenshotProcessingMode.OCRApi)
-            {
-                return await _preprocessingMultimodal.AnalyzeImageAsync(image);
-            }
-
-            try
-            {
-                var text = await PerformOCR(image);
-                return string.IsNullOrWhiteSpace(text)
-                    ? PreprocessingResult.CreateFailure("未识别到文字")
-                    : PreprocessingResult.CreateSuccess(text, "OCR");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ScreenshotService: OCR 识别失败: {ex.Message}");
-                return PreprocessingResult.CreateFailure($"OCR 识别失败: {ex.Message}");
-            }
+            var analysis = await _analyzer.AnalyzeAsync(images, focus);
+            return analysis.ToPreprocessingResult();
         }
 
         /// <summary>
-        /// 多图前置处理：逐张送视觉模型拿描述，再把描述按顺序编号拼成一段文本。
-        /// 前置多模态的本质是「把图翻译成文字再给主模型」，所以多图只能逐张翻译后合并，
-        /// 没法像原生多模态那样一次请求塞多张。
+        /// 前置处理入口：把图交给统一分发器变成文字，再拼上用户提问，最后播事件。
+        ///
+        /// 单图/多图不再分两条路 —— 编号、失败回落、模式分流全在 ScreenshotAnalyzer 里，
+        /// 这里只剩「拼消息 + 播事件 + 管状态」这点本职工作。
         /// </summary>
         public async Task<PreprocessingResult> ProcessWithPreprocessingAsync(IReadOnlyList<byte[]> images, string userQuestion)
         {
-            images = images?.Where(i => i is not null && i.Length > 0).ToList() ?? new List<byte[]>();
+            var valid = (images ?? Array.Empty<byte[]>())
+                .Where(i => i is not null && i.Length > 0)
+                .ToList();
 
-            if (images.Count == 0)
+            if (valid.Count == 0)
             {
                 return PreprocessingResult.CreateFailure("没有可分析的图片");
             }
 
-            if (images.Count == 1)
-            {
-                return await ProcessSingleWithPreprocessingAsync(images[0], userQuestion);
-            }
-
             try
             {
-                Logger.Log($"Starting preprocessing for {images.Count} images");
+                Logger.Log($"Starting preprocessing for {valid.Count} image(s)");
                 SetState(ScreenshotState.Processing);
 
-                var descriptions = new List<string>();
-                var provider = "";
+                // 用户的提问同时也是识图的关注点：以前手动截图这条路是不传的，
+                // 视觉模型只能泛泛描述整屏，用户问什么它并不知道。
+                var result = await RecognizeImagesAsync(valid, userQuestion);
 
-                for (int i = 0; i < images.Count; i++)
+                if (result.Success)
                 {
-                    var result = await RecognizeImageAsync(images[i]);
-                    if (result.Success && !string.IsNullOrWhiteSpace(result.ImageDescription))
-                    {
-                        descriptions.Add($"【图片 {i + 1}/{images.Count}】{result.ImageDescription.Trim()}");
-                        provider = result.UsedProvider;
-                    }
-                    else
-                    {
-                        Logger.Log($"Preprocessing failed for image {i + 1}: {result.ErrorMessage}");
-                        descriptions.Add($"【图片 {i + 1}/{images.Count}】（识别失败：{result.ErrorMessage}）");
-                    }
+                    Logger.Log($"Preprocessing completed successfully, provider: {result.UsedProvider}");
+                }
+                else
+                {
+                    Logger.Log($"Preprocessing failed: {result.ErrorMessage}");
                 }
 
-                var combinedDescription = string.Join("\n\n", descriptions);
-                var combinedMessage = MessageCombiner.Combine(combinedDescription, userQuestion);
+                var combinedMessage = result.Success
+                    ? MessageCombiner.Combine(result.ImageDescription, userQuestion)
+                    : "";
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     PreprocessingCompleted?.Invoke(this, new PreprocessingCompletedEventArgs
                     {
-                        Success = true,
+                        Success = result.Success,
                         CombinedMessage = combinedMessage,
-                        ImageDescription = combinedDescription,
-                        UsedProvider = provider
+                        ImageDescription = result.ImageDescription,
+                        UsedProvider = result.UsedProvider,
+                        ErrorMessage = result.ErrorMessage
                     });
+
+                    if (!result.Success)
+                    {
+                        ErrorOccurred?.Invoke(this, result.ErrorMessage);
+                    }
+
                     SetState(ScreenshotState.Idle);
                 });
-
-                return PreprocessingResult.CreateSuccess(combinedDescription, provider);
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error in multi-image preprocessing: {ex.Message}");
-                SetState(ScreenshotState.Idle);
-                return PreprocessingResult.CreateFailure($"前置处理异常: {ex.Message}");
-            }
-        }
-
-        private async Task<PreprocessingResult> ProcessSingleWithPreprocessingAsync(byte[] imageData, string userQuestion)
-        {
-            try
-            {
-                Logger.Log($"Starting preprocessing multimodal analysis, image size: {imageData.Length} bytes");
-                SetState(ScreenshotState.Processing);
-
-                var result = await RecognizeImageAsync(imageData);
-
-                if (result.Success)
-                {
-                    Logger.Log($"Preprocessing completed successfully, provider: {result.UsedProvider}");
-
-                    // 组合图片描述和用户问题
-                    var combinedMessage = MessageCombiner.Combine(result.ImageDescription, userQuestion);
-
-                    // 触发完成事件
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        PreprocessingCompleted?.Invoke(this, new PreprocessingCompletedEventArgs
-                        {
-                            Success = true,
-                            CombinedMessage = combinedMessage,
-                            ImageDescription = result.ImageDescription,
-                            UsedProvider = result.UsedProvider
-                        });
-                        SetState(ScreenshotState.Idle);
-                    });
-                }
-                else
-                {
-                    Logger.Log($"Preprocessing failed: {result.ErrorMessage}");
-
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        PreprocessingCompleted?.Invoke(this, new PreprocessingCompletedEventArgs
-                        {
-                            Success = false,
-                            ErrorMessage = result.ErrorMessage
-                        });
-                        ErrorOccurred?.Invoke(this, result.ErrorMessage);
-                        SetState(ScreenshotState.Idle);
-                    });
-                }
 
                 return result;
             }

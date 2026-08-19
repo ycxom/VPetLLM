@@ -65,6 +65,32 @@ try
     var ocr = Make("[屏幕内容 - 文字识别]\nhello");
     Assert(ocr.RoleDisplay == "看屏幕 · 文字识别", "ocr variant is distinguished");
 
+    // ── 手动截图：前置多模态 / OCR 把图转成描述后，以 [图片内容] 灌进 user 角色 ──
+    // 它和 AI 主动看屏幕（[屏幕内容]）是两条入口、两套标记，但在编辑器眼里都是
+    // 「截图产生的内容」。以前只认 [屏幕内容]，于是这几百字的机器描述顶着用户名显示，
+    // 还因为不算程序灌入而收不起来，把编辑器撑得老长。
+    var shotOnly = Make("[图片内容]\n这是一张 Visual Studio Code 编辑器的屏幕截图。");
+    Assert(shotOnly.IsSystemGenerated, "manual screenshot is system generated");
+    Assert(shotOnly.RoleDisplay == "截图", "manual screenshot shows feature name");
+    Assert(shotOnly.CanCollapse && shotOnly.IsCollapsedView, "manual screenshot starts collapsed");
+    Assert(!shotOnly.CollapsedPreview.Contains("图片内容"), "preview strips the image marker");
+    Assert(!shotOnly.CollapsedPreview.Contains('\n'), "screenshot preview is a single line");
+
+    // 带用户提问时：收起那一行应该给用户真正问的那句 ——
+    // 图片描述的开头通常是「这是一张…的截图」，占满 80 字等于没说。
+    var shotWithQuestion = Make(
+        "[图片内容]\n这是一张 VS Code 的屏幕截图，左侧是资源管理器。\n\n[用户问题]\n这个报错是什么意思");
+    Assert(shotWithQuestion.IsSystemGenerated, "screenshot with question is still system generated");
+    Assert(shotWithQuestion.RoleDisplay == "截图", "screenshot with question shows feature name");
+    Assert(shotWithQuestion.CollapsedPreview == "这个报错是什么意思",
+        $"preview prefers the user question, got: {shotWithQuestion.CollapsedPreview}");
+
+    // 两条截图入口在编辑器里必须表现一致：都算程序灌入、都可收纳
+    var aiShot = Make("[屏幕内容]\n这是一张桌面截图。\n[/屏幕内容]");
+    Assert(aiShot.IsSystemGenerated == shotOnly.IsSystemGenerated,
+        "both screenshot entries agree on system-generated");
+    Assert(aiShot.CanCollapse == shotOnly.CanCollapse, "both screenshot entries agree on collapsible");
+
     var systemEvent = Make("[System] 用户摸了摸头");
     Assert(systemEvent.RoleDisplay == "系统事件", "bare [System] shows a generic feature name");
 

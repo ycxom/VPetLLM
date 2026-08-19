@@ -17,7 +17,7 @@ namespace VPetLLM.Handlers.Actions
         private const int CaptureTimeoutSeconds = 45;
 
         private readonly Setting _settings;
-        private IPreprocessingMultimodal? _preprocessing;
+        private ScreenshotAnalyzer? _analyzer;
 
         public string Keyword => "see_screen";
         public ActionType ActionType => ActionType.Tool;
@@ -41,10 +41,10 @@ namespace VPetLLM.Handlers.Actions
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
-        private IPreprocessingMultimodal GetPreprocessing()
+        private ScreenshotAnalyzer GetAnalyzer()
         {
             // 延迟构造：插件实例在 ActionProcessor 注册期可能尚未就绪
-            return _preprocessing ??= new PreprocessingMultimodal(_settings, VPetLLM.Instance);
+            return _analyzer ??= new ScreenshotAnalyzer(_settings, VPetLLM.Instance);
         }
 
         public async Task Execute(string value, IMainWindow mainWindow)
@@ -88,12 +88,13 @@ namespace VPetLLM.Handlers.Actions
                     return;
                 }
 
-                var mode = _settings.Screenshot?.ProcessingMode ?? ScreenshotProcessingMode.NativeMultimodal;
+                // 处理类型的分发统一交给 ScreenshotAnalyzer —— 与用户手动截图同一份实现。
+                var analysis = await GetAnalyzer().AnalyzeAsync(imageData, question);
 
                 // 原生多模态：不做任何描述，把截图原样交给回灌，
                 // 由 ResultAggregator 在本回合结束时经 TalkBox.SendChatWithImages 送出——
                 // 与手动截图完全同一条链路，主模型看到的是真实像素而不是自己写的描述。
-                if (mode == ScreenshotProcessingMode.NativeMultimodal)
+                if (analysis.Kind == ScreenshotAnalysisKind.RawImages)
                 {
                     var caption = string.IsNullOrWhiteSpace(question)
                         ? "[屏幕内容] 这是用户当前屏幕的截图，请据此回答。"
@@ -104,15 +105,13 @@ namespace VPetLLM.Handlers.Actions
                     return;
                 }
 
-                // 前置多模态 / OCR：先转成文字再回灌
-                var text = await AnalyzeAsync(imageData, question);
                 if (InterruptManager.IsInterrupted)
                 {
                     Logger.Log("SeeScreenHandler: 分析完成时已中断，不回灌结果");
                     return;
                 }
 
-                ResultAggregator.Enqueue(text);
+                ResultAggregator.Enqueue(DescribeForAi(analysis));
             }
             catch (Exception ex)
             {
@@ -146,125 +145,31 @@ namespace VPetLLM.Handlers.Actions
         }
 
         /// <summary>
-        /// 把画面变成文字。AI 侧统一拿文本，不受主模型是否支持视觉影响。
+        /// 把分析结果翻译成给模型看的话。
+        ///
+        /// 这里只做「AI 协议层」的措辞：原始报错（鉴权失败、状态码之类）一律只进日志——
+        /// 那是给用户排查用的，塞进对话只会让模型对着一段它无能为力的错误信息瞎猜。
+        /// 至于该走视觉还是 OCR、失败要不要回落，全都在 ScreenshotAnalyzer 里，这里不重复判断。
         /// </summary>
-        private async Task<string> AnalyzeAsync(byte[] imageData, string question)
+        private static string DescribeForAi(ScreenshotAnalysis analysis)
         {
-            var mode = _settings.Screenshot?.ProcessingMode ?? ScreenshotProcessingMode.NativeMultimodal;
-            var preprocessing = GetPreprocessing();
-            var visionPrompt = BuildVisionPrompt(question);
-
-            // OCR 模式：纯文字识别
-            if (mode == ScreenshotProcessingMode.OCRApi)
+            if (analysis.Kind == ScreenshotAnalysisKind.Text)
             {
-                return await AnalyzeWithOcrAsync(imageData);
+                var tag = analysis.UsedProvider == "OCR" ? "[屏幕内容 - 文字识别]" : "[屏幕内容]";
+                return $"{tag}\n{analysis.Text.Trim()}\n[/屏幕内容]";
             }
 
-            // 走到这里只剩前置多模态：原生模式在 Execute 里就已经把图直接交给回灌了，
-            // 根本不进本方法。
-            if (!preprocessing.HasAvailableProvider())
-            {
-                // OCR 只有在用户单独配了端点时才算另一条链路。否则它复用的就是这套没配好的
-                // 视觉节点，打过去必然同样失败；更糟的是它的最终兜底是主聊天渠道，
-                // 那等于绕过用户「不要把图交给主模型」的选择偷偷做原生多模态。
-                var fallbackOcr = new OCREngine(_settings, VPetLLM.Instance);
-                if (fallbackOcr.UsesDedicatedEndpoint)
-                {
-                    Logger.Log("SeeScreenHandler: 前置多模态未配置可用视觉节点，改用独立 OCR 端点");
-                    return await AnalyzeWithOcrAsync(imageData);
-                }
+            var error = analysis.ErrorMessage ?? "";
+            Logger.Log($"SeeScreenHandler: 识图失败，原始错误: {error}");
 
-                Logger.Log("SeeScreenHandler: 前置多模态未配置可用视觉节点，且无独立 OCR 端点，放弃识图");
+            if (error.Contains("没有识别到文字"))
+                return "[屏幕内容] 屏幕上没有识别到文字。";
+
+            if (error.Contains("视觉渠道"))
                 return "[屏幕内容] 这次没能看清屏幕（前置多模态还没有配置可用的视觉渠道）。如实告诉用户你暂时看不了屏幕，" +
                        "建议他打开设置的「截图与模型视觉」，把多模态提供商配置好，不要重复请求。";
-            }
 
-            Logger.Log("SeeScreenHandler: 前置多模态，使用配置的视觉节点识图");
-            var result = await preprocessing.AnalyzeImageAsync(imageData, visionPrompt);
-
-            if (result.Success && !string.IsNullOrWhiteSpace(result.ImageDescription))
-            {
-                return $"[屏幕内容]\n{result.ImageDescription.Trim()}\n[/屏幕内容]";
-            }
-
-            var visionError = string.IsNullOrWhiteSpace(result.ErrorMessage) ? "视觉模型没有返回内容" : result.ErrorMessage;
-
-            // 视觉不可用时回落 OCR——但只在 OCR 确实是另一条链路时才值得试。
-            // OCR 未配独立端点时复用的就是刚失败的这批节点，凭据和地址完全一样，
-            // 再打一次必然同样失败，只是多耗一次往返和一次超时等待。
-            var ocrEngine = new OCREngine(_settings, VPetLLM.Instance);
-            if (ocrEngine.UsesDedicatedEndpoint)
-            {
-                Logger.Log($"SeeScreenHandler: 视觉分析失败（{visionError}），回落独立 OCR 端点");
-
-                var fallback = await AnalyzeWithOcrAsync(imageData);
-                if (!fallback.StartsWith("[屏幕内容] "))
-                {
-                    return fallback;
-                }
-                Logger.Log("SeeScreenHandler: 独立 OCR 端点同样未取到文字");
-            }
-            else
-            {
-                Logger.Log($"SeeScreenHandler: 视觉分析失败（{visionError}）；" +
-                           "OCR 与视觉共用同一批节点，跳过必然失败的重试");
-            }
-
-            // OCR 也没成：给 AI 一句干净的说明即可。
-            // 原始报文（鉴权失败、状态码之类）只写日志——那是给用户排查用的，
-            // 塞进对话只会让模型对着一段它无能为力的错误信息瞎猜。
-            Logger.Log($"SeeScreenHandler: OCR 回落同样失败，视觉侧原始错误: {visionError}");
             return "[屏幕内容] 这次没能看清屏幕（识别服务不可用）。如实告诉用户你暂时看不了屏幕，建议他检查截图/视觉相关设置，不要复述技术错误，也不要重复请求。";
-        }
-
-        /// <summary>
-        /// 用 OCR 读屏幕文字
-        /// </summary>
-        private async Task<string> AnalyzeWithOcrAsync(byte[] imageData)
-        {
-            try
-            {
-                Logger.Log("SeeScreenHandler: 使用 OCR 读取屏幕文字");
-                var ocrEngine = new OCREngine(_settings, VPetLLM.Instance);
-                var ocrText = await ocrEngine.RecognizeText(imageData);
-
-                if (string.IsNullOrWhiteSpace(ocrText))
-                {
-                    return "[屏幕内容] 屏幕上没有识别到文字。";
-                }
-
-                return $"[屏幕内容 - 文字识别]\n{ocrText.Trim()}\n[/屏幕内容]";
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"SeeScreenHandler: OCR 失败: {ex.Message}");
-                return "[屏幕内容] OCR 识别失败。";
-            }
-        }
-
-        /// <summary>
-        /// 带上 AI 的关注点，让视觉模型有的放矢，而不是泛泛描述整屏
-        /// </summary>
-        private string BuildVisionPrompt(string question)
-        {
-            var lang = _settings.PromptLanguage ?? "zh";
-            var basePrompt = PromptHelper.Get("SeeScreen_Vision_Prompt", lang);
-
-            if (string.IsNullOrWhiteSpace(basePrompt))
-            {
-                basePrompt = lang == "zh"
-                    ? "请客观描述这张屏幕截图的内容，包括正在使用的程序、可见的文字和画面重点。"
-                    : "Objectively describe this screenshot: the app in use, visible text, and the main focus.";
-            }
-
-            if (string.IsNullOrWhiteSpace(question))
-                return basePrompt;
-
-            var focus = lang == "zh"
-                ? $"\n特别关注：{question}"
-                : $"\nPay special attention to: {question}";
-
-            return basePrompt + focus;
         }
 
         /// <summary>

@@ -7943,34 +7943,36 @@ namespace VPetLLM.UI.Windows
 
         private void ComboBox_Screenshot_ProcessingMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // 获取当前选择的处理模式
             var comboBox = sender as ComboBox;
             var selectedItem = comboBox?.SelectedItem as ComboBoxItem;
             var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
 
-            // 如果切换到前置多模态模式，需要先加载已保存的多模态提供商设置
-            // 然后再保存处理模式变更，避免覆盖已保存的多模态提供商配置
-            if (mode == "PreprocessingMultimodal")
+            // 面板可见性是纯 UI，任何时候都该跟上当前选择。
+            // 注意它内部对「前置多模态」会顺带把已保存的提供商配置读进控件。
+            UpdateScreenshotProcessingModePanel();
+
+            // ↓ 下面是「把选择写回设置」，只有用户真的在操作时才该做。
+            //
+            // 这个事件有两个时机是非用户触发的：
+            //   1. InitializeComponent() 期间 —— XAML 里第一个 ComboBoxItem 写了 IsSelected="True"，
+            //      WPF 当场就会抛这个事件。而 _plugin 是在构造函数里 InitializeComponent() 的
+            //      **下一行**才赋值的，所以此刻它还是 null，一路走到保存就是 NullReferenceException。
+            //      日志里那句「Screenshot: Error saving settings: Object reference not set to an
+            //      instance of an object.」正是它，每次打开设置窗口都会来一遍。
+            //   2. LoadScreenshotSettings() 把已保存的模式写进 SelectedIndex 时 —— 那是「加载」，
+            //      不是「用户改了」，跟着保存一遍纯属多余。
+            //
+            // 而且这比多一行错误日志严重：上面这两个时机里，ComboBox 上的值可能还是 XAML 默认的
+            // 「原生多模态」，保存下去就会把用户真正选的模式覆盖掉。现在之所以没出事，
+            // 纯粹是因为那个 NRE 抢在写入之前把整个方法打断了 —— 靠异常兜底不是设计。
+            if (_plugin?.Settings is null || _isLoadingSettings || _isLoadingMultimodalSettings)
             {
-                // 设置加载标志，防止在加载过程中触发保存
-                _isLoadingMultimodalSettings = true;
-                try
-                {
-                    UpdateScreenshotProcessingModePanel();
-                    // 只保存处理模式，不保存多模态提供商设置（因为刚刚加载了）
-                    SaveScreenshotSettingsWithoutMultimodalProvider();
-                }
-                finally
-                {
-                    _isLoadingMultimodalSettings = false;
-                }
+                return;
             }
-            else
-            {
-                UpdateScreenshotProcessingModePanel();
-                // 立即保存设置，确保处理模式变更生效
-                SaveScreenshotSettings();
-            }
+
+            // 切到前置多模态时，上面的面板更新刚把已保存的提供商配置读进控件；
+            // 这时再保存一次提供商设置等于拿刚读出来的值覆盖自己，没意义。
+            SaveScreenshotSettingsCore(saveMultimodalProvider: mode != "PreprocessingMultimodal");
         }
 
         private void UpdateScreenshotProcessingModePanel()
@@ -8190,82 +8192,27 @@ namespace VPetLLM.UI.Windows
             }
         }
 
-        private void SaveScreenshotSettings()
-        {
-            try
-            {
-                // 确保 Screenshot 和其嵌套对象不为 null
-                if (_plugin.Settings.Screenshot is null)
-                {
-                    _plugin.Settings.Screenshot = new Configuration.ScreenshotSettings();
-                }
-                if (_plugin.Settings.Screenshot.OCR is null)
-                {
-                    _plugin.Settings.Screenshot.OCR = new Configuration.OCRSettings();
-                }
-                if (_plugin.Settings.Screenshot.MultimodalProvider is null)
-                {
-                    _plugin.Settings.Screenshot.MultimodalProvider = new Configuration.MultimodalProviderConfig();
-                }
-
-                var checkBoxEnabled = (CheckBox)this.FindName("CheckBox_Screenshot_Main_IsEnabled");
-                var comboBoxMode = (ComboBox)this.FindName("ComboBox_Screenshot_Main_ProcessingMode");
-                var checkBoxAutoSend = (CheckBox)this.FindName("CheckBox_Screenshot_Main_AutoSend");
-                var comboBoxOCRProvider = (ComboBox)this.FindName("ComboBox_Screenshot_Main_OCR_Provider");
-                var textBoxOCRBaseUrl = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_BaseUrl");
-                var textBoxOCRApiKey = (TextBox)this.FindName("TextBox_Screenshot_Main_OCR_ApiKey");
-
-                if (checkBoxEnabled is not null)
-                    _plugin.Settings.Screenshot.IsEnabled = checkBoxEnabled.IsChecked ?? false;
-
-                if (comboBoxMode is not null)
-                {
-                    var selectedItem = comboBoxMode.SelectedItem as ComboBoxItem;
-                    var mode = selectedItem?.Tag?.ToString() ?? "NativeMultimodal";
-                    _plugin.Settings.Screenshot.ProcessingMode = mode switch
-                    {
-                        "OCRApi" => Configuration.ScreenshotProcessingMode.OCRApi,
-                        "PreprocessingMultimodal" => Configuration.ScreenshotProcessingMode.PreprocessingMultimodal,
-                        _ => Configuration.ScreenshotProcessingMode.NativeMultimodal
-                    };
-                }
-
-                if (checkBoxAutoSend is not null)
-                    _plugin.Settings.Screenshot.AutoSend = checkBoxAutoSend.IsChecked ?? false;
-
-                if (comboBoxOCRProvider is not null)
-                {
-                    var selectedItem = comboBoxOCRProvider.SelectedItem as ComboBoxItem;
-                    _plugin.Settings.Screenshot.OCR.Provider = selectedItem?.Tag?.ToString() ?? "OpenAI";
-                }
-
-                if (textBoxOCRBaseUrl is not null)
-                    _plugin.Settings.Screenshot.OCR.BaseUrl = textBoxOCRBaseUrl.Text;
-
-                if (textBoxOCRApiKey is not null)
-                    _plugin.Settings.Screenshot.OCR.ApiKey = textBoxOCRApiKey.Text;
-
-                // 更新快捷键注册
-                _plugin.UpdateScreenshotHotkey();
-
-                // 保存多模态提供商设置
-                SaveMultimodalProviderSettings();
-
-                _hasUnsavedChanges = true;
-                Logger.Log("Screenshot settings saved to disk");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Screenshot: Error saving settings: {ex.Message}");
-            }
-        }
-
         /// <summary>
-        /// 保存截图设置，但不保存多模态提供商设置
-        /// 用于切换到前置多模态模式时，避免覆盖已保存的多模态提供商配置
+        /// 把截图设置从控件写回 <c>_plugin.Settings</c>。
+        ///
+        /// 以前这里是两个方法：SaveScreenshotSettings 和 SaveScreenshotSettingsWithoutMultimodalProvider，
+        /// 六十多行逐字重复，差别只有末尾要不要调 SaveMultimodalProviderSettings()。
+        /// 现在合成一个，用参数区分。
         /// </summary>
-        private void SaveScreenshotSettingsWithoutMultimodalProvider()
+        /// <param name="saveMultimodalProvider">
+        /// 是否一并保存多模态提供商配置。切换到「前置多模态」时传 false ——
+        /// 那条路刚把已保存的配置读进控件，再存一次等于拿刚读出来的值覆盖自己。
+        /// </param>
+        private void SaveScreenshotSettingsCore(bool saveMultimodalProvider)
         {
+            // 调用方可能来自控件事件，而控件事件在窗口构造期就会触发（此时 _plugin 还没赋值）。
+            // 明确挡掉并说清楚原因，比让它抛一个光秃秃的 NullReferenceException 强。
+            if (_plugin?.Settings is null)
+            {
+                Logger.Log("Screenshot: 设置尚未就绪，跳过本次保存");
+                return;
+            }
+
             try
             {
                 // 确保 Screenshot 和其嵌套对象不为 null
@@ -8322,17 +8269,23 @@ namespace VPetLLM.UI.Windows
                 // 更新快捷键注册
                 _plugin.UpdateScreenshotHotkey();
 
-                // 注意：这里不调用 SaveMultimodalProviderSettings()
-                // 因为我们刚刚加载了已保存的多模态提供商设置，不需要再保存
+                if (saveMultimodalProvider)
+                {
+                    SaveMultimodalProviderSettings();
+                }
 
                 _hasUnsavedChanges = true;
-                Logger.Log("Screenshot settings saved to disk (without multimodal provider settings)");
+                Logger.Log(saveMultimodalProvider
+                    ? "Screenshot settings saved to disk"
+                    : "Screenshot settings saved to disk (without multimodal provider settings)");
             }
             catch (Exception ex)
             {
                 Logger.Log($"Screenshot: Error saving settings: {ex.Message}");
             }
         }
+
+        private void SaveScreenshotSettings() => SaveScreenshotSettingsCore(saveMultimodalProvider: true);
 
         private void ComboBox_Screenshot_MultimodalProvider_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {

@@ -25,6 +25,23 @@ namespace VPetLLM.UI.Windows
             @"\[屏幕内容(?:\s*-\s*(?<variant>[^\]]+))?\]",
             RegexOptions.Compiled);
 
+        /// <summary>
+        /// 手动截图：<c>[图片内容]</c>（+ 可选的 <c>[用户问题]</c>），由 MessageCombiner 拼出。
+        ///
+        /// 这条以前没人认，于是前置多模态/OCR 生成的几百字图片描述会顶着用户名显示，
+        /// 看起来像用户自己敲的；也因为不算「程序灌入」而无法收纳，把编辑器撑得老长。
+        /// 它和 AI 主动看屏幕的 <c>[屏幕内容]</c> 是两条入口、两套标记，但在编辑器眼里
+        /// 都是「截图产生的内容」，该一视同仁。
+        /// </summary>
+        private static readonly Regex ImageContentRegex = new(
+            @"\[图片内容\]",
+            RegexOptions.Compiled);
+
+        /// <summary>手动截图里用户自己补充的那句提问。</summary>
+        private static readonly Regex UserQuestionRegex = new(
+            @"\[用户问题\]\s*(?<question>[\s\S]*)$",
+            RegexOptions.Compiled);
+
         /// <summary>系统事件：<c>[System] 内容</c>（TouchInteractionHandler 等）</summary>
         private static readonly Regex SystemRegex = new(
             @"^\s*\[System\]",
@@ -86,6 +103,11 @@ namespace VPetLLM.UI.Windows
                 Add(variant.Length > 0 ? $"看屏幕 · {variant}" : "看屏幕");
             }
 
+            if (ImageContentRegex.IsMatch(content))
+            {
+                Add("截图");
+            }
+
             foreach (Match m in JsonPluginRegex.Matches(content))
             {
                 var name = m.Groups["name"].Value;
@@ -119,10 +141,25 @@ namespace VPetLLM.UI.Windows
 
             var text = content;
 
+            // 手动截图那条消息是「机器写的图片描述 + 用户自己补的提问」拼起来的。
+            // 收起时只剩一行，那一行应该给用户真正问的那句 —— 图片描述的前 80 字
+            // 通常是「这是一张…的截图」，看了等于没看。
+            var question = UserQuestionRegex.Match(content);
+            if (question.Success)
+            {
+                var asked = question.Groups["question"].Value.Trim();
+                if (asked.Length > 0)
+                {
+                    text = asked;
+                }
+            }
+
             // 标记本身已经由来源名表达了，摘要里重复一遍纯属浪费那 80 个字符
             text = PluginResultRegex.Replace(text, " ");
             text = SeeScreenRegex.Replace(text, " ");
             text = Regex.Replace(text, @"\[/屏幕内容\]", " ");
+            text = ImageContentRegex.Replace(text, " ");
+            text = Regex.Replace(text, @"\[用户问题\]", " ");
             text = SystemRegex.Replace(text, " ");
 
             // 换行、制表压成单空格：收起态只有一行，留着换行会把它撑高
