@@ -972,6 +972,18 @@ namespace VPetLLM.UI.Windows
         /// </summary>
         protected override void OnClosing(CancelEventArgs e)
         {
+            // 退出路径上不能拦。宿主关停时会挨个 Close 掉本插件的窗口，
+            // 那时主窗口已经销毁、下一步就是 Environment.Exit：
+            // 这里弹模态等于把退出卡在一个嵌套消息循环里，用户点"否"更糟 ——
+            // 窗口会一直活到 Dispatcher 关停，然后 WPF 对着已失效的句柄
+            // DestroyWindow，报 Win32Exception(1400)，整个游戏弹"致命性错误"。
+            if (_plugin.IsExiting)
+            {
+                Logger.Log("上下文编辑器: 游戏正在退出，跳过未保存确认");
+                base.OnClosing(e);
+                return;
+            }
+
             if (!_saved && HasUnsavedChanges())
             {
                 var result = MessageBox.Show(

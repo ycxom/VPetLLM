@@ -1202,7 +1202,23 @@ namespace VPetLLM
             ChatCore?.SaveHistory();
             SavePluginStates();
 
-            // 后台异步保存配置，不阻塞（避免 Windows 关闭超时）
+            if (_isShuttingDown)
+            {
+                // 退出路径上不能"发出去就不管"：宿主的顺序是 EndGame → Save → Exit，
+                // 而 Exit 最后一句就是 Environment.Exit(0)。进程当场就没了，
+                // 后台那个保存任务大概率跑不完 —— 表现就是"退出前改的设置下次打开没了"。
+                //
+                // Task.Run 起头是为了让 await 之后的续体落在线程池而不是 UI 线程
+                // （这里是 Window_Closed，本身就在 UI 线程上），避免自己等自己。
+                // 超时兜底 3 秒：宿主那边还有个 10 秒硬杀，不能把预算耗光。
+                if (!Task.Run(() => _configurationManager.SaveAllAsync()).Wait(TimeSpan.FromSeconds(3)))
+                {
+                    Logger.Log("关停：配置落盘超时（3 秒），可能有未保存的更改");
+                }
+                return;
+            }
+
+            // 平时（自动存档等）后台异步保存，不阻塞 UI
             _ = SaveConfigurationsAsync();
         }
 
@@ -1235,50 +1251,111 @@ namespace VPetLLM
             });
         }
 
+        /// <summary>宿主已经在走退出流程。<see cref="Save"/> 会据此改成同步等待落盘。</summary>
+        private volatile bool _isShuttingDown;
+
+        /// <summary>
+        /// 本插件实例是否正在关停。窗口用它来判断"现在不该再弹确认框了"。
+        ///
+        /// 是实例属性不是静态的：VPet 支持多开，一个桌宠退出不代表另一个也在退出，
+        /// 静态标志会把还活着那只的确认框一起吞掉。
+        /// </summary>
+        public bool IsExiting => _isShuttingDown;
+
+        /// <summary>关停只做一次。<c>EndGame</c> 和 <c>Dispose</c> 两条路都会进来。</summary>
+        private bool _shutdownDone;
+
+        private readonly object _shutdownLock = new();
+
+        /// <summary>
+        /// 游戏退出。<b>这是宿主唯一会调的关停回调</b> —— 它不认识 <see cref="IDisposable"/>，
+        /// 全仓也没有任何地方调过本类的 <see cref="Dispose"/>。以前没实现这个方法，
+        /// 等于正常退出时本插件<b>一点清理都不做</b>：窗口不关、补丁不摘、定时器不停。
+        ///
+        /// 后果就是那个"游戏致命性错误 Win32Exception(1400) 无效的窗口句柄"：
+        /// 我们的窗口一路活到 <c>Environment.Exit</c>，等 WPF 在
+        /// <c>Dispatcher.ShutdownFinished</c> 里挨个 <c>HwndSource.Dispose</c> →
+        /// <c>DestroyWindow</c> 时，句柄已经没了，Win32 报 1400，异常没人接，
+        /// 弹的还是不点名 MOD 的"致命性错误"框。
+        ///
+        /// 注意时序：宿主是 <c>EndGame() → Save() → Exit()</c>，
+        /// <b><see cref="Save"/> 在这之后才跑</b>，所以这里只能做"不影响存档"的关停，
+        /// 容器和存储必须留到 <see cref="Dispose"/>。
+        /// </summary>
+        public override void EndGame()
+        {
+            _isShuttingDown = true;
+            ShutdownUiAndHooks();
+        }
+
+        /// <summary>
+        /// 关掉窗口、摘掉补丁、停掉定时器、退订宿主事件。
+        /// 幂等，<c>EndGame</c> 和 <c>Dispose</c> 谁先到都行。
+        ///
+        /// 这里的每一项都不碰配置存储 —— 宿主会在 <c>EndGame</c> 之后才调 <see cref="Save"/>。
+        /// </summary>
+        private void ShutdownUiAndHooks()
+        {
+            lock (_shutdownLock)
+            {
+                if (_shutdownDone) return;
+                _shutdownDone = true;
+            }
+
+            // 关掉自己开的窗口，必须早于其它清理 —— 这是 1400 的正解：
+            // 主动 Close() 能让 HwndSource 在句柄还有效的时候有序释放
+            Run(CloseOwnedWindows, "关闭插件窗口");
+
+            if (MW is not null)
+            {
+                Run(UnregisterTakeItemHandleEvent, "退订 TakeItem 事件");
+                Run(UnregisterItemUseHook, "退订物品使用钩子");
+
+                // 摘掉气泡守卫的 Harmony 补丁。不摘的话宿主之后每次说话都会
+                // 调进一个已经没人维护（甚至已卸载）的程序集
+                Run(Utils.UI.BubbleGuard.Uninstall, "卸载气泡守卫");
+            }
+
+            // 关停动画协调器。
+            // 这一步以前整个是缺的：AnimationCoordinator.Dispose 全代码库没有任何调用点，
+            // 于是插件卸载后它的后台队列循环还在转，还攥着主窗口引用；
+            // 再加上它是 Lazy 单例 + static 初始化标志，重载后会一直用着上一次那个死窗口。
+            Run(Handlers.Animation.AnimationHelper.Shutdown, "关停 AnimationCoordinator");
+
+            // UI 挂件
+            Run(UI.Controls.TalkBoxInterruptButton.Detach, "摘掉打断按钮");
+            Run(() => _floatingSidebarManager?.Dispose(), "关停悬浮侧栏");
+
+            // 语音输入持有全局热键和自己的窗口
+            Run(() => _voiceInputService?.Dispose(), "关停语音输入");
+
+            // 停止定时器
+            Run(() => { _syncTimer?.Stop(); _syncTimer?.Dispose(); }, "停止同步定时器");
+            Run(() => { _freeConfigTimer?.Stop(); _freeConfigTimer?.Dispose(); }, "停止免费配置定时器");
+        }
+
+        /// <summary>
+        /// 退出路径专用：任何一步失败都只记一笔，绝不能中断后面的清理。
+        /// 少关一个窗口就是一次 1400 崩溃。
+        /// </summary>
+        private static void Run(Action step, string what)
+        {
+            try { step(); }
+            catch (Exception ex) { Logger.Log($"关停[{what}]失败（忽略，继续）: {ex.Message}"); }
+        }
+
         public void Dispose()
         {
             try
             {
-                // 先关掉自己开的窗口，必须早于其它清理。
-                //
-                // 这些窗口以 VPet 主窗口为 Owner，退出时主窗口的 HWND 一销毁，
-                // Win32 会连带销毁所有 owned 窗口——这一步绕过了 WPF。等到
-                // Dispatcher.ShutdownFinished 时，WPF 仍以为这些 HwndSource 有效，
-                // 再调一次 DestroyWindow 就会抛 Win32Exception(1400) 无效窗口句柄。
-                // 主动 Close() 能让 HwndSource 在句柄还有效时有序释放。
-                CloseOwnedWindows();
-
-                // 取消事件监听
-                if (MW is not null)
-                {
-                    UnregisterTakeItemHandleEvent();
-                    UnregisterItemUseHook();
-
-                    // 把真气泡还给宿主。不还的话宿主会一直握着一个指向已卸载插件的装饰器，
-                    // 之后每次说话都要穿过我们这层已经没人维护的代码
-                    Utils.UI.BubbleGuard.Uninstall();
-                }
-
-                // 关停动画协调器。
-                // 这一步以前整个是缺的：AnimationCoordinator.Dispose 全代码库没有任何调用点，
-                // 于是插件卸载后它的后台队列循环还在转，还攥着主窗口引用；
-                // 再加上它是 Lazy 单例 + static 初始化标志，重载后会一直用着上一次那个死窗口。
-                try { Handlers.Animation.AnimationHelper.Shutdown(); }
-                catch (Exception ex) { Logger.Log($"关停 AnimationCoordinator 失败: {ex.Message}"); }
+                // 正常退出走的是 EndGame；这里是插件被禁用/重载的路径。
+                // 两条路共用同一套关停，谁先到谁做
+                ShutdownUiAndHooks();
 
                 // 清理服务
-                _voiceInputService?.Dispose();
                 _purchaseService?.Dispose();
-                UI.Controls.TalkBoxInterruptButton.Detach();
-                _floatingSidebarManager?.Dispose();
                 TTSService?.Dispose();
                 TouchInteractionHandler?.Dispose();
-
-                // 停止定时器
-                _syncTimer?.Stop();
-                _syncTimer?.Dispose();
-                _freeConfigTimer?.Stop();
-                _freeConfigTimer?.Dispose();
 
                 // 停止所有服务。
                 //
@@ -1309,9 +1386,35 @@ namespace VPetLLM
         /// </summary>
         private void CloseOwnedWindows()
         {
-            // 只处理真正的 Window（有自己的 HWND）。TalkBox 是宿主在主窗口里的
-            // UserControl，没有独立窗口句柄，不涉及本问题。
-            CloseWindowSafely(SettingWindow, nameof(SettingWindow));
+            // 按"这个类型是不是本程序集的"来认领，而不是一个个数字段。
+            //
+            // 以前这里只关 SettingWindow，可我们有十来种独立顶层窗口：上下文编辑器、
+            // 记录编辑器、语音输入、截图遮罩、截图编辑器、图片预览、诊断报告……
+            // 它们都不是设置窗口的子窗口，关设置窗口一个也带不走。
+            // 按程序集扫的另一个好处是以后新加窗口自动纳入，不用记得回来改这里。
+            var app = Application.Current;
+            if (app is null) return;
+
+            var self = typeof(VPetLLM).Assembly;
+
+            // 必须先快照：Close() 会把窗口从 app.Windows 里摘掉，边遍历边改会漏
+            var mine = app.Dispatcher.Invoke(() =>
+                app.Windows.OfType<System.Windows.Window>()
+                   .Where(w => w.GetType().Assembly == self)
+                   .ToArray());
+
+            if (mine.Length > 0)
+            {
+                Logger.Log($"关停：需要关闭 {mine.Length} 个插件窗口 " +
+                           $"[{string.Join(", ", mine.Select(w => w.GetType().Name))}]");
+            }
+
+            foreach (var window in mine)
+            {
+                CloseWindowSafely(window, window.GetType().Name);
+            }
+
+            // 别人不会碰它，但它是我们自己缓存的引用，得跟着失效
             SettingWindow = null;
         }
 
