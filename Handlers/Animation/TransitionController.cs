@@ -108,19 +108,35 @@ namespace VPetLLM.Handlers.Animation
                 {
                     Logger.Log($"TransitionController: Playing C_End animation before transition");
 
-                    var tcs = new TaskCompletionSource<bool>();
+                    // C_End 是过渡中间步，没有自己的回收动作（回收由后面的目标动画负责），
+                    // 所以 reclaim 传 null；超时只丢记账，不影响宿主。
+                    var endGeneration = _synchronizer.BeginDisplay();
+                    using var endCompletion = new AnimationCompletion(
+                        reclaim: null,
+                        bookkeeping: null,
+                        stillOwnsDisplay: () => _synchronizer.OwnsDisplay(endGeneration),
+                        describe: $"C_End:{currentDisplay?.Name}");
 
                     _synchronizer.ExecuteOnUIThread(() =>
                     {
-                        mainWindow.Main.Display(transitionGraph, () =>
+                        try
                         {
-                            tcs.TrySetResult(true);
-                        });
+                            mainWindow.Main.Display(transitionGraph, endCompletion.Complete);
+                        }
+                        catch (Exception ex)
+                        {
+                            endCompletion.Fail(ex);
+                        }
                     });
 
-                    // 等待结束动画完成
-                    var completed = await Task.WhenAny(tcs.Task, Task.Delay(request.TimeoutMs)) == tcs.Task;
-                    if (!completed)
+                    // 等待结束动画完成。
+                    // 原来是 Task.WhenAny(tcs, Task.Delay(timeout))：tcs 先赢时那个 Delay 定时器
+                    // 仍然武装着直到到期，动画高频时会一直堆积。WaitAsync 自己管定时器生命周期。
+                    try
+                    {
+                        await endCompletion.Task.WaitAsync(TimeSpan.FromMilliseconds(request.TimeoutMs));
+                    }
+                    catch (TimeoutException)
                     {
                         Logger.Log("TransitionController: C_End animation timed out");
                     }
@@ -142,7 +158,19 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         private async Task<bool> ExecuteTargetAnimationAsync(IMainWindow mainWindow, AnimationRequest request)
         {
-            var tcs = new TaskCompletionSource<bool>();
+            var label = request.AnimationName ?? request.TargetGraphType?.ToString() ?? "(normal)";
+
+            // 两条通道必须分开走（详见 AnimationCompletion 的注释）：
+            //   · reclaim = request.EndAction，全项目一律是 Main.DisplayToNomal —— 这是 VPet 的
+            //     回收契约，不调宠物就卡在最后一帧。即使我们等超时了，它也得留着，
+            //     由代际检查负责在显示权易主时自动失效。
+            //   · bookkeeping = 协调器记账 —— 超时就必须丢，否则会给下一个动画错误记账。
+            var generation = _synchronizer.BeginDisplay();
+            using var completion = new AnimationCompletion(
+                reclaim: request.EndAction,
+                bookkeeping: () => _synchronizer.MarkAnimationCompleted(),
+                stillOwnsDisplay: () => _synchronizer.OwnsDisplay(generation),
+                describe: $"{request.Source}:{label}");
 
             try
             {
@@ -150,46 +178,38 @@ namespace VPetLLM.Handlers.Animation
                 {
                     try
                     {
-                        Action endAction = () =>
-                        {
-                            request.EndAction?.Invoke();
-                            _synchronizer.MarkAnimationCompleted();
-                            tcs.TrySetResult(true);
-                        };
-
                         if (request.TargetGraphType.HasValue)
                         {
-                            mainWindow.Main.Display(request.TargetGraphType.Value, request.AnimatType, endAction);
+                            mainWindow.Main.Display(request.TargetGraphType.Value, request.AnimatType, completion.Complete);
                         }
                         else if (!string.IsNullOrEmpty(request.AnimationName))
                         {
-                            mainWindow.Main.Display(request.AnimationName, request.AnimatType, endAction);
+                            mainWindow.Main.Display(request.AnimationName, request.AnimatType, completion.Complete);
                         }
                         else
                         {
+                            // 这一支自己就已经回到待机了，回收动作没必要再跑一遍。
                             mainWindow.Main.DisplayToNomal();
-                            tcs.TrySetResult(true);
+                            completion.HandOff();
                         }
 
                         _synchronizer.UpdateState(mainWindow, request.Source);
-                        Logger.Log($"TransitionController: Target animation started - {request.AnimationName ?? request.TargetGraphType?.ToString()}");
+                        Logger.Log($"TransitionController: Target animation started - {label}");
                     }
                     catch (Exception ex)
                     {
                         Logger.Log($"TransitionController: Error executing animation: {ex.Message}");
-                        tcs.TrySetException(ex);
+                        completion.Fail(ex);
                     }
                 });
 
-                // 等待动画完成或超时
-                var completed = await Task.WhenAny(tcs.Task, Task.Delay(request.TimeoutMs)) == tcs.Task;
-                if (!completed)
-                {
-                    Logger.Log($"TransitionController: Animation timed out after {request.TimeoutMs}ms");
-                    return false;
-                }
-
-                return await tcs.Task;
+                // 超时用 WaitAsync：不像 Task.WhenAny(t, Task.Delay(..)) 那样留下武装着的定时器。
+                return await completion.Task.WaitAsync(TimeSpan.FromMilliseconds(request.TimeoutMs));
+            }
+            catch (TimeoutException)
+            {
+                Logger.Log($"TransitionController: Animation timed out after {request.TimeoutMs}ms - {label}");
+                return false;
             }
             catch (Exception ex)
             {
@@ -285,9 +305,17 @@ namespace VPetLLM.Handlers.Animation
 
             var tcs = new TaskCompletionSource<bool>();
 
+            var lockAcquired = false;
             try
             {
-                await _synchronizer.AcquireLockAsync(request.TimeoutMs);
+                // 原来这里丢弃了返回值：拿不到锁照样往下跑（等于无锁改状态），
+                // 而 finally 还会去 Release 一把根本没拿到的锁。
+                lockAcquired = await _synchronizer.AcquireLockAsync(request.TimeoutMs);
+                if (!lockAcquired)
+                {
+                    Logger.Log($"TransitionController: 获取动画锁超时 ({request.TimeoutMs}ms)，放弃本次状态变更");
+                    return false;
+                }
 
                 try
                 {
@@ -332,7 +360,7 @@ namespace VPetLLM.Handlers.Animation
                 }
                 finally
                 {
-                    _synchronizer.ReleaseLock();
+                    if (lockAcquired) _synchronizer.ReleaseLock();
                 }
             }
             catch (Exception ex)

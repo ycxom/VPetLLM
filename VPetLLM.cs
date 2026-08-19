@@ -1259,6 +1259,13 @@ namespace VPetLLM
                     Utils.UI.BubbleGuard.Uninstall(MW);
                 }
 
+                // 关停动画协调器。
+                // 这一步以前整个是缺的：AnimationCoordinator.Dispose 全代码库没有任何调用点，
+                // 于是插件卸载后它的后台队列循环还在转，还攥着主窗口引用；
+                // 再加上它是 Lazy 单例 + static 初始化标志，重载后会一直用着上一次那个死窗口。
+                try { Handlers.Animation.AnimationHelper.Shutdown(); }
+                catch (Exception ex) { Logger.Log($"关停 AnimationCoordinator 失败: {ex.Message}"); }
+
                 // 清理服务
                 _voiceInputService?.Dispose();
                 _purchaseService?.Dispose();

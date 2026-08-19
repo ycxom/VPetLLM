@@ -50,6 +50,43 @@ namespace VPetLLM.Core.Services
                               or VPet_Simulator.Core.Main.WorkingState.Sleep);
         }
 
+        /// <summary>
+        /// 「现在能不能把宿主正在放的动画换掉」——全项目唯一的判定入口。
+        /// 返回 null 表示可以换；返回字符串表示不能换的原因（可直接进日志）。
+        ///
+        /// 之前这套判断在三个地方各抄了一份，而且已经开始漂移：
+        ///   · AnimationSynchronizer.CanExecuteAnimation —— 调了 IsAnimationProtected，又手抄一遍 Touch/Switch/Raised；
+        ///   · AnimationSynchronizer.GetBlockingReason  —— 手抄的那份漏了 Switch_Thirsty / Switch_Hunger；
+        ///   · AnimationCoordinator.ExecuteFallbackAsync —— 完全手写，只认 5 种，
+        ///     漏掉全部 Switch_* 和 StartUP / Shutdown，也没考虑 Say+语音 和宿主瞬时动画。
+        ///     结果就是动画出错回退时，会在 VPet 自己的过渡/启动/关机动画中间强行 DisplayToNomal()。
+        ///
+        /// 现在三处都从这里取结论，清单只有这一份。
+        /// </summary>
+        public static string GetAnimationOverrideBlockReason(IMainWindow mainWindow)
+        {
+            var main = mainWindow?.Main;
+            if (main is null)
+                return "mainWindow is null";
+
+            var displayType = main.DisplayType;
+            if (displayType is not null)
+            {
+                if (IsAnimationProtected(displayType.Type))
+                    return $"Protected host animation in progress ({displayType.Type})";
+
+                // 说话动画 + 正在放语音：打断了口型就停了，音频还在响，对不上。
+                if (displayType.Type == GraphType.Say && main.PlayingVoice)
+                    return "Say animation with voice playing";
+            }
+
+            // 宿主自己甩出来的一次性 Work / Sleep 动画（见 IsTransientHostAnimation 的说明）。
+            if (IsTransientHostAnimation(mainWindow))
+                return $"Transient host animation in progress ({displayType?.Type})";
+
+            return null;
+        }
+
         public static double ClampWindowCoordinate(
             double target,
             double areaStart,

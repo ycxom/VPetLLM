@@ -20,11 +20,15 @@ namespace VPetLLM.Handlers.Animation
         private readonly FlickerDetector _flickerDetector;
         private readonly TransitionController _transitionController;
 
+        // Initialize / Shutdown 会被不同线程调用（插件加载在 UI 线程，卸载可能不在），
+        // 而它们要一起改 _initialized / _mainWindow / _processingCts 三个字段。
+        private readonly object _lifecycleLock = new object();
+
         private IMainWindow _mainWindow;
         private CancellationTokenSource _processingCts;
         private Task _processingTask;
-        private bool _isProcessing = false;
-        private bool _disposed = false;
+        // GetState() 会从别的线程读它，用 volatile 保证读到的不是寄存器里的旧值。
+        private volatile bool _isProcessing = false;
         private bool _initialized = false;
 
         private AnimationCoordinator()
@@ -42,17 +46,30 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public void Initialize(IMainWindow mainWindow)
         {
-            if (_initialized)
+            if (mainWindow is null) throw new ArgumentNullException(nameof(mainWindow));
+
+            lock (_lifecycleLock)
             {
-                Logger.Log("AnimationCoordinator: Already initialized");
-                return;
+                if (_initialized)
+                {
+                    // 插件重载时主窗口可能换了一个。以前这里直接 return，
+                    // 于是协调器一直攥着上一次那个已经死掉的窗口，动画再也发不出去。
+                    if (ReferenceEquals(_mainWindow, mainWindow))
+                    {
+                        Logger.Log("AnimationCoordinator: Already initialized");
+                        return;
+                    }
+
+                    Logger.Log("AnimationCoordinator: 主窗口已更换，先关掉旧的处理循环再重新初始化");
+                    ShutdownCore();
+                }
+
+                _mainWindow = mainWindow;
+                _initialized = true;
+
+                // 启动队列处理
+                StartProcessing();
             }
-
-            _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
-            _initialized = true;
-
-            // 启动队列处理
-            StartProcessing();
 
             Logger.Log("AnimationCoordinator: Initialized successfully");
         }
@@ -159,86 +176,95 @@ namespace VPetLLM.Handlers.Animation
                 return;
             }
 
-            _processingCts = new CancellationTokenSource();
-            _processingTask = Task.Run(() => ProcessQueueAsync(_processingCts.Token));
+            // 令牌源整个交给循环自己持有并收尾。
+            // 以前是 Shutdown 里 Cancel 完立刻 Dispose，而循环可能正卡在
+            // Task.Delay(50, token) 上 —— 令牌源被抽走就是 ObjectDisposedException。
+            var cts = new CancellationTokenSource();
+            _processingCts = cts;
+            _processingTask = Task.Run(() => ProcessQueueAsync(cts));
             Logger.Log("AnimationCoordinator: Queue processing started");
-        }
-
-        /// <summary>
-        /// 停止队列处理
-        /// </summary>
-        private void StopProcessing()
-        {
-            _processingCts?.Cancel();
-            Logger.Log("AnimationCoordinator: Queue processing stopped");
         }
 
         /// <summary>
         /// 队列处理循环
         /// </summary>
-        private async Task ProcessQueueAsync(CancellationToken cancellationToken)
+        private async Task ProcessQueueAsync(CancellationTokenSource ownCts)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            var cancellationToken = ownCts.Token;
+            try
             {
-                try
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    // 检查是否可以出队
-                    if (!_queue.CanDequeueNow())
+                    try
                     {
-                        var waitTime = _queue.GetMillisecondsUntilNextDequeue();
-                        if (waitTime > 0)
+                        // 检查是否可以出队
+                        if (!_queue.CanDequeueNow())
                         {
-                            await Task.Delay(Math.Min(waitTime, 50), cancellationToken);
+                            var waitTime = _queue.GetMillisecondsUntilNextDequeue();
+                            if (waitTime > 0)
+                            {
+                                await Task.Delay(Math.Min(waitTime, 50), cancellationToken);
+                            }
+                            else
+                            {
+                                await Task.Delay(50, cancellationToken);
+                            }
+                            continue;
+                        }
+
+                        // A request may have been queued before VPet entered a host-controlled
+                        // animation. Re-check the queue head so delayed high-priority requests
+                        // cannot interrupt native movement or dragging.
+                        var nextRequest = _queue.Peek();
+                        var currentDisplay = _mainWindow?.Main?.DisplayType;
+                        if (nextRequest is not null && !nextRequest.Force
+                            && currentDisplay is not null
+                            && global::VPetLLM.Core.Services.VPetMovementPolicy.IsAnimationProtected(currentDisplay.Type))
+                        {
+                            await Task.Delay(100, cancellationToken);
+                            continue;
+                        }
+
+                        // 检查用户交互
+                        if (_synchronizer.CurrentState.IsUserInteracting)
+                        {
+                            await Task.Delay(100, cancellationToken);
+                            continue;
+                        }
+
+                        // 出队并处理
+                        var request = _queue.Dequeue();
+                        if (request is not null)
+                        {
+                            // 必须 try/finally：以前这里出任何岔子 _isProcessing 就永远卡在 true，
+                            // GetState() 从此一直报「正在处理」。
+                            _isProcessing = true;
+                            try { await ProcessRequestAsync(request); }
+                            finally { _isProcessing = false; }
                         }
                         else
                         {
                             await Task.Delay(50, cancellationToken);
                         }
-                        continue;
                     }
-
-                    // A request may have been queued before VPet entered a host-controlled
-                    // animation. Re-check the queue head so delayed high-priority requests
-                    // cannot interrupt native movement or dragging.
-                    var nextRequest = _queue.Peek();
-                    var currentDisplay = _mainWindow?.Main?.DisplayType;
-                    if (nextRequest is not null && !nextRequest.Force
-                        && currentDisplay is not null
-                        && global::VPetLLM.Core.Services.VPetMovementPolicy.IsAnimationProtected(currentDisplay.Type))
+                    catch (OperationCanceledException)
                     {
-                        await Task.Delay(100, cancellationToken);
-                        continue;
+                        break;
                     }
-
-                    // 检查用户交互
-                    if (_synchronizer.CurrentState.IsUserInteracting)
+                    catch (Exception ex)
                     {
-                        await Task.Delay(100, cancellationToken);
-                        continue;
-                    }
-
-                    // 出队并处理
-                    var request = _queue.Dequeue();
-                    if (request is not null)
-                    {
-                        _isProcessing = true;
-                        await ProcessRequestAsync(request);
-                        _isProcessing = false;
-                    }
-                    else
-                    {
-                        await Task.Delay(50, cancellationToken);
+                        Logger.Log($"AnimationCoordinator: Error in processing loop: {ex.Message}");
+                        try { await Task.Delay(100, cancellationToken); }
+                        catch (OperationCanceledException) { break; }
                     }
                 }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"AnimationCoordinator: Error in processing loop: {ex.Message}");
-                    await Task.Delay(100, cancellationToken);
-                }
+            }
+            finally
+            {
+                // 循环自己收尾令牌源：Shutdown 那边只负责 Cancel，不碰它。
+                _isProcessing = false;
+                ownCts.Dispose();
+                Logger.Log("AnimationCoordinator: 处理循环已退出");
             }
         }
 
@@ -283,10 +309,24 @@ namespace VPetLLM.Handlers.Animation
                 if (success)
                 {
                     Logger.Log($"AnimationCoordinator: Request {request.Id.Substring(0, 8)} completed successfully");
+                    return;
                 }
-                else
+
+                Logger.Log($"AnimationCoordinator: Request {request.Id.Substring(0, 8)} failed");
+
+                // 失败/超时兜底。原来这里只打一行日志就走人，宠物可能就那么僵在半路。
+                //
+                // 只对 Single 动画兜底：B_Loop 本来就是要一直循环的，5 秒默认超时对它是常态，
+                // 这时候去 DisplayToNomal 等于把用户要的循环动画掐掉。
+                // A_Start 同理 —— 它后面还接着 B_Loop，不该被当成"卡住了"。
+                //
+                // 另外这只是第二道保险：动画收尾器里的回收动作在超时后仍然armed，
+                // VPet 只要还会回调就会自己把宠物带回待机。这里管的是"回调永远不来"那种。
+                if (request.Type != AnimationRequestType.Stop
+                    && request.AnimatType == VPet_Simulator.Core.GraphInfo.AnimatType.Single)
                 {
-                    Logger.Log($"AnimationCoordinator: Request {request.Id.Substring(0, 8)} failed");
+                    Logger.Log($"AnimationCoordinator: Single 动画未能收尾，执行兜底回收");
+                    await ExecuteFallbackAsync();
                 }
             }
             catch (Exception ex)
@@ -330,8 +370,10 @@ namespace VPetLLM.Handlers.Animation
                 return false;
             }
 
-            // 等待动画就绪
-            var startTime = DateTime.Now;
+            // 等待动画就绪。
+            // 用 Stopwatch 而不是 DateTime.Now：墙钟会被 NTP 校时、夏令时、用户手动改表拨动，
+            // 拨过去一次就可能让这里当场判超时，或者反过来永远等不到超时。
+            var sw = global::System.Diagnostics.Stopwatch.StartNew();
             while (!targetGraph.IsReady)
             {
                 if (targetGraph.IsFail)
@@ -340,7 +382,7 @@ namespace VPetLLM.Handlers.Animation
                     return false;
                 }
 
-                if ((DateTime.Now - startTime).TotalMilliseconds > request.TimeoutMs)
+                if (sw.ElapsedMilliseconds > request.TimeoutMs)
                 {
                     Logger.Log($"AnimationCoordinator: Timeout waiting for animation to be ready");
                     return false;
@@ -358,6 +400,9 @@ namespace VPetLLM.Handlers.Animation
         private async Task<bool> ExecuteStopAsync(AnimationRequest request)
         {
             var tcs = new TaskCompletionSource<bool>();
+
+            // 推进代际：这一下就接管了显示权，之前那些动画迟到的回收动作从此自动失效。
+            _synchronizer.BeginDisplay();
 
             _synchronizer.ExecuteOnUIThread(() =>
             {
@@ -388,21 +433,23 @@ namespace VPetLLM.Handlers.Animation
             {
                 try
                 {
-                    var displayType = _mainWindow?.Main?.DisplayType;
-                    bool isSafeToReset = displayType == null
-                        || (displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Touch_Head
-                            && displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Touch_Body
-                            && displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Raised_Dynamic
-                            && displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Raised_Static
-                            && displayType.Type != VPet_Simulator.Core.GraphInfo.GraphType.Move);
+                    // 这里原来是一份手写的保护清单，只认 Touch_Head / Touch_Body /
+                    // Raised_Dynamic / Raised_Static / Move 五种，漏掉了全部 Switch_*、
+                    // StartUP / Shutdown，也不管 Say+语音 和宿主瞬时动画。
+                    // 于是动画一出错回退，就可能在 VPet 自己的过渡/启动/关机动画中间
+                    // 强行 DisplayToNomal() 把它掐掉。现在统一问策略。
+                    var blockReason = global::VPetLLM.Core.Services.VPetMovementPolicy
+                        .GetAnimationOverrideBlockReason(_mainWindow);
 
-                    if (isSafeToReset)
+                    if (blockReason is null)
                     {
+                        // 同样要推进代际：我们正在接管显示权。
+                        _synchronizer.BeginDisplay();
                         _mainWindow?.Main?.DisplayToNomal();
                     }
                     else
                     {
-                        Logger.Log($"AnimationCoordinator: Fallback skipped - VPet in protected animation ({displayType?.Type})");
+                        Logger.Log($"AnimationCoordinator: Fallback skipped - {blockReason}");
                     }
                     tcs.TrySetResult(true);
                 }
@@ -416,16 +463,44 @@ namespace VPetLLM.Handlers.Animation
             await tcs.Task;
         }
 
-        public void Dispose()
+        /// <summary>
+        /// 关停协调器：停处理循环、清空待处理请求、松开对主窗口的引用。
+        /// 关停之后还能再 <see cref="Initialize"/> 起来（插件重载要用），
+        /// 所以这里不会去 Dispose 掉 _synchronizer 里的信号量 —— 那是一次性的，
+        /// 销毁了下次就再也拿不到锁。
+        /// </summary>
+        public void Shutdown()
         {
-            if (!_disposed)
+            lock (_lifecycleLock)
             {
-                StopProcessing();
-                _processingCts?.Dispose();
-                _synchronizer?.Dispose();
-                _disposed = true;
-                Logger.Log("AnimationCoordinator: Disposed");
+                ShutdownCore();
             }
         }
+
+        /// <summary>关停的实际执行体，调用方必须已经持有 _lifecycleLock。</summary>
+        private void ShutdownCore()
+        {
+            if (!_initialized && _processingTask is null) return;
+
+            _initialized = false;
+
+            // 只 Cancel，不 Dispose —— 令牌源由处理循环在自己的 finally 里收尾。
+            try { _processingCts?.Cancel(); }
+            catch (ObjectDisposedException) { }
+            _processingCts = null;
+            _processingTask = null;
+
+            // 待处理请求全部丢弃：它们捕获的 EndAction 可能指向已经卸载的插件代码。
+            _queue.Clear();
+            _flickerDetector.Reset();
+            _synchronizer.ResetTransientState();
+
+            _mainWindow = null;
+            _isProcessing = false;
+
+            Logger.Log("AnimationCoordinator: Shutdown 完成");
+        }
+
+        public void Dispose() => Shutdown();
     }
 }

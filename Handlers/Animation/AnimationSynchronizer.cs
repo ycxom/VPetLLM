@@ -13,6 +13,12 @@ namespace VPetLLM.Handlers.Animation
     public class AnimationSynchronizer : IDisposable
     {
         private readonly SemaphoreSlim _animationLock = new SemaphoreSlim(1, 1);
+
+        // 显示权代际号。每下发一个动画就 +1。
+        // 用途：一次动画超时之后，它交给 VPet 的回收动作（DisplayToNomal）可能很久才被回调；
+        // 那时候如果已经有新动画接管了显示，这个迟到的回收就必须放弃，否则会把新动画掐掉。
+        // 单调递增，永不复位 —— 复位会让过期的收尾器误以为自己又持有显示权。
+        private long _displayGeneration;
         private AnimationState _currentState = new AnimationState();
         private Action _completionCallback;
         private bool _disposed = false;
@@ -21,16 +27,27 @@ namespace VPetLLM.Handlers.Animation
         public AnimationState CurrentState => _currentState;
 
         /// <summary>
+        /// 认领显示权。真正下发动画之前调用，返回本次的代际号。
+        /// </summary>
+        public long BeginDisplay() => Interlocked.Increment(ref _displayGeneration);
+
+        /// <summary>
+        /// 指定代际是否仍然持有显示权（即之后没有别的动画接管过）。
+        /// </summary>
+        public bool OwnsDisplay(long generation) => Interlocked.Read(ref _displayGeneration) == generation;
+
+        /// <summary>
         /// 等待当前动画完成
         /// </summary>
         /// <param name="timeoutMs">超时时间 (毫秒)</param>
         /// <returns>true 如果动画完成，false 如果超时</returns>
         public async Task<bool> WaitForAnimationCompleteAsync(int timeoutMs = 5000)
         {
-            var startTime = DateTime.Now;
+            // Stopwatch 而非 DateTime.Now：墙钟被校时/夏令时拨动会让超时判断失准。
+            var sw = global::System.Diagnostics.Stopwatch.StartNew();
             while (_currentState.IsAnimating)
             {
-                if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
+                if (sw.ElapsedMilliseconds > timeoutMs)
                 {
                     Logger.Log($"AnimationSynchronizer: Wait timed out after {timeoutMs}ms");
                     return false;
@@ -113,83 +130,19 @@ namespace VPetLLM.Handlers.Animation
         /// <summary>
         /// 检查是否可以执行动画
         /// </summary>
+        /// <summary>
+        /// 检查是否可以执行动画。
+        /// 判定逻辑只有 <see cref="GetBlockingReason"/> 一份 —— 这两个方法结构上不可能再漂移。
+        /// （以前是各写各的：CanExecuteAnimation 认 Say+语音，GetBlockingReason 不认，
+        /// 于是协调器打出来的日志会是 "Request blocked - " 后面一片空白。）
+        /// </summary>
         public bool CanExecuteAnimation(IMainWindow mainWindow)
         {
-            if (mainWindow?.Main is null)
-            {
-                Logger.Log("AnimationSynchronizer: mainWindow is null");
-                return false;
-            }
+            var reason = GetBlockingReason(mainWindow);
+            if (reason is null) return true;
 
-            // 检查用户交互
-            if (_currentState.IsUserInteracting)
-            {
-                Logger.Log("AnimationSynchronizer: User is interacting, cannot execute animation");
-                return false;
-            }
-
-            // 检查重要状态
-            var workingState = mainWindow.Main.State;
-            if (workingState == Main.WorkingState.Work ||
-                workingState == Main.WorkingState.Sleep ||
-                workingState == Main.WorkingState.Travel)
-            {
-                Logger.Log($"AnimationSynchronizer: VPet is in {workingState} state, cannot execute animation");
-                return false;
-            }
-
-            // 检查是否正在播放语音（参考 VPet MessageBar 的逻辑）
-            if (mainWindow.Main.PlayingVoice)
-            {
-                Logger.Log("AnimationSynchronizer: VPet is playing voice, should not interrupt Say animation");
-                // 注意：这里不直接返回 false，因为某些动画可能需要在语音播放时执行
-                // 但我们需要记录这个状态
-            }
-
-            // 检查触摸动画
-            var displayType = mainWindow.Main.DisplayType;
-            if (displayType is not null)
-            {
-                if (VPetMovementPolicy.IsAnimationProtected(displayType.Type))
-                {
-                    Logger.Log($"AnimationSynchronizer: VPet is in protected host animation ({displayType.Type}), cannot execute animation");
-                    return false;
-                }
-
-                if (displayType.Type == GraphType.Touch_Head ||
-                    displayType.Type == GraphType.Touch_Body)
-                {
-                    Logger.Log($"AnimationSynchronizer: VPet is in touch animation ({displayType.Type}), cannot execute animation");
-                    return false;
-                }
-
-                // 检查过渡动画
-                if (displayType.Type == GraphType.Switch_Up ||
-                    displayType.Type == GraphType.Switch_Down ||
-                    displayType.Type == GraphType.Switch_Thirsty ||
-                    displayType.Type == GraphType.Switch_Hunger)
-                {
-                    Logger.Log($"AnimationSynchronizer: VPet is in transition animation ({displayType.Type}), cannot execute animation");
-                    return false;
-                }
-
-                // 检查提起动画
-                if (displayType.Type == GraphType.Raised_Dynamic ||
-                    displayType.Type == GraphType.Raised_Static)
-                {
-                    Logger.Log($"AnimationSynchronizer: VPet is being raised ({displayType.Type}), cannot execute animation");
-                    return false;
-                }
-
-                // 检查说话动画 - 如果正在播放语音，不应该中断说话动画
-                if (displayType.Type == GraphType.Say && mainWindow.Main.PlayingVoice)
-                {
-                    Logger.Log("AnimationSynchronizer: VPet is in Say animation with voice playing, cannot interrupt");
-                    return false;
-                }
-            }
-
-            return true;
+            Logger.Log($"AnimationSynchronizer: cannot execute animation - {reason}");
+            return false;
         }
 
         /// <summary>
@@ -237,10 +190,10 @@ namespace VPetLLM.Handlers.Animation
             if (mainWindow?.Main is null || !mainWindow.Main.PlayingVoice)
                 return;
 
-            var startTime = DateTime.Now;
+            var sw = global::System.Diagnostics.Stopwatch.StartNew();
             while (mainWindow.Main.PlayingVoice)
             {
-                if ((DateTime.Now - startTime).TotalMilliseconds > maxWaitMs)
+                if (sw.ElapsedMilliseconds > maxWaitMs)
                 {
                     Logger.Log($"AnimationSynchronizer: Voice wait timed out after {maxWaitMs}ms");
                     break;
@@ -260,6 +213,12 @@ namespace VPetLLM.Handlers.Animation
         /// <summary>
         /// 获取阻塞原因
         /// </summary>
+        /// <summary>
+        /// 获取阻塞原因。null = 当前可以执行动画。
+        /// 这是「能不能动画」的唯一实现：宿主动画那部分统一走
+        /// <see cref="VPetMovementPolicy.GetAnimationOverrideBlockReason"/>，本方法只额外加上
+        /// VPetLLM 自己的两层门（用户交互中 / 宠物处于工作·睡眠·旅行会话）。
+        /// </summary>
         public string GetBlockingReason(IMainWindow mainWindow)
         {
             if (mainWindow?.Main is null)
@@ -276,21 +235,8 @@ namespace VPetLLM.Handlers.Animation
             if (workingState == Main.WorkingState.Travel)
                 return "VPet is traveling";
 
-            var displayType = mainWindow.Main.DisplayType;
-            if (displayType is not null)
-            {
-                if (VPetMovementPolicy.IsAnimationProtected(displayType.Type))
-                    return $"Protected host animation in progress ({displayType.Type})";
-
-                if (displayType.Type == GraphType.Touch_Head || displayType.Type == GraphType.Touch_Body)
-                    return $"Touch animation in progress ({displayType.Type})";
-                if (displayType.Type == GraphType.Switch_Up || displayType.Type == GraphType.Switch_Down)
-                    return $"Transition animation in progress ({displayType.Type})";
-                if (displayType.Type == GraphType.Raised_Dynamic || displayType.Type == GraphType.Raised_Static)
-                    return $"Raised animation in progress ({displayType.Type})";
-            }
-
-            return null;
+            // 宿主动画的保护清单只有 VPetMovementPolicy 一份，别在这里再抄。
+            return VPetMovementPolicy.GetAnimationOverrideBlockReason(mainWindow);
         }
 
         /// <summary>
@@ -517,10 +463,23 @@ namespace VPetLLM.Handlers.Animation
             });
         }
 
+        /// <summary>
+        /// 复位瞬时状态，但保留信号量 —— 供协调器关停后重新初始化时使用。
+        /// 重点是把 _completionCallback 断掉：那个委托可能捕获了已经卸载的插件对象，
+        /// 留着它既是内存泄漏，也可能在下一轮动画里被误触发。
+        /// </summary>
+        public void ResetTransientState()
+        {
+            _completionCallback = null;
+            _currentState = new AnimationState();
+            Logger.Log("AnimationSynchronizer: 瞬时状态已复位");
+        }
+
         public void Dispose()
         {
             if (!_disposed)
             {
+                _completionCallback = null;
                 _animationLock?.Dispose();
                 _disposed = true;
             }

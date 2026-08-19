@@ -9,24 +9,55 @@ namespace VPetLLM.Handlers.Animation
     /// </summary>
     public static class AnimationHelper
     {
+        private static readonly object _gate = new object();
         private static bool _initialized = false;
 
         /// <summary>
-        /// 初始化动画协调器
+        /// 初始化动画协调器。
+        /// 重复调用是安全的：主窗口没变就直接返回，换了新窗口则由协调器内部先关旧的再接管。
+        /// （以前这里的 static _initialized 一旦置位就再也不会重来，插件重载后
+        /// 协调器还攥着上一次那个已经死掉的主窗口。）
         /// </summary>
         public static void Initialize(IMainWindow mainWindow)
         {
-            if (_initialized) return;
-
-            try
+            lock (_gate)
             {
-                AnimationCoordinator.Instance.Initialize(mainWindow);
-                _initialized = true;
-                Logger.Log("AnimationHelper: Initialized successfully");
+                try
+                {
+                    AnimationCoordinator.Instance.Initialize(mainWindow);
+                    _initialized = true;
+                    Logger.Log("AnimationHelper: Initialized successfully");
+                }
+                catch (Exception ex)
+                {
+                    // 协调器没起来就别把自己标成已初始化，否则后面每个请求都会
+                    // 傻乎乎地投进一个根本没在跑的队列。
+                    _initialized = false;
+                    Logger.Log($"AnimationHelper: Initialization failed: {ex.Message}");
+                }
             }
-            catch (Exception ex)
+        }
+
+        /// <summary>
+        /// 关停动画协调器。插件卸载时必须调用 —— 否则后台的队列处理循环会一直转下去，
+        /// 并且一直攥着主窗口引用不放。
+        /// </summary>
+        public static void Shutdown()
+        {
+            lock (_gate)
             {
-                Logger.Log($"AnimationHelper: Initialization failed: {ex.Message}");
+                try
+                {
+                    AnimationCoordinator.Instance.Shutdown();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"AnimationHelper: Shutdown failed: {ex.Message}");
+                }
+                finally
+                {
+                    _initialized = false;
+                }
             }
         }
 
