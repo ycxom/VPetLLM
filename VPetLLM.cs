@@ -729,7 +729,7 @@ namespace VPetLLM
 
                 // 装上气泡独占守卫：回复期间别人的气泡请求会被静默吞掉，顶不掉正在念的回复。
                 // 放在这里只是先占好位；宿主中途换掉气泡实例时 BubbleGuard 会自愈重装
-                Utils.UI.BubbleGuard.Install(MW);
+                Utils.UI.BubbleGuard.Install();
 
                 // 检测 VPet.Plugin.VPetTTS 插件
                 DetectAndHandleVPetTTSPlugin();
@@ -1256,7 +1256,7 @@ namespace VPetLLM
 
                     // 把真气泡还给宿主。不还的话宿主会一直握着一个指向已卸载插件的装饰器，
                     // 之后每次说话都要穿过我们这层已经没人维护的代码
-                    Utils.UI.BubbleGuard.Uninstall(MW);
+                    Utils.UI.BubbleGuard.Uninstall();
                 }
 
                 // 关停动画协调器。

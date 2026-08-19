@@ -1,8 +1,9 @@
+using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
-using System.Windows.Controls;
+using HarmonyLib;
 using VPet_Simulator.Core;
-using VPet_Simulator.Windows.Interface;
 
 namespace VPetLLM.Utils.UI
 {
@@ -19,8 +20,26 @@ namespace VPetLLM.Utils.UI
     /// 只是那次显示没有落到气泡上。对别的 mod 来说这是一次成功的调用，
     /// 不会因为我们的介入而抛异常或卡在等待里。
     ///
-    /// 实现方式是把 <c>Main.MsgBar</c>（公开可写字段，宿主自己在多人模式里也这么换）
-    /// 换成一层 <see cref="GuardedMessageBar"/> 装饰器，而不是 IL 补丁。
+    /// <b>为什么最后用了 Harmony</b>（这条路是一步步被堵出来的，别再走回头路）：
+    ///
+    /// 最早的做法是把 <c>Main.MsgBar</c>（公开可写字段，宿主自己在多人模式里也这么换）
+    /// 换成一个实现了 <see cref="IMassageBar"/> 的包装器。当时判断"全仓没人把它强转成
+    /// 具体类型，所以安全"—— 那次排查只覆盖了 VPet 仓和我们自己的插件，<b>没覆盖创意工坊的
+    /// 第三方 MOD</b>。实际有人踩了：ThemeCreator 的
+    /// <c>MessageBarResources.ApplyResources</c> 就是 <c>(MessageBar)main.Main.MsgBar</c>
+    /// 直接强转，包装器让它当场 InvalidCastException，游戏起不来。
+    /// 更糟的是宿主的全局错误框按栈里的 <c>VPet.Plugin.*</c> 认领作者，
+    /// <b>我们捅的娄子会报到 ThemeCreator 作者头上</b>。
+    ///
+    /// 第二个想法是让守卫继承 <see cref="MessageBar"/>，这样强转就成立了。
+    /// <b>WPF 不允许</b>：<c>MessageBar</c> 的构造函数会调 <c>InitializeComponent()</c>，
+    /// 而它内部的 <c>Application.LoadComponent(this, uri)</c> 要求 <c>this</c> 的程序集
+    /// 和 URI 里的程序集一致。子类在 VPetLLM.dll 里，URI 指向 VPet-Simulator.Core，
+    /// 构造时直接抛"组件不具有由 URI 识别的资源"。跨程序集继承 XAML 控件这条路是死的。
+    ///
+    /// 剩下的就是 Harmony：给 <c>MessageBar</c> 的 <c>Show</c>/<c>ForceClose</c> 挂前置补丁。
+    /// <c>Main.MsgBar</c> 自始至终是宿主原装的那个 <see cref="MessageBar"/>，
+    /// 谁想怎么强转都行；而拦截比换实例更彻底 —— 连拿着具体类型引用调过来的也拦得住。
     /// </summary>
     public static class BubbleGuard
     {
@@ -82,100 +101,182 @@ namespace VPetLLM.Utils.UI
         // 安装 / 卸载
         // ============================================================================
 
+        /// <summary>Harmony 实例。非 null 即表示补丁在位。</summary>
+        private static Harmony? _harmony;
+
+        private const string HarmonyId = "com.vpetllm.bubbleguard";
+
         /// <summary>
-        /// 把守卫装到宿主的气泡上。重复调用是安全的。
+        /// 给宿主的气泡挂上守卫补丁。重复调用是安全的（幂等）。
+        ///
+        /// 补丁是进程级的，不绑定某个窗口、也不绑定某个气泡实例 —— 宿主进多人模式时会
+        /// <c>Main.MsgBar = new MessageBar(Main)</c> 换掉实例，换了也照样拦得住，
+        /// 所以不再需要"检查守卫还在不在、掉了就重装"那套自愈逻辑。
         /// </summary>
-        public static void Install(IMainWindow? mainWindow)
+        public static void Install()
         {
-            var main = mainWindow?.Main;
-            if (main is null) return;
+            // 功能关掉了就一个字节都别动宿主。以前这里不查开关，
+            // 结果"关掉气泡独占"只是让守卫不吞气泡，宿主该被动的还是被动了 —— 等于没有退路
+            if (!IsEnabled) return;
 
-            try
+            lock (_lock)
             {
-                lock (_lock)
+                if (_harmony is not null) return;
+
+                try
                 {
-                    // 已经装过了 / 宿主还没建出气泡来
-                    if (main.MsgBar is GuardedMessageBar || main.MsgBar is null) return;
+                    var harmony = new Harmony(HarmonyId);
 
-                    main.MsgBar = new GuardedMessageBar(main.MsgBar);
+                    Patch(harmony, nameof(MessageBar.Show), nameof(ShowTextPrefix),
+                          typeof(string), typeof(string), typeof(string), typeof(UIElement));
+                    Patch(harmony, nameof(MessageBar.Show), nameof(ShowStreamPrefix),
+                          typeof(string), typeof(SayInfoWithStream));
+                    Patch(harmony, nameof(MessageBar.ForceClose), nameof(ForceClosePrefix));
+
+                    _harmony = harmony;
+                    Logger.Log("BubbleGuard: 气泡独占守卫已安装");
                 }
-
-                Logger.Log("BubbleGuard: 气泡独占守卫已安装");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"BubbleGuard: 安装失败，气泡独占不可用: {ex.Message}");
+                catch (Exception ex)
+                {
+                    // 补丁挂不上就是这个功能不可用，不该连累插件加载
+                    Logger.Log($"BubbleGuard: 安装失败，气泡独占不可用: {ex.Message}");
+                    _harmony = null;
+                }
             }
         }
 
-        /// <summary>
-        /// 摘掉守卫，把真正的气泡还给宿主。插件卸载/禁用时必须调用，
-        /// 否则宿主会一直拿着一个指向已卸载程序集的装饰器。
-        /// </summary>
-        public static void Uninstall(IMainWindow? mainWindow)
+        /// <summary>挂一个前置补丁。目标方法找不到就出声，别静默地少拦一条路。</summary>
+        private static void Patch(Harmony harmony, string targetName, string prefixName, params Type[] args)
         {
-            var main = mainWindow?.Main;
+            var target = typeof(MessageBar).GetMethod(targetName,
+                BindingFlags.Public | BindingFlags.Instance, binder: null, types: args, modifiers: null);
 
-            try
+            if (target is null)
             {
-                lock (_lock)
+                Logger.Log($"BubbleGuard: 宿主没有 MessageBar.{targetName}({string.Join(", ", args.Select(t => t.Name))})，" +
+                           $"这条路拦不住（宿主内部结构可能变了）");
+                return;
+            }
+
+            var prefix = typeof(BubbleGuard).GetMethod(prefixName, BindingFlags.NonPublic | BindingFlags.Static)!;
+            harmony.Patch(target, prefix: new HarmonyMethod(prefix));
+        }
+
+        /// <summary>
+        /// 摘掉守卫。插件卸载/禁用时必须调用 —— 补丁里的委托指向本程序集，
+        /// 不摘的话宿主会一直调用一个已经卸载的程序集里的方法。
+        /// </summary>
+        public static void Uninstall()
+        {
+            lock (_lock)
+            {
+                try
                 {
-                    if (main?.MsgBar is GuardedMessageBar guard)
+                    if (_harmony is not null)
                     {
-                        main.MsgBar = guard.Inner;
+                        _harmony.UnpatchAll(HarmonyId);
                         Logger.Log("BubbleGuard: 气泡独占守卫已卸载");
                     }
-
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"BubbleGuard: 卸载失败: {ex.Message}");
+                }
+                finally
+                {
+                    _harmony = null;
                     _replyDepth = 0;
                     ClearPendingLocked();
                 }
             }
+        }
+
+        // ============================================================================
+        // 补丁本体：返回 false = 跳过宿主原方法（也就是把这次气泡吞掉）
+        // ============================================================================
+
+        /// <summary>参数由 Harmony 按名字注入，名字必须和宿主方法的形参一致。</summary>
+        private static bool ShowTextPrefix(string text) => !SwallowExternal(() => ShouldSwallow(text, "文本"));
+
+        /// <inheritdoc cref="ShowTextPrefix"/>
+        private static bool ShowStreamPrefix(SayInfoWithStream sayInfoWithStream)
+            // 吞掉它只是不去订阅它的更新事件，生产方那边照常往下跑，
+            // 不会因为没人消费而卡住
+            => !SwallowExternal(() => ShouldSwallowStream(sayInfoWithStream));
+
+        /// <inheritdoc cref="ShowTextPrefix"/>
+        private static bool ForceClosePrefix() => !SwallowExternal(ShouldSwallowClose);
+
+        /// <summary>
+        /// 只拦<b>外部</b>打进来的调用，气泡自己内部的调用一律放行。
+        ///
+        /// 这条规则不是保守，是在还原换实例那版的语义：那时候拦截点在 <c>Main.MsgBar</c>，
+        /// 只有"通过字段调进来"的才会经过守卫，气泡自己方法之间的互相调用根本不经过。
+        /// Harmony 打在方法上，内外一起拦，得手动把内部的择出去。
+        ///
+        /// 具体差在哪：<c>MessageBar.ForceClose</c> 有两个内部调用方 ——
+        /// 双击气泡、右键菜单里的"关闭"，<b>都是用户亲手要关掉它</b>。
+        /// 这种时候还拦着不放，就成了"桌宠说起话来关都关不掉"。
+        /// </summary>
+        private static bool SwallowExternal(Func<bool> decide)
+        {
+            // 先做便宜的判断：没在回复中就什么都不用管，走栈的代价一分不付
+            lock (_lock)
+            {
+                if (!IsEnabled || !IsHoldingLocked()) return false;
+            }
+
+            if (IsCallFromMessageBarItself()) return false;
+
+            return decide();
+        }
+
+        /// <summary>调用是不是从 <see cref="MessageBar"/> 自己的方法里发出来的。</summary>
+        private static bool IsCallFromMessageBarItself()
+        {
+            try
+            {
+                foreach (var frame in new StackTrace(fNeedFileInfo: false).GetFrames())
+                {
+                    var method = frame?.GetMethod();
+                    if (method?.DeclaringType != typeof(MessageBar)) continue;
+
+                    // 被打补丁的那一层自己不算 —— 它就在栈上，是我们进来的必经之路
+                    if (method.Name is nameof(MessageBar.Show) or nameof(MessageBar.ForceClose)) continue;
+
+                    return true;
+                }
+            }
             catch (Exception ex)
             {
-                Logger.Log($"BubbleGuard: 卸载失败: {ex.Message}");
+                // 走栈失败就按"外部调用"处理：宁可多拦一次，也不放过一次顶掉回复的机会
+                Logger.Log($"BubbleGuard: 判断调用来源失败，按外部调用处理: {ex.Message}");
             }
-        }
 
-        /// <summary>
-        /// 确认守卫还在位上，被换掉了就重新装。
-        ///
-        /// 宿主进多人模式时会执行 <c>Main.MsgBar = new MessageBar(Main)</c>，
-        /// 直接把我们的装饰器顶掉；不自愈的话此后气泡独占就静默失效了。
-        /// </summary>
-        private static void EnsureInstalled()
-        {
-            var main = VPetLLM.Instance?.MW?.Main;
-            if (main is null) return;
-
-            if (main.MsgBar is GuardedMessageBar) return;
-
-            Logger.Log("BubbleGuard: 检测到宿主更换了气泡实例，重新安装守卫");
-            Install(VPetLLM.Instance?.MW);
+            return false;
         }
 
         // ============================================================================
-        // 解包：本插件自己要操作真气泡时用
+        // 取真气泡：本插件自己要操作气泡时用
         // ============================================================================
 
         /// <summary>
-        /// 取回被包在装饰器里的真气泡。
+        /// 取宿主真正的气泡实例。
         ///
-        /// 本插件有大量代码是反射进 <c>MessageBar</c> 的私有字段（定时器、打字机缓冲区）
-        /// 来精修气泡的，那些代码必须拿到真实例：拿到装饰器的话反射一个字段都找不到，
-        /// <see cref="MessageBarHelper"/> 还会把"不支持"的结论缓存进静态字段，
-        /// 之后整个进程都降级运行。
+        /// 守卫改成打补丁之后，<c>Main.MsgBar</c> 从头到尾都是宿主原装的 <see cref="MessageBar"/>，
+        /// 这里已经没有"壳"要剥了。保留这两个方法是因为调用点有十几处，
+        /// 而且它们表达的是"我要的是能反射私有字段的那个实例"这层意图，
+        /// 比裸读 <c>Main.MsgBar</c> 清楚。
         /// </summary>
-        public static object? Real(object? msgBar)
-            => msgBar is GuardedMessageBar guard ? guard.Inner : msgBar;
+        public static object? Real(object? msgBar) => msgBar;
 
         /// <inheritdoc cref="Real(object?)"/>
-        public static IMassageBar? Real(IMassageBar? msgBar)
-            => msgBar is GuardedMessageBar guard ? guard.Inner : msgBar;
+        public static IMassageBar? Real(IMassageBar? msgBar) => msgBar;
 
         /// <summary>
-        /// 宿主当前的真气泡（已解包）。本插件内部一律用这个，不要直接读 <c>Main.MsgBar</c>。
+        /// 宿主当前的气泡。本插件内部一律用这个，不要直接读 <c>Main.MsgBar</c>。
         /// </summary>
-        public static IMassageBar? RealMsgBar => Real(VPetLLM.Instance?.MW?.Main?.MsgBar);
+        public static IMassageBar? RealMsgBar => VPetLLM.Instance?.MW?.Main?.MsgBar;
 
         // ============================================================================
         // 回复状态
@@ -197,11 +298,9 @@ namespace VPetLLM.Utils.UI
                 _replyDepth++;
             }
 
-            // 装在这里而不是只在插件加载时装一次：宿主可能中途换过气泡实例
-            if (IsEnabled)
-            {
-                EnsureInstalled();
-            }
+            // 也在这里装一次：用户可能是在插件加载之后才把开关打开的。
+            // 补丁是进程级的，装过就直接返回，重复调用不花钱
+            Install();
 
             return new ReplyScope();
         }
@@ -313,7 +412,7 @@ namespace VPetLLM.Utils.UI
         }
 
         // ============================================================================
-        // 守卫判定（供装饰器调用）
+        // 守卫判定（供补丁调用）
         // ============================================================================
 
         /// <summary>
@@ -414,7 +513,7 @@ namespace VPetLLM.Utils.UI
 
         /// <summary>
         /// 流式说话。登记的是"发起时已有的文本"，与
-        /// <see cref="GuardedMessageBar.Show(string, SayInfoWithStream)"/> 的认领口径一致。
+        /// <see cref="BubbleGuard.ShouldSwallowStream"/> 的认领口径一致。
         /// </summary>
         public static void SayGuarded(this Main main, SayInfoWithStream sayInfo)
         {
@@ -423,60 +522,4 @@ namespace VPetLLM.Utils.UI
         }
     }
 
-    /// <summary>
-    /// 装在宿主 <c>Main.MsgBar</c> 上的一层壳：平时原样转发，
-    /// LLM 回复期间把别人的显示/关闭请求丢进黑洞（正常返回，不抛异常）。
-    /// </summary>
-    internal sealed class GuardedMessageBar : IMassageBar
-    {
-        /// <summary>被包住的真气泡</summary>
-        public IMassageBar Inner { get; }
-
-        public GuardedMessageBar(IMassageBar inner)
-        {
-            Inner = inner ?? throw new ArgumentNullException(nameof(inner));
-        }
-
-        public void Show(string name, string text, string? graphName = null, UIElement? msgContent = null)
-        {
-            if (BubbleGuard.ShouldSwallow(text, "文本")) return;
-            Inner.Show(name, text, graphName, msgContent);
-        }
-
-        public void Show(string name, SayInfoWithStream sayInfoWithStream)
-        {
-            // 吞掉它只是不去订阅它的更新事件，生产方那边照常往下跑，
-            // 不会因为没人消费而卡住
-            if (BubbleGuard.ShouldSwallowStream(sayInfoWithStream)) return;
-            Inner.Show(name, sayInfoWithStream!);
-        }
-
-        public void ForceClose()
-        {
-            if (BubbleGuard.ShouldSwallowClose()) return;
-            Inner.ForceClose();
-        }
-
-        // 以下都原样转发：位置、可见性、控件本身、关闭事件都属于宿主自己的生命周期，
-        // 拦下来的收益远小于把宿主状态机搞乱的风险
-        public void SetPlaceIN() => Inner.SetPlaceIN();
-
-        public void SetPlaceOUT() => Inner.SetPlaceOUT();
-
-        public Visibility Visibility
-        {
-            get => Inner.Visibility;
-            set => Inner.Visibility = value;
-        }
-
-        public Control This => Inner.This;
-
-        public event Action EndAction
-        {
-            add => Inner.EndAction += value;
-            remove => Inner.EndAction -= value;
-        }
-
-        public void Dispose() => Inner.Dispose();
-    }
 }

@@ -42,9 +42,6 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否初始化成功</returns>
         public static bool Initialize(object msgBar)
         {
-            // 兜底解包：这里反射的是宿主 MessageBar 的私有字段，拿到 BubbleGuard 的装饰器
-            // 会一个字段都找不到，还会把"不支持精细控制"的结论缓存进静态字段，
-            // 之后整个进程的气泡都降级运行。调用方本该传真气泡，这里再兜一道
             msgBar = BubbleGuard.Real(msgBar)!;
             if (msgBar is null) return false;
 
@@ -58,17 +55,17 @@ namespace VPetLLM.Utils.UI
                     _msgBarType = msgBar.GetType();
 
                     // 缓存公共字段
-                    _showTimerField = _msgBarType.GetField("ShowTimer", BindingFlags.Public | BindingFlags.Instance);
-                    _endTimerField = _msgBarType.GetField("EndTimer", BindingFlags.Public | BindingFlags.Instance);
-                    _closeTimerField = _msgBarType.GetField("CloseTimer", BindingFlags.Public | BindingFlags.Instance);
-                    _tTextField = _msgBarType.GetField("TText", BindingFlags.Public | BindingFlags.Instance);
-                    _messageBoxContentField = _msgBarType.GetField("MessageBoxContent", BindingFlags.Public | BindingFlags.Instance);
+                    _showTimerField = FindField(_msgBarType, "ShowTimer");
+                    _endTimerField = FindField(_msgBarType, "EndTimer");
+                    _closeTimerField = FindField(_msgBarType, "CloseTimer");
+                    _tTextField = FindField(_msgBarType, "TText");
+                    _messageBoxContentField = FindField(_msgBarType, "MessageBoxContent");
 
                     // 缓存私有字段
-                    _lNameField = _msgBarType.GetField("LName", BindingFlags.NonPublic | BindingFlags.Instance);
-                    _oldsaystreamField = _msgBarType.GetField("oldsaystream", BindingFlags.NonPublic | BindingFlags.Instance);
-                    _outputtextField = _msgBarType.GetField("outputtext", BindingFlags.NonPublic | BindingFlags.Instance);
-                    _outputtextsampleField = _msgBarType.GetField("outputtextsample", BindingFlags.NonPublic | BindingFlags.Instance);
+                    _lNameField = FindField(_msgBarType, "LName");
+                    _oldsaystreamField = FindField(_msgBarType, "oldsaystream");
+                    _outputtextField = FindField(_msgBarType, "outputtext");
+                    _outputtextsampleField = FindField(_msgBarType, "outputtextsample");
 
                     _isInitialized = true;
 
@@ -101,6 +98,30 @@ namespace VPetLLM.Utils.UI
                     return false;
                 }
             }
+        }
+
+        /// <summary>
+        /// 找字段，找不到就往基类走。
+        ///
+        /// 必须这么找，不能直接 <c>type.GetField(name, NonPublic | Instance)</c>：
+        /// <b>私有字段不被继承</b>，在子类型上按 NonPublic 找基类的私有字段一律返回 null。
+        /// 而宿主气泡如今真实的运行时类型是 <see cref="GuardedMessageBar"/>（继承自
+        /// <c>MessageBar</c>，见 <see cref="BubbleGuard"/> 的注释），
+        /// <c>outputtext</c> / <c>oldsaystream</c> 这些都声明在基类上 ——
+        /// 不往上走就会全部落空，然后整个进程的流式气泡降级成公共 Show API。
+        /// </summary>
+        private static FieldInfo FindField(Type type, string name)
+        {
+            const BindingFlags Flags = BindingFlags.Public | BindingFlags.NonPublic
+                                     | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
+            for (var t = type; t is not null; t = t.BaseType)
+            {
+                var field = t.GetField(name, Flags);
+                if (field is not null) return field;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -150,7 +171,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>字段值，失败返回默认值</returns>
         public static T GetFieldValue<T>(object msgBar, string fieldName)
         {
-            msgBar = BubbleGuard.Real(msgBar)!;   // 兜底解包，理由见 Initialize
+            msgBar = BubbleGuard.Real(msgBar)!;
             if (msgBar is null) return default;
 
             if (!_isInitialized)
@@ -171,8 +192,7 @@ namespace VPetLLM.Utils.UI
                 }
 
                 // 回退：直接反射获取
-                var directField = msgBar.GetType().GetField(fieldName,
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                var directField = FindField(msgBar.GetType(), fieldName);
                 if (directField is not null)
                 {
                     var value = directField.GetValue(msgBar);
@@ -199,7 +219,7 @@ namespace VPetLLM.Utils.UI
         /// <returns>是否设置成功</returns>
         public static bool SetFieldValue(object msgBar, string fieldName, object value)
         {
-            msgBar = BubbleGuard.Real(msgBar)!;   // 兜底解包，理由见 Initialize
+            msgBar = BubbleGuard.Real(msgBar)!;
             if (msgBar is null) return false;
 
             if (!_isInitialized)
@@ -217,8 +237,7 @@ namespace VPetLLM.Utils.UI
                 }
 
                 // 回退：直接反射设置
-                var directField = msgBar.GetType().GetField(fieldName,
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                var directField = FindField(msgBar.GetType(), fieldName);
                 if (directField is not null)
                 {
                     directField.SetValue(msgBar, value);
