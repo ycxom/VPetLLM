@@ -262,26 +262,30 @@ namespace VPetLLM.UI.Windows
             {
                 try
                 {
-                    // 检查是否为完整消息（非流式模式的特征：包含多个完整命令）
-                    if (IsCompleteMessage(response))
+                    // 等待前一个回复处理完成，保证回复间的命令顺序。
+                    //
+                    // 两条分支都要在锁里：只含一条命令的回复（插件回执引出的那种，
+                    // 多半就是一句 say）走的是下面那条，过去它完全不排队 ——
+                    // 于是上一轮的语音还在放，它的气泡和语音就直接压上来，
+                    // 用户听到的是同一次互动被回答了两遍。
+                    await _responseLock.WaitAsync();
+                    try
                     {
-                        Logger.LogVerbose($"HandleResponse: 检测到完整消息，使用统一流式处理器拆分处理");
-
-                        // 等待前一个回复处理完成，保证回复间的命令顺序
-                        await _responseLock.WaitAsync();
-                        try
+                        // 检查是否为完整消息（非流式模式的特征：包含多个完整命令）
+                        if (IsCompleteMessage(response))
                         {
+                            Logger.LogVerbose($"HandleResponse: 检测到完整消息，使用统一流式处理器拆分处理");
                             await ProcessCompleteMessageAsStreaming(response);
                         }
-                        finally
+                        else
                         {
-                            _responseLock.Release();
+                            // 流式片段，直接使用现有的流式处理逻辑
+                            await _messageProcessor.ProcessMessageAsync(response, !isFirstResponse, autoSetIdleOnComplete: false);
                         }
                     }
-                    else
+                    finally
                     {
-                        // 流式片段，直接使用现有的流式处理逻辑
-                        await _messageProcessor.ProcessMessageAsync(response, !isFirstResponse, autoSetIdleOnComplete: false);
+                        _responseLock.Release();
                     }
                 }
                 catch (Exception ex)

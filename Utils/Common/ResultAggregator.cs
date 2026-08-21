@@ -14,6 +14,11 @@ namespace VPetLLM.Utils.Common
         private static readonly Dictionary<string, DateTime> _lastTouchUtc = new();
 
         /// <summary>
+        /// 非会话缓冲区第一次为"上一轮还在说话"让路的时刻，用于给让路加上限。
+        /// </summary>
+        private static readonly Dictionary<string, DateTime> _deferSinceUtc = new();
+
+        /// <summary>
         /// 随本次回灌一并送出的图像。
         ///
         /// 存在的理由：原生多模态要求主模型看到真实像素，而不是先让它描述一遍再读自己的描述。
@@ -26,6 +31,16 @@ namespace VPetLLM.Utils.Common
         /// 聚合窗口时长
         /// </summary>
         public static TimeSpan Window { get; set; } = TimeSpan.FromSeconds(2);
+
+        /// <summary>
+        /// 为正在播出的回复让路时的重试间隔。
+        /// </summary>
+        private static readonly TimeSpan BusyRetryInterval = TimeSpan.FromSeconds(1);
+
+        /// <summary>
+        /// 让路的上限。超过这么久还没等到空闲就照常回灌。
+        /// </summary>
+        private static readonly TimeSpan MaxDeferral = TimeSpan.FromMinutes(2);
 
         /// <summary>
         /// 会话缓冲区的存活上限。
@@ -95,25 +110,12 @@ namespace VPetLLM.Utils.Common
                         imageList.AddRange(images.Where(i => i is not null && i.Length > 0));
                     }
 
-                    // 会话内不启用计时器，统一由会话结束时 FlushSession 触发一次
+                    // 会话内不启用计时器，统一由会话结束时 FlushSession 触发一次。
+                    // 非会话（插件自发事件）才排计时器：重排等于重置窗口，
+                    // 持续输入时在最后一条的 2 秒后统一输出一次
                     if (!IsSessionKey(key))
                     {
-                        // 启动或重置计时器（仅非会话全局聚合）
-                        if (!_timers.TryGetValue(key, out var timer))
-                        {
-                            timer = new SystemTimers.Timer(Window.TotalMilliseconds);
-                            timer.AutoReset = false;
-                            timer.Elapsed += (_, __) => Flush(key);
-                            _timers[key] = timer;
-                            timer.Start();
-                        }
-                        else
-                        {
-                            // 重置窗口：在持续输入的2秒后统一输出一次
-                            timer.Stop();
-                            timer.Interval = Window.TotalMilliseconds;
-                            timer.Start();
-                        }
+                        RearmTimerLocked(key, Window);
                     }
                 }
             }
@@ -167,6 +169,10 @@ namespace VPetLLM.Utils.Common
                 lock (_lock)
                 {
                     var hasContent = _buffers.TryGetValue(key, out var list) && list.Count > 0;
+
+                    // 上一轮的回复还在播：先让路，缓冲区原样留着继续攒
+                    if (hasContent && !IsSessionKey(key) && DeferForOngoingReplyLocked(key))
+                        return;
 
                     // 无论有没有内容都要清干净这个 key，空缓冲区同样会把字典撑大
                     if (hasContent)
@@ -243,6 +249,73 @@ namespace VPetLLM.Utils.Common
         }
 
         /// <summary>
+        /// 插件自发的回执（不属于任何一轮对话，key 为 session:global）撞上正在播出的回复时先让路，
+        /// 返回 true 表示本次不回灌。
+        ///
+        /// 会话内的回执有 FlushSession 兜着 —— 本回合的输出跑完才回灌，天然不会插队。
+        /// 全局这条只有一个 2 秒计时器，到点就发，于是出现过这样的时序：用户的话刚回答到
+        /// 第一句、语音还在放，前台窗口一变化就又灌进去一条，模型第二次开口 ——
+        /// 两段话叠在一起，听感上就是"同一次互动回答了两遍"。
+        ///
+        /// 让路不丢内容：缓冲区原样留着、计时器重排，其间新到的回执继续并进同一条，
+        /// 等这一轮的输出收干净了一起回灌。
+        /// 调用方须持有 <see cref="_lock"/>。
+        /// </summary>
+        private static bool DeferForOngoingReplyLocked(string key)
+        {
+            var sidebar = VPetLLM.Instance?.FloatingSidebarManager;
+
+            // ActiveSessionCount 覆盖"输出已经开始"，IsBusy 补上"请求还在飞、输出尚未开始"
+            // 那一小段窗口 —— 只看前者的话，回灌会正好挤在上一轮拿到回复之前发出去
+            bool busy = sidebar is not null
+                && (sidebar.ActiveSessionCount > 0 || sidebar.IsBusy);
+
+            if (!busy)
+            {
+                _deferSinceUtc.Remove(key);
+                return false;
+            }
+
+            if (!_deferSinceUtc.TryGetValue(key, out var since))
+            {
+                // 只在第一次让路时记一笔：这里每 BusyRetryInterval 就会走一遍，
+                // 每次都打日志会把一轮回复的日志刷成几十行等待
+                _deferSinceUtc[key] = DateTime.UtcNow;
+                VPetLLMUtils.Logger.Log("ResultAggregator: 上一轮回复仍在输出，推迟回灌直到它说完");
+            }
+            else if (DateTime.UtcNow - since >= MaxDeferral)
+            {
+                // 让路也要有上限：状态灯万一卡在非 Idle，回执不能就此石沉大海
+                VPetLLMUtils.Logger.Log($"ResultAggregator: 已推迟 {MaxDeferral.TotalSeconds:F0}s，不再等待，照常回灌");
+                _deferSinceUtc.Remove(key);
+                return false;
+            }
+
+            RearmTimerLocked(key, BusyRetryInterval);
+            return true;
+        }
+
+        /// <summary>
+        /// 给某个 key 排一次性计时器（已有则重排）。调用方须持有 <see cref="_lock"/>。
+        /// </summary>
+        private static void RearmTimerLocked(string key, TimeSpan due)
+        {
+            if (!_timers.TryGetValue(key, out var timer))
+            {
+                timer = new SystemTimers.Timer(due.TotalMilliseconds);
+                timer.AutoReset = false;
+                timer.Elapsed += (_, __) => Flush(key);
+                _timers[key] = timer;
+                timer.Start();
+                return;
+            }
+
+            timer.Stop();
+            timer.Interval = due.TotalMilliseconds;
+            timer.Start();
+        }
+
+        /// <summary>
         /// 丢弃某个 key 的全部状态。调用方须持有 <see cref="_lock"/>。
         /// </summary>
         private static void Discard(string key)
@@ -251,6 +324,7 @@ namespace VPetLLM.Utils.Common
             // 图像缓冲同样要清，否则一张整屏截图会一直占着内存
             _imageBuffers.Remove(key);
             _lastTouchUtc.Remove(key);
+            _deferSinceUtc.Remove(key);
 
             if (_timers.TryGetValue(key, out var timer))
             {
