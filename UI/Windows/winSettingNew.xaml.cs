@@ -5220,8 +5220,10 @@ namespace VPetLLM.UI.Windows
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
                     if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
                     if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
-                    if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Collapsed;
-                    if (cbChannelProxyMode != null) cbChannelProxyMode.Visibility = Visibility.Collapsed;
+                    // 本地端点同样会被全局代理劫持（代理没配 localhost 绕过时必然失败），
+                    // 所以和 OpenAI/Gemini 一样需要渠道级代理模式
+                    if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Visible;
+                    if (cbChannelProxyMode != null) cbChannelProxyMode.Visibility = Visibility.Visible;
                     if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
                     if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
                     if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
@@ -5241,8 +5243,9 @@ namespace VPetLLM.UI.Windows
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
                     if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
                     if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
-                    if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Collapsed;
-                    if (cbChannelProxyMode != null) cbChannelProxyMode.Visibility = Visibility.Collapsed;
+                    // 同 Ollama：本地端点也需要渠道级代理模式
+                    if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Visible;
+                    if (cbChannelProxyMode != null) cbChannelProxyMode.Visibility = Visibility.Visible;
                     if (cbEnableAdvanced != null) cbEnableAdvanced.Visibility = Visibility.Visible;
                     if (stackPanelAdvanced != null) stackPanelAdvanced.Visibility = Visibility.Visible;
                     if (buttonRefreshModels != null) buttonRefreshModels.Visibility = Visibility.Visible;
@@ -5579,6 +5582,17 @@ namespace VPetLLM.UI.Windows
                                     }
                                 }
                             }
+                            if (cbChannelProxyMode != null)
+                            {
+                                foreach (ComboBoxItem item in cbChannelProxyMode.Items)
+                                {
+                                    if (item.Tag?.ToString() == ollamaNode.ProxyMode.ToString())
+                                    {
+                                        cbChannelProxyMode.SelectedItem = item;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                         break;
                     case "LMStudio":
@@ -5603,6 +5617,17 @@ namespace VPetLLM.UI.Windows
                                     if (item.Tag?.ToString() == lmStudioNode.Mode.ToString())
                                     {
                                         cbChannelMode.SelectedItem = item;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (cbChannelProxyMode != null)
+                            {
+                                foreach (ComboBoxItem item in cbChannelProxyMode.Items)
+                                {
+                                    if (item.Tag?.ToString() == lmStudioNode.ProxyMode.ToString())
+                                    {
+                                        cbChannelProxyMode.SelectedItem = item;
                                         break;
                                     }
                                 }
@@ -6449,6 +6474,8 @@ namespace VPetLLM.UI.Windows
                             ollamaNode.MaxTokens = maxTokens;
                         if (cbChannelMode != null && cbChannelMode.SelectedItem is ComboBoxItem modeItem)
                             ollamaNode.Mode = Enum.Parse<Setting.ChannelMode>(modeItem.Tag?.ToString() ?? "Unrestricted");
+                        if (cbChannelProxyMode != null && cbChannelProxyMode.SelectedItem is ComboBoxItem proxyModeItem)
+                            ollamaNode.ProxyMode = Enum.Parse<Setting.ChannelProxyMode>(proxyModeItem.Tag?.ToString() ?? "FollowDefault");
                     }
                     break;
                 case "LMStudio":
@@ -6470,6 +6497,8 @@ namespace VPetLLM.UI.Windows
                             lmStudioNode.MaxTokens = maxTokens;
                         if (cbChannelMode != null && cbChannelMode.SelectedItem is ComboBoxItem modeItem)
                             lmStudioNode.Mode = Enum.Parse<Setting.ChannelMode>(modeItem.Tag?.ToString() ?? "Unrestricted");
+                        if (cbChannelProxyMode != null && cbChannelProxyMode.SelectedItem is ComboBoxItem proxyModeItem)
+                            lmStudioNode.ProxyMode = Enum.Parse<Setting.ChannelProxyMode>(proxyModeItem.Tag?.ToString() ?? "FollowDefault");
                     }
                     break;
                 case "Free":

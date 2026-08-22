@@ -2003,6 +2003,21 @@ namespace VPetLLM
 
                 // 3) 仅生成代理相关推荐项
                 var recommendations = diagService.GenerateProxyRecommendations(result, isChina);
+
+                // 用户点过"应用"或"忽略"的条目不再重复打扰。
+                // 只靠"应用后设置变了、下次自然不再生成"是不够的：一旦某条应用不下去
+                // （例如目标设置项不存在），弹窗就会每次启动原样重来
+                var handled = Settings?.HandledProxyRecommendations;
+                if (handled is { Count: > 0 })
+                {
+                    var before = recommendations.Count;
+                    recommendations = recommendations
+                        .Where(r => !handled.Contains(RecommendationSignature(r)))
+                        .ToList();
+                    if (before != recommendations.Count)
+                        Logger.Log($"StartupProxyOptimization: 跳过 {before - recommendations.Count} 项用户已处理的建议。");
+                }
+
                 if (recommendations.Count == 0)
                 {
                     Logger.Log("StartupProxyOptimization: 未发现需要调整的代理相关项。");
@@ -2026,22 +2041,33 @@ namespace VPetLLM
                     {
                         diagWindow.ShowRecommendations(recommendations, accepted =>
                         {
+                            // 无论应用还是忽略，这批条目都算"用户已经表过态"，下次不再问。
+                            // 记录必须先于任何可能提前返回的分支，否则又回到无限弹窗
+                            RememberHandledRecommendations(recommendations);
+
                             if (accepted)
                             {
-                                diagService.ApplyRecommendedSettings(recommendations);
+                                var unapplied = diagService.ApplyRecommendedSettings(recommendations);
                                 diagWindow.OnRecommendationsApplied();
-                                Logger.Log("StartupProxyOptimization: 已应用代理相关推荐设置。");
+
+                                if (unapplied.Count > 0)
+                                {
+                                    // 老实告诉用户哪几条没落地，而不是装作已经解决
+                                    Logger.Log($"StartupProxyOptimization: {unapplied.Count} 项未能应用: {string.Join(", ", unapplied)}");
+                                    diagWindow.ShowInfo(
+                                        lang.StartsWith("zh") ? "部分设置未能应用" : "Some settings were not applied",
+                                        lang.StartsWith("zh")
+                                            ? $"有 {unapplied.Count} 项建议未能写入设置，可在设置中手动调整。"
+                                            : $"{unapplied.Count} suggestion(s) could not be written. Please adjust them manually in Settings.");
+                                }
+                                else
+                                {
+                                    Logger.Log("StartupProxyOptimization: 已应用代理相关推荐设置。");
+                                }
                             }
                             else
                             {
-                                // 用户忽略：持久化关闭启动自动优化弹窗，避免每次启动重复打扰。
-                                // 用户仍可在设置中重新勾选"启动时代理自动优化"，或手动运行诊断。
-                                if (Settings != null)
-                                {
-                                    Settings.EnableStartupProxyOptimization = false;
-                                    Settings.Save();
-                                    Logger.Log("StartupProxyOptimization: 用户忽略，已关闭启动自动优化弹窗（可在设置中重新启用）。");
-                                }
+                                Logger.Log("StartupProxyOptimization: 用户忽略本批建议，已记录，不再重复弹窗。");
                                 diagWindow.Close();
                             }
                         });
@@ -2052,6 +2078,43 @@ namespace VPetLLM
             catch (Exception ex)
             {
                 Logger.Log($"StartupProxyOptimization error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 建议的稳定签名。带上推荐值：同一项设置日后若给出**不同**的推荐，
+        /// 仍然应该重新征求用户意见，而不是被旧记录一并压掉。
+        /// </summary>
+        private static string RecommendationSignature(Services.RecommendedSetting rec)
+            => $"{rec.Key}={rec.RecommendedValue}";
+
+        /// <summary>
+        /// 记下用户已经表过态的建议并落盘。
+        /// </summary>
+        private void RememberHandledRecommendations(List<Services.RecommendedSetting> recommendations)
+        {
+            try
+            {
+                if (Settings == null) return;
+
+                var handled = Settings.HandledProxyRecommendations ??= new List<string>();
+                foreach (var rec in recommendations)
+                {
+                    var sig = RecommendationSignature(rec);
+                    if (!handled.Contains(sig))
+                        handled.Add(sig);
+                }
+
+                // 渠道可以被反复增删改名，这里加个上限免得它只增不减
+                const int maxKept = 200;
+                if (handled.Count > maxKept)
+                    handled.RemoveRange(0, handled.Count - maxKept);
+
+                Settings.Save();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"StartupProxyOptimization: 记录已处理建议失败: {ex.Message}");
             }
         }
 

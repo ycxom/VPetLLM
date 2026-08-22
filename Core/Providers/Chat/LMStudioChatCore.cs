@@ -38,6 +38,18 @@ namespace VPetLLM.Core.Providers.Chat
             _setting = setting;
         }
 
+        /// <summary>
+        /// 渠道级代理模式。单节点构造时 LMStudioNodes 里就是那一个节点；
+        /// 整份设置构造时按当前选中节点取。取不到就跟随默认（与本类过去的行为一致）。
+        /// </summary>
+        protected override Setting.ChannelProxyMode GetChannelProxyMode()
+        {
+            var node = _lmStudioSetting.LMStudioNodes.Count == 1
+                ? _lmStudioSetting.LMStudioNodes[0]
+                : _lmStudioSetting.GetCurrentLMStudioSetting();
+            return node?.ProxyMode ?? Setting.ChannelProxyMode.FollowDefault;
+        }
+
         private string GetCurrentApiUrl()
         {
             string apiUrl = _lmStudioSetting.Url;

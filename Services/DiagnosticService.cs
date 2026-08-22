@@ -676,8 +676,8 @@ namespace VPetLLM.Services
                 ApiUrl = node.Url ?? "http://localhost:11434",
                 Model = node.Model ?? "",
                 Enabled = node.Enabled,
-                ProxyMode = Setting.ChannelProxyMode.FollowDefault,
-                UsesProxy = ShouldUseProxyForChannel(Setting.ChannelProxyMode.FollowDefault, "Ollama"),
+                ProxyMode = node.ProxyMode,
+                UsesProxy = ShouldUseProxyForChannel(node.ProxyMode, "Ollama"),
                 DirectTried = true,
                 ProxyTried = true
             };
@@ -719,7 +719,7 @@ namespace VPetLLM.Services
             result.ProxyConnectionMessage = proxyMsg;
             result.ApiAvailable = directOk || proxyOk;
 
-            EvaluateProxyRecommendation(result, Setting.ChannelProxyMode.FollowDefault);
+            EvaluateProxyRecommendation(result, node.ProxyMode);
 
             if (directOk)
             {
@@ -746,8 +746,8 @@ namespace VPetLLM.Services
                 ApiUrl = node.Url ?? "http://localhost:1234",
                 Model = node.Model ?? "",
                 Enabled = node.Enabled,
-                ProxyMode = Setting.ChannelProxyMode.FollowDefault,
-                UsesProxy = ShouldUseProxyForChannel(Setting.ChannelProxyMode.FollowDefault, "LMStudio"),
+                ProxyMode = node.ProxyMode,
+                UsesProxy = ShouldUseProxyForChannel(node.ProxyMode, "LMStudio"),
                 DirectTried = true,
                 ProxyTried = true
             };
@@ -785,7 +785,7 @@ namespace VPetLLM.Services
             result.ProxyConnectionMessage = proxyMsg;
             result.ApiAvailable = directOk || proxyOk;
 
-            EvaluateProxyRecommendation(result, Setting.ChannelProxyMode.FollowDefault);
+            EvaluateProxyRecommendation(result, node.ProxyMode);
 
             if (directOk)
             {
@@ -1619,8 +1619,16 @@ namespace VPetLLM.Services
             return recs;
         }
 
-        public void ApplyRecommendedSettings(List<RecommendedSetting> recommendations)
+        /// <summary>
+        /// 应用推荐设置，返回其中**没能落地**的 Key 列表（空列表表示全部应用成功）。
+        ///
+        /// 返回值不是可有可无的：调用方要靠它区分"已解决"和"点了没反应"，
+        /// 否则应用不下去的建议会在每次启动时原样弹回来。
+        /// </summary>
+        public List<string> ApplyRecommendedSettings(List<RecommendedSetting> recommendations)
         {
+            var unapplied = new List<string>();
+
             foreach (var rec in recommendations)
             {
                 switch (rec.Key)
@@ -1674,47 +1682,92 @@ namespace VPetLLM.Services
                     default:
                         if (rec.Key.StartsWith("Channel."))
                         {
-                            var parts = rec.Key.Split('.');
-                            if (parts.Length >= 4)
-                            {
-                                var channelType = parts[1];
-                                var channelName = parts[2];
-
-                                var proxyMode = rec.RecommendedValue switch
-                                    {
-                                        "Direct" => Setting.ChannelProxyMode.Direct,
-                                        "ForceProxy" => Setting.ChannelProxyMode.ForceProxy,
-                                        _ => Setting.ChannelProxyMode.FollowDefault
-                                    };
-
-                                switch (channelType)
-                                {
-                                    case "OpenAI":
-                                        var oaNode = _settings.OpenAI.OpenAINodes
-                                            .FirstOrDefault(n => n.Name == channelName);
-                                        if (oaNode != null)
-                                            oaNode.ProxyMode = proxyMode;
-                                        break;
-                                    case "Gemini":
-                                        var gmNode = _settings.Gemini.GeminiNodes
-                                            .FirstOrDefault(n => n.Name == channelName);
-                                        if (gmNode != null)
-                                            gmNode.ProxyMode = proxyMode;
-                                        break;
-                                }
-                            }
+                            if (!ApplyChannelProxyMode(rec))
+                                unapplied.Add(rec.Key);
                         }
                         else if (rec.Key == "PluginStore.UseProxy")
                         {
                             if (_settings.PluginStore != null)
                                 _settings.PluginStore.UseProxy = rec.RecommendedValue == "true";
+                            else
+                                unapplied.Add(rec.Key);
+                        }
+                        else
+                        {
+                            unapplied.Add(rec.Key);
                         }
                         break;
                 }
             }
 
             _settings.Save();
-            Logger.Log($"Applied {recommendations.Count} recommended settings");
+
+            if (unapplied.Count > 0)
+            {
+                // 静默吞掉应用不下去的建议，就会变成"每次启动弹同一个窗、点应用没反应"。
+                // 这里必须留痕，调用方也据此知道不能当成已解决
+                Logger.Log($"ApplyRecommendedSettings: {unapplied.Count} 项未能应用: {string.Join(", ", unapplied)}");
+            }
+
+            Logger.Log($"Applied {recommendations.Count - unapplied.Count}/{recommendations.Count} recommended settings");
+            return unapplied;
+        }
+
+        /// <summary>
+        /// 把 <c>Channel.&lt;类型&gt;.&lt;名称&gt;.ProxyMode</c> 落到对应节点上，成功返回 true。
+        ///
+        /// 名称里可能带点（"GPT-4.1 节点"），所以不能简单按 '.' 取第 3 段 ——
+        /// 取头两段和最后一段，中间整段都是名称。
+        /// </summary>
+        private bool ApplyChannelProxyMode(RecommendedSetting rec)
+        {
+            var parts = rec.Key.Split('.');
+            if (parts.Length < 4 || parts[^1] != "ProxyMode")
+                return false;
+
+            var channelType = parts[1];
+            var channelName = string.Join('.', parts[2..^1]);
+
+            var proxyMode = rec.RecommendedValue switch
+            {
+                "Direct" => Setting.ChannelProxyMode.Direct,
+                "ForceProxy" => Setting.ChannelProxyMode.ForceProxy,
+                _ => Setting.ChannelProxyMode.FollowDefault
+            };
+
+            switch (channelType)
+            {
+                case "OpenAI":
+                    var oaNode = _settings.OpenAI?.OpenAINodes
+                        .FirstOrDefault(n => n.Name == channelName);
+                    if (oaNode == null) return false;
+                    oaNode.ProxyMode = proxyMode;
+                    return true;
+
+                case "Gemini":
+                    var gmNode = _settings.Gemini?.GeminiNodes
+                        .FirstOrDefault(n => n.Name == channelName);
+                    if (gmNode == null) return false;
+                    gmNode.ProxyMode = proxyMode;
+                    return true;
+
+                case "Ollama":
+                    var olNode = _settings.Ollama?.OllamaNodes
+                        .FirstOrDefault(n => n.Name == channelName);
+                    if (olNode == null) return false;
+                    olNode.ProxyMode = proxyMode;
+                    return true;
+
+                case "LMStudio":
+                    var lmNode = _settings.LMStudio?.LMStudioNodes
+                        .FirstOrDefault(n => n.Name == channelName);
+                    if (lmNode == null) return false;
+                    lmNode.ProxyMode = proxyMode;
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
         public string FormatRecommendationsReport(List<RecommendedSetting> recommendations)

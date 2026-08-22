@@ -156,6 +156,15 @@ namespace VPetLLM
         public bool EnableStartupProxyOptimization { get; set; } = true;
 
         /// <summary>
+        /// 用户已经处理过（应用或忽略）的启动代理建议签名，格式 "Key=RecommendedValue"。
+        ///
+        /// 存在的理由：光靠"应用后设置变了、下次自然不会再生成同一条建议"是不够的 ——
+        /// 只要有一条建议应用不下去（例如目标设置项根本不存在），弹窗就会每次启动重来一遍。
+        /// 记下用户的决定，才能保证"点过就不再问"。
+        /// </summary>
+        public List<string> HandledProxyRecommendations { get; set; } = new();
+
+        /// <summary>
         /// 降级提供商配置列表
         /// </summary>
         public List<ProviderFallbackConfig> FallbackProviders { get; set; } = new();
@@ -952,6 +961,7 @@ namespace VPetLLM
             public bool EnableVision { get; set; } = false;
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
             public string? PluginModeId { get; set; }
+            public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
         }
 
         public class OllamaSetting
@@ -1386,6 +1396,7 @@ namespace VPetLLM
             public bool EnableVision { get; set; } = false;
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
             public string? PluginModeId { get; set; }
+            public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
         }
 
         public class LMStudioSetting
