@@ -614,9 +614,16 @@ namespace VPetLLM.Core.Providers.Chat
                 }
             };
 
-            var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
+            var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, node.EnableToolCall);
 
-            var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model, node.EnableStreaming);
+            var payload = JObject.FromObject(requestData);
+            toolSession?.AttachGeminiTools(payload);
+
+            var content = new StringContent(payload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+
+            // 工具循环强制非流式，所以端点也要按非流式来选
+            var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model,
+                node.EnableStreaming && toolSession is null);
 
             string message;
             try
@@ -625,7 +632,34 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     AddAuthHeaders(client, node);
 
-                    if (node.EnableStreaming)
+                    if (toolSession is not null)
+                    {
+                        var loop = await global::VPetLLM.Core.Tools.NativeToolLoop.RunGeminiAsync(
+                            payload, toolSession,
+                            async body =>
+                            {
+                                var roundContent = new StringContent(
+                                    body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                                var roundResponse = await client.PostAsync(apiEndpoint, roundContent, InterruptManager.Token);
+                                if (!roundResponse.IsSuccessStatusCode)
+                                {
+                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Gemini");
+                                    ResponseHandler?.Invoke(errorMessage);
+                                    return null;
+                                }
+                                return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
+                            });
+
+                        if (!loop.Success) return "";
+
+                        message = loop.Message;
+                        if (loop.HitLimit)
+                        {
+                            Logger.Log("Gemini: 工具调用达到轮次上限，本轮不再继续");
+                        }
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else if (node.EnableStreaming)
                     {
                         Logger.Log("Gemini: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint) { Content = content };

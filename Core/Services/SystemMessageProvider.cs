@@ -420,9 +420,33 @@ namespace VPetLLM.Core.Services
             // 只有在EnablePlugin开启时才添加插件说明（独立于EnableAction）
             if (_settings.EnablePlugin && VPetLLM.Instance.Plugins.Any(p => p.Enabled))
             {
-                var pluginDescriptions = VPetLLM.Instance.Plugins.Where(p => p.Enabled).Select(p => $"{p.Name}: {p.Description} {p.Examples}");
+                // 实现了 IToolSchemaPlugin 的插件渲染成 TypeScript 风格签名，
+                // 其余仍走 "Name: Description Examples" 的老格式（见 ToolSchemaRenderer）
+                var pluginList = ToolSchemaRenderer.RenderAll(VPetLLM.Instance.Plugins.Where(p => p.Enabled));
                 parts.Add(PromptHelper.Get("Available_Plugins_Prefix", lang)
-                            .Replace("{PluginList}", string.Join("\n", pluginDescriptions)));
+                            .Replace("{PluginList}", pluginList));
+
+                // 开了原生工具调用就补一句优先级说明。
+                // 刻意**不**移除上面的标记说明：节点混搭时（有的节点开了工具、有的没开）
+                // 拿掉标记说明会让没开的那些节点彻底调不动插件，而多留着最多只是冗余。
+                if (Core.Tools.NativeToolSession.IsLikelyActive(_settings))
+                {
+                    parts.Add(Core.Tools.NativeToolSession.BuildPromptNotice(lang));
+                }
+
+                // 有插件调用还挂在后台时告诉模型，避免它以为没执行成功又发一遍
+                var running = BackgroundPluginTasks.DescribeRunning(lang);
+                if (!string.IsNullOrEmpty(running))
+                {
+                    parts.Add(running);
+                }
+            }
+
+            // 草稿纸上有东西时列出键名，否则模型不知道有什么可 load
+            var storedKeys = SessionStore.Describe(lang);
+            if (!string.IsNullOrEmpty(storedKeys))
+            {
+                parts.Add(storedKeys);
             }
 
             var systemMessage = string.Join("\n", parts);

@@ -84,6 +84,22 @@ namespace VPetLLM
         public EmbeddingSetting Embedding { get; set; } = new EmbeddingSetting();
 
         public bool EnablePlugin { get; set; } = true;
+
+        /// <summary>
+        /// 原生工具调用（function calling）的总闸。
+        ///
+        /// 真正决定开不开的是各节点上的 EnableToolCall（默认 false，有 UI 开关）——
+        /// 模型支不支持 tools 本来就是一个模型一个样。这里默认 true，只作为
+        /// "整个特性一键停用"的兜底，改它需要直接编辑配置文件。
+        /// </summary>
+        public bool EnableNativeToolCall { get; set; } = true;
+
+        /// <summary>
+        /// 插件调用的"让出"时限（秒）。超过这个时间还没返回，就先把控制权交回给桌宠，
+        /// 让它能开口说话，插件继续在后台跑完再自动回灌结果。0 表示关闭（一直阻塞等到底）。
+        /// 取自 codex code-mode 的 yield_time_ms 语义。
+        /// </summary>
+        public int PluginYieldSeconds { get; set; } = 5;
         public List<ToolSetting> Tools { get; set; } = new List<ToolSetting>();
         public bool ShowUninstallWarning { get; set; } = true;
         public TTSSetting TTS { get; set; } = new TTSSetting();
@@ -959,6 +975,8 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "Ollama节点";
             public bool EnableVision { get; set; } = false;
+            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
+            public bool EnableToolCall { get; set; } = false;
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
             public string? PluginModeId { get; set; }
             public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
@@ -977,6 +995,8 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
+            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
+            public bool EnableToolCall { get; set; } = false;
 
             public OllamaNodeSetting? GetCurrentOllamaSetting(string? purpose = null, HashSet<int>? excludeIndices = null)
             {
@@ -1070,6 +1090,8 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
             public bool EnableVision { get; set; } = false;
+            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
+            public bool EnableToolCall { get; set; } = false;
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
             public string? PluginModeId { get; set; }
             public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
@@ -1230,6 +1252,8 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "Gemini节点";
             public bool EnableVision { get; set; } = false;
+            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
+            public bool EnableToolCall { get; set; } = false;
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
             public string? PluginModeId { get; set; }
             public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
@@ -1365,6 +1389,8 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
+            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
+            public bool EnableToolCall { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
         }
@@ -1381,6 +1407,8 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
+            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
+            public bool EnableToolCall { get; set; } = false;
         }
 
         public class LMStudioNodeSetting
@@ -1394,6 +1422,8 @@ namespace VPetLLM
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "LM Studio节点";
             public bool EnableVision { get; set; } = false;
+            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
+            public bool EnableToolCall { get; set; } = false;
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
             public string? PluginModeId { get; set; }
             public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
@@ -1412,6 +1442,8 @@ namespace VPetLLM
             public bool EnableAdvanced { get; set; } = false;
             public bool EnableStreaming { get; set; } = false;
             public bool EnableVision { get; set; } = false;
+            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
+            public bool EnableToolCall { get; set; } = false;
 
             public LMStudioNodeSetting? GetCurrentLMStudioSetting(string? purpose = null, HashSet<int>? excludeIndices = null)
             {

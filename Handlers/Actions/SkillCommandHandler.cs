@@ -386,10 +386,15 @@ namespace VPetLLM.Handlers.Actions
                 var aiName = VPetLLM.Instance.Settings?.AiName ?? "AI";
                 var userName = VPetLLM.Instance.Settings?.UserName ?? "User";
 
+                // 先把模板里的 {{键名}} 换成草稿纸上的值，技能才能引用之前存下的中间结果。
+                // 这是技能系统一直缺的那条数据流：模板原本只有调用时的 {param} 替换，
+                // 步骤之间没法传数据。找不到的键会原样保留，交给专家模型自己判断。
+                var actionTemplate = SessionStore.Interpolate(skill.ActionTemplate);
+
                 // Build expert system prompt — concise, no conversation history
                 var systemPrompt = lang == "zh"
-                    ? $"你是 {aiName}，正在执行技能 \"{skill.Name}\"。只输出执行该技能所需的命令，不要聊天。技能模板：{skill.ActionTemplate}"
-                    : $"You are {aiName}, executing skill \"{skill.Name}\". Only output the commands needed to execute this skill. Do not chat. Skill template: {skill.ActionTemplate}";
+                    ? $"你是 {aiName}，正在执行技能 \"{skill.Name}\"。只输出执行该技能所需的命令，不要聊天。技能模板：{actionTemplate}"
+                    : $"You are {aiName}, executing skill \"{skill.Name}\". Only output the commands needed to execute this skill. Do not chat. Skill template: {actionTemplate}";
 
                 var userMessage = lang == "zh"
                     ? $"请执行技能: {skill.Name}\n描述: {skill.Description}\n触发条件: {skill.TriggerHint}\n\n根据模板执行并返回结果。"
@@ -420,7 +425,7 @@ namespace VPetLLM.Handlers.Actions
                 // Process the response (from expert LLM or direct template fallback)
                 var responseToProcess = usedExpertLlama && !string.IsNullOrWhiteSpace(expertResponse)
                     ? expertResponse
-                    : skill.ActionTemplate;
+                    : actionTemplate;   // 兜底路径同样要用替换过的模板
 
                 if (!usedExpertLlama)
                 {

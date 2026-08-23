@@ -94,7 +94,34 @@ namespace VPetLLM.Handlers.Actions
                     string result;
                     try
                     {
-                        result = await actionPlugin.Function(arguments);
+                        var call = actionPlugin.Function(arguments);
+
+                        // 让出：到点还没跑完就先把控制权还给桌宠，别让它僵在原地等插件。
+                        // 任务继续在后台跑，结果由 BackgroundPluginTasks 自动回灌。
+                        var yieldSeconds = VPetLLM.Instance.Settings?.PluginYieldSeconds ?? 0;
+                        if (yieldSeconds > 0 && !global::VPetLLM.Core.Services.BackgroundPluginTasks.AtCapacity)
+                        {
+                            // CTS 是为了在插件先返回时把计时器立刻取消，
+                            // 否则每次调用都会白留一个 yieldSeconds 的定时器
+                            using var yieldCts = new System.Threading.CancellationTokenSource();
+                            var timer = Task.Delay(TimeSpan.FromSeconds(yieldSeconds), yieldCts.Token);
+                            var finished = await Task.WhenAny(call, timer);
+                            yieldCts.Cancel();
+
+                            if (finished != call)
+                            {
+                                var cell = global::VPetLLM.Core.Services.BackgroundPluginTasks.Register(pluginName, arguments, call);
+                                var language = VPetLLM.Instance.Settings?.Language ?? "en";
+                                var notice = global::VPetLLM.Core.Services.BackgroundPluginTasks.BuildYieldNotice(cell, yieldSeconds, language);
+
+                                global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.PluginCompleted(pluginName, notice, true);
+                                ResultAggregator.Enqueue(notice);
+                                VPetLLM.Instance.Log($"PluginHandler: {pluginName} yielded to background as #{cell.CellId}");
+                                return;
+                            }
+                        }
+
+                        result = await call;
                         global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.PluginCompleted(pluginName, result, true);
                     }
                     catch (Exception ex)

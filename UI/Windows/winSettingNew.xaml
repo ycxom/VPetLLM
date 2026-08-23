@@ -631,7 +631,9 @@
                     </Grid>
                 </Grid>
                 <CheckBox x:Name="CheckBox_EnableStreaming" Content="{utils:Localize KeyPath=LLM_Settings.EnableStreaming}" Margin="0,16,0,8" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableStreaming_Checked" Unchecked="CheckBox_EnableStreaming_Unchecked"/>
-                <CheckBox x:Name="CheckBox_EnableVision" Content="{utils:Localize KeyPath=LLM_Settings.EnableVision}" Margin="0,0,0,16" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableVision_Checked" Unchecked="CheckBox_EnableVision_Unchecked"/>
+                <CheckBox x:Name="CheckBox_EnableVision" Content="{utils:Localize KeyPath=LLM_Settings.EnableVision}" Margin="0,0,0,8" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableVision_Checked" Unchecked="CheckBox_EnableVision_Unchecked"/>
+                <CheckBox x:Name="CheckBox_EnableToolCall" Content="{utils:Localize KeyPath=LLM_Settings.EnableToolCall, Default=启用原生工具调用 (function calling)}" Margin="0,0,0,4" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableToolCall_Checked" Unchecked="CheckBox_EnableToolCall_Unchecked"/>
+                <TextBlock x:Name="TextBlock_EnableToolCallTip" Text="{utils:Localize KeyPath=LLM_Settings.EnableToolCallTip, Default=以模型原生的 tools 参数暴露插件，替代文本标记。仅在该模型确实支持时开启；开启后本节点的回复不再流式输出。}" TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="24,0,0,16"/>
                 <Label x:Name="Label_ChannelMode" Content="{utils:Localize KeyPath=LLM_Settings.ChannelMode, Default=渠道模式:}" Style="{StaticResource SettingLabel}"/>
                 <ComboBox x:Name="ComboBox_ChannelMode" Margin="0,0,0,16" Style="{StaticResource ModernComboBox}" SelectionChanged="ComboBox_ChannelMode_SelectionChanged">
                     <ComboBoxItem x:Name="ComboBoxItem_ChannelMode_Unrestricted" Content="{utils:Localize KeyPath=ChannelMode.Unrestricted, Default=无限制}" Tag="Unrestricted"/>

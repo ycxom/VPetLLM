@@ -590,7 +590,20 @@ namespace VPetLLM.Core.Providers.Chat
                     };
                 }
             }
-            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+            // 原生工具调用：Responses API 的 tools 结构与 chat completions 不同，暂不支持
+            var toolSession = useResponses
+                ? null
+                : global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, currentNode.EnableToolCall);
+
+            var payload = JObject.FromObject(data);
+            if (toolSession is not null)
+            {
+                toolSession.AttachOpenAiTools(payload);
+                // 工具循环强制非流式，见 NativeToolLoop 的说明
+                payload["stream"] = false;
+            }
+
+            var content = new StringContent(payload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
 
             string message;
             try
@@ -602,7 +615,34 @@ namespace VPetLLM.Core.Providers.Chat
                         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                     }
 
-                    if (currentNode.EnableStreaming)
+                    if (toolSession is not null)
+                    {
+                        var loop = await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiAsync(
+                            payload, toolSession,
+                            async body =>
+                            {
+                                var roundContent = new StringContent(
+                                    body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                                var roundResponse = await client.PostAsync(apiUrl, roundContent, InterruptManager.Token);
+                                if (!roundResponse.IsSuccessStatusCode)
+                                {
+                                    var errorMessage = await HandleHttpError(roundResponse, Settings, "OpenAI");
+                                    ResponseHandler?.Invoke(errorMessage);
+                                    return null;
+                                }
+                                return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
+                            });
+
+                        if (!loop.Success) return "";
+
+                        message = loop.Message;
+                        if (loop.HitLimit)
+                        {
+                            SystemLogger.Log("OpenAI: 工具调用达到轮次上限，本轮不再继续");
+                        }
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else if (currentNode.EnableStreaming)
                     {
                         // 流式传输模式
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)

@@ -5149,6 +5149,8 @@ namespace VPetLLM.UI.Windows
             var cbModel = this.FindName("ComboBox_Model") as ComboBox;
             var cbEnableStreaming = this.FindName("CheckBox_EnableStreaming") as CheckBox;
             var cbEnableVision = this.FindName("CheckBox_EnableVision") as CheckBox;
+            var cbEnableToolCall = this.FindName("CheckBox_EnableToolCall") as CheckBox;
+            var tipEnableToolCall = this.FindName("TextBlock_EnableToolCallTip") as System.Windows.Controls.TextBlock;
             var labelChannelMode = this.FindName("Label_ChannelMode") as Label;
             var cbChannelMode = this.FindName("ComboBox_ChannelMode") as ComboBox;
             var labelChannelProxyMode = this.FindName("Label_ChannelProxyMode") as Label;
@@ -5176,6 +5178,8 @@ namespace VPetLLM.UI.Windows
                     if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Visible;
                     if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (cbEnableToolCall != null) cbEnableToolCall.Visibility = Visibility.Visible;
+                    if (tipEnableToolCall != null) tipEnableToolCall.Visibility = Visibility.Visible;
                     if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
                     if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
                     if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Visible;
@@ -5197,6 +5201,8 @@ namespace VPetLLM.UI.Windows
                     if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
                     if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (cbEnableToolCall != null) cbEnableToolCall.Visibility = Visibility.Visible;
+                    if (tipEnableToolCall != null) tipEnableToolCall.Visibility = Visibility.Visible;
                     if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
                     if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
                     if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Visible;
@@ -5218,6 +5224,8 @@ namespace VPetLLM.UI.Windows
                     if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
                     if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (cbEnableToolCall != null) cbEnableToolCall.Visibility = Visibility.Visible;
+                    if (tipEnableToolCall != null) tipEnableToolCall.Visibility = Visibility.Visible;
                     if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
                     if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
                     // 本地端点同样会被全局代理劫持（代理没配 localhost 绕过时必然失败），
@@ -5241,6 +5249,8 @@ namespace VPetLLM.UI.Windows
                     if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
                     if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (cbEnableToolCall != null) cbEnableToolCall.Visibility = Visibility.Visible;
+                    if (tipEnableToolCall != null) tipEnableToolCall.Visibility = Visibility.Visible;
                     if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Visible;
                     if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Visible;
                     // 同 Ollama：本地端点也需要渠道级代理模式
@@ -5256,7 +5266,8 @@ namespace VPetLLM.UI.Windows
                     }
                     break;
                 case "Free":
-                    // Free 渠道：无需 API Key/URL，显示流式传输和视觉能力开关
+                    // Free 渠道：无需 API Key/URL，显示流式传输和视觉能力开关。
+                    // 原生工具调用不在这里暴露 —— Free 端点后端不确定，NativeToolSession 也不会为它建会话
                     if (labelApiKey != null) labelApiKey.Visibility = Visibility.Collapsed;
                     if (gridApiKey != null) gridApiKey.Visibility = Visibility.Collapsed;
                     if (labelApiAddress != null) labelApiAddress.Visibility = Visibility.Collapsed;
@@ -5264,6 +5275,8 @@ namespace VPetLLM.UI.Windows
                     if (cbUrlPreset != null) cbUrlPreset.Visibility = Visibility.Collapsed;
                     if (cbEnableStreaming != null) cbEnableStreaming.Visibility = Visibility.Visible;
                     if (cbEnableVision != null) cbEnableVision.Visibility = Visibility.Visible;
+                    if (cbEnableToolCall != null) cbEnableToolCall.Visibility = Visibility.Collapsed;
+                    if (tipEnableToolCall != null) tipEnableToolCall.Visibility = Visibility.Collapsed;
                     if (labelChannelMode != null) labelChannelMode.Visibility = Visibility.Collapsed;
                     if (cbChannelMode != null) cbChannelMode.Visibility = Visibility.Collapsed;
                     if (labelChannelProxyMode != null) labelChannelProxyMode.Visibility = Visibility.Collapsed;
@@ -5463,6 +5476,7 @@ namespace VPetLLM.UI.Windows
                 var tbApiUrl = this.FindName("TextBox_ApiUrl") as TextBox;
                 var cbEnableStreaming = this.FindName("CheckBox_EnableStreaming") as CheckBox;
                 var cbEnableVision = this.FindName("CheckBox_EnableVision") as CheckBox;
+                var cbEnableToolCall = this.FindName("CheckBox_EnableToolCall") as CheckBox;
                 var cbEnableAdvanced = this.FindName("CheckBox_EnableAdvanced") as CheckBox;
                 var sliderTemperature = this.FindName("Slider_Temperature") as Slider;
                 var tbMaxTokens = this.FindName("TextBox_MaxTokens") as TextBox;
@@ -5486,6 +5500,7 @@ namespace VPetLLM.UI.Windows
                             
                             if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = openaiNode.EnableStreaming;
                             if (cbEnableVision != null) cbEnableVision.IsChecked = openaiNode.EnableVision;
+                            if (cbEnableToolCall != null) cbEnableToolCall.IsChecked = openaiNode.EnableToolCall;
                             if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = openaiNode.EnableAdvanced;
                             if (sliderTemperature != null) sliderTemperature.Value = openaiNode.Temperature;
                             if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = openaiNode.Temperature.ToString("F2");
@@ -5528,6 +5543,7 @@ namespace VPetLLM.UI.Windows
                             
                             if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = geminiNode.EnableStreaming;
                             if (cbEnableVision != null) cbEnableVision.IsChecked = geminiNode.EnableVision;
+                            if (cbEnableToolCall != null) cbEnableToolCall.IsChecked = geminiNode.EnableToolCall;
                             if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = geminiNode.EnableAdvanced;
                             if (sliderTemperature != null) sliderTemperature.Value = geminiNode.Temperature;
                             if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = geminiNode.Temperature.ToString("F2");
@@ -5567,6 +5583,7 @@ namespace VPetLLM.UI.Windows
                             }
                             if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = ollamaNode.EnableStreaming;
                             if (cbEnableVision != null) cbEnableVision.IsChecked = ollamaNode.EnableVision;
+                            if (cbEnableToolCall != null) cbEnableToolCall.IsChecked = ollamaNode.EnableToolCall;
                             if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = ollamaNode.EnableAdvanced;
                             if (sliderTemperature != null) sliderTemperature.Value = ollamaNode.Temperature;
                             if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = ollamaNode.Temperature.ToString("F2");
@@ -5606,6 +5623,7 @@ namespace VPetLLM.UI.Windows
                             }
                             if (cbEnableStreaming != null) cbEnableStreaming.IsChecked = lmStudioNode.EnableStreaming;
                             if (cbEnableVision != null) cbEnableVision.IsChecked = lmStudioNode.EnableVision;
+                            if (cbEnableToolCall != null) cbEnableToolCall.IsChecked = lmStudioNode.EnableToolCall;
                             if (cbEnableAdvanced != null) cbEnableAdvanced.IsChecked = lmStudioNode.EnableAdvanced;
                             if (sliderTemperature != null) sliderTemperature.Value = lmStudioNode.Temperature;
                             if (textBlockTemperatureValue != null) textBlockTemperatureValue.Text = lmStudioNode.Temperature.ToString("F2");
@@ -6392,6 +6410,8 @@ namespace VPetLLM.UI.Windows
             var cbModel = this.FindName("ComboBox_Model") as ComboBox;
             var cbEnableStreaming = this.FindName("CheckBox_EnableStreaming") as CheckBox;
             var cbEnableVision = this.FindName("CheckBox_EnableVision") as CheckBox;
+            var cbEnableToolCall = this.FindName("CheckBox_EnableToolCall") as CheckBox;
+            var tipEnableToolCall = this.FindName("TextBlock_EnableToolCallTip") as System.Windows.Controls.TextBlock;
             var cbEnableAdvanced = this.FindName("CheckBox_EnableAdvanced") as CheckBox;
             var sliderTemperature = this.FindName("Slider_Temperature") as Slider;
             var tbMaxTokens = this.FindName("TextBox_MaxTokens") as TextBox;
@@ -6418,6 +6438,7 @@ namespace VPetLLM.UI.Windows
                             openaiNode.Model = cbModel.Text;
                         if (cbEnableStreaming != null) openaiNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
                         if (cbEnableVision != null) openaiNode.EnableVision = cbEnableVision.IsChecked ?? false;
+                        if (cbEnableToolCall != null) openaiNode.EnableToolCall = cbEnableToolCall.IsChecked ?? false;
                         if (cbEnableAdvanced != null) openaiNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
                         if (sliderTemperature != null) openaiNode.Temperature = sliderTemperature.Value;
                         if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
@@ -6445,6 +6466,7 @@ namespace VPetLLM.UI.Windows
                             geminiNode.Model = cbModel.Text;
                         if (cbEnableStreaming != null) geminiNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
                         if (cbEnableVision != null) geminiNode.EnableVision = cbEnableVision.IsChecked ?? false;
+                        if (cbEnableToolCall != null) geminiNode.EnableToolCall = cbEnableToolCall.IsChecked ?? false;
                         if (cbEnableAdvanced != null) geminiNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
                         if (sliderTemperature != null) geminiNode.Temperature = sliderTemperature.Value;
                         if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
@@ -6468,6 +6490,7 @@ namespace VPetLLM.UI.Windows
                             ollamaNode.Model = cbModel.Text;
                         if (cbEnableStreaming != null) ollamaNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
                         if (cbEnableVision != null) ollamaNode.EnableVision = cbEnableVision.IsChecked ?? false;
+                        if (cbEnableToolCall != null) ollamaNode.EnableToolCall = cbEnableToolCall.IsChecked ?? false;
                         if (cbEnableAdvanced != null) ollamaNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
                         if (sliderTemperature != null) ollamaNode.Temperature = sliderTemperature.Value;
                         if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
@@ -6491,6 +6514,7 @@ namespace VPetLLM.UI.Windows
                             lmStudioNode.Model = cbModel.Text;
                         if (cbEnableStreaming != null) lmStudioNode.EnableStreaming = cbEnableStreaming.IsChecked ?? false;
                         if (cbEnableVision != null) lmStudioNode.EnableVision = cbEnableVision.IsChecked ?? false;
+                        if (cbEnableToolCall != null) lmStudioNode.EnableToolCall = cbEnableToolCall.IsChecked ?? false;
                         if (cbEnableAdvanced != null) lmStudioNode.EnableAdvanced = cbEnableAdvanced.IsChecked ?? false;
                         if (sliderTemperature != null) lmStudioNode.Temperature = sliderTemperature.Value;
                         if (tbMaxTokens != null && int.TryParse(tbMaxTokens.Text, out int maxTokens))
@@ -6688,6 +6712,18 @@ namespace VPetLLM.UI.Windows
         }
 
         private void CheckBox_EnableVision_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+            ScheduleSecretSave();
+        }
+
+        private void CheckBox_EnableToolCall_Checked(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentNodeChanges();
+            ScheduleSecretSave();
+        }
+
+        private void CheckBox_EnableToolCall_Unchecked(object sender, RoutedEventArgs e)
         {
             SaveCurrentNodeChanges();
             ScheduleSecretSave();

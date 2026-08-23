@@ -69,6 +69,29 @@ namespace VPetLLM.Utils.Common
         public static void Enqueue(string payload) => Enqueue(payload, null);
 
         /// <summary>
+        /// 强制以"非会话"身份入队，无视当前的 <c>CurrentMessageId</c>。
+        ///
+        /// 给后台任务用：任务是在某轮回复里发起的，<see cref="AsyncLocal{T}"/> 会把那轮的
+        /// 会话 Id 一路带进延续里；可等它跑完时那轮早就 FlushSession 过了，
+        /// 结果会落进一个没人再去 flush 的会话缓冲区，直到 TTL 到期被丢掉。
+        /// 走非会话路径才会排上计时器，自己把自己冲出去。
+        /// </summary>
+        public static void EnqueueDetached(string payload)
+        {
+            var previous = VPetLLMUtils.ExecutionContext.CurrentMessageId.Value;
+            try
+            {
+                // AsyncLocal 的赋值只影响当前执行流，不会回传给发起方
+                VPetLLMUtils.ExecutionContext.CurrentMessageId.Value = null;
+                Enqueue(payload, null);
+            }
+            finally
+            {
+                VPetLLMUtils.ExecutionContext.CurrentMessageId.Value = previous;
+            }
+        }
+
+        /// <summary>
         /// 入队一条回执，并可附带图像。
         ///
         /// 带图时回灌会走 TalkBox.SendChatWithImages（与手动截图完全同一条路），

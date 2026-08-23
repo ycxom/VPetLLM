@@ -117,6 +117,10 @@ namespace VPetLLM.Handlers.Core
                 _handlerRegistry.Register("skill_list", new SkillListHandler(_skillManager));
             }
 
+            // 会话草稿纸：让模型能把中间结果放一边，后面再取回来
+            _handlerRegistry.Register("store", new StoreHandler());
+            _handlerRegistry.Register("load", new LoadHandler());
+
             // Add PlayHandler if MediaPlaybackService is available
             if (_mediaPlaybackService is not null)
             {

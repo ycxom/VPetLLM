@@ -37,6 +37,7 @@ global using IDynamicInfoPlugin = VPetLLM.Core.Abstractions.Interfaces.Plugin.ID
 global using IPluginTakeover = VPetLLM.Core.Abstractions.Interfaces.Plugin.IPluginTakeover;
 global using IChannelModeProvider = VPetLLM.Core.Abstractions.Interfaces.Plugin.IChannelModeProvider;
 global using IPluginTab = VPetLLM.Core.Abstractions.Interfaces.Plugin.IPluginTab;
+global using IToolSchemaPlugin = VPetLLM.Core.Abstractions.Interfaces.Plugin.IToolSchemaPlugin;
 
 // VPetLLM Core - 提供商实现
 global using VPetLLM.Core.Providers.ASR;
