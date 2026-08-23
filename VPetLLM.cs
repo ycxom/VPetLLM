@@ -374,6 +374,23 @@ namespace VPetLLM
             {
                 var result = await FreeConfigManager.InitializeConfigsAsync();
                 Logger.Log($"Free配置更新检查完成: {result}");
+
+                // 工具调用策略要能热生效：配置每 5 分钟刷一次，但 FreeChatCore 不会重建
+                // （LoadConfig 只在构造时跑一次），不补这一下的话云端改了也得等用户重启。
+                // ApplyCloudConfig 只在策略真的变了时才作废探测结论，所以定时刷新不会
+                // 反复清空判定。
+                try
+                {
+                    var chatConfig = FreeConfigManager.GetChatConfig();
+                    if (chatConfig is not null)
+                    {
+                        Core.Tools.FreeToolCapability.ApplyCloudConfig(chatConfig["EnableToolCall"]);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Free工具调用策略读取失败: {ex.Message}");
+                }
             }
             catch (Exception ex)
             {

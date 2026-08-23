@@ -415,6 +415,11 @@ namespace VPetLLM.UI.Windows
                 // 打开设置窗口时立即检查Free配置更新（后台执行，不阻塞UI加载）
                 _ = _plugin.CheckFreeConfigUpdateAsync();
 
+                // 顺带让 Free 的工具能力探测重新开始：云端随时可能换模型，
+                // 而"不支持"的结论如果一直压着，用户没有任何手段让新模型的能力生效。
+                // 打开设置窗口是用户唯一可依赖的重置入口（另一个是重启）。
+                global::VPetLLM.Core.Tools.FreeToolCapability.Reset();
+
                 await LoadSettingsAsync();
 
                 LanguageHelper.ReloadLanguages();

@@ -95,6 +95,9 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         Handlers.Actions.MemoryRetrievalHandler.IsEnabled = false;
                     }
+                    // 读取云端下发的原生工具调用策略（Auto/On/Off，缺省 Auto）。
+                    // Free 的模型由云端决定且随时可换，所以这里只收策略，具体支不支持由客户端探测。
+                    Tools.FreeToolCapability.ApplyCloudConfig(config["EnableToolCall"]);
                     Logger.Log("FreeChatCore: 配置加载成功");
                 }
                 else
@@ -200,8 +203,39 @@ namespace VPetLLM.Core.Providers.Chat
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                string message;
-                if (useStreaming)
+                string message = "";
+                var handledByTools = false;
+
+                // 多模态请求同样可以带工具。但这一路**不记录**能力判定：
+                // 有的端点单独支持视觉、单独支持工具，两者同时用才报错；
+                // 把那种失败写成"该模型不支持工具"会连纯文本对话的工具也一起误关。
+                var imageToolSession = Tools.NativeToolSession.TryCreate(
+                    Settings, Tools.FreeToolCapability.ShouldAttachTools());
+                if (imageToolSession is not null)
+                {
+                    var attempt = await TryChatWithNativeToolsAsync(requestBody, imageToolSession, recordVerdict: false);
+                    if (attempt.Completed)
+                    {
+                        message = attempt.Message;
+                        ResponseHandler?.Invoke(message);
+                        handledByTools = true;
+                    }
+                    else if (!attempt.FallBack)
+                    {
+                        ReportFailure(attempt.Message);
+                        return "";
+                    }
+                    else
+                    {
+                        Logger.Log("Free ChatWithImage: 工具路径不可用，本轮改用标记协议重发");
+                    }
+                }
+
+                if (handledByTools)
+                {
+                    // 工具路径已经拿到最终回复，直接走下面的落库
+                }
+                else if (useStreaming)
                 {
                     // 流式传输模式
                     Logger.Log("Free ChatWithImage: 使用流式传输模式");
@@ -346,6 +380,7 @@ namespace VPetLLM.Core.Providers.Chat
 
         public override async Task<string> Chat(string prompt, bool isRetry)
         {
+            LastCallFailed = false;
             try
             {
                 // Handle conversation turn for record weight decrement
@@ -395,6 +430,32 @@ namespace VPetLLM.Core.Providers.Chat
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 string message;
+
+                // 原生工具调用：Free 没有"用户勾选"这一说（模型是云端下发的），
+                // 由云端策略 + 本地探测共同决定这一轮要不要挂 tools。
+                var toolSession = Tools.NativeToolSession.TryCreate(
+                    Settings, Tools.FreeToolCapability.ShouldAttachTools());
+                if (toolSession is not null)
+                {
+                    var attempt = await TryChatWithNativeToolsAsync(requestBody, toolSession);
+                    if (attempt.Completed)
+                    {
+                        message = attempt.Message;
+                        ResponseHandler?.Invoke(message);
+                        await PersistTurnAsync(tempUserMessage, message);
+                        return "";
+                    }
+                    if (!attempt.FallBack)
+                    {
+                        // 与工具能力无关的失败（限流、维护、网络），按普通错误处理
+                        ReportFailure(attempt.Message);
+                        return "";
+                    }
+                    // FallBack：判定当前模型不支持原生工具，落到下面用标记协议把这一轮重发一遍。
+                    // 探测请求没有产生任何用户可见输出，所以重发是干净的。
+                    Logger.Log("Free: 本轮改用标记协议重发");
+                }
+
                 if (_freeSetting.EnableStreaming)
                 {
                     // 流式传输模式
@@ -506,6 +567,8 @@ namespace VPetLLM.Core.Providers.Chat
                                 ? $"API调用失败: {response.StatusCode} - {responseContent}"
                                 : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
                         }
+                        // 错误分支必须自己投递：底部那句"已在各分支调用过"只对成功分支成立
+                        ReportFailure(message);
                     }
                 }
                 else
@@ -571,6 +634,8 @@ namespace VPetLLM.Core.Providers.Chat
                                 ? $"API调用失败: {response.StatusCode} - {responseContent}"
                                 : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
                         }
+                        // 错误分支必须自己投递：底部那句"已在各分支调用过"只对成功分支成立
+                        ReportFailure(message);
                     }
                 }
 
@@ -706,6 +771,170 @@ namespace VPetLLM.Core.Providers.Chat
             var result = await GetCoreHistoryCommonAsync(injectRecords, userQuery);
             return CaptureOverflowCheckData(result);
         }
+
+        #region 原生工具调用
+
+        /// <summary>一次带工具的请求尝试的三种去向。</summary>
+        private sealed class ToolAttempt
+        {
+            /// <summary>拿到了最终回复，<see cref="Message"/> 即正文。</summary>
+            public bool Completed;
+            /// <summary>判定当前模型不支持原生工具，调用方应用标记协议重发本轮。</summary>
+            public bool FallBack;
+            /// <summary>Completed 时是正文；两者都为 false 时是要展示给用户的错误文案。</summary>
+            public string Message = "";
+
+            public static ToolAttempt Done(string message) => new() { Completed = true, Message = message };
+            public static ToolAttempt Retry() => new() { FallBack = true };
+            public static ToolAttempt Error(string message) => new() { Message = message };
+        }
+
+        /// <summary>
+        /// 带 tools 跑一轮对话，并顺带完成"当前 Free 模型到底支不支持工具"的判定。
+        ///
+        /// 判定只认两类硬证据：端点因为 tools 字段本身报错，或者模型把工具调用当正文吐出来。
+        /// 「这一轮没调工具」不是证据 —— 大多数闲聊本来就不需要工具，据此关掉工具模式是错的，
+        /// 所以那种情况保持"未知"，下一轮继续探测。
+        /// </summary>
+        /// <param name="recordVerdict">
+        /// 是否把本轮的观察写进全局能力判定。纯文本对话传 true；多模态传 false ——
+        /// "图 + 工具不能同时用"是端点组合能力的问题，不该被记成"该模型不支持工具"。
+        /// 为 false 时依然会按需退回标记协议，只是不留下结论。
+        /// </param>
+        private async Task<ToolAttempt> TryChatWithNativeToolsAsync(
+            object requestBody, Tools.NativeToolSession toolSession, bool recordVerdict = true)
+        {
+            var payload = JObject.FromObject(requestBody);
+            toolSession.AttachOpenAiTools(payload);
+            // 工具循环强制非流式，见 NativeToolLoop 的说明
+            payload["stream"] = false;
+
+            var policy = Tools.FreeToolCapability.CurrentPolicy;
+            string? rejectReason = null;    // 端点明确拒绝 tools
+            string? hardError = null;       // 与工具无关的失败
+            bool sawToolCalls = false;
+
+            var loop = await Tools.NativeToolLoop.RunOpenAiAsync(payload, toolSession, async body =>
+            {
+                var roundContent = new StringContent(
+                    body.ToString(Formatting.None), Encoding.UTF8, "application/json");
+                var roundResponse = await _httpClient.PostAsync(_apiUrl, roundContent, InterruptManager.Token);
+                var roundText = await roundResponse.Content.ReadAsStringAsync();
+
+                if (!roundResponse.IsSuccessStatusCode)
+                {
+                    var status = (int)roundResponse.StatusCode;
+                    if (Tools.FreeToolCapability.LooksLikeToolRejection(status, roundText))
+                    {
+                        rejectReason = $"HTTP {status}: {Truncate(roundText, 200)}";
+                    }
+                    else
+                    {
+                        Logger.Log($"Free 工具请求错误: {roundResponse.StatusCode} - {roundText}");
+                        hardError = ErrorMessageHelper.IsDebugMode(Settings)
+                            ? $"API调用失败: {roundResponse.StatusCode} - {roundText}"
+                            : ErrorMessageHelper.GetFriendlyHttpError(roundResponse.StatusCode, roundText, Settings);
+                    }
+                    return null;
+                }
+
+                JObject parsed;
+                try
+                {
+                    parsed = JObject.Parse(roundText);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Free 工具响应解析失败: {ex.Message}");
+                    hardError = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
+                    return null;
+                }
+
+                if (parsed["choices"]?[0]?["message"]?["tool_calls"] is JArray { Count: > 0 })
+                {
+                    sawToolCalls = true;
+                }
+                return parsed;
+            });
+
+            if (loop.Success)
+            {
+                if (sawToolCalls)
+                {
+                    if (recordVerdict) Tools.FreeToolCapability.MarkSupported();
+                }
+                else if (Tools.FreeToolCapability.LooksLikeToolCallLeakage(
+                             loop.Message, toolSession.Definitions.Select(d => d.Name)))
+                {
+                    // 模型想调工具但吐成了正文。这段文本直接念给用户听是最糟的结果，
+                    // 所以无论云端策略如何，本轮都退回标记协议重发。
+                    if (!recordVerdict)
+                        Logger.Log("Free: 多模态轮次出现正文泄漏，本轮退回标记协议（不记录判定）");
+                    else if (policy == Tools.FreeToolCapability.Policy.On)
+                        Logger.Log("Free: 云端策略为 On，但模型把工具调用写进了正文；本轮退回标记协议（不改变策略）");
+                    else
+                        Tools.FreeToolCapability.MarkUnsupported("模型把工具调用写进了正文");
+                    return ToolAttempt.Retry();
+                }
+                // 其余情况说明不了任何事（这轮本来就不需要工具），保持现状，下轮继续观察
+
+                if (loop.HitLimit)
+                {
+                    Logger.Log("Free: 工具调用达到轮次上限，本轮不再继续");
+                }
+
+                var message = string.IsNullOrWhiteSpace(loop.Message) ? "无回复" : loop.Message;
+                return ToolAttempt.Done(message);
+            }
+
+            if (rejectReason is not null)
+            {
+                if (!recordVerdict)
+                    Logger.Log($"Free: 多模态轮次被端点拒绝 tools（{rejectReason}）；本轮退回标记协议（不记录判定）");
+                else if (policy == Tools.FreeToolCapability.Policy.On)
+                    Logger.Log($"Free: 云端策略为 On，但端点拒绝了 tools 字段（{rejectReason}）；本轮退回标记协议（不改变策略）");
+                else
+                    Tools.FreeToolCapability.MarkUnsupported(rejectReason);
+                return ToolAttempt.Retry();
+            }
+
+            if (hardError is not null)
+            {
+                return ToolAttempt.Error(hardError);
+            }
+
+            // 循环自己放弃了（payload 结构异常等），没有证据说明模型不支持，按重发处理
+            Logger.Log("Free: 工具循环未能完成且无明确原因，本轮退回标记协议");
+            return ToolAttempt.Retry();
+        }
+
+        /// <summary>成功一轮之后落库。与流式/非流式两条分支里的保存逻辑保持一致。</summary>
+        private async Task PersistTurnAsync(Message? tempUserMessage, string message)
+        {
+            if (!(Settings?.KeepContext ?? true)) return;
+
+            if (tempUserMessage is not null)
+            {
+                await HistoryManager.AddMessage(tempUserMessage);
+            }
+            await HistoryManager.AddMessage(new Message
+            {
+                Role = "assistant",
+                Content = AppendInterruptMarker(message)
+            });
+            SaveHistory();
+
+            TriggerOverflowCheckAfterSuccess();
+        }
+
+        private static string Truncate(string? text, int max)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            text = text.Replace("\r", " ").Replace("\n", " ");
+            return text.Length <= max ? text : text.Substring(0, max) + "…";
+        }
+
+        #endregion
 
         /// <summary>
         /// 检查API服务状态

@@ -78,7 +78,11 @@ namespace VPetLLM.Core.Tools
                     Setting.LLMType.Gemini => settings.Gemini.GeminiNodes.Any(n => n.Enabled && n.EnableToolCall),
                     Setting.LLMType.Ollama => settings.Ollama.OllamaNodes.Any(n => n.Enabled && n.EnableToolCall),
                     Setting.LLMType.LMStudio => settings.LMStudio.LMStudioNodes.Any(n => n.Enabled && n.EnableToolCall),
-                    _ => false   // Free 端点的后端不确定，不声称支持
+                    // Free 没有可勾选的节点开关：模型由云端下发，能力由云端策略 + 本地探测决定。
+                    // 注意这里用 IsProven 而不是 ShouldAttachTools：探测期照挂 tools，
+                    // 但**不**写"优先用工具调用"那句提示 —— 详见 FreeToolCapability.IsProven。
+                    Setting.LLMType.Free => FreeToolCapability.IsProven(),
+                    _ => false
                 };
             }
             catch
