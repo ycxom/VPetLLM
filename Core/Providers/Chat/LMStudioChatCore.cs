@@ -347,6 +347,18 @@ namespace VPetLLM.Core.Providers.Chat
                     };
                 }
 
+                // 多模态同样挂工具
+                var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(
+                    Settings, _lmStudioSetting.EnableToolCall);
+
+                var toolPayload = JObject.FromObject(data);
+                if (toolSession is not null)
+                {
+                    toolSession.AttachOpenAiTools(toolPayload);
+                    // 工具循环强制非流式，见 NativeToolLoop 的说明
+                    toolPayload["stream"] = false;
+                }
+
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
                 string message;
 
@@ -355,7 +367,34 @@ namespace VPetLLM.Core.Providers.Chat
                     var apiUrl = GetCurrentApiUrl();
                     SystemLogger.Log($"LM Studio ChatWithImage: 请求 URL = {apiUrl}");
 
-                    if (_lmStudioSetting.EnableStreaming)
+                    if (toolSession is not null)
+                    {
+                        var loop = await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiAsync(
+                            toolPayload, toolSession,
+                            async body =>
+                            {
+                                var roundContent = new StringContent(
+                                    body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                                var roundResponse = await client.PostAsync(apiUrl, roundContent, InterruptManager.Token);
+                                if (!roundResponse.IsSuccessStatusCode)
+                                {
+                                    var errorMessage = await HandleHttpError(roundResponse, Settings, "LM Studio");
+                                    ReportFailure(errorMessage);
+                                    return null;
+                                }
+                                return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
+                            });
+
+                        if (!loop.Success) return "";
+
+                        message = loop.Message;
+                        if (loop.HitLimit)
+                        {
+                            SystemLogger.Log("LM Studio ChatWithImage: 工具调用达到轮次上限，本轮不再继续");
+                        }
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else if (_lmStudioSetting.EnableStreaming)
                     {
                         SystemLogger.Log("LM Studio ChatWithImage: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)

@@ -101,6 +101,14 @@ namespace VPetLLM.Core.Tools
             payload["tool_choice"] = "auto";
         }
 
+        /// <summary>OpenAI Responses API 格式（工具声明是扁平的，见 ToOpenAiResponsesFormat）。</summary>
+        public void AttachOpenAiResponsesTools(JObject payload)
+        {
+            if (!HasTools) return;
+            payload["tools"] = new JArray(_definitions.Select(d => (JToken)d.ToOpenAiResponsesFormat()));
+            payload["tool_choice"] = "auto";
+        }
+
         /// <summary>Gemini 的 generateContent 格式。</summary>
         public void AttachGeminiTools(JObject payload)
         {
@@ -178,6 +186,71 @@ namespace VPetLLM.Core.Tools
                 {
                     ["role"] = "tool",
                     ["content"] = result.Content
+                });
+            }
+        }
+
+        /// <summary>
+        /// 从 Responses API 的响应里读取工具调用。
+        ///
+        /// 与 chat completions 的三处不同：调用项散落在 <c>output[]</c> 里（靠 type 区分，
+        /// 和 message 项混在一起）；配对用的是 <c>call_id</c> 而不是 <c>id</c>
+        /// （同一项上的 <c>id</c> 是这条 output 项自己的编号，拿它去配对会对不上）；
+        /// arguments 是 JSON 字符串。
+        /// </summary>
+        public static List<NativeToolCall> ParseOpenAiResponsesToolCalls(JObject response)
+        {
+            var calls = new List<NativeToolCall>();
+            var output = response["output"] as JArray;
+            if (output is null) return calls;
+
+            foreach (var item in output)
+            {
+                if (item["type"]?.ToString() != "function_call") continue;
+
+                var name = item["name"]?.ToString() ?? "";
+                var callId = item["call_id"]?.ToString();
+                if (string.IsNullOrEmpty(callId)) callId = item["id"]?.ToString();
+
+                calls.Add(new NativeToolCall
+                {
+                    Id = string.IsNullOrEmpty(callId) ? Guid.NewGuid().ToString("N") : callId,
+                    Name = name,
+                    Arguments = ParseArguments(item["arguments"])
+                });
+            }
+            return calls;
+        }
+
+        /// <summary>
+        /// Responses 风格的回填：把模型这轮产出的 output 项原样接回 input，
+        /// 再为每个调用补一条 function_call_output。
+        ///
+        /// 不用 previous_response_id，所以每轮都要把完整 input 重发；
+        /// 模型自己发出的 function_call 项必须原样回传，否则 call_id 配不上。
+        /// </summary>
+        public static void AppendOpenAiResponsesTurn(JArray input, JObject response, IEnumerable<NativeToolResult> results)
+        {
+            if (response["output"] is JArray output)
+            {
+                foreach (var item in output)
+                {
+                    // reasoning 项是各家自有的中间态，回传容易被判非法，只接回调用与消息
+                    var type = item["type"]?.ToString();
+                    if (type == "function_call" || type == "message")
+                    {
+                        input.Add(item.DeepClone());
+                    }
+                }
+            }
+
+            foreach (var result in results)
+            {
+                input.Add(new JObject
+                {
+                    ["type"] = "function_call_output",
+                    ["call_id"] = result.Call.Id,
+                    ["output"] = result.Content
                 });
             }
         }

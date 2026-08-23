@@ -46,6 +46,19 @@ namespace VPetLLM.Core.Tools
         };
 
         /// <summary>
+        /// OpenAI Responses API 格式。和 chat completions 的区别是**扁平的**：
+        /// 没有嵌套的 function 对象，name/description/parameters 直接挂在工具上。
+        /// 把 Responses 的载荷喂 chat completions 的格式（或反过来）会被端点判为参数非法。
+        /// </summary>
+        public JObject ToOpenAiResponsesFormat() => new()
+        {
+            ["type"] = "function",
+            ["name"] = Name,
+            ["description"] = Description,
+            ["parameters"] = Parameters.DeepClone()
+        };
+
+        /// <summary>
         /// Gemini 格式。Gemini 的 schema 不接受 additionalProperties 等 JSON Schema 关键字，
         /// 多传会被判为 400，所以这里过一遍白名单。
         /// </summary>

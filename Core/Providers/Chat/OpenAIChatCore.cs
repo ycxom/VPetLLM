@@ -355,6 +355,19 @@ namespace VPetLLM.Core.Providers.Chat
                 }
             }
 
+            // 多模态请求同样可以带工具：模型看完图之后往往正需要调插件（查天气、开应用、搜网页）。
+            var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, currentNode.EnableToolCall);
+            var toolPayload = JObject.FromObject(data);
+            if (toolSession is not null)
+            {
+                if (useResponses)
+                    toolSession.AttachOpenAiResponsesTools(toolPayload);
+                else
+                    toolSession.AttachOpenAiTools(toolPayload);
+                // 工具循环强制非流式，见 NativeToolLoop 的说明
+                toolPayload["stream"] = false;
+            }
+
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
             string message;
 
@@ -367,7 +380,38 @@ namespace VPetLLM.Core.Providers.Chat
                         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
                     }
 
-                    if (useStreaming)
+                    if (toolSession is not null)
+                    {
+                        Func<JObject, Task<JObject?>> roundSend = async body =>
+                        {
+                            var roundContent = new StringContent(
+                                body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                            var roundResponse = await client.PostAsync(apiUrl, roundContent, InterruptManager.Token);
+                            if (!roundResponse.IsSuccessStatusCode)
+                            {
+                                var errorMessage = await HandleHttpError(roundResponse, Settings, "OpenAI");
+                                ReportFailure(errorMessage);
+                                return null;
+                            }
+                            return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
+                        };
+
+                        var loop = useResponses
+                            ? await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiResponsesAsync(
+                                toolPayload, toolSession, roundSend)
+                            : await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiAsync(
+                                toolPayload, toolSession, roundSend);
+
+                        if (!loop.Success) return "";
+
+                        message = loop.Message;
+                        if (loop.HitLimit)
+                        {
+                            SystemLogger.Log("OpenAI ChatWithImage: 工具调用达到轮次上限，本轮不再继续");
+                        }
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else if (useStreaming)
                     {
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
                         {
@@ -590,15 +634,17 @@ namespace VPetLLM.Core.Providers.Chat
                     };
                 }
             }
-            // 原生工具调用：Responses API 的 tools 结构与 chat completions 不同，暂不支持
-            var toolSession = useResponses
-                ? null
-                : global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, currentNode.EnableToolCall);
+            // 原生工具调用。Responses API 和 chat completions 的工具协议完全不同
+            // （声明扁平、调用散在 output[] 里、靠 call_id 配对），所以分两条路挂。
+            var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, currentNode.EnableToolCall);
 
             var payload = JObject.FromObject(data);
             if (toolSession is not null)
             {
-                toolSession.AttachOpenAiTools(payload);
+                if (useResponses)
+                    toolSession.AttachOpenAiResponsesTools(payload);
+                else
+                    toolSession.AttachOpenAiTools(payload);
                 // 工具循环强制非流式，见 NativeToolLoop 的说明
                 payload["stream"] = false;
             }
@@ -617,21 +663,25 @@ namespace VPetLLM.Core.Providers.Chat
 
                     if (toolSession is not null)
                     {
-                        var loop = await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiAsync(
-                            payload, toolSession,
-                            async body =>
+                        Func<JObject, Task<JObject?>> roundSend = async body =>
+                        {
+                            var roundContent = new StringContent(
+                                body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                            var roundResponse = await client.PostAsync(apiUrl, roundContent, InterruptManager.Token);
+                            if (!roundResponse.IsSuccessStatusCode)
                             {
-                                var roundContent = new StringContent(
-                                    body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
-                                var roundResponse = await client.PostAsync(apiUrl, roundContent, InterruptManager.Token);
-                                if (!roundResponse.IsSuccessStatusCode)
-                                {
-                                    var errorMessage = await HandleHttpError(roundResponse, Settings, "OpenAI");
-                                    ResponseHandler?.Invoke(errorMessage);
-                                    return null;
-                                }
-                                return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
-                            });
+                                var errorMessage = await HandleHttpError(roundResponse, Settings, "OpenAI");
+                                ResponseHandler?.Invoke(errorMessage);
+                                return null;
+                            }
+                            return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
+                        };
+
+                        var loop = useResponses
+                            ? await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiResponsesAsync(
+                                payload, toolSession, roundSend)
+                            : await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiAsync(
+                                payload, toolSession, roundSend);
 
                         if (!loop.Success) return "";
 

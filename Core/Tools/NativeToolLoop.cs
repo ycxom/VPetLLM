@@ -52,6 +52,64 @@ namespace VPetLLM.Core.Tools
             return NativeToolLoopResult.Exhausted();
         }
 
+        /// <summary>OpenAI Responses API 格式（消息表叫 input，工具项散在 output[] 里）。</summary>
+        public static async Task<NativeToolLoopResult> RunOpenAiResponsesAsync(
+            JObject payload,
+            NativeToolSession session,
+            Func<JObject, Task<JObject?>> send)
+        {
+            var input = payload["input"] as JArray;
+            if (input is null)
+            {
+                Logger.Log("NativeToolLoop: payload 里没有 input 数组，放弃工具循环");
+                return NativeToolLoopResult.Failed();
+            }
+
+            for (int iteration = 0; iteration < NativeToolSession.MaxIterations; iteration++)
+            {
+                var response = await send(payload);
+                if (response is null) return NativeToolLoopResult.Failed();
+
+                var calls = NativeToolSession.ParseOpenAiResponsesToolCalls(response);
+                if (calls.Count == 0)
+                {
+                    return NativeToolLoopResult.Completed(ExtractResponsesText(response), iteration);
+                }
+
+                Logger.Log($"NativeToolLoop: 第 {iteration + 1} 轮，模型请求 {calls.Count} 个工具调用");
+                var results = await session.ExecuteAsync(calls);
+                NativeToolSession.AppendOpenAiResponsesTurn(input, response, results);
+            }
+
+            Logger.Log($"NativeToolLoop: 达到 {NativeToolSession.MaxIterations} 轮上限，停止工具循环");
+            return NativeToolLoopResult.Exhausted();
+        }
+
+        /// <summary>
+        /// Responses API 的正文在 output[] 里 type=="message" 的项下，
+        /// 一条 message 可能被拆成多个 output_text 片段，要全部拼起来。
+        /// </summary>
+        public static string ExtractResponsesText(JObject response)
+        {
+            var output = response["output"] as JArray;
+            if (output is null) return "";
+
+            var sb = new System.Text.StringBuilder();
+            foreach (var item in output)
+            {
+                if (item["type"]?.ToString() != "message") continue;
+                if (item["content"] is not JArray content) continue;
+
+                foreach (var part in content)
+                {
+                    if (part["type"]?.ToString() != "output_text") continue;
+                    var text = part["text"]?.ToString();
+                    if (!string.IsNullOrEmpty(text)) sb.Append(text);
+                }
+            }
+            return sb.ToString();
+        }
+
         /// <summary>Ollama 原生 /api/chat 格式。</summary>
         public static async Task<NativeToolLoopResult> RunOllamaAsync(
             JObject payload,

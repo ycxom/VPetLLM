@@ -164,6 +164,16 @@ namespace VPetLLM.Core.Providers.Chat
                 };
             }
 
+
+            // 挂原生工具（OpenAI 兼容格式）
+            var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, node.EnableToolCall);
+            var toolPayload = JObject.FromObject(data);
+            if (toolSession is not null)
+            {
+                toolSession.AttachOpenAiTools(toolPayload);
+                // 工具循环强制非流式，见 NativeToolLoop 的说明
+                toolPayload["stream"] = false;
+            }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
             var apiUrl = BuildOpenAIEndpoint(node.Url);
@@ -175,7 +185,34 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     AddAuthHeaders(client, node);
 
-                    if (useStreaming)
+                    if (toolSession is not null)
+                    {
+                        var loop = await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiAsync(
+                            toolPayload, toolSession,
+                            async body =>
+                            {
+                                var roundContent = new StringContent(
+                                    body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                                var roundResponse = await client.PostAsync(apiUrl, roundContent, InterruptManager.Token);
+                                if (!roundResponse.IsSuccessStatusCode)
+                                {
+                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Gemini");
+                                    ResponseHandler?.Invoke(errorMessage);
+                                    return null;
+                                }
+                                return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
+                            });
+
+                        if (!loop.Success) return "";
+
+                        message = loop.Message;
+                        if (loop.HitLimit)
+                        {
+                            Logger.Log("Gemini ChatWithImage: 工具调用达到轮次上限，本轮不再继续");
+                        }
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else if (useStreaming)
                     {
                         Logger.Log("Gemini (OpenAI兼容): 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl) { Content = content };
@@ -308,10 +345,16 @@ namespace VPetLLM.Core.Providers.Chat
                 }
             };
 
+            // 挂原生工具（Gemini 原生格式）
+            var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, node.EnableToolCall);
+            var toolPayload = JObject.FromObject(requestData);
+            toolSession?.AttachGeminiTools(toolPayload);
+
             var content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
 
             var useStreaming = UseStreaming(node.EnableStreaming);
-            var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model, useStreaming);
+            // 工具循环强制非流式，端点也要跟着按非流式选，否则会打到 streamGenerateContent
+            var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model, useStreaming && toolSession is null);
 
             string message;
             try
@@ -320,7 +363,34 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     AddAuthHeaders(client, node);
 
-                    if (useStreaming)
+                    if (toolSession is not null)
+                    {
+                        var loop = await global::VPetLLM.Core.Tools.NativeToolLoop.RunGeminiAsync(
+                            toolPayload, toolSession,
+                            async body =>
+                            {
+                                var roundContent = new StringContent(
+                                    body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                                var roundResponse = await client.PostAsync(apiEndpoint, roundContent, InterruptManager.Token);
+                                if (!roundResponse.IsSuccessStatusCode)
+                                {
+                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Gemini");
+                                    ResponseHandler?.Invoke(errorMessage);
+                                    return null;
+                                }
+                                return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
+                            });
+
+                        if (!loop.Success) return "";
+
+                        message = loop.Message;
+                        if (loop.HitLimit)
+                        {
+                            Logger.Log("Gemini ChatWithImage: 工具调用达到轮次上限，本轮不再继续");
+                        }
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else if (useStreaming)
                     {
                         Logger.Log("Gemini ChatWithImage: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiEndpoint) { Content = content };
@@ -480,6 +550,16 @@ namespace VPetLLM.Core.Providers.Chat
                     stream = node.EnableStreaming
                 };
             }
+
+            // 挂原生工具（OpenAI 兼容格式）
+            var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, node.EnableToolCall);
+            var toolPayload = JObject.FromObject(data);
+            if (toolSession is not null)
+            {
+                toolSession.AttachOpenAiTools(toolPayload);
+                // 工具循环强制非流式，见 NativeToolLoop 的说明
+                toolPayload["stream"] = false;
+            }
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
             var apiUrl = BuildOpenAIEndpoint(node.Url);
@@ -491,7 +571,34 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     AddAuthHeaders(client, node);
 
-                    if (node.EnableStreaming)
+                    if (toolSession is not null)
+                    {
+                        var loop = await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiAsync(
+                            toolPayload, toolSession,
+                            async body =>
+                            {
+                                var roundContent = new StringContent(
+                                    body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                                var roundResponse = await client.PostAsync(apiUrl, roundContent, InterruptManager.Token);
+                                if (!roundResponse.IsSuccessStatusCode)
+                                {
+                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Gemini");
+                                    ResponseHandler?.Invoke(errorMessage);
+                                    return null;
+                                }
+                                return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
+                            });
+
+                        if (!loop.Success) return "";
+
+                        message = loop.Message;
+                        if (loop.HitLimit)
+                        {
+                            Logger.Log("Gemini (OpenAI兼容): 工具调用达到轮次上限，本轮不再继续");
+                        }
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else if (node.EnableStreaming)
                     {
                         Logger.Log("Gemini (OpenAI兼容): 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl) { Content = content };

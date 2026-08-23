@@ -117,74 +117,80 @@ namespace VPetLLM.Handlers.Actions
         }
 
         /// <summary>
-        /// 朋友赠送物品
+        /// 朋友赠送物品：朋友出东西，桌宠白拿。不扣任何人的钱，但物品要真的生效。
         /// </summary>
         public async Task ExecuteFriendGift(string itemName, IMainWindow mainWindow, string friendName = "朋友")
         {
             Logger.Log($"BuyHandler: 开始处理朋友赠送请求 - 物品: {itemName}, 赠送者: {friendName}");
-
-            try
-            {
-                // 使用智能搜索服务查找物品
-                var searchService = GetFoodSearchService(mainWindow);
-                var food = searchService.SearchFood(itemName);
-
-                if (food is null)
-                {
-                    Logger.Log($"BuyHandler: 朋友赠送物品未找到: {itemName}");
-                    return;
-                }
-
-                // 直接使用 Food.ItemType 属性
-                string itemType = food.ItemType;
-
-                // 播放动画
-                await PlayBuyAnimationAsync(mainWindow, food, itemType);
-
-                // 朋友赠送不扣钱，只添加物品并标记来源
-                mainWindow.TakeItemHandle(food, 1, FriendGiftSource);
-
-                Logger.Log($"BuyHandler: 朋友赠送完成 - {food.Name} (来自 {friendName}), 不扣金钱");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"BuyHandler: 朋友赠送处理异常: {ex.Message}");
-            }
+            await ApplyItemAsync(itemName, mainWindow, FriendGiftSource,
+                $"朋友赠送完成 - {{0}} (来自 {friendName}), 不扣金钱");
         }
 
         /// <summary>
-        /// 朋友代为购买
+        /// 朋友代为购买：由朋友付款，所以不动本机存档的钱，但物品同样要真的生效。
         /// </summary>
         public async Task ExecuteFriendBuy(string itemName, IMainWindow mainWindow, string friendName = "朋友")
         {
             Logger.Log($"BuyHandler: 开始处理朋友代购请求 - 物品: {itemName}, 代购者: {friendName}");
+            await ApplyItemAsync(itemName, mainWindow, $"friendbuy_{friendName}",
+                $"朋友代购完成 - {{0}} (由 {friendName} 支付), 不扣当前用户金钱");
+        }
+
+        /// <summary>
+        /// 「别人送的东西」的公共落地流程：查物品 → 校验 → 播动画 → 真正使用 → 通知宿主。
+        ///
+        /// 抽出来是因为这两条路原本各写一遍，而且都漏掉了最关键的 <c>TakeItem</c> ——
+        /// 只播动画 + 抛事件，桌宠一点属性都拿不到，AI 却会收到"你收到了 X"的反馈，
+        /// 于是道谢道得很开心，饱食度纹丝不动。共用一份就不会再各自走偏。
+        /// </summary>
+        /// <param name="source">传给宿主的来源标记，PurchaseSourceDetector 据此分类。</param>
+        /// <param name="successLogFormat">成功日志模板，{0} 会被替换成物品名。</param>
+        private async Task ApplyItemAsync(string itemName, IMainWindow mainWindow, string source, string successLogFormat)
+        {
+            // 与 Execute 一致：非默认插件时不动手，避免多实例重复消耗同一件物品
+            if (VPetLLM.Instance?.IsVPetLLMDefaultPlugin() != true)
+            {
+                Logger.Log("BuyHandler: VPetLLM不是默认插件，忽略本次物品发放");
+                return;
+            }
 
             try
             {
-                // 使用智能搜索服务查找物品
                 var searchService = GetFoodSearchService(mainWindow);
                 var food = searchService.SearchFood(itemName);
 
                 if (food is null)
                 {
-                    Logger.Log($"BuyHandler: 朋友代购物品未找到: {itemName}");
+                    Logger.Log($"BuyHandler: 物品未找到: {itemName}");
                     return;
                 }
 
-                // 直接使用 Food.ItemType 属性
+                if (!food.CanUse)
+                {
+                    Logger.Log($"BuyHandler: 物品不可用: {itemName}");
+                    return;
+                }
+
+                if (mainWindow.Core?.Save is null)
+                {
+                    Logger.Log("BuyHandler: 存档不可用，取消本次物品发放");
+                    return;
+                }
+
                 string itemType = food.ItemType;
 
-                // 播放动画
                 await PlayBuyAnimationAsync(mainWindow, food, itemType);
 
-                // 朋友代为购买，扣朋友的钱，不扣当前用户的钱
-                mainWindow.TakeItemHandle(food, 1, $"friendbuy_{friendName}");
+                // 关键的一步：TakeItem 才会真正结算属性。只调 TakeItemHandle 的话
+                // 那只是抛一个通知事件，什么也不会改变。
+                mainWindow.TakeItem(food);
+                mainWindow.TakeItemHandle(food, 1, source);
 
-                Logger.Log($"BuyHandler: 朋友代购完成 - {food.Name} (由 {friendName} 支付), 不扣当前用户金钱");
+                Logger.Log("BuyHandler: " + string.Format(successLogFormat, food.Name) + $" (type: {itemType})");
             }
             catch (Exception ex)
             {
-                Logger.Log($"BuyHandler: 朋友代购处理异常: {ex.Message}");
+                Logger.Log($"BuyHandler: 物品发放处理异常: {ex.Message}");
             }
         }
 

@@ -146,6 +146,19 @@ namespace VPetLLM.Core.Providers.Chat
                         num_predict = _ollamaSetting.MaxTokens
                     } : null
                 };
+                // 多模态同样挂工具。Ollama 认 OpenAI 那套 tools 声明，但响应是自己的格式
+                // （message.tool_calls，无 id），所以解析走 RunOllamaAsync。
+                var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(
+                    Settings, _ollamaSetting.EnableToolCall);
+
+                var toolPayload = JObject.FromObject(data);
+                if (toolSession is not null)
+                {
+                    toolSession.AttachOpenAiTools(toolPayload);
+                    // 工具循环强制非流式，见 NativeToolLoop 的说明
+                    toolPayload["stream"] = false;
+                }
+
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
                 string message;
@@ -153,7 +166,34 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     client.BaseAddress = new System.Uri(_ollamaSetting.Url);
 
-                    if (useStreaming)
+                    if (toolSession is not null)
+                    {
+                        var loop = await global::VPetLLM.Core.Tools.NativeToolLoop.RunOllamaAsync(
+                            toolPayload, toolSession,
+                            async body =>
+                            {
+                                var roundContent = new StringContent(
+                                    body.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                                var roundResponse = await client.PostAsync("/api/chat", roundContent, InterruptManager.Token);
+                                if (!roundResponse.IsSuccessStatusCode)
+                                {
+                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Ollama");
+                                    ResponseHandler?.Invoke(errorMessage);
+                                    return null;
+                                }
+                                return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
+                            });
+
+                        if (!loop.Success) return "";
+
+                        message = loop.Message;
+                        if (loop.HitLimit)
+                        {
+                            Logger.Log("Ollama ChatWithImage: 工具调用达到轮次上限，本轮不再继续");
+                        }
+                        ResponseHandler?.Invoke(message);
+                    }
+                    else if (useStreaming)
                     {
                         // 流式传输模式
                         Logger.Log("Ollama ChatWithImage: 使用流式传输模式");
