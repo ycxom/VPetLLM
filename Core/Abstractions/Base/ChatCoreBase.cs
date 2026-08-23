@@ -602,7 +602,10 @@ namespace VPetLLM.Core.Abstractions.Base
             }
             catch (Exception ex)
             {
-                Logger.Log($"Failed to initialize EmbeddingService: {ex.Message}");
+                // 这里失败会静默关掉整条向量检索路径，只记 Message 的话
+                // NullReferenceException 就只剩一句"未将对象引用设置到对象的实例"，根本没法定位。
+                // 带上类型和堆栈，代价只是日志长一点。
+                Logger.Log($"Failed to initialize EmbeddingService: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                 return null;
             }
         }

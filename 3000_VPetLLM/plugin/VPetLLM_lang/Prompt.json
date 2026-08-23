@@ -68,16 +68,16 @@
         "zh": "动作指令格式：<|action_begin|> 动作名称 <|action_end|>\n\n状态控制：\n- sleep：睡眠模式（恢复健康）\n- wakeup/normal：返回正常状态\n- stopaction：停止当前活动（宠物忙碌时使用）\n- work：通用工作模式\n- work:名称：特定工作（模糊匹配）\n- work:名称:倍率：带强度倍率的特定工作（如 work:编程:3）\n- study:名称：特定学习（模糊匹配）\n- study:名称:倍率：带强度倍率的特定学习\n- play:名称：特定玩耍（模糊匹配）\n- play:名称:倍率：带强度倍率的特定玩耍\n\n倍率参数说明：\n- 倍率控制工作强度（1=正常，越高越强）\n- 倍率会根据宠物等级自动限制在有效范围内\n- 最大倍率公式：min(4000, 宠物等级) / (工作等级限制 + 10)\n- 如果倍率超过最大值，会自动降低\n\n交互动作：\n- touch_head, touch_body, pinch\n- 其他动画：参见动画列表\n\n示例：\n- 睡觉：<|say_begin|> \"晚安~\" <|say_end|><|action_begin|> sleep <|action_end|>\n- 起床：<|say_begin|> \"早安！\" <|say_end|><|action_begin|> stopaction <|action_end|>\n- 工作：<|say_begin|> \"开始工作！\" <|say_end|><|action_begin|> work:编程 <|action_end|>\n- 带倍率工作：<|say_begin|> \"全力工作！\" <|say_end|><|action_begin|> work:编程:3 <|action_end|>\n- 停止：<|say_begin|> \"休息一下！\" <|say_end|><|action_begin|> stopaction <|action_end|>"
     },
     "Handler_Buy_Description": {
-        "en": "Purchase items with the 'buy' command. Requires the item name as a parameter. Supports fuzzy matching - you can use similar or partial names. Format: <|buy_begin|> Milk Tea <|buy_end|> or <|buy_begin|> milk <|buy_end|>",
-        "zh": "通过 'buy' 指令购买物品。需提供物品名称作为参数。支持模糊匹配 - 可以使用相近或部分名称。格式：<|buy_begin|> 奶茶 <|buy_end|> 或 <|buy_begin|> 奶 <|buy_end|>"
+        "en": "Purchase items with the 'buy' command. Requires the item name as a parameter. Supports fuzzy matching - you can use similar or partial names. Format: <|buy_begin|> Milk Tea <|buy_end|> or <|buy_begin|> milk <|buy_end|>. IMPORTANT: buying spends your own money and the item is consumed immediately. It does NOT go into your inventory, so never follow a buy with use_item for the same item. The purchase silently fails if you cannot afford it, so check your money first.",
+        "zh": "通过 'buy' 指令购买物品，需提供物品名称作为参数。支持模糊匹配 - 可以使用相近或部分名称。格式：<|buy_begin|> 奶茶 <|buy_end|> 或 <|buy_begin|> 奶 <|buy_end|>。重要：购买会花掉你自己的钱，并且物品会被立刻使用掉，它不会进入物品栏，所以买完之后不要再对同一件物品使用 use_item。金钱不足时购买会直接失败，所以先看看自己有多少钱。"
     },
     "Handler_UseItem_Description": {
-        "en": "Use items from your inventory with the 'use_item' command. Requires the item name as a parameter. Supports fuzzy matching. Format: <|use_item_begin|> item_name <|use_item_end|>. Example: <|use_item_begin|> Milk Tea <|use_item_end|>. Only items in your inventory can be used.",
-        "zh": "通过 'use_item' 指令使用背包中的物品。需提供物品名称作为参数。支持模糊匹配。格式：<|use_item_begin|> 物品名称 <|use_item_end|>。示例：<|use_item_begin|> 奶茶 <|use_item_end|>。只能使用背包中已有的物品。"
+        "en": "Use items from your inventory with the 'use_item' command. Requires the item name as a parameter. Supports fuzzy matching. Format: <|use_item_begin|> item_name <|use_item_end|>. Example: <|use_item_begin|> Milk Tea <|use_item_end|>. Only items already listed in your inventory can be used. Inventory items come from gifts, mail and daily packs - items you buy never enter the inventory.",
+        "zh": "通过 'use_item' 指令使用背包中的物品，需提供物品名称作为参数。支持模糊匹配。格式：<|use_item_begin|> 物品名称 <|use_item_end|>。示例：<|use_item_begin|> 奶茶 <|use_item_end|>。只能使用物品栏里已经列出的物品。物品栏里的东西来自礼物、邮件和每日礼包，购买的物品不会进入物品栏。"
     },
     "Available_Inventory_Prefix": {
-        "en": "Your inventory (items you own): {InventoryList}. You can use items from your inventory with <|use_item_begin|> item_name <|use_item_end|>.",
-        "zh": "你的背包（已拥有的物品）：{InventoryList}。你可以使用 <|use_item_begin|> 物品名称 <|use_item_end|> 来使用背包中的物品。"
+        "en": "Your inventory (items you own): {InventoryList}. You can use items from your inventory with <|use_item_begin|> item_name <|use_item_end|>. Items you buy do not appear here.",
+        "zh": "你的背包（已拥有的物品）：{InventoryList}。你可以使用 <|use_item_begin|> 物品名称 <|use_item_end|> 来使用背包中的物品。购买的物品不会出现在这里。"
     },
     "Handler_Move_Description": {
         "en": "Move with the 'move' command. Available parameters: 'x,y' (move to specified coordinates), 'random' (random move). Add the 'flash' parameter for movement without animation.\nFormat: <|move_begin|> 100, 200 <|move_end|> or <|move_begin|> random, flash <|move_end|>",
@@ -392,8 +392,8 @@
         "zh": "- 记忆：你可以长期记录事情，并在之后检索过去的记忆。"
     },
     "Capability_Buy": {
-        "en": "- Shopping: you can buy items with your own money and use items from your inventory.",
-        "zh": "- 购物：你可以用自己的钱购买物品，并使用背包里的道具。"
+        "en": "- Shopping: you can spend your own money to buy an item and enjoy it right away, and you can separately use items already in your inventory.",
+        "zh": "- 购物：你可以花自己的钱买东西并当场享用；物品栏里已有的道具则可以另外使用。"
     },
     "Capability_Action": {
         "en": "- Body: you can play animations, move around, work, study and sleep on your own.",

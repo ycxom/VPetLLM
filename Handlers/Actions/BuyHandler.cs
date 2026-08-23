@@ -64,16 +64,33 @@ namespace VPetLLM.Handlers.Actions
                 // 直接使用 Food.ItemType 属性
                 string itemType = food.ItemType;
 
+                // 钱不够就别买。宿主商店（winBetterBuy）也是先查钱再扣，这里保持一致；
+                // 放在动画之前，免得播完购买动画却什么也没发生。
+                var save = mainWindow.Core?.Save;
+                if (save is null)
+                {
+                    Logger.Log("BuyHandler: 存档不可用，取消购买");
+                    return;
+                }
+                if (save.Money < food.Price)
+                {
+                    Logger.Log($"BuyHandler: 金钱不足，取消购买 - {food.Name} 需要 ${food.Price:F2}，当前 ${save.Money:F2}");
+                    return;
+                }
+
                 // 播放购买动画
                 await PlayBuyAnimationAsync(mainWindow, food, itemType);
 
-                // 使用物品
+                // 扣钱 + 当场使用。这两步要合起来看：宿主的 TakeItem 是"吃掉/用掉"而不是入库
+                // （入库是 ItemsAdd，那是礼包/邮件系统的路径），所以 buy 的语义就是
+                // "买来立刻用掉"，买完不会出现在物品栏里。见 winBetterBuy 的同一组调用。
+                save.Money -= food.Price;
                 mainWindow.TakeItem(food);
 
                 // 直接调用 IMainWindow.TakeItemHandle 方法
                 mainWindow.TakeItemHandle(food, 1, VPetLLMSource);
 
-                Logger.Log($"BuyHandler: 购买完成 - {food.Name} (type: {itemType}), 剩余金钱: ${mainWindow.Core.Save.Money:F2}");
+                Logger.Log($"BuyHandler: 购买完成 - {food.Name} (type: {itemType}), 花费 ${food.Price:F2}, 剩余金钱: ${save.Money:F2}");
             }
             catch (Exception ex)
             {
