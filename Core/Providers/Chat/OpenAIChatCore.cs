@@ -372,6 +372,7 @@ namespace VPetLLM.Core.Providers.Chat
             }
 
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+            global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
             string message;
 
             try
@@ -406,6 +407,7 @@ namespace VPetLLM.Core.Providers.Chat
                                 toolPayload, toolSession, roundSend);
 
                         if (!loop.Success) return "";
+                        toolLoop = loop;
 
                         message = loop.Message;
                         if (loop.HitLimit)
@@ -528,6 +530,7 @@ namespace VPetLLM.Core.Providers.Chat
                     userMessage.ImageData = imageData;
                     await HistoryManager.AddMessage(userMessage);
                 }
+                await PersistToolCallTraceAsync(toolLoop);
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
@@ -653,6 +656,7 @@ namespace VPetLLM.Core.Providers.Chat
             }
 
             var content = new StringContent(payload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+            global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
 
             string message;
             try
@@ -687,6 +691,7 @@ namespace VPetLLM.Core.Providers.Chat
                                 payload, toolSession, roundSend);
 
                         if (!loop.Success) return "";
+                        toolLoop = loop;
 
                         message = loop.Message;
                         if (loop.HitLimit)
@@ -849,6 +854,7 @@ namespace VPetLLM.Core.Providers.Chat
                     await HistoryManager.AddMessage(tempUserMessage);
                 }
                 // 再保存助手回复
+                await PersistToolCallTraceAsync(toolLoop);
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 // 保存历史记录
                 SaveHistory();

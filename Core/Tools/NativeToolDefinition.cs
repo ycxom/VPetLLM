@@ -144,5 +144,20 @@ namespace VPetLLM.Core.Tools
     {
         public NativeToolCall Call { get; init; } = new();
         public string Content { get; init; } = "";
+
+        /// <summary>对应的插件名（原始大小写），用来还原标记文本。调用失败时可能为空。</summary>
+        public string PluginName { get; init; } = "";
+
+        /// <summary>
+        /// 传给插件的文本参数 —— 也就是标记协议里 begin/end 之间的那段。
+        ///
+        /// 这个值本来就要算（插件的 Function(string) 只吃这套文本），顺手记下来，
+        /// 落库时就能无损还原成 <c>&lt;|plugin_X_begin|&gt; ... &lt;|plugin_X_end|&gt;</c>，
+        /// 不必再写一个"从 JSON 猜标记"的转换器。
+        /// </summary>
+        public string MarkerArguments { get; init; } = "";
+
+        /// <summary>插件是否真的执行成功（失败时 Content 是 [error] 开头的说明）。</summary>
+        public bool Succeeded { get; init; }
     }
 }

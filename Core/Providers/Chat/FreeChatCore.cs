@@ -205,6 +205,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 string message = "";
                 var handledByTools = false;
+                Tools.NativeToolLoopResult? imageToolLoop = null;
 
                 // 多模态请求同样可以带工具。但这一路**不记录**能力判定：
                 // 有的端点单独支持视觉、单独支持工具，两者同时用才报错；
@@ -218,6 +219,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         message = attempt.Message;
                         ResponseHandler?.Invoke(message);
+                        imageToolLoop = attempt.Loop;
                         handledByTools = true;
                     }
                     else if (!attempt.FallBack)
@@ -330,6 +332,7 @@ namespace VPetLLM.Core.Providers.Chat
                         userMessage.ImageData = imageData;
                         await HistoryManager.AddMessage(userMessage);
                     }
+                    await PersistToolCallTraceAsync(imageToolLoop);
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
@@ -442,7 +445,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         message = attempt.Message;
                         ResponseHandler?.Invoke(message);
-                        await PersistTurnAsync(tempUserMessage, message);
+                        await PersistTurnAsync(tempUserMessage, message, attempt.Loop);
                         return "";
                     }
                     if (!attempt.FallBack)
@@ -784,7 +787,11 @@ namespace VPetLLM.Core.Providers.Chat
             /// <summary>Completed 时是正文；两者都为 false 时是要展示给用户的错误文案。</summary>
             public string Message = "";
 
-            public static ToolAttempt Done(string message) => new() { Completed = true, Message = message };
+            /// <summary>本轮工具调用还原成标记后的消息序列，Completed 时随正文一起落库。</summary>
+            public Tools.NativeToolLoopResult? Loop;
+
+            public static ToolAttempt Done(string message, Tools.NativeToolLoopResult? loop = null)
+                => new() { Completed = true, Message = message, Loop = loop };
             public static ToolAttempt Retry() => new() { FallBack = true };
             public static ToolAttempt Error(string message) => new() { Message = message };
         }
@@ -884,7 +891,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 var message = string.IsNullOrWhiteSpace(loop.Message) ? "无回复" : loop.Message;
-                return ToolAttempt.Done(message);
+                return ToolAttempt.Done(message, loop);
             }
 
             if (rejectReason is not null)
@@ -909,7 +916,8 @@ namespace VPetLLM.Core.Providers.Chat
         }
 
         /// <summary>成功一轮之后落库。与流式/非流式两条分支里的保存逻辑保持一致。</summary>
-        private async Task PersistTurnAsync(Message? tempUserMessage, string message)
+        private async Task PersistTurnAsync(
+            Message? tempUserMessage, string message, Tools.NativeToolLoopResult? loop = null)
         {
             if (!(Settings?.KeepContext ?? true)) return;
 
@@ -917,6 +925,11 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 await HistoryManager.AddMessage(tempUserMessage);
             }
+
+            // 工具调用留下的痕迹（已还原成标记）夹在用户消息和最终回复之间，
+            // 顺序与标记模式一致
+            await PersistToolCallTraceAsync(loop);
+
             await HistoryManager.AddMessage(new Message
             {
                 Role = "assistant",

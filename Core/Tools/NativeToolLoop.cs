@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using VPetLLM.Utils.System;
@@ -30,6 +31,8 @@ namespace VPetLLM.Core.Tools
                 return NativeToolLoopResult.Failed();
             }
 
+            var transcript = new List<NativeToolTranscript.Entry>();
+
             for (int iteration = 0; iteration < NativeToolSession.MaxIterations; iteration++)
             {
                 var response = await send(payload);
@@ -39,17 +42,18 @@ namespace VPetLLM.Core.Tools
                 if (calls.Count == 0)
                 {
                     var text = response["choices"]?[0]?["message"]?["content"]?.ToString() ?? "";
-                    return NativeToolLoopResult.Completed(text, iteration);
+                    return NativeToolLoopResult.Completed(text, iteration, transcript);
                 }
 
                 Logger.Log($"NativeToolLoop: 第 {iteration + 1} 轮，模型请求 {calls.Count} 个工具调用");
                 var results = await session.ExecuteAsync(calls);
+                NativeToolTranscript.AppendRound(transcript, response["choices"]?[0]?["message"]?["content"]?.ToString() ?? "", results);
                 NativeToolSession.AppendOpenAiTurn(messages, response, results);
             }
 
             // 到上限还在要工具：把最后一次的文本（可能为空）交回去，别无限转
             Logger.Log($"NativeToolLoop: 达到 {NativeToolSession.MaxIterations} 轮上限，停止工具循环");
-            return NativeToolLoopResult.Exhausted();
+            return NativeToolLoopResult.Exhausted(transcript);
         }
 
         /// <summary>OpenAI Responses API 格式（消息表叫 input，工具项散在 output[] 里）。</summary>
@@ -65,6 +69,8 @@ namespace VPetLLM.Core.Tools
                 return NativeToolLoopResult.Failed();
             }
 
+            var transcript = new List<NativeToolTranscript.Entry>();
+
             for (int iteration = 0; iteration < NativeToolSession.MaxIterations; iteration++)
             {
                 var response = await send(payload);
@@ -73,16 +79,18 @@ namespace VPetLLM.Core.Tools
                 var calls = NativeToolSession.ParseOpenAiResponsesToolCalls(response);
                 if (calls.Count == 0)
                 {
-                    return NativeToolLoopResult.Completed(ExtractResponsesText(response), iteration);
+                    var text = ExtractResponsesText(response);
+                    return NativeToolLoopResult.Completed(text, iteration, transcript);
                 }
 
                 Logger.Log($"NativeToolLoop: 第 {iteration + 1} 轮，模型请求 {calls.Count} 个工具调用");
                 var results = await session.ExecuteAsync(calls);
+                NativeToolTranscript.AppendRound(transcript, ExtractResponsesText(response), results);
                 NativeToolSession.AppendOpenAiResponsesTurn(input, response, results);
             }
 
             Logger.Log($"NativeToolLoop: 达到 {NativeToolSession.MaxIterations} 轮上限，停止工具循环");
-            return NativeToolLoopResult.Exhausted();
+            return NativeToolLoopResult.Exhausted(transcript);
         }
 
         /// <summary>
@@ -123,6 +131,8 @@ namespace VPetLLM.Core.Tools
                 return NativeToolLoopResult.Failed();
             }
 
+            var transcript = new List<NativeToolTranscript.Entry>();
+
             for (int iteration = 0; iteration < NativeToolSession.MaxIterations; iteration++)
             {
                 var response = await send(payload);
@@ -132,16 +142,17 @@ namespace VPetLLM.Core.Tools
                 if (calls.Count == 0)
                 {
                     var text = response["message"]?["content"]?.ToString() ?? "";
-                    return NativeToolLoopResult.Completed(text, iteration);
+                    return NativeToolLoopResult.Completed(text, iteration, transcript);
                 }
 
                 Logger.Log($"NativeToolLoop: 第 {iteration + 1} 轮，模型请求 {calls.Count} 个工具调用");
                 var results = await session.ExecuteAsync(calls);
+                NativeToolTranscript.AppendRound(transcript, response["message"]?["content"]?.ToString() ?? "", results);
                 NativeToolSession.AppendOllamaTurn(messages, response, results);
             }
 
             Logger.Log($"NativeToolLoop: 达到 {NativeToolSession.MaxIterations} 轮上限，停止工具循环");
-            return NativeToolLoopResult.Exhausted();
+            return NativeToolLoopResult.Exhausted(transcript);
         }
 
         /// <summary>Gemini generateContent 格式。</summary>
@@ -157,6 +168,8 @@ namespace VPetLLM.Core.Tools
                 return NativeToolLoopResult.Failed();
             }
 
+            var transcript = new List<NativeToolTranscript.Entry>();
+
             for (int iteration = 0; iteration < NativeToolSession.MaxIterations; iteration++)
             {
                 var response = await send(payload);
@@ -165,16 +178,18 @@ namespace VPetLLM.Core.Tools
                 var calls = NativeToolSession.ParseGeminiToolCalls(response);
                 if (calls.Count == 0)
                 {
-                    return NativeToolLoopResult.Completed(ExtractGeminiText(response), iteration);
+                    var text = ExtractGeminiText(response);
+                    return NativeToolLoopResult.Completed(text, iteration, transcript);
                 }
 
                 Logger.Log($"NativeToolLoop: 第 {iteration + 1} 轮，模型请求 {calls.Count} 个工具调用");
                 var results = await session.ExecuteAsync(calls);
+                NativeToolTranscript.AppendRound(transcript, ExtractGeminiText(response), results);
                 NativeToolSession.AppendGeminiTurn(contents, response, results);
             }
 
             Logger.Log($"NativeToolLoop: 达到 {NativeToolSession.MaxIterations} 轮上限，停止工具循环");
-            return NativeToolLoopResult.Exhausted();
+            return NativeToolLoopResult.Exhausted(transcript);
         }
 
         /// <summary>Gemini 的文本分散在 parts 里，functionCall 之外的 text 要拼起来。</summary>
@@ -208,13 +223,35 @@ namespace VPetLLM.Core.Tools
         /// <summary>是否因为撞上轮次上限而中止。</summary>
         public bool HitLimit { get; init; }
 
-        public static NativeToolLoopResult Completed(string message, int iterations)
-            => new() { Success = true, Message = message, Iterations = iterations };
+        /// <summary>
+        /// 本轮对话还原成标记协议后的消息序列，供落库。
+        /// 没调工具时只有一条 assistant（就是 <see cref="Message"/>）。
+        /// 见 <see cref="NativeToolTranscript"/> 说明为什么要还原成标记而不是原样存工具格式。
+        /// </summary>
+        public IReadOnlyList<NativeToolTranscript.Entry> Transcript { get; init; }
+            = System.Array.Empty<NativeToolTranscript.Entry>();
+
+        public static NativeToolLoopResult Completed(
+            string message, int iterations, IReadOnlyList<NativeToolTranscript.Entry>? transcript = null)
+            => new()
+            {
+                Success = true,
+                Message = message,
+                Iterations = iterations,
+                Transcript = transcript ?? System.Array.Empty<NativeToolTranscript.Entry>()
+            };
 
         public static NativeToolLoopResult Failed()
             => new() { Success = false };
 
-        public static NativeToolLoopResult Exhausted()
-            => new() { Success = true, Message = "", HitLimit = true, Iterations = NativeToolSession.MaxIterations };
+        public static NativeToolLoopResult Exhausted(IReadOnlyList<NativeToolTranscript.Entry>? transcript = null)
+            => new()
+            {
+                Success = true,
+                Message = "",
+                HitLimit = true,
+                Iterations = NativeToolSession.MaxIterations,
+                Transcript = transcript ?? System.Array.Empty<NativeToolTranscript.Entry>()
+            };
     }
 }

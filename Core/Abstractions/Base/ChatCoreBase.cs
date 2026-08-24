@@ -57,6 +57,31 @@ namespace VPetLLM.Core.Abstractions.Base
         public bool LastCallFailed { get; protected set; }
 
         /// <summary>
+        /// 把原生工具循环里发生的调用与结果补进历史 —— 已还原成标记协议，
+        /// 和标记模式产出的历史完全同形。
+        ///
+        /// 不含模型最终的自然语言回复：那条由各 provider 原有的落库代码负责，
+        /// 所以本方法要在"写入用户消息之后、写入最终 assistant 之前"调用。
+        /// 没发生工具调用时是空操作。
+        /// </summary>
+        protected async Task PersistToolCallTraceAsync(Core.Tools.NativeToolLoopResult? loop)
+        {
+            if (loop is null || loop.Transcript.Count == 0) return;
+            if (!(Settings?.KeepContext ?? true)) return;
+
+            foreach (var entry in loop.Transcript)
+            {
+                await HistoryManager.AddMessage(new Message
+                {
+                    Role = entry.Role,
+                    Content = entry.Content,
+                    // 结果消息标成 Plugin，和 ResultAggregator 回灌的那条同类
+                    MessageType = entry.Role == "user" ? "Plugin" : null
+                });
+            }
+        }
+
+        /// <summary>
         /// 上报一次失败：置位标志并把错误文本照常送给 ResponseHandler
         /// </summary>
         protected void ReportFailure(string message)
@@ -1220,7 +1245,13 @@ namespace VPetLLM.Core.Abstractions.Base
 
                 if (!string.IsNullOrEmpty(vpetStatus))
                 {
-                    parts.Add($"\"VPetStatus\": \"{vpetStatus}\"");
+                    // 键名必须自带主语。这段状态是桌宠**自己**的身体数值，但它渲染在
+                    // user 角色的消息里，紧挨着用户说的话和插件结果 —— 模型没有别的
+                    // 依据判断它属于谁。旧键名 "VPetStatus" 不带人称，实测会被读成
+                    // 用户的状态（"主人你已经饿了3小时了"，实际饿的是桌宠自己）。
+                    // 完整提示词路径里的 Status_Prefix 本来就写着「你（桌宠）的当前状态」，
+                    // 这条省 token 的路径当初漏抄了那个主语，这里用键名补回来。
+                    parts.Add($"\"YourStatus\": \"{vpetStatus}\"");
                 }
 
                 // 检测是否为插件消息（格式：[Plugin Result: XXX] 内容）

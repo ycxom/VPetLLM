@@ -182,6 +182,7 @@ namespace VPetLLM.Core.Providers.Chat
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
             var apiUrl = BuildOpenAIEndpoint(node.Url);
+            global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
 
             string message;
             try
@@ -209,6 +210,7 @@ namespace VPetLLM.Core.Providers.Chat
                             });
 
                         if (!loop.Success) return "";
+                        toolLoop = loop;
 
                         message = loop.Message;
                         if (loop.HitLimit)
@@ -308,6 +310,7 @@ namespace VPetLLM.Core.Providers.Chat
                     userMessage.ImageData = imageData;
                     await HistoryManager.AddMessage(userMessage);
                 }
+                await PersistToolCallTraceAsync(toolLoop);
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
@@ -360,6 +363,7 @@ namespace VPetLLM.Core.Providers.Chat
             var useStreaming = UseStreaming(node.EnableStreaming);
             // 工具循环强制非流式，端点也要跟着按非流式选，否则会打到 streamGenerateContent
             var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model, useStreaming && toolSession is null);
+            global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
 
             string message;
             try
@@ -387,6 +391,7 @@ namespace VPetLLM.Core.Providers.Chat
                             });
 
                         if (!loop.Success) return "";
+                        toolLoop = loop;
 
                         message = loop.Message;
                         if (loop.HitLimit)
@@ -483,6 +488,7 @@ namespace VPetLLM.Core.Providers.Chat
                     userMessage.ImageData = imageData;
                     await HistoryManager.AddMessage(userMessage);
                 }
+                await PersistToolCallTraceAsync(toolLoop);
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
@@ -568,6 +574,7 @@ namespace VPetLLM.Core.Providers.Chat
             var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
             var apiUrl = BuildOpenAIEndpoint(node.Url);
+            global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
 
             string message;
             try
@@ -595,6 +602,7 @@ namespace VPetLLM.Core.Providers.Chat
                             });
 
                         if (!loop.Success) return "";
+                        toolLoop = loop;
 
                         message = loop.Message;
                         if (loop.HitLimit)
@@ -701,6 +709,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     await HistoryManager.AddMessage(tempUserMessage);
                 }
+                await PersistToolCallTraceAsync(toolLoop);
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
@@ -736,6 +745,7 @@ namespace VPetLLM.Core.Providers.Chat
             // 工具循环强制非流式，所以端点也要按非流式来选
             var apiEndpoint = BuildGeminiEndpoint(node.Url, node.Model,
                 node.EnableStreaming && toolSession is null);
+            global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
 
             string message;
             try
@@ -763,6 +773,7 @@ namespace VPetLLM.Core.Providers.Chat
                             });
 
                         if (!loop.Success) return "";
+                        toolLoop = loop;
 
                         message = loop.Message;
                         if (loop.HitLimit)
@@ -859,6 +870,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     await HistoryManager.AddMessage(tempUserMessage);
                 }
+                await PersistToolCallTraceAsync(toolLoop);
                 await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();

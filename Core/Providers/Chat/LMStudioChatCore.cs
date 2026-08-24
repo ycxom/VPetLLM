@@ -134,6 +134,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 var content = new StringContent(payload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+            global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
                 string message;
 
                 using (var client = GetClient())
@@ -160,6 +161,7 @@ namespace VPetLLM.Core.Providers.Chat
                             });
 
                         if (!loop.Success) return "";
+                        toolLoop = loop;
 
                         message = loop.Message;
                         if (loop.HitLimit)
@@ -247,6 +249,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         await HistoryManager.AddMessage(tempUserMessage);
                     }
+                    await PersistToolCallTraceAsync(toolLoop);
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
@@ -367,6 +370,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+            global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
                 string message;
 
                 using (var client = GetClient())
@@ -393,6 +397,7 @@ namespace VPetLLM.Core.Providers.Chat
                             });
 
                         if (!loop.Success) return "";
+                        toolLoop = loop;
 
                         message = loop.Message;
                         if (loop.HitLimit)
@@ -480,6 +485,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         await HistoryManager.AddMessage(tempUserMessage);
                     }
+                    await PersistToolCallTraceAsync(toolLoop);
                     await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();

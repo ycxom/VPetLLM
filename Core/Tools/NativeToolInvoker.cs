@@ -67,7 +67,8 @@ namespace VPetLLM.Core.Tools
                 {
                     // 不取消任务（插件接口没有取消通道），只是不再等它
                     RemoteChat.RemoteChatSessionContext.PluginCompleted(definition.PluginName, "timeout", false);
-                    return Fail(call, $"Plugin '{definition.PluginName}' did not finish within {CallTimeout.TotalSeconds:F0}s.");
+                    return Fail(call, $"Plugin '{definition.PluginName}' did not finish within {CallTimeout.TotalSeconds:F0}s.",
+                        definition.PluginName, arguments);
                 }
 
                 var result = await task ?? "";
@@ -79,13 +80,20 @@ namespace VPetLLM.Core.Tools
                     result = "(no output)";
                 }
 
-                return new NativeToolResult { Call = call, Content = result };
+                return new NativeToolResult
+                {
+                    Call = call,
+                    Content = result,
+                    PluginName = definition.PluginName,
+                    MarkerArguments = arguments,
+                    Succeeded = true
+                };
             }
             catch (Exception ex)
             {
                 RemoteChat.RemoteChatSessionContext.PluginCompleted(definition.PluginName, ex.Message, false);
                 Logger.Log($"NativeToolInvoker: {call.Name} 抛出异常: {ex.Message}");
-                return Fail(call, $"Plugin error: {ex.Message}");
+                return Fail(call, $"Plugin error: {ex.Message}", definition.PluginName, arguments);
             }
         }
 
@@ -129,10 +137,18 @@ namespace VPetLLM.Core.Tools
             };
         }
 
-        private static NativeToolResult Fail(NativeToolCall call, string message)
+        private static NativeToolResult Fail(
+            NativeToolCall call, string message, string pluginName = "", string markerArguments = "")
         {
             Logger.Log($"NativeToolInvoker: {message}");
-            return new NativeToolResult { Call = call, Content = "[error] " + message };
+            return new NativeToolResult
+            {
+                Call = call,
+                Content = "[error] " + message,
+                PluginName = pluginName,
+                MarkerArguments = markerArguments,
+                Succeeded = false
+            };
         }
     }
 }
