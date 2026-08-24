@@ -49,6 +49,8 @@ namespace VPetLLM.Core.Tools
         private static readonly object Gate = new();
         private static Policy _policy = Policy.Auto;
         private static Probe _probe = Probe.Unknown;
+        /// <summary>是否已经至少应用过一次云端配置（用来让首次读取仍然留一行日志）。</summary>
+        private static bool _everApplied;
 
         /// <summary>云端下发的策略。未下发时保持 <see cref="Policy.Auto"/>。</summary>
         public static Policy CurrentPolicy
@@ -68,16 +70,22 @@ namespace VPetLLM.Core.Tools
         public static void ApplyCloudConfig(JToken? token)
         {
             var policy = ParsePolicy(token);
+            bool changed;
             lock (Gate)
             {
+                changed = _policy != policy || !_everApplied;
                 if (_policy != policy)
                 {
                     // 策略变了，之前那次探测的结论就作废
                     _probe = Probe.Unknown;
                 }
                 _policy = policy;
+                _everApplied = true;
             }
-            Logger.Log($"FreeToolCapability: 云端工具调用策略={policy}");
+
+            // 云端配置每 5 分钟刷一次，绝大多数时候策略没变。
+            // 无条件打日志会往用户的 Debug.log 里灌进每天近 300 行毫无信息量的重复。
+            if (changed) Logger.Log($"FreeToolCapability: 云端工具调用策略={policy}");
         }
 
         public static Policy ParsePolicy(JToken? token)

@@ -296,6 +296,11 @@ namespace VPetLLM
                 var culture = System.Globalization.CultureInfo.CurrentUICulture.Name.ToLower();
                 Settings.Language = LanguageHelper.LanguageDisplayMap.ContainsKey(culture) ? culture : "en";
             }
+
+            // 把语言同步给绑定层。此前 ChangeLanguage 只在设置窗口里调，
+            // 用户没打开过设置时 LocalizationService.LangCode 一直停在默认的 zh-hans ——
+            // 悬浮侧边栏那些走 LocalizationService 的文案对非中文用户就全是中文。
+            Utils.Localization.LocalizationService.Instance.ChangeLanguage(Settings.Language);
         }
 
         private void InitializeActionProcessor()
@@ -1838,11 +1843,11 @@ namespace VPetLLM
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    var title = lang.StartsWith("zh") ? "运行诊断结果" : "Diagnostic Results";
+                    var title = LanguageHelper.Get("Diagnostic.UiWindowTitle", lang, "运行诊断结果");
                     UI.Windows.winDiagnosticReport? diagWindow = null;
                     diagWindow = new UI.Windows.winDiagnosticReport(
                         title, result, report,
-                        lang.StartsWith("zh") ? "可选择测试LLM或应用推荐设置" : "You can test LLM or apply recommended settings",
+                        LanguageHelper.Get("Diagnostic.UiWindowHint", lang, "可选择测试 LLM 或应用推荐设置"),
                         onTestLLM: async () =>
                         {
                             diagWindow!.ShowProgress(lang.StartsWith("zh") ? "正在测试各渠道 LLM 响应..." : "Testing channel LLM responses...");
@@ -2046,7 +2051,7 @@ namespace VPetLLM
                 // 4) 弹窗确认后应用
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    var title = lang.StartsWith("zh") ? "代理自动优化建议" : "Proxy Optimization Suggestions";
+                    var title = LanguageHelper.Get("Diagnostic.UiProxyWindowTitle", lang, "代理自动优化建议");
                     var status = lang.StartsWith("zh")
                         ? "检测到可优化的代理设置，确认后应用"
                         : "Detected proxy settings that can be optimized";

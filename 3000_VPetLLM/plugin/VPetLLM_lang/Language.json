@@ -130,12 +130,6 @@
       "zh-hant": "保持聊天上下文",
       "jp": "チャットコンテキストを維持する"
     },
-    "EnableChatHistory": {
-      "en": "Save Chat History",
-      "zh-hans": "保存聊天历史",
-      "zh-hant": "保存聊天歷史",
-      "jp": "チャット履歴を保存する"
-    },
     "SeparateChatByProvider": {
       "en": "Separate Chat by Provider",
       "zh-hans": "按提供商分离聊天记录",
@@ -262,11 +256,17 @@
       "zh-hant": "啟用視覺",
       "jp": "ビジョンを有効にする"
     },
-    "EnableVisionTooltip": {
-      "en": "Enable vision capability for this channel to process images and screenshots",
-      "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
-      "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
-      "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
+    "EnableToolCall": {
+      "en": "Enable Native Tool Calling (function calling)",
+      "zh-hans": "启用原生工具调用 (function calling)",
+      "zh-hant": "啟用原生工具調用 (function calling)",
+      "jp": "ネイティブツール呼び出し (function calling) を有効にする"
+    },
+    "EnableToolCallTip": {
+      "en": "Expose plugins through the model's native tools parameter instead of text markers. Enable only if the model actually supports it; replies from this node will no longer stream.",
+      "zh-hans": "以模型原生的 tools 参数暴露插件，替代文本标记。仅在该模型确实支持时开启；开启后本节点的回复不再流式输出。",
+      "zh-hant": "以模型原生的 tools 參數暴露插件，取代文字標記。僅在該模型確實支援時開啟；開啟後本節點的回覆不再串流輸出。",
+      "jp": "プラグインをテキストマーカーではなくモデルネイティブの tools パラメータで公開します。モデルが実際に対応している場合のみ有効にしてください。有効にするとこのノードの応答はストリーミングされなくなります。"
     },
     "ChannelMode": {
       "en": "Channel Mode:",
@@ -446,35 +446,11 @@
       "zh-hant": "最大Token:",
       "jp": "最大トークン:"
     },
-    "ChannelManagement": {
-      "en": "Gemini Channel Management",
-      "zh-hans": "Gemini渠道管理",
-      "zh-hant": "Gemini渠道管理",
-      "jp": "Geminiチャネル管理"
-    },
-    "ChannelManagementDesc": {
-      "en": "Support adding multiple Gemini channels. You can enter multiple API Keys (one per line) within a channel, and the program will automatically rotate them to distribute request frequency.",
-      "zh-hans": "支持添加多个Gemini渠道，渠道内可输入多行API Key，程序会自动轮换分散请求频率",
-      "zh-hant": "支持添加多個Gemini渠道，渠道內可輸入多行API Key，程序會自動輪換分散請求頻率",
-      "jp": "複数のGeminiチャネルの追加をサポートします。チャネル内に複数のAPIキー（1行に1つ）を入力でき、プログラムはリクエスト頻度を分散するために自動的にローテーションします。"
-    },
     "EnableLoadBalancing": {
       "en": "Enable Load Balancing (Auto-rotate API Keys)",
       "zh-hans": "启用负载均衡（自动轮换API Key）",
       "zh-hant": "啟用負載均衡（自動輪換API Key）",
       "jp": "負荷分散を有効にする（APIキーを自動ローテーション）"
-    },
-    "AddChannel": {
-      "en": "Add Channel",
-      "zh-hans": "添加渠道",
-      "zh-hant": "添加渠道",
-      "jp": "チャネルを追加"
-    },
-    "RemoveSelectedChannel": {
-      "en": "Remove Selected Channel",
-      "zh-hans": "删除选中渠道",
-      "zh-hant": "刪除選中渠道",
-      "jp": "選択したチャネルを削除"
     },
     "Enabled": {
       "en": "Enabled",
@@ -488,115 +464,19 @@
       "zh-hant": "渠道名稱",
       "jp": "チャネル名"
     },
-    "ChannelConfig": {
-      "en": "Channel Configuration",
-      "zh-hans": "渠道配置",
-      "zh-hant": "渠道配置",
-      "jp": "チャネル設定"
-    },
-    "ApiKeyTooltip": {
-      "en": "One API Key per line",
-      "zh-hans": "每行一个 API Key",
-      "zh-hant": "每行一個 API Key",
-      "jp": "1行に1つのAPIキー"
-    },
-    "ToggleApiKeyVisibility": {
-      "en": "Show/Hide",
-      "zh-hans": "显示/隐藏",
-      "zh-hant": "顯示/隱藏",
-      "jp": "表示/非表示"
-    },
     "EnableVision": {
       "en": "Enable Vision",
       "zh-hans": "启用视觉",
       "zh-hant": "啟用視覺",
       "jp": "ビジョンを有効にする"
-    },
-    "EnableVisionTooltip": {
-      "en": "Enable vision capability for this channel to process images and screenshots",
-      "zh-hans": "为此渠道启用视觉能力以处理图片和截图",
-      "zh-hant": "為此渠道啟用視覺能力以處理圖片和截圖",
-      "jp": "このチャネルのビジョン機能を有効にして画像とスクリーンショットを処理"
-    },
-    "ChannelMode": {
-      "en": "Channel Mode:",
-      "zh-hans": "渠道模式:",
-      "zh-hant": "渠道模式:",
-      "jp": "チャネルモード:"
     }
   },
   "LMStudio": {
-    "Header": {
-      "en": "LM Studio",
-      "zh-hans": "LM Studio",
-      "zh-hant": "LM Studio",
-      "jp": "LM Studio"
-    },
-    "URL": {
-      "en": "URL",
-      "zh-hans": "URL",
-      "zh-hant": "URL",
-      "jp": "URL"
-    },
-    "URLPlaceholder": {
-      "en": "http://localhost:1234",
-      "zh-hans": "http://localhost:1234",
-      "zh-hant": "http://localhost:1234",
-      "jp": "http://localhost:1234"
-    },
     "Model": {
       "en": "Model",
       "zh-hans": "模型",
       "zh-hant": "模型",
       "jp": "モデル"
-    },
-    "ModelPlaceholder": {
-      "en": "Model name (optional, auto-detect if empty)",
-      "zh-hans": "模型名称（留空则自动检测）",
-      "zh-hant": "模型名稱（留空則自動檢測）",
-      "jp": "モデル名（空欄の場合は自動検出）"
-    },
-    "Refresh": {
-      "en": "Refresh",
-      "zh-hans": "刷新",
-      "zh-hant": "刷新",
-      "jp": "更新"
-    },
-    "EnableAdvanced": {
-      "en": "Enable Advanced Configuration",
-      "zh-hans": "启用高级配置",
-      "zh-hant": "啟用高級配置",
-      "jp": "詳細設定を有効にする"
-    },
-    "EnableStreaming": {
-      "en": "Enable Streaming",
-      "zh-hans": "启用流式传输",
-      "zh-hant": "啟用流式傳輸",
-      "jp": "ストリーミングを有効にする"
-    },
-    "Temperature": {
-      "en": "Temperature:",
-      "zh-hans": "温度:",
-      "zh-hant": "溫度:",
-      "jp": "温度:"
-    },
-    "MaxTokens": {
-      "en": "Max Tokens:",
-      "zh-hans": "最大Token:",
-      "zh-hant": "最大Token:",
-      "jp": "最大トークン:"
-    },
-    "EnableVision": {
-      "en": "Enable Vision",
-      "zh-hans": "启用视觉",
-      "zh-hant": "啟用視覺",
-      "jp": "ビジョンを有効にする"
-    },
-    "EnableVisionTooltip": {
-      "en": "Enable vision capability to process images and screenshots",
-      "zh-hans": "启用视觉能力以处理图片和截图",
-      "zh-hant": "啟用視覺能力以處理圖片和截圖",
-      "jp": "ビジョン機能を有効にして画像とスクリーンショットを処理"
     }
   },
   "ChannelMode": {
@@ -898,24 +778,6 @@
       "zh-hant": "聊天壓縮模式（有損）",
       "jp": "チャット圧縮モード（非可逆）"
     },
-    "EnableOverflowMode": {
-      "en": "Enable Overflow Long Memory (replace lossy compression)",
-      "zh-hans": "启用溢出式超长记忆（替代有损压缩）",
-      "zh-hant": "啟用溢出式超長記憶（替代有損壓縮）",
-      "jp": "オーバーフロー式長期記憶を有効にする（非可逆圧縮を置き換え）"
-    },
-    "EnableOverflowModeTooltip": {
-      "en": "When enabled, chat history is no longer lossily compressed. Messages exceeding the token limit are evicted but not deleted. Overflowed content is periodically summarized into memory points. Requires memory retrieval to be enabled for full long-memory effect.",
-      "zh-hans": "启用后不再有损压缩聊天记录，超出Token阈值的消息会被挤出但不删除，累积到一定程度自动总结为记忆点。配合专家模型检索使用可实现超长记忆。",
-      "zh-hant": "啟用後不再有損壓縮聊天記錄，超出Token閾值的消息會被擠出但不刪除，累積到一定程度自動總結為記憶點。配合專家模型檢索使用可實現超長記憶。",
-      "jp": "有効にすると、チャット履歴が非可逆圧縮されなくなります。トークン制限を超えたメッセージは削除されずに退避され、蓄積されたコンテンツは定期的にメモリポイントに要約されます。完全な長期記憶効果を得るには、メモリ検索を有効にする必要があります。"
-    },
-    "OverflowTokenLimit": {
-      "en": "Prompt Token Limit:",
-      "zh-hans": "Prompt Token 上限:",
-      "zh-hant": "Prompt Token 上限:",
-      "jp": "プロンプトトークン上限:"
-    },
     "OverflowTriggerMode": {
       "en": "Trigger Mode:",
       "zh-hans": "触发方式:",
@@ -963,24 +825,6 @@
       "zh-hans": "专家检索上下文长度:",
       "zh-hant": "專家檢索上下文長度:",
       "jp": "エキスパート検索コンテキスト長:"
-    },
-    "OverflowSummaryTriggerTokens": {
-      "en": "Overflow Trigger Tokens:",
-      "zh-hans": "累积溢出 Token 后触发总结:",
-      "zh-hant": "累積溢出 Token 後觸發總結:",
-      "jp": "オーバーフロー要約トリガートークン:"
-    },
-    "EnableExpertMemoryRetrieval": {
-      "en": "Enable Expert Model Memory Retrieval",
-      "zh-hans": "启用专家模型检索溢出记忆",
-      "zh-hant": "啟用專家模型檢索溢出記憶",
-      "jp": "エキスパートモデルによるメモリ検索を有効にする"
-    },
-    "EnableExpertMemoryRetrievalTooltip": {
-      "en": "When user asks a question, the system searches overflowed memory points and chat summaries, processes them via an expert model, and injects relevant context into the conversation. Enables long-term memory recall.",
-      "zh-hans": "用户提问时自动搜索被溢出的记忆点和聊天摘要，由专家模型处理后注入当前对话。可实现超长记忆的回忆。",
-      "zh-hant": "用戶提問時自動搜索被溢出的記憶點和聊天摘要，由專家模型處理後注入當前對話。可實現超長記憶的回忆。",
-      "jp": "ユーザーが質問すると、システムは退避されたメモリポイントとチャット要約を検索し、エキスパートモデルで処理して関連コンテキストを会話に注入します。長期記憶の呼び出しを実現します。"
     },
     "MaxRecordsLimitUnit": {
       "en": "records",
@@ -1123,12 +967,6 @@
       "zh-hans": "删除",
       "zh-hant": "刪除",
       "jp": "削除"
-    },
-    "NoSkills": {
-      "en": "No skills yet. The AI creates skills automatically as it learns your habits.",
-      "zh-hans": "暂无技能。AI 会在互动中根据你的习惯自动创建技能。",
-      "zh-hant": "暫無技能。AI 會在互動中根據你的習慣自動創建技能。",
-      "jp": "スキルはまだありません。AIがあなたの習慣を学習すると自動的にスキルを作成します。"
     },
     "ConfirmDelete": {
       "en": "Are you sure you want to delete skill \"{0}\"?",
@@ -1286,18 +1124,6 @@
       "zh-hant": "插件商店",
       "jp": "プラグインストア"
     },
-    "HowToUse": {
-      "en": "How to use? View",
-      "zh-hans": "如何使用？查看",
-      "zh-hant": "如何使用？查看",
-      "jp": "使い方？表示"
-    },
-    "LoadPlugins": {
-      "en": "Load Plugins",
-      "zh-hans": "加载插件",
-      "zh-hant": "加載插件",
-      "jp": "プラグインを読み込む"
-    },
     "ImportPlugin": {
       "en": "Import Plugin",
       "zh-hans": "导入插件",
@@ -1358,12 +1184,6 @@
       "zh-hant": "未知版本",
       "jp": "不明なバージョン"
     },
-    "LocalOnly": {
-      "en": "Local Only",
-      "zh-hans": "仅本地",
-      "zh-hant": "僅本地",
-      "jp": "ローカルのみ"
-    },
     "Source": {
       "Local": {
         "en": "Local",
@@ -1413,12 +1233,6 @@
       "zh-hans": "未下载",
       "zh-hant": "未下載",
       "jp": "未ダウンロード"
-    },
-    "Icon": {
-      "en": "Icon",
-      "zh-hans": "图标",
-      "zh-hant": "圖標",
-      "jp": "アイコン"
     },
     "Name": {
       "en": "Name",
@@ -1586,24 +1400,6 @@
       "zh-hant": "上下文編輯器",
       "jp": "コンテキストエディタ"
     },
-    "Role": {
-      "en": "Role",
-      "zh-hans": "角色",
-      "zh-hant": "角色",
-      "jp": "役割"
-    },
-    "Content": {
-      "en": "Content",
-      "zh-hans": "内容",
-      "zh-hant": "內容",
-      "jp": "内容"
-    },
-    "Image": {
-      "en": "Image",
-      "zh-hans": "图像",
-      "zh-hant": "圖像",
-      "jp": "画像"
-    },
     "Save": {
       "en": "Save",
       "zh-hans": "保存",
@@ -1769,38 +1565,6 @@
       "jp": "この記録を削除してもよろしいですか？"
     }
   },
-  "UninstallConfirm": {
-    "Title": {
-      "en": "Confirm Uninstall",
-      "zh-hans": "确认卸载",
-      "zh-hant": "確認卸載",
-      "jp": "アンインストールを確認する"
-    },
-    "Message": {
-      "en": "Are you sure you want to uninstall this plugin? This will delete the plugin file and cannot be undone.",
-      "zh-hans": "您确定要卸载此插件吗？这将删除插件文件且无法撤销。",
-      "zh-hant": "您確定要卸載此插件嗎？這將刪除插件文件且無法撤銷。",
-      "jp": "このプラグインをアンインストールしてもよろしいですか？これにより、プラグインファイルが削除され、元に戻すことはできません。"
-    },
-    "DoNotShowAgain": {
-      "en": "Do not show this again",
-      "zh-hans": "不再显示",
-      "zh-hant": "不再顯示",
-      "jp": "今後表示しない"
-    },
-    "Yes": {
-      "en": "Yes",
-      "zh-hans": "是",
-      "zh-hant": "是",
-      "jp": "はい"
-    },
-    "No": {
-      "en": "No",
-      "zh-hans": "否",
-      "zh-hant": "否",
-      "jp": "いいえ"
-    }
-  },
   "Voice": {
     "Tab": {
       "en": "Voice",
@@ -1887,12 +1651,6 @@
       "zh-hans": "音量增益",
       "zh-hant": "音量增益",
       "jp": "音量ゲイン"
-    },
-    "VolumeGainTip": {
-      "en": "Adjust audio volume in dB. Positive values increase volume, negative values decrease volume. 0dB means no change.",
-      "zh-hans": "以dB为单位调整音频音量。正值增加音量，负值降低音量。0dB表示不改变。",
-      "zh-hant": "以dB為單位調整音頻音量。正值增加音量，負值降低音量。0dB表示不改變。",
-      "jp": "dB単位でオーディオ音量を調整します。正の値は音量を上げ、負の値は音量を下げます。0dBは変更なしを意味します。"
     },
     "DIYTTSConfig": {
       "en": "DIY TTS Configuration",
@@ -2090,30 +1848,6 @@
         "zh-hans": "请输入完整的TTS API地址，包含完整路径（如：https://api.fish.audio/v1/tts）",
         "zh-hant": "請輸入完整的TTS API地址，包含完整路徑（如：https://api.fish.audio/v1/tts）",
         "jp": "完全なパスを含む完全なTTS API URLを入力してください（例：https://api.fish.audio/v1/tts）"
-      },
-      "ApiKeyRequired": {
-        "en": "Please enter API Key first",
-        "zh-hans": "请先输入API Key",
-        "zh-hant": "請先輸入API Key",
-        "jp": "まずAPI Keyを入力してください"
-      },
-      "ModelsRefreshed": {
-        "en": "Model list refreshed",
-        "zh-hans": "模型列表已刷新",
-        "zh-hant": "模型列表已刷新",
-        "jp": "モデルリストが更新されました"
-      },
-      "RefreshModelsFail": {
-        "en": "Failed to get model list, please check API Key and network connection.",
-        "zh-hans": "获取模型列表失败，请检查API Key和网络连接。",
-        "zh-hant": "獲取模型列表失敗，請檢查API Key和網路連接。",
-        "jp": "モデルリストの取得に失敗しました。API Keyとネットワーク接続を確認してください。"
-      },
-      "RefreshModelsError": {
-        "en": "Error getting model list",
-        "zh-hans": "获取模型列表出错",
-        "zh-hant": "獲取模型列表出錯",
-        "jp": "モデルリスト取得エラー"
       }
     },
     "GPTSoVITS": {
@@ -2378,12 +2112,6 @@
       "zh-hant": "ASR（語音輸入）",
       "jp": "ASR（音声入力）"
     },
-    "BasicSettings": {
-      "en": "Basic Settings",
-      "zh-hans": "基本设置",
-      "zh-hant": "基本設置",
-      "jp": "基本設定"
-    },
     "Enable": {
       "en": "Enable Voice Input",
       "zh-hans": "启用语音输入",
@@ -2395,12 +2123,6 @@
       "zh-hans": "启用后可以使用快捷键进行语音输入",
       "zh-hant": "啟用後可以使用快捷鍵進行語音輸入",
       "jp": "有効にすると、ホットキーで音声入力が使用できます"
-    },
-    "HotkeySettings": {
-      "en": "Hotkey Settings",
-      "zh-hans": "快捷键设置",
-      "zh-hant": "快捷鍵設置",
-      "jp": "ホットキー設定"
     },
     "HotkeyModifiers": {
       "en": "Modifiers:",
@@ -2419,12 +2141,6 @@
       "zh-hans": "点击捕获按钮后，按下您想要的快捷键组合",
       "zh-hant": "點擊捕獲按鈕後，按下您想要的快速鍵組合",
       "jp": "キャプチャボタンをクリックしてから、ご希望のホットキーの組み合わせを押してください。"
-    },
-    "RecognitionSettings": {
-      "en": "Recognition Settings",
-      "zh-hans": "识别设置",
-      "zh-hant": "識別設置",
-      "jp": "認識設定"
     },
     "Provider": {
       "en": "Recognition Provider",
@@ -2624,18 +2340,6 @@
       "zh-hant": "捕獲快捷鍵",
       "jp": "ホットキーをキャプチャ"
     },
-    "EndCapture": {
-      "en": "End Capture",
-      "zh-hans": "结束捕获",
-      "zh-hant": "結束捕獲",
-      "jp": "キャプチャ終了"
-    },
-    "PressKey": {
-      "en": "Press your hotkey combination...",
-      "zh-hans": "请按下快捷键...",
-      "zh-hant": "請按下快捷鍵...",
-      "jp": "ホットキーを押してください..."
-    },
     "NoHotkey": {
       "en": "Not set",
       "zh-hans": "未设置",
@@ -2698,12 +2402,6 @@
       "zh-hant": "正在處理...",
       "jp": "処理中..."
     },
-    "Completed": {
-      "en": "Recognition completed",
-      "zh-hans": "识别完成",
-      "zh-hant": "識別完成",
-      "jp": "認識完了"
-    },
     "Recognized": {
       "en": "Recognition Result",
       "zh-hans": "识别结果",
@@ -2736,47 +2434,11 @@
     }
   },
   "PluginStore": {
-    "Tab": {
-      "en": "Plugin Store",
-      "zh-hans": "插件商店",
-      "zh-hant": "插件商店",
-      "jp": "プラグインストア"
-    },
-    "Refresh": {
-      "en": "Refresh Store",
-      "zh-hans": "刷新商店",
-      "zh-hant": "刷新商店",
-      "jp": "ストアを更新"
-    },
-    "Name": {
-      "en": "Name",
-      "zh-hans": "名称",
-      "zh-hant": "名稱",
-      "jp": "名前"
-    },
-    "Description": {
-      "en": "Description",
-      "zh-hans": "描述",
-      "zh-hant": "描述",
-      "jp": "説明"
-    },
-    "Action": {
-      "en": "Action",
-      "zh-hans": "操作",
-      "zh-hant": "操作",
-      "jp": "アクション"
-    },
     "Install": {
       "en": "Install",
       "zh-hans": "安装",
       "zh-hant": "安裝",
       "jp": "インストール"
-    },
-    "Author": {
-      "en": "Author",
-      "zh-hans": "作者",
-      "zh-hant": "作者",
-      "jp": "作者"
     },
     "ProxySettings": {
       "en": "Plugin Store Proxy Settings",
@@ -2801,12 +2463,6 @@
       "zh-hans": "示例: https://ghfast.top (用于加速中国大陆等访问GitHub困难使用)",
       "zh-hant": "示例: https://ghfast.top (用於加速中國大陸等訪問GitHub困難使用)",
       "jp": "例: https://ghfast.top (中国本土などGitHubアクセスが困難な地域での高速化用)"
-    }
-  },
-  "ReloadPrompts": {
-    "Success": {
-      "en": "Prompts reloaded successfully.",
-      "zh-hans": "提示词已成功重载。"
     }
   },
   "Success": {
@@ -2842,12 +2498,6 @@
       "zh-hant": "身體交互設置",
       "jp": "タッチインタラクション設定"
     },
-    "Tab": {
-      "en": "Touch Interaction",
-      "zh-hans": "身体交互设置",
-      "zh-hant": "身體交互設置",
-      "jp": "タッチインタラクション"
-    },
     "Enable": {
       "en": "Touch Interaction Feedback",
       "zh-hans": "身体交互反馈",
@@ -2880,12 +2530,6 @@
     }
   },
   "BuyInteraction": {
-    "Title": {
-      "en": "Purchase Interaction Settings",
-      "zh-hans": "购买互动设置",
-      "zh-hant": "購買互動設置",
-      "jp": "購入インタラクション設定"
-    },
     "Enable": {
       "en": "Enable Purchase Feedback",
       "zh-hans": "启用购买反馈",
@@ -2897,48 +2541,6 @@
       "zh-hans": "当用户购买物品时，宠物会通过AI生成个性化的反馈回应。",
       "zh-hant": "當用戶購買物品時，寵物會通過AI生成個性化的反饋回應。",
       "jp": "ユーザーがアイテムを購入すると、ペットはAIを通じてパーソナライズされたフィードバック応答を生成します。"
-    },
-    "EnableDescription": {
-      "en": "When enabled, VPet will provide intelligent feedback when you buy items for it",
-      "zh-hans": "启用后，当你给VPet购买物品时，它会提供智能反馈",
-      "zh-hant": "啟用後，當你給VPet購買物品時，它會提供智能反饋",
-      "jp": "有効にすると、VPetにアイテムを購入したときにインテリジェントなフィードバックを提供します"
-    },
-    "EnableRecommendation": {
-      "en": "Purchase Recommendations",
-      "zh-hans": "购买建议",
-      "zh-hant": "購買建議",
-      "jp": "購入推奨"
-    },
-    "RecommendationDescription": {
-      "en": "VPet will suggest items to buy based on its current needs",
-      "zh-hans": "VPet会根据当前需求建议购买物品",
-      "zh-hant": "VPet會根據當前需求建議購買物品",
-      "jp": "VPetは現在のニーズに基づいてアイテムの購入を提案します"
-    },
-    "EmotionResponse": {
-      "en": "Emotional Response Level",
-      "zh-hans": "情感反应程度",
-      "zh-hant": "情感反應程度",
-      "jp": "感情反応レベル"
-    },
-    "EmotionLow": {
-      "en": "Calm",
-      "zh-hans": "平静",
-      "zh-hant": "平靜",
-      "jp": "穏やか"
-    },
-    "EmotionMedium": {
-      "en": "Normal",
-      "zh-hans": "正常",
-      "zh-hant": "正常",
-      "jp": "普通"
-    },
-    "EmotionHigh": {
-      "en": "Enthusiastic",
-      "zh-hans": "热情",
-      "zh-hant": "熱情",
-      "jp": "熱狂的"
     }
   },
   "TouchArea": {
@@ -2959,32 +2561,6 @@
       "zh-hans": "脸部",
       "zh-hant": "臉部",
       "jp": "顔"
-    }
-  },
-  "Inventory": {
-    "Empty": {
-      "en": "Inventory is empty",
-      "zh-hans": "物品栏为空",
-      "zh-hant": "物品欄為空",
-      "jp": "インベントリは空です"
-    },
-    "ItemCannotUse": {
-      "en": "This item cannot be used",
-      "zh-hans": "此物品无法使用",
-      "zh-hant": "此物品無法使用",
-      "jp": "このアイテムは使用できません"
-    },
-    "HasItem": {
-      "en": "Pet has this item",
-      "zh-hans": "宠物拥有此物品",
-      "zh-hant": "寵物擁有此物品",
-      "jp": "ペットはこのアイテムを持っています"
-    },
-    "NoItem": {
-      "en": "Pet doesn't have this item",
-      "zh-hans": "宠物没有此物品",
-      "zh-hant": "寵物沒有此物品",
-      "jp": "ペットはこのアイテムを持っていません"
     }
   },
   "ItemType": {
@@ -3090,12 +2666,6 @@
       "zh-hant": "懸浮側邊欄",
       "jp": "フローティングサイドバー"
     },
-    "Tab": {
-      "en": "Floating Sidebar",
-      "zh-hans": "悬浮侧边栏",
-      "zh-hant": "懸浮側邊欄",
-      "jp": "フローティングサイドバー"
-    },
     "Enable": {
       "en": "Enable Floating Sidebar",
       "zh-hans": "启用悬浮侧边栏",
@@ -3161,12 +2731,6 @@
       "zh-hans": "非活动透明度:",
       "zh-hant": "非活動透明度:",
       "jp": "非アクティブ時の不透明度:"
-    },
-    "AutoHideDelay": {
-      "en": "Auto Hide Delay (seconds)",
-      "zh-hans": "自动隐藏延迟（秒）",
-      "zh-hant": "自動隱藏延遲（秒）",
-      "jp": "自動非表示遅延（秒）"
     },
     "Settings": {
       "en": "Open Settings",
@@ -3240,24 +2804,6 @@
       "zh-hant": "插件管理",
       "jp": "プラグイン管理"
     },
-    "ShowSidebar": {
-      "en": "Show Floating Sidebar",
-      "zh-hans": "显示悬浮侧边栏",
-      "zh-hant": "顯示懸浮側邊欄",
-      "jp": "フローティングサイドバーを表示"
-    },
-    "HideSidebar": {
-      "en": "Hide Floating Sidebar",
-      "zh-hans": "隐藏悬浮侧边栏",
-      "zh-hant": "隱藏懸浮側邊欄",
-      "jp": "フローティングサイドバーを非表示"
-    },
-    "ButtonSettings": {
-      "en": "Button Settings",
-      "zh-hans": "按钮设置",
-      "zh-hant": "按鈕設定",
-      "jp": "ボタン設定"
-    },
     "EnabledButtons": {
       "en": "Enabled Buttons",
       "zh-hans": "启用的按钮",
@@ -3292,12 +2838,6 @@
       "zh-hant": "截圖與模型視覺",
       "jp": "スクリーンショットとモデルビジョン"
     },
-    "BasicSettings": {
-      "en": "Basic Settings",
-      "zh-hans": "基本设置",
-      "zh-hant": "基本設置",
-      "jp": "基本設定"
-    },
     "Enable": {
       "en": "Enable Screenshot Feature",
       "zh-hans": "启用截图功能",
@@ -3309,12 +2849,6 @@
       "zh-hans": "启用后可以使用快捷键或侧边栏按钮进行截图",
       "zh-hant": "啟用後可以使用快捷鍵或側邊欄按鈕進行截圖",
       "jp": "有効にすると、ホットキーまたはサイドバーボタンでスクリーンショットが使用できます"
-    },
-    "HotkeySettings": {
-      "en": "Hotkey Settings",
-      "zh-hans": "快捷键设置",
-      "zh-hant": "快捷鍵設置",
-      "jp": "ホットキー設定"
     },
     "HotkeyModifiers": {
       "en": "Modifiers:",
@@ -3339,18 +2873,6 @@
       "zh-hans": "捕获快捷键",
       "zh-hant": "捕獲快捷鍵",
       "jp": "ホットキーをキャプチャ"
-    },
-    "EndCapture": {
-      "en": "End Capture",
-      "zh-hans": "结束捕获",
-      "zh-hant": "結束捕獲",
-      "jp": "キャプチャ終了"
-    },
-    "PressKey": {
-      "en": "Press your hotkey combination...",
-      "zh-hans": "请按下快捷键...",
-      "zh-hant": "請按下快捷鍵...",
-      "jp": "ホットキーを押してください..."
     },
     "NoHotkey": {
       "en": "Not set",
@@ -3382,35 +2904,11 @@
       "zh-hant": "測試截圖",
       "jp": "スクリーンショットテスト"
     },
-    "ProcessingSettings": {
-      "en": "Processing Settings",
-      "zh-hans": "处理设置",
-      "zh-hant": "處理設置",
-      "jp": "処理設定"
-    },
     "ProcessingMode": {
       "en": "Processing Mode",
       "zh-hans": "处理模式",
       "zh-hant": "處理模式",
       "jp": "処理モード"
-    },
-    "ProcessingModeTooltip": {
-      "en": "Choose how to process captured screenshots",
-      "zh-hans": "选择如何处理截取的图片",
-      "zh-hant": "選擇如何處理截取的圖片",
-      "jp": "キャプチャしたスクリーンショットの処理方法を選択"
-    },
-    "ModeNativeMultimodal": {
-      "en": "Native Multimodal (Send to Vision LLM)",
-      "zh-hans": "原生多模态（发送给视觉LLM）",
-      "zh-hant": "原生多模態（發送給視覺LLM）",
-      "jp": "ネイティブマルチモーダル（Vision LLMに送信）"
-    },
-    "ModeOCRApi": {
-      "en": "OCR API (Extract Text)",
-      "zh-hans": "OCR API（提取文字）",
-      "zh-hant": "OCR API（提取文字）",
-      "jp": "OCR API（テキスト抽出）"
     },
     "Mode": {
       "NativeMultimodal": {
@@ -3444,12 +2942,6 @@
       "zh-hant": "截圖後自動發送",
       "jp": "キャプチャ後に自動送信"
     },
-    "AutoSendTooltip": {
-      "en": "Automatically send the screenshot to LLM after capture",
-      "zh-hans": "截图完成后自动发送给LLM",
-      "zh-hant": "截圖完成後自動發送給LLM",
-      "jp": "キャプチャ後に自動的にLLMに送信"
-    },
     "OCRSettings": {
       "en": "OCR Settings",
       "zh-hans": "OCR设置",
@@ -3475,78 +2967,12 @@
         "zh-hant": "API 地址",
         "jp": "API URL"
       },
-      "Language": {
-        "en": "Recognition Language",
-        "zh-hans": "识别语言",
-        "zh-hant": "識別語言",
-        "jp": "認識言語"
-      },
       "Description": {
         "en": "OCR mode reuses the vision nodes configured for Preprocessing Multimodal (or the main chat provider if none configured) to recognize text. Only fill in the API URL and Key below if you need a dedicated OpenAI endpoint instead.",
         "zh-hans": "OCR 模式默认复用「前置多模态」配置的视觉节点（未配置则使用主聊天渠道）识别文字；只有需要接入独立的 OpenAI 接口时，才需要在下方填写 API 地址和 Key",
         "zh-hant": "OCR 模式預設複用「前置多模態」配置的視覺節點（未配置則使用主聊天管道）識別文字；僅當你需要接入獨立的 OpenAI 介面時，才需要在下方填寫 API 位址和 Key",
         "jp": "OCRモードはデフォルトで「前置マルチモーダル」に設定されたビジョンノード（未設定の場合はメインチャットプロバイダー）を再利用してテキストを認識します。専用のOpenAIエンドポイントが必要な場合のみ、下記にAPI URLとKeyを入力してください"
       }
-    },
-    "OCRProvider": {
-      "en": "OCR Provider",
-      "zh-hans": "OCR提供商",
-      "zh-hant": "OCR提供商",
-      "jp": "OCRプロバイダー"
-    },
-    "OCRApiKey": {
-      "en": "API Key",
-      "zh-hans": "API Key",
-      "zh-hant": "API Key",
-      "jp": "APIキー"
-    },
-    "OCRBaseUrl": {
-      "en": "API URL",
-      "zh-hans": "API 地址",
-      "zh-hant": "API 地址",
-      "jp": "API URL"
-    },
-    "OCRLanguage": {
-      "en": "Recognition Language",
-      "zh-hans": "识别语言",
-      "zh-hant": "識別語言",
-      "jp": "認識言語"
-    },
-    "OCRLanguageAuto": {
-      "en": "Auto Detect",
-      "zh-hans": "自动检测",
-      "zh-hant": "自動檢測",
-      "jp": "自動検出"
-    },
-    "VisionSettings": {
-      "en": "Vision Capability",
-      "zh-hans": "视觉能力",
-      "zh-hant": "視覺能力",
-      "jp": "ビジョン機能"
-    },
-    "EnableVision": {
-      "en": "Enable Vision",
-      "zh-hans": "启用视觉",
-      "zh-hant": "啟用視覺",
-      "jp": "ビジョンを有効にする"
-    },
-    "EnableVisionTooltip": {
-      "en": "Enable vision capability for this LLM channel to process images",
-      "zh-hans": "为此LLM渠道启用视觉能力以处理图片",
-      "zh-hant": "為此LLM渠道啟用視覺能力以處理圖片",
-      "jp": "このLLMチャネルのビジョン機能を有効にして画像を処理"
-    },
-    "VisionNotSupported": {
-      "en": "Current LLM channel does not support vision. Please enable vision in channel settings or switch to OCR mode.",
-      "zh-hans": "当前LLM渠道不支持视觉功能。请在渠道设置中启用视觉或切换到OCR模式。",
-      "zh-hant": "當前LLM渠道不支持視覺功能。請在渠道設置中啟用視覺或切換到OCR模式。",
-      "jp": "現在のLLMチャネルはビジョンをサポートしていません。チャネル設定でビジョンを有効にするか、OCRモードに切り替えてください。"
-    },
-    "MultimodalSettings": {
-      "en": "Multimodal Settings",
-      "zh-hans": "多模态配置",
-      "zh-hant": "多模態配置",
-      "jp": "マルチモーダル設定"
     },
     "PreprocessingSettings": {
       "en": "Preprocessing Multimodal Settings",
@@ -3597,12 +3023,6 @@
           "jp": "ビジョン対応チャネル"
         }
       },
-      "ProviderTip": {
-        "en": "Free channel requires no configuration; Vision-enabled channels require EnableVision to be enabled in LLM settings",
-        "zh-hans": "Free 渠道无需配置；启用视觉的渠道需要在 LLM 设置中启用 EnableVision",
-        "zh-hant": "Free 渠道無需配置；啟用視覺的渠道需要在 LLM 設置中啟用 EnableVision",
-        "jp": "無料チャネルは設定不要；ビジョン対応チャネルはLLM設定でEnableVisionを有効にする必要があります"
-      },
       "FreeProviderTip": {
         "en": "Using Free channel requires enabling EnableVision in LLM Settings -> Free Interface",
         "zh-hans": "使用 Free 渠道需要在 LLM 设置 -> Free 接口 中启用 EnableVision 选项",
@@ -3644,18 +3064,6 @@
         "zh-hans": "选择多个节点时将随机选择一个进行请求，失败时自动切换到其他节点",
         "zh-hant": "選擇多個節點時將隨機選擇一個進行請求，失敗時自動切換到其他節點",
         "jp": "複数のノードを選択すると、リクエストごとにランダムに1つが選択されます。失敗した場合は自動的に別のノードが試行されます。"
-      },
-      "ImagePrompt": {
-        "en": "Image Description Prompt",
-        "zh-hans": "图片描述提示词",
-        "zh-hant": "圖片描述提示詞",
-        "jp": "画像説明プロンプト"
-      },
-      "ImagePromptTip": {
-        "en": "This prompt is built-in and cannot be modified",
-        "zh-hans": "此提示词由系统内置，不可修改",
-        "zh-hant": "此提示詞由系統內置，不可修改",
-        "jp": "このプロンプトはシステム内蔵で、変更できません"
       }
     },
     "SupportedModels": {
@@ -3663,92 +3071,6 @@
       "zh-hans": "支持的模型",
       "zh-hant": "支持的模型",
       "jp": "サポートされているモデル"
-    },
-    "CaptureWindow": {
-      "Title": {
-        "en": "Screenshot Capture - Press Enter to confirm, Escape to cancel",
-        "zh-hans": "截图捕获 - 按Enter确认，Escape取消",
-        "zh-hant": "截圖捕獲 - 按Enter確認，Escape取消",
-        "jp": "スクリーンショットキャプチャ - Enterで確認、Escapeでキャンセル"
-      },
-      "SelectRegion": {
-        "en": "Drag to select region",
-        "zh-hans": "拖动选择区域",
-        "zh-hant": "拖動選擇區域",
-        "jp": "ドラッグして領域を選択"
-      }
-    },
-    "Status": {
-      "Idle": {
-        "en": "Ready",
-        "zh-hans": "就绪",
-        "zh-hant": "就緒",
-        "jp": "準備完了"
-      },
-      "Capturing": {
-        "en": "Capturing...",
-        "zh-hans": "截图中...",
-        "zh-hant": "截圖中...",
-        "jp": "キャプチャ中..."
-      },
-      "Processing": {
-        "en": "Processing...",
-        "zh-hans": "处理中...",
-        "zh-hant": "處理中...",
-        "jp": "処理中..."
-      }
-    },
-    "Error": {
-      "CaptureFailedTitle": {
-        "en": "Screenshot Failed",
-        "zh-hans": "截图失败",
-        "zh-hant": "截圖失敗",
-        "jp": "スクリーンショット失敗"
-      },
-      "CaptureFailedMessage": {
-        "en": "Failed to capture screenshot. Please try again.",
-        "zh-hans": "截图失败，请重试。",
-        "zh-hant": "截圖失敗，請重試。",
-        "jp": "スクリーンショットのキャプチャに失敗しました。もう一度お試しください。"
-      },
-      "OCRFailedTitle": {
-        "en": "OCR Failed",
-        "zh-hans": "OCR失败",
-        "zh-hant": "OCR失敗",
-        "jp": "OCR失敗"
-      },
-      "OCRFailedMessage": {
-        "en": "Failed to extract text from image. Please check OCR settings.",
-        "zh-hans": "从图片提取文字失败，请检查OCR设置。",
-        "zh-hant": "從圖片提取文字失敗，請檢查OCR設置。",
-        "jp": "画像からテキストを抽出できませんでした。OCR設定を確認してください。"
-      },
-      "NoTextDetected": {
-        "en": "No text detected in the image.",
-        "zh-hans": "未在图片中检测到文字。",
-        "zh-hant": "未在圖片中檢測到文字。",
-        "jp": "画像内にテキストが検出されませんでした。"
-      },
-      "HotkeyRegistrationFailed": {
-        "en": "Failed to register screenshot hotkey. The key combination may be in use by another application.",
-        "zh-hans": "截图快捷键注册失败，该组合键可能被其他程序占用。",
-        "zh-hant": "截圖快捷鍵註冊失敗，該組合鍵可能被其他程序佔用。",
-        "jp": "スクリーンショットホットキーの登録に失敗しました。キーの組み合わせが他のアプリケーションで使用されている可能性があります。"
-      }
-    },
-    "Success": {
-      "OCRComplete": {
-        "en": "Text extracted successfully",
-        "zh-hans": "文字提取成功",
-        "zh-hant": "文字提取成功",
-        "jp": "テキスト抽出成功"
-      },
-      "ImageAttached": {
-        "en": "Screenshot attached to message",
-        "zh-hans": "截图已附加到消息",
-        "zh-hant": "截圖已附加到消息",
-        "jp": "スクリーンショットがメッセージに添付されました"
-      }
     },
     "Editor": {
       "Title": {
@@ -4550,6 +3872,12 @@
       "zh-hant": "未配置",
       "jp": "未設定"
     },
+    "RecSectionTitle": {
+      "en": "Recommended Settings",
+      "zh-hans": "推荐设置调整",
+      "zh-hant": "推薦設置調整",
+      "jp": "推奨設定"
+    },
     "RecApplyAll": {
       "en": "Apply All",
       "zh-hans": "全部应用",
@@ -4562,23 +3890,239 @@
       "zh-hant": "忽略",
       "jp": "無視"
     },
-    "RecSectionTitle": {
-      "en": "Recommended Settings",
-      "zh-hans": "推荐设置调整",
-      "zh-hant": "推薦設置調整",
-      "jp": "推奨設定"
-    },
     "CurrentPrefix": {
       "en": "Current: ",
       "zh-hans": "当前: ",
       "zh-hant": "當前: ",
       "jp": "現在: "
     },
-    "SuggestPrefix": {
-      "en": "Suggested: ",
+    "ValueNotSet": {
+      "en": "Not set",
+      "zh-hans": "未设置",
+      "zh-hant": "未設置",
+      "jp": "未設定"
+    },
+    "RecCount": {
+      "en": "({0} critical, {1} suggested)",
+      "zh-hans": "({0} 项关键, {1} 项建议)",
+      "zh-hant": "({0} 項關鍵, {1} 項建議)",
+      "jp": "(重要 {0} 件, 推奨 {1} 件)"
+    },
+    "UiWindowTitle": {
+      "en": "Diagnostic Results",
+      "zh-hans": "运行诊断结果",
+      "zh-hant": "運行診斷結果",
+      "jp": "診断結果"
+    },
+    "UiWindowHint": {
+      "en": "You can test LLM responses or apply the recommended settings",
+      "zh-hans": "可选择测试 LLM 或应用推荐设置",
+      "zh-hant": "可選擇測試 LLM 或應用推薦設置",
+      "jp": "LLM のテスト、または推奨設定の適用を選べます"
+    },
+    "UiProxyWindowTitle": {
+      "en": "Proxy Optimization Suggestions",
+      "zh-hans": "代理自动优化建议",
+      "zh-hant": "代理自動優化建議",
+      "jp": "プロキシ最適化の提案"
+    },
+    "UiSectionNetwork": {
+      "en": "Network Connectivity",
+      "zh-hans": "网络连通性",
+      "zh-hant": "網絡連通性",
+      "jp": "ネットワーク接続"
+    },
+    "UiSectionProxy": {
+      "en": "Proxy Connection",
+      "zh-hans": "代理连接",
+      "zh-hant": "代理連接",
+      "jp": "プロキシ接続"
+    },
+    "UiSectionPluginStore": {
+      "en": "Plugin Store",
+      "zh-hans": "插件商店",
+      "zh-hant": "插件商店",
+      "jp": "プラグインストア"
+    },
+    "UiSectionTTS": {
+      "en": "Text to Speech (TTS)",
+      "zh-hans": "语音合成 (TTS)",
+      "zh-hant": "語音合成 (TTS)",
+      "jp": "音声合成 (TTS)"
+    },
+    "UiChannelAddress": {
+      "en": "Address: ",
+      "zh-hans": "地址: ",
+      "zh-hant": "地址: ",
+      "jp": "アドレス: "
+    },
+    "UiChannelDirect": {
+      "en": "Direct: ",
+      "zh-hans": "直连: ",
+      "zh-hant": "直連: ",
+      "jp": "直接: "
+    },
+    "UiChannelProxy": {
+      "en": "Proxy: ",
+      "zh-hans": "代理: ",
+      "zh-hant": "代理: ",
+      "jp": "プロキシ: "
+    },
+    "UiShowDetail": {
+      "en": "View detailed report",
+      "zh-hans": "查看详细文本报告",
+      "zh-hant": "查看詳細文本報告",
+      "jp": "詳細レポートを表示"
+    },
+    "UiHideDetail": {
+      "en": "Collapse detailed report",
+      "zh-hans": "收起详细文本报告",
+      "zh-hant": "收起詳細文本報告",
+      "jp": "詳細レポートを閉じる"
+    },
+    "UiConfirmOk": {
+      "en": "OK",
+      "zh-hans": "确定",
+      "zh-hant": "確定",
+      "jp": "OK"
+    },
+    "UiTestLLM": {
+      "en": "Test LLM Response",
+      "zh-hans": "测试 LLM 响应",
+      "zh-hant": "測試 LLM 響應",
+      "jp": "LLM 応答をテスト"
+    },
+    "UiApplyRecs": {
+      "en": "Apply Recommendations",
+      "zh-hans": "应用推荐设置",
+      "zh-hant": "應用推薦設置",
+      "jp": "推奨設定を適用"
+    },
+    "UiOpenSettings": {
+      "en": "Open Settings",
+      "zh-hans": "打开设置",
+      "zh-hant": "打開設置",
+      "jp": "設定を開く"
+    },
+    "UiClose": {
+      "en": "Close",
+      "zh-hans": "关闭",
+      "zh-hant": "關閉",
+      "jp": "閉じる"
+    },
+    "UiOverallOk": {
+      "en": "All OK",
+      "zh-hans": "全部正常",
+      "zh-hant": "全部正常",
+      "jp": "すべて正常"
+    },
+    "UiOverallNetworkFail": {
+      "en": "Network Error",
+      "zh-hans": "网络异常",
+      "zh-hant": "網絡異常",
+      "jp": "ネットワーク異常"
+    },
+    "UiOverallPartial": {
+      "en": "Partial Issues",
+      "zh-hans": "部分异常",
+      "zh-hant": "部分異常",
+      "jp": "一部に問題"
+    },
+    "UiNetworkPingOk": {
+      "en": "Ping 8.8.8.8 / 1.1.1.1 - OK",
+      "zh-hans": "Ping 8.8.8.8 / 1.1.1.1 - 成功",
+      "zh-hant": "Ping 8.8.8.8 / 1.1.1.1 - 成功",
+      "jp": "Ping 8.8.8.8 / 1.1.1.1 - 成功"
+    },
+    "UiNetworkHttpOk": {
+      "en": "HTTP access test - OK",
+      "zh-hans": "HTTP 访问测试 - 成功",
+      "zh-hant": "HTTP 訪問測試 - 成功",
+      "jp": "HTTP アクセステスト - 成功"
+    },
+    "UiNetworkUnreachable": {
+      "en": "Network unreachable, please check your network settings",
+      "zh-hans": "网络不可达，请检查网络设置",
+      "zh-hant": "網絡不可達，請檢查網絡設置",
+      "jp": "ネットワークに到達できません。ネットワーク設定を確認してください"
+    },
+    "UiProxySkipped": {
+      "en": "Proxy disabled, check skipped",
+      "zh-hans": "代理未启用，跳过检查",
+      "zh-hant": "代理未啟用，跳過檢查",
+      "jp": "プロキシ無効のため検査をスキップ"
+    },
+    "UiProxyAvailable": {
+      "en": "Proxy OK: ",
+      "zh-hans": "代理可用: ",
+      "zh-hant": "代理可用: ",
+      "jp": "プロキシ利用可: "
+    },
+    "UiProxyUnavailable": {
+      "en": "Proxy failed: ",
+      "zh-hans": "代理不可用: ",
+      "zh-hant": "代理不可用: ",
+      "jp": "プロキシ利用不可: "
+    },
+    "UiModelsAvailable": {
+      "en": "{0} models available",
+      "zh-hans": "可用模型: {0} 个",
+      "zh-hant": "可用模型: {0} 個",
+      "jp": "利用可能なモデル: {0} 件"
+    },
+    "UiConnected": {
+      "en": "Connected",
+      "zh-hans": "已连接",
+      "zh-hant": "已連接",
+      "jp": "接続済み"
+    },
+    "UiDisabled": {
+      "en": "Disabled",
+      "zh-hans": "未启用",
+      "zh-hant": "未啟用",
+      "jp": "無効"
+    },
+    "UiSuccess": {
+      "en": "OK",
+      "zh-hans": "成功",
+      "zh-hant": "成功",
+      "jp": "成功"
+    },
+    "UiFailedPrefix": {
+      "en": "Failed: ",
+      "zh-hans": "失败: ",
+      "zh-hant": "失敗: ",
+      "jp": "失敗: "
+    },
+    "UiLlmOk": {
+      "en": "LLM: OK",
+      "zh-hans": "LLM: 正常",
+      "zh-hant": "LLM: 正常",
+      "jp": "LLM: 正常"
+    },
+    "UiLlmNoResponse": {
+      "en": "LLM: no response",
+      "zh-hans": "LLM: 无响应",
+      "zh-hant": "LLM: 無響應",
+      "jp": "LLM: 応答なし"
+    },
+    "UiStoreRecPrefix": {
+      "en": "Suggestion: ",
       "zh-hans": "建议: ",
       "zh-hant": "建議: ",
-      "jp": "推奨: "
+      "jp": "提案: "
+    },
+    "UiTtsProvider": {
+      "en": "Provider: ",
+      "zh-hans": "提供商: ",
+      "zh-hant": "提供商: ",
+      "jp": "プロバイダ: "
+    },
+    "UiTtsEndpoint": {
+      "en": "Endpoint: ",
+      "zh-hans": "端点: ",
+      "zh-hant": "端點: ",
+      "jp": "エンドポイント: "
     }
   },
   "UpdateNotice": {

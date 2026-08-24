@@ -8986,11 +8986,11 @@ namespace VPetLLM.UI.Windows
                     if (btn != null) btn.IsEnabled = true;
                     if (statusText != null) statusText.Text = LanguageHelper.Get("Advanced_Options.DiagnosticComplete", lang) ?? "诊断完成";
 
-                    var title = lang.StartsWith("zh") ? "运行诊断结果" : "Diagnostic Results";
+                    var title = LanguageHelper.Get("Diagnostic.UiWindowTitle", lang, "运行诊断结果");
                     UI.Windows.winDiagnosticReport? diagWindow = null;
                     diagWindow = new UI.Windows.winDiagnosticReport(
                         title, result, report,
-                        lang.StartsWith("zh") ? "可选择测试LLM或应用推荐设置" : "You can test LLM or apply recommended settings",
+                        LanguageHelper.Get("Diagnostic.UiWindowHint", lang, "可选择测试 LLM 或应用推荐设置"),
                         onTestLLM: async () =>
                         {
                             diagWindow!.ShowProgress(lang.StartsWith("zh") ? "正在测试各渠道 LLM 响应..." : "Testing channel LLM responses...");

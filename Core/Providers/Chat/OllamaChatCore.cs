@@ -39,6 +39,13 @@ namespace VPetLLM.Core.Providers.Chat
         /// </summary>
         protected override Setting.ChannelProxyMode GetChannelProxyMode()
         {
+            // 注意：本方法可能在**基类构造函数**执行期间被调到
+            // （ChatCoreBase ctor → CreateEmbeddingService → NewEmbeddingHttpClient →
+            //  CreateHttpClientHandler → GetProxy → 本虚方法），
+            // 那时派生类的 _xxxSetting 还没赋值（派生 ctor 体在 base(...) 之后才跑）。
+            // 所以这里必须容忍字段为 null，否则整个 EmbeddingService 会被一个 NRE 静默干掉。
+            if (_ollamaSetting is null) return Setting.ChannelProxyMode.FollowDefault;
+
             var node = _ollamaSetting.OllamaNodes.Count == 1
                 ? _ollamaSetting.OllamaNodes[0]
                 : _ollamaSetting.GetCurrentOllamaSetting();

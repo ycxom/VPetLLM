@@ -34,14 +34,17 @@ namespace VPetLLM.Utils.Localization
         /// <summary>
         /// 通过索引器获取本地化文本，供 Binding 使用：Path="[{key}]"
         /// </summary>
-        public string this[string key]
+        /// <summary>取词条；缺失时返回 null，让绑定的 TargetNullValue（XAML 的 Default=）接手。</summary>
+        public string? this[string key]
         {
             get
             {
                 if (string.IsNullOrWhiteSpace(key))
-                    return $"[{key}]";
-                // 使用现有 LanguageHelper 取值；若无则返回 null 交由 TargetNullValue/FallbackValue 处理
-                return LanguageHelper.Get(key, LangCode, null);
+                    return null;
+                // 缺词条时必须返回 null，绑定的 TargetNullValue/FallbackValue（即 XAML 里的
+                // Default=）才会接手。用 LanguageHelper.Get 会拿到 "[key]" 占位串，
+                // 那是非 null 的，兜底就永远不生效了。
+                return LanguageHelper.GetOrNull(key, LangCode);
             }
         }
 

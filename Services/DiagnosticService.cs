@@ -1860,8 +1860,11 @@ namespace VPetLLM.Services
         {
             try
             {
-                var text = Utils.Localization.LanguageHelper.Get(key, _language);
-                if (!string.IsNullOrEmpty(text) && text != key)
+                // 用 GetOrNull：Get 在缺词条时返回的是 "[key]"，而下面那句原本比的是 key 本身，
+                // "[Diagnostic.Xxx]" != "Diagnostic.Xxx" 恒成立 —— 于是占位串被当成有效译文返回，
+                // 后面那张几十条的兜底表一次也走不到。
+                var text = Utils.Localization.LanguageHelper.GetOrNull(key, _language);
+                if (!string.IsNullOrEmpty(text))
                     return text;
             }
             catch { }

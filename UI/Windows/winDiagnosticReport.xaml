@@ -155,7 +155,7 @@
                         </Grid.RowDefinitions>
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
                             <Border x:Name="DotNetwork" Style="{StaticResource StatusIndicator}"/>
-                            <TextBlock Text="网络连通性" Style="{StaticResource CardTitle}"/>
+                            <TextBlock x:Name="TxtSectionNetwork" Text="网络连通性" Style="{StaticResource CardTitle}"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Margin="4,0,0,0">
                             <TextBlock x:Name="TxtNetworkPing" Style="{StaticResource CardSubtitle}" Margin="0,0,0,2"/>
@@ -173,7 +173,7 @@
                         </Grid.RowDefinitions>
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
                             <Border x:Name="DotProxy" Style="{StaticResource StatusIndicator}"/>
-                            <TextBlock Text="代理连接" Style="{StaticResource CardTitle}"/>
+                            <TextBlock x:Name="TxtSectionProxy" Text="代理连接" Style="{StaticResource CardTitle}"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Margin="4,0,0,0">
                             <TextBlock x:Name="TxtProxyStatus" Style="{StaticResource CardSubtitle}"/>
@@ -207,20 +207,20 @@
                                                    Text="{Binding ChannelName}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="4,0,0,2">
-                                        <TextBlock FontSize="11" Foreground="#8A8886" Text="地址: "/>
+                                        <TextBlock FontSize="11" Foreground="#8A8886" Text="{Binding AddressLabel}"/>
                                         <TextBlock FontSize="11" Foreground="#605E5C"
                                                    Text="{Binding ApiUrl}" TextTrimming="CharacterEllipsis"
                                                    MaxWidth="400"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="4,0,0,0">
-                                        <TextBlock FontSize="11" Foreground="#8A8886" Text="直连: "/>
+                                        <TextBlock FontSize="11" Foreground="#8A8886" Text="{Binding DirectLabel}"/>
                                         <TextBlock FontSize="11" Foreground="#107C10"
                                                    Text="{Binding DirectStatus}" Margin="0,0,12,0"
                                                    Visibility="{Binding HasDirectTest}"/>
                                         <TextBlock FontSize="11" Foreground="#D13438"
                                                    Text="{Binding DirectStatus}" Margin="0,0,12,0"
                                                    Visibility="{Binding HasDirectFail}"/>
-                                        <TextBlock FontSize="11" Foreground="#8A8886" Text="代理: "/>
+                                        <TextBlock FontSize="11" Foreground="#8A8886" Text="{Binding ProxyLabel}"/>
                                         <TextBlock FontSize="11" Foreground="#107C10"
                                                    Text="{Binding ProxyStatus}" Margin="0,0,12,0"
                                                    Visibility="{Binding HasProxyTest}"/>
@@ -249,7 +249,7 @@
                         </Grid.RowDefinitions>
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
                             <Border x:Name="DotStore" Style="{StaticResource StatusIndicator}"/>
-                            <TextBlock Text="插件商店" Style="{StaticResource CardTitle}"/>
+                            <TextBlock x:Name="TxtSectionPluginStore" Text="插件商店" Style="{StaticResource CardTitle}"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Margin="4,0,0,0">
                             <TextBlock x:Name="TxtStoreUrl" Style="{StaticResource CardSubtitle}" Margin="0,0,0,2"/>
@@ -271,7 +271,7 @@
                         </Grid.RowDefinitions>
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
                             <Border x:Name="DotTTS" Style="{StaticResource StatusIndicator}"/>
-                            <TextBlock Text="语音合成 (TTS)" Style="{StaticResource CardTitle}"/>
+                            <TextBlock x:Name="TxtSectionTTS" Text="语音合成 (TTS)" Style="{StaticResource CardTitle}"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Margin="4,0,0,0">
                             <TextBlock x:Name="TxtTTSMain" Style="{StaticResource CardSubtitle}" Margin="0,0,0,2"/>

@@ -98,8 +98,11 @@ namespace VPetLLM.Core.Providers.Chat
                 return _currentNodeContext;
             }
 
-            // 使用集中式节点选择逻辑
-            var node = _openAISetting.GetCurrentOpenAISetting(purpose);
+            // 使用集中式节点选择逻辑。
+            // _openAISetting 可能为 null：基类构造函数会经 GetChannelProxyMode 调到这里，
+            // 而派生 ctor 体在 base(...) 之后才跑。不容忍 null 会让 EmbeddingService
+            // 被一个 NRE 静默干掉（向量检索整条路就此失效，且日志只有一句"未将对象引用..."）。
+            var node = _openAISetting?.GetCurrentOpenAISetting(purpose);
             if (node is not null)
             {
                 // 缓存本次选中的节点，供同一请求中后续调用复用

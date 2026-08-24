@@ -17,6 +17,13 @@ namespace VPetLLM.UI.Windows
         public string ProxyStatus { get; set; } = "";
         public string ModelCount { get; set; } = "";
         public string LLMStatus { get; set; } = "";
+
+        // 卡片模板里的三个前缀标签。DataTemplate 内的元素拿不到 x:Name（每张卡一份），
+        // 所以本地化只能随数据一起传进来。
+        public string AddressLabel { get; set; } = "";
+        public string DirectLabel { get; set; } = "";
+        public string ProxyLabel { get; set; } = "";
+
         public Brush StatusColor { get; set; } = new SolidColorBrush(Color.FromRgb(0xA1, 0x9F, 0x9D));
         public Visibility HasDirectTest { get; set; } = Visibility.Collapsed;
         public Visibility HasDirectFail { get; set; } = Visibility.Collapsed;
@@ -82,7 +89,7 @@ namespace VPetLLM.UI.Windows
 
             TxtDetailReport.Text = report;
             TxtDetailReport.Visibility = Visibility.Visible;
-            BtnToggleDetails.Content = "▼ 收起详细文本报告";
+            BtnToggleDetails.Content = "▼ " + L("Diagnostic.UiHideDetail", "收起详细文本报告", UiLanguage);
             BtnToggleDetails.IsEnabled = false;
 
             CardNetwork.Visibility = Visibility.Collapsed;
@@ -94,9 +101,38 @@ namespace VPetLLM.UI.Windows
             BorderOverall.Visibility = Visibility.Collapsed;
         }
 
+        /// <summary>
+        /// 刷新窗口自身的静态文案。XAML 里写的是中文占位，真正的取值在这里 ——
+        /// 这个窗口不用 {utils:Localize}：那条路依赖 LocalizationService.LangCode 的
+        /// 生命周期，而本窗口可能在设置窗口从未打开过时被唤起，直接读设置更稳。
+        /// </summary>
+        private void ApplyStaticLocalization()
+        {
+            var lang = UiLanguage;
+
+            TxtSectionNetwork.Text = L("Diagnostic.UiSectionNetwork", "网络连通性", lang);
+            TxtSectionProxy.Text = L("Diagnostic.UiSectionProxy", "代理连接", lang);
+            TxtChannelSection.Text = L("Diagnostic.SectionChannels", "API 渠道", lang);
+            TxtSectionPluginStore.Text = L("Diagnostic.UiSectionPluginStore", "插件商店", lang);
+            TxtSectionTTS.Text = L("Diagnostic.UiSectionTTS", "语音合成 (TTS)", lang);
+
+            BtnToggleDetails.Content = "▶ " + L("Diagnostic.UiShowDetail", "查看详细文本报告", lang);
+
+            BtnConfirmNo.Content = L("Diagnostic.No", "否", lang);
+            BtnConfirmYes.Content = L("Diagnostic.Yes", "是", lang);
+            BtnConfirmOk.Content = L("Diagnostic.UiConfirmOk", "确定", lang);
+
+            BtnTestLLM.Content = L("Diagnostic.UiTestLLM", "测试 LLM 响应", lang);
+            BtnApplyRecs.Content = L("Diagnostic.UiApplyRecs", "应用推荐设置", lang);
+            BtnOpenSettings.Content = L("Diagnostic.UiOpenSettings", "打开设置", lang);
+            BtnClose.Content = L("Diagnostic.UiClose", "关闭", lang);
+        }
+
         private void InitCommon(string title, string status,
             Action? onTestLLM, Action? onApplyRecommendations, Action? onOpenSettings)
         {
+            ApplyStaticLocalization();
+
             TxtTitle.Text = title;
             if (!string.IsNullOrEmpty(status))
                 TxtStatus.Text = status;
@@ -165,19 +201,19 @@ namespace VPetLLM.UI.Windows
 
             if (allOk && result.AllPassed)
             {
-                TxtOverallStatus.Text = "全部正常";
+                TxtOverallStatus.Text = L("Diagnostic.UiOverallOk", "全部正常", UiLanguage);
                 BorderOverall.Background = new SolidColorBrush(Color.FromRgb(0xE8, 0xF5, 0xE9));
                 TxtOverallStatus.Foreground = GreenBrush;
             }
             else if (networkFail)
             {
-                TxtOverallStatus.Text = "网络异常";
+                TxtOverallStatus.Text = L("Diagnostic.UiOverallNetworkFail", "网络异常", UiLanguage);
                 BorderOverall.Background = new SolidColorBrush(Color.FromRgb(0xFD, 0xEC, 0xEA));
                 TxtOverallStatus.Foreground = RedBrush;
             }
             else
             {
-                TxtOverallStatus.Text = "部分异常";
+                TxtOverallStatus.Text = L("Diagnostic.UiOverallPartial", "部分异常", UiLanguage);
                 BorderOverall.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xF4, 0xE5));
                 TxtOverallStatus.Foreground = OrangeBrush;
             }
@@ -188,14 +224,14 @@ namespace VPetLLM.UI.Windows
             if (result.NetworkConnectivityOk)
             {
                 DotNetwork.Background = GreenBrush;
-                TxtNetworkPing.Text = "Ping 8.8.8.8 / 1.1.1.1 - 成功";
-                TxtNetworkHttp.Text = "HTTP 访问测试 - 成功";
+                TxtNetworkPing.Text = L("Diagnostic.UiNetworkPingOk", "Ping 8.8.8.8 / 1.1.1.1 - 成功", UiLanguage);
+                TxtNetworkHttp.Text = L("Diagnostic.UiNetworkHttpOk", "HTTP 访问测试 - 成功", UiLanguage);
             }
             else
             {
                 DotNetwork.Background = RedBrush;
                 TxtNetworkPing.Text = result.NetworkDetails;
-                TxtNetworkHttp.Text = "网络不可达，请检查网络设置";
+                TxtNetworkHttp.Text = L("Diagnostic.UiNetworkUnreachable", "网络不可达，请检查网络设置", UiLanguage);
             }
         }
 
@@ -204,24 +240,25 @@ namespace VPetLLM.UI.Windows
             if (!result.ProxyEnabled)
             {
                 DotProxy.Background = GrayBrush;
-                TxtProxyStatus.Text = "代理未启用，跳过检查";
+                TxtProxyStatus.Text = L("Diagnostic.UiProxySkipped", "代理未启用，跳过检查", UiLanguage);
                 return;
             }
 
             if (result.ProxyOk)
             {
                 DotProxy.Background = GreenBrush;
-                TxtProxyStatus.Text = "代理可用: " + result.ProxyDetails;
+                TxtProxyStatus.Text = L("Diagnostic.UiProxyAvailable", "代理可用: ", UiLanguage) + result.ProxyDetails;
             }
             else
             {
                 DotProxy.Background = RedBrush;
-                TxtProxyStatus.Text = "代理不可用: " + result.ProxyDetails;
+                TxtProxyStatus.Text = L("Diagnostic.UiProxyUnavailable", "代理不可用: ", UiLanguage) + result.ProxyDetails;
             }
         }
 
         private void RenderChannelCards(DiagnosticResult result)
         {
+            var lang = UiLanguage;
             var cards = new List<ChannelCardViewModel>();
 
             foreach (var cr in result.ChannelResults)
@@ -230,20 +267,24 @@ namespace VPetLLM.UI.Windows
                 {
                     ChannelType = cr.ChannelType,
                     ChannelName = cr.ChannelName,
-                    ApiUrl = cr.ApiUrl
+                    ApiUrl = cr.ApiUrl,
+                    AddressLabel = L("Diagnostic.UiChannelAddress", "地址: ", lang),
+                    DirectLabel = L("Diagnostic.UiChannelDirect", "直连: ", lang),
+                    ProxyLabel = L("Diagnostic.UiChannelProxy", "代理: ", lang)
                 };
 
                 if (cr.ApiAvailable)
                 {
                     vm.StatusColor = GreenBrush;
                     vm.ModelCount = cr.AvailableModels.Count > 0
-                        ? $"可用模型: {cr.AvailableModels.Count} 个"
-                        : "已连接";
+                        ? string.Format(L("Diagnostic.UiModelsAvailable", "可用模型: {0} 个", lang),
+                                        cr.AvailableModels.Count)
+                        : L("Diagnostic.UiConnected", "已连接", lang);
                 }
                 else if (!cr.Enabled)
                 {
                     vm.StatusColor = GrayBrush;
-                    vm.ModelCount = "未启用";
+                    vm.ModelCount = L("Diagnostic.UiDisabled", "未启用", lang);
                 }
                 else
                 {
@@ -255,13 +296,13 @@ namespace VPetLLM.UI.Windows
                 {
                     if (cr.DirectOk)
                     {
-                        vm.DirectStatus = "成功";
+                        vm.DirectStatus = L("Diagnostic.UiSuccess", "成功", lang);
                         vm.HasDirectTest = Visibility.Visible;
                         vm.HasDirectFail = Visibility.Collapsed;
                     }
                     else
                     {
-                        vm.DirectStatus = "失败: " + Truncate(cr.DirectMessage, 60);
+                        vm.DirectStatus = L("Diagnostic.UiFailedPrefix", "失败: ", lang) + Truncate(cr.DirectMessage, 60);
                         vm.HasDirectTest = Visibility.Collapsed;
                         vm.HasDirectFail = Visibility.Visible;
                     }
@@ -271,13 +312,13 @@ namespace VPetLLM.UI.Windows
                 {
                     if (cr.ProxyConnectionOk)
                     {
-                        vm.ProxyStatus = "成功";
+                        vm.ProxyStatus = L("Diagnostic.UiSuccess", "成功", lang);
                         vm.HasProxyTest = Visibility.Visible;
                         vm.HasProxyFail = Visibility.Collapsed;
                     }
                     else
                     {
-                        vm.ProxyStatus = "失败: " + Truncate(cr.ProxyConnectionMessage, 60);
+                        vm.ProxyStatus = L("Diagnostic.UiFailedPrefix", "失败: ", lang) + Truncate(cr.ProxyConnectionMessage, 60);
                         vm.HasProxyTest = Visibility.Collapsed;
                         vm.HasProxyFail = Visibility.Visible;
                     }
@@ -285,7 +326,9 @@ namespace VPetLLM.UI.Windows
 
                 if (cr.LlmTested)
                 {
-                    vm.LLMStatus = cr.LlmResponded ? "LLM: 正常" : "LLM: 无响应";
+                    vm.LLMStatus = cr.LlmResponded
+                        ? L("Diagnostic.UiLlmOk", "LLM: 正常", lang)
+                        : L("Diagnostic.UiLlmNoResponse", "LLM: 无响应", lang);
                     vm.HasLLMResult = Visibility.Visible;
                 }
 
@@ -305,6 +348,7 @@ namespace VPetLLM.UI.Windows
 
         private void RenderStoreCard(DiagnosticResult result)
         {
+            var lang = UiLanguage;
             var ps = result.PluginStoreResult;
             if (ps == null)
             {
@@ -312,28 +356,30 @@ namespace VPetLLM.UI.Windows
                 return;
             }
 
-            TxtStoreUrl.Text = "地址: " + ps.StoreUrl;
+            TxtStoreUrl.Text = L("Diagnostic.UiChannelAddress", "地址: ", lang) + ps.StoreUrl;
 
             if (ps.DirectOk)
             {
-                TxtStoreDirect.Text = "直连: 成功";
+                TxtStoreDirect.Text = L("Diagnostic.UiChannelDirect", "直连: ", lang)
+                    + L("Diagnostic.UiSuccess", "成功", lang);
                 TxtStoreDirect.Foreground = GreenBrush;
                 DotStore.Background = GreenBrush;
             }
             else
             {
-                TxtStoreDirect.Text = "直连: " + Truncate(ps.DirectMessage, 50);
+                TxtStoreDirect.Text = L("Diagnostic.UiChannelDirect", "直连: ", lang) + Truncate(ps.DirectMessage, 50);
                 TxtStoreDirect.Foreground = RedBrush;
             }
 
             if (ps.ProxyOk)
             {
-                TxtStoreProxy.Text = "代理: 成功";
+                TxtStoreProxy.Text = L("Diagnostic.UiChannelProxy", "代理: ", lang)
+                    + L("Diagnostic.UiSuccess", "成功", lang);
                 TxtStoreProxy.Foreground = GreenBrush;
             }
             else
             {
-                TxtStoreProxy.Text = "代理: " + Truncate(ps.ProxyMessage, 50);
+                TxtStoreProxy.Text = L("Diagnostic.UiChannelProxy", "代理: ", lang) + Truncate(ps.ProxyMessage, 50);
                 TxtStoreProxy.Foreground = RedBrush;
             }
 
@@ -344,11 +390,12 @@ namespace VPetLLM.UI.Windows
             else
                 DotStore.Background = OrangeBrush;
 
-            TxtStoreRec.Text = "建议: " + ps.Recommendation;
+            TxtStoreRec.Text = L("Diagnostic.UiStoreRecPrefix", "建议: ", lang) + ps.Recommendation;
         }
 
         private void RenderTTSCard(DiagnosticResult result)
         {
+            var lang = UiLanguage;
             var tts = result.TTSResult;
             if (tts == null)
             {
@@ -366,28 +413,30 @@ namespace VPetLLM.UI.Windows
                 return;
             }
 
-            TxtTTSMain.Text = "提供商: " + tts.Provider;
-            TxtTTSEndpoint.Text = "端点: " + tts.Endpoint;
+            TxtTTSMain.Text = L("Diagnostic.UiTtsProvider", "提供商: ", lang) + tts.Provider;
+            TxtTTSEndpoint.Text = L("Diagnostic.UiTtsEndpoint", "端点: ", lang) + tts.Endpoint;
 
             if (tts.DirectOk)
             {
-                TxtTTSDirect.Text = "直连: 成功";
+                TxtTTSDirect.Text = L("Diagnostic.UiChannelDirect", "直连: ", lang)
+                    + L("Diagnostic.UiSuccess", "成功", lang);
                 TxtTTSDirect.Foreground = GreenBrush;
             }
             else
             {
-                TxtTTSDirect.Text = "直连: " + Truncate(tts.DirectMessage, 50);
+                TxtTTSDirect.Text = L("Diagnostic.UiChannelDirect", "直连: ", lang) + Truncate(tts.DirectMessage, 50);
                 TxtTTSDirect.Foreground = RedBrush;
             }
 
             if (tts.ProxyOk)
             {
-                TxtTTSProxy.Text = "代理: 成功";
+                TxtTTSProxy.Text = L("Diagnostic.UiChannelProxy", "代理: ", lang)
+                    + L("Diagnostic.UiSuccess", "成功", lang);
                 TxtTTSProxy.Foreground = GreenBrush;
             }
             else
             {
-                TxtTTSProxy.Text = "代理: " + Truncate(tts.ProxyMessage, 50);
+                TxtTTSProxy.Text = L("Diagnostic.UiChannelProxy", "代理: ", lang) + Truncate(tts.ProxyMessage, 50);
                 TxtTTSProxy.Foreground = RedBrush;
             }
 
@@ -481,16 +530,16 @@ namespace VPetLLM.UI.Windows
             _recommendationsCallback = onResult;
 
             var cards = new List<RecommendationCardViewModel>();
-            var isZh = System.Threading.Thread.CurrentThread.CurrentUICulture.Name.StartsWith("zh");
+            var lang = UiLanguage;
 
             foreach (var rec in recommendations)
             {
                 var vm = new RecommendationCardViewModel
                 {
                     DisplayName = rec.DisplayName,
-                    CurrentLabel = isZh ? "当前: " : "Current: ",
-                    CurrentDisplay = HumanizeValue(rec.CurrentValue, isZh),
-                    RecommendedDisplay = HumanizeValue(rec.RecommendedValue, isZh),
+                    CurrentLabel = L("Diagnostic.CurrentPrefix", "当前: ", lang),
+                    CurrentDisplay = HumanizeValue(rec.CurrentValue, lang),
+                    RecommendedDisplay = HumanizeValue(rec.RecommendedValue, lang),
                     Reason = rec.Reason,
                     CategoryColor = rec.Category == "critical"
                         ? new SolidColorBrush(Color.FromRgb(0xD1, 0x34, 0x38))
@@ -504,12 +553,11 @@ namespace VPetLLM.UI.Windows
 
             var criticalCount = recommendations.Count(r => r.Category == "critical");
             var recCount = recommendations.Count(r => r.Category == "recommended");
-            TxtRecSectionTitle.Text = isZh ? "推荐设置调整" : "Recommended Settings";
-            TxtRecCount.Text = isZh
-                ? $"({criticalCount} 项关键, {recCount} 项建议)"
-                : $"({criticalCount} critical, {recCount} suggested)";
-            BtnRecApplyAll.Content = isZh ? "全部应用" : "Apply All";
-            BtnRecIgnore.Content = isZh ? "忽略" : "Ignore";
+            TxtRecSectionTitle.Text = L("Diagnostic.RecSectionTitle", "推荐设置调整", lang);
+            TxtRecCount.Text = string.Format(
+                L("Diagnostic.RecCount", "({0} 项关键, {1} 项建议)", lang), criticalCount, recCount);
+            BtnRecApplyAll.Content = L("Diagnostic.RecApplyAll", "全部应用", lang);
+            BtnRecIgnore.Content = L("Diagnostic.RecIgnore", "忽略", lang);
 
             SetActionsEnabled(false);
         }
@@ -523,22 +571,38 @@ namespace VPetLLM.UI.Windows
 
         public bool IsRecommendationsVisible => PanelRecommendations.Visibility == Visibility.Visible;
 
-        private static string HumanizeValue(string value, bool isZh)
+        private static string HumanizeValue(string value, string lang)
         {
             if (string.IsNullOrEmpty(value)) return value;
 
             return value.ToLowerInvariant() switch
             {
-                "true" => isZh ? "启用" : "Enabled",
-                "false" => isZh ? "禁用" : "Disabled",
-                "direct" => isZh ? "直连" : "Direct",
-                "forceproxy" => isZh ? "强制代理" : "Force Proxy",
-                "followdefault" => isZh ? "跟随默认" : "Follow Default",
-                "not configured" => isZh ? "未配置" : "Not configured",
-                "not set" => isZh ? "未设置" : "Not set",
+                "true" => L("Diagnostic.ValueEnabled", "启用", lang),
+                "false" => L("Diagnostic.ValueDisabled", "禁用", lang),
+                "direct" => L("Diagnostic.ValueDirect", "直连", lang),
+                "forceproxy" => L("Diagnostic.ValueForceProxy", "强制代理", lang),
+                "followdefault" => L("Diagnostic.ValueFollowDefault", "跟随默认", lang),
+                "not configured" => L("Diagnostic.ValueNotConfigured", "未配置", lang),
+                "not set" => L("Diagnostic.ValueNotSet", "未设置", lang),
                 _ => value
             };
         }
+
+        /// <summary>
+        /// 界面语言。用 VPetLLM 自己的设置，**不是** Thread.CurrentUICulture ——
+        /// 后者是操作系统语言，用户在插件里选了中文却跑在英文系统上时会拿到英文，反之亦然。
+        /// </summary>
+        private static string UiLanguage
+            => global::VPetLLM.VPetLLM.Instance?.Settings?.Language ?? "zh-hans";
+
+        /// <summary>
+        /// 取词条，缺失时回落到中文字面量。
+        /// 刻意要求传**完整键路径**而不是在这里拼 "Diagnostic." 前缀 ——
+        /// 拼出来的键在源码里不是字面量，"哪些词条没人用"的审计就扫不到，
+        /// 清理弃用词条时会被误删。
+        /// </summary>
+        private static string L(string key, string fallback, string lang)
+            => Utils.Localization.LanguageHelper.Get(key, lang, fallback);
 
         public bool IsConfirmVisible => BorderConfirm.Visibility == Visibility.Visible;
 
@@ -613,12 +677,12 @@ namespace VPetLLM.UI.Windows
             if (TxtDetailReport.Visibility == Visibility.Visible)
             {
                 TxtDetailReport.Visibility = Visibility.Collapsed;
-                BtnToggleDetails.Content = "▶ 查看详细文本报告";
+                BtnToggleDetails.Content = "▶ " + L("Diagnostic.UiShowDetail", "查看详细文本报告", UiLanguage);
             }
             else
             {
                 TxtDetailReport.Visibility = Visibility.Visible;
-                BtnToggleDetails.Content = "▼ 收起详细文本报告";
+                BtnToggleDetails.Content = "▼ " + L("Diagnostic.UiHideDetail", "收起详细文本报告", UiLanguage);
             }
         }
 

@@ -412,30 +412,26 @@ namespace VPetLLM.Handlers.UI
             switch (touchType)
             {
                 case TouchType.Head:
-                    key = "TouchArea_Head";
+                    key = "TouchArea.TouchArea_Head";
                     defaultValue = "head";
                     break;
                 case TouchType.Body:
-                    key = "TouchArea_Body";
+                    key = "TouchArea.TouchArea_Body";
                     defaultValue = "body";
                     break;
                 case TouchType.Pinch:
-                    key = "TouchArea_Pinch";
+                    key = "TouchArea.TouchArea_Pinch";
                     defaultValue = "face";
                     break;
                 default:
                     return "unknown";
             }
 
-            var localizedArea = LanguageHelper.Get(key, language);
-
-            // 如果没有找到本地化文本，返回英文默认值
-            if (string.IsNullOrEmpty(localizedArea))
-            {
-                return defaultValue;
-            }
-
-            return localizedArea;
+            // 词条嵌在 TouchArea 节点下，必须走完整路径 —— 早先写成顶层的 "TouchArea_Head"，
+            // SelectToken 取不到，Get 又回落成非空的 "[TouchArea_Head]"，
+            // 于是下面的 IsNullOrEmpty 兜底从来不触发，模型收到的就是那个方括号字面量。
+            // 顺手把 defaultValue 真正传进去，缺词条时才会落到 head/body/face 而不是占位串。
+            return LanguageHelper.Get(key, language, defaultValue);
         }
 
         /// <summary>
