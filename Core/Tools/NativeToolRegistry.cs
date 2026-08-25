@@ -41,6 +41,16 @@ namespace VPetLLM.Core.Tools
                 try
                 {
                     var schema = (plugin as IToolSchemaPlugin)?.GetToolSchema();
+
+                    // 依赖回复渲染会话的插件不进工具表：工具循环跑在会话建立之前，
+                    // 它们必然失败，而模型会把失败当成"再试一次"的信号。
+                    // 它们仍然可以走标记模式 —— 系统提示词里的插件列表不受这里影响。
+                    if (schema?.RequiresReplySession == true)
+                    {
+                        Logger.Log($"NativeToolRegistry: {plugin.Name} 依赖回复会话，不导出为原生工具（仍可用标记调用）");
+                        continue;
+                    }
+
                     if (schema is not null && schema.Forms.Count > 0)
                     {
                         BuildFromSchema(plugin, schema, result, usedNames);

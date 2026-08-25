@@ -106,5 +106,20 @@ namespace VPetLLM.Core.Abstractions.Models
 
         /// <summary>补充说明，渲染在所有签名之后（限制条件、注意事项等）。</summary>
         public string? Remarks { get; init; }
+
+        /// <summary>
+        /// 这个插件的执行依赖"回复渲染会话"（气泡 / TTS 的独占会话），
+        /// 因此**不导出为原生工具**，只走标记模式。
+        ///
+        /// 两种模式下插件的执行时机是不同的：标记模式在模型回复**之后**执行，
+        /// 那时 SmartMessageProcessor 已经建好了独占会话；而原生工具在 LLM 请求
+        /// **过程中**执行，会话还不存在。Sticker 这类要往界面上贴东西的插件
+        /// 在工具循环里拿不到 sessionId，只能直接返回 —— 模型收到空结果会判断
+        /// 失败并原样重试，白跑几轮还把重复调用写进了上下文。
+        ///
+        /// 这类插件的返回值对模型本来也没有信息量（模型要的是"发一个表情"这个
+        /// 副作用，不是一段文本），放进工具表有害无益。
+        /// </summary>
+        public bool RequiresReplySession { get; init; }
     }
 }

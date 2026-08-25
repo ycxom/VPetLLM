@@ -76,8 +76,10 @@ namespace VPetLLM.Core.Tools
 
                 if (string.IsNullOrWhiteSpace(result))
                 {
-                    // 空结果对 function calling 是非法的（必须回一条 tool 消息），给个明确说明
-                    result = "(no output)";
+                    // 空结果对 function calling 是非法的（必须回一条 tool 消息）。
+                    // 措辞要说清这是**成功且终态**：原来那句 "(no output)" 太含糊，
+                    // 模型读成"这次没拿到东西"，会用一模一样的参数再调一遍。
+                    result = "Executed successfully. No text output.";
                 }
 
                 return new NativeToolResult
