@@ -91,6 +91,92 @@ namespace VPetLLM.Core.Tools
             }
         }
 
+        /// <summary>上一次记录过的"工具能力不一致"提示，避免每个请求刷一行。</summary>
+        private static string _lastLoggedNodeWarning = "";
+        private static readonly object NodeWarningGate = new();
+
+        /// <summary>
+        /// 负载均衡开着、但启用中的节点只有一部分打开了 EnableToolCall 时提醒一次。
+        ///
+        /// 这种配置下每个请求走哪条路是**轮询决定的**：轮到带工具的节点就用 function calling
+        /// （且该请求强制非流式），轮到别的就退回标记模式。两种模式都能工作，所以不报错；
+        /// 但表现会时好时坏，排查时极易误判成"功能不稳定"。实测就因为这个白查过一轮。
+        /// </summary>
+        public static string? TakeNodeConsistencyWarning(Setting? settings)
+        {
+            if (settings is null || !settings.EnableNativeToolCall || !settings.EnablePlugin) return null;
+
+            string provider;
+            bool balancing;
+            List<(string Name, bool Tool)> nodes;
+
+            try
+            {
+                switch (settings.Provider)
+                {
+                    case Setting.LLMType.OpenAI:
+                        provider = "OpenAI";
+                        balancing = settings.OpenAI.EnableLoadBalancing;
+                        nodes = settings.OpenAI.OpenAINodes.Where(n => n.Enabled)
+                            .Select(n => (n.Name ?? "", n.EnableToolCall)).ToList();
+                        break;
+                    case Setting.LLMType.Gemini:
+                        provider = "Gemini";
+                        balancing = settings.Gemini.EnableLoadBalancing;
+                        nodes = settings.Gemini.GeminiNodes.Where(n => n.Enabled)
+                            .Select(n => (n.Name ?? "", n.EnableToolCall)).ToList();
+                        break;
+                    case Setting.LLMType.Ollama:
+                        provider = "Ollama";
+                        balancing = settings.Ollama.EnableLoadBalancing;
+                        nodes = settings.Ollama.OllamaNodes.Where(n => n.Enabled)
+                            .Select(n => (n.Name ?? "", n.EnableToolCall)).ToList();
+                        break;
+                    case Setting.LLMType.LMStudio:
+                        provider = "LMStudio";
+                        balancing = settings.LMStudio.EnableLoadBalancing;
+                        nodes = settings.LMStudio.LMStudioNodes.Where(n => n.Enabled)
+                            .Select(n => (n.Name ?? "", n.EnableToolCall)).ToList();
+                        break;
+                    // Free 只有云端下发的单一模型，没有"部分节点带工具"这回事
+                    default:
+                        return null;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+
+            return TakeNodeConsistencyWarning(provider, balancing, nodes);
+        }
+
+        /// <summary>
+        /// 上面那个方法的纯逻辑部分，单独暴露以便直接断言 —— 构造一个真的
+        /// <see cref="Setting"/> 会去碰文件和数据库，不适合放进测试。
+        /// </summary>
+        public static string? TakeNodeConsistencyWarning(
+            string provider, bool balancing, IReadOnlyList<(string Name, bool Tool)> enabledNodes)
+        {
+            // 只有"轮询 + 部分节点带工具"才是问题：单节点或全开/全关都是确定性的
+            if (!balancing || enabledNodes.Count < 2) return null;
+
+            var without = enabledNodes.Where(n => !n.Tool).Select(n => n.Name)
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+            var withCount = enabledNodes.Count - without.Count;
+            if (withCount == 0 || without.Count == 0) return null;
+
+            var signature = $"{provider}|{withCount}|{string.Join(",", without)}";
+            lock (NodeWarningGate)
+            {
+                if (signature == _lastLoggedNodeWarning) return null;
+                _lastLoggedNodeWarning = signature;
+            }
+
+            return $"NativeToolSession: {provider} 开着负载均衡，{enabledNodes.Count} 个启用节点里只有 {withCount} 个打开了原生工具调用；" +
+                   $"轮到 {string.Join("、", without)} 时会退回标记模式（功能正常，但行为逐请求不同，排查时容易误判）";
+        }
+
         #region 请求侧：把工具声明挂到 payload 上
 
         /// <summary>OpenAI / Ollama / LMStudio 的 chat completions 格式。</summary>

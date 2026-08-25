@@ -28,11 +28,19 @@ namespace VPetLLM.Core.Tools
 
         private const int MaxNameLength = 64;
 
+        /// <summary>
+        /// 上一次记录过的"被排除的插件"名单。工具表**每个请求都会重建一次**，
+        /// 无条件打日志等于往 Debug.log 里按请求数灌重复行。只在名单变化时说话。
+        /// </summary>
+        private static string _lastLoggedExclusions = "";
+        private static readonly object ExclusionLogGate = new();
+
         /// <summary>构建当前所有可用工具。</summary>
         public static IReadOnlyList<NativeToolDefinition> Build(IEnumerable<HostPlugin> plugins)
         {
             var result = new List<NativeToolDefinition>();
             var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var excluded = new List<string>();
 
             foreach (var plugin in plugins)
             {
@@ -47,7 +55,7 @@ namespace VPetLLM.Core.Tools
                     // 它们仍然可以走标记模式 —— 系统提示词里的插件列表不受这里影响。
                     if (schema?.RequiresReplySession == true)
                     {
-                        Logger.Log($"NativeToolRegistry: {plugin.Name} 依赖回复会话，不导出为原生工具（仍可用标记调用）");
+                        excluded.Add(plugin.Name);
                         continue;
                     }
 
@@ -67,7 +75,33 @@ namespace VPetLLM.Core.Tools
                 }
             }
 
+            var notice = TakeExclusionNotice(excluded);
+            if (notice is not null) Logger.Log(notice);
+
             return result;
+        }
+
+        /// <summary>
+        /// 排除名单变化时返回该记的那行日志，没变则返回 null。
+        ///
+        /// 插件可能被启用/禁用/重载，名单不是一成不变的，所以比对的是名单本身
+        /// 而不是"是否记过一次"。抽成独立方法是为了能直接断言去重行为 ——
+        /// <see cref="Logger.Log"/> 在没有 WPF Application 时会直接返回，测试里观察不到。
+        /// </summary>
+        public static string? TakeExclusionNotice(IReadOnlyList<string> excluded)
+        {
+            var signature = string.Join(", ", excluded.OrderBy(n => n, StringComparer.OrdinalIgnoreCase));
+
+            lock (ExclusionLogGate)
+            {
+                if (signature == _lastLoggedExclusions) return null;
+                _lastLoggedExclusions = signature;
+            }
+
+            // 名单从"有"变成"空"时只更新状态，不值得为"现在没有被排除的插件了"记一行
+            return signature.Length > 0
+                ? $"NativeToolRegistry: {signature} 依赖回复会话，不导出为原生工具（仍可用标记调用）"
+                : null;
         }
 
         private static void BuildFromSchema(

@@ -2495,11 +2495,20 @@ namespace VPetLLM
         // ============================================================================
 
         /// <summary>
+        /// 动画表。插件构造函数结束到 LoadPlugin 之间 <c>MW.Main</c> 还不存在，
+        /// 而这段窗口里插件回灌（ForegroundAppWatcher 等）可能已经在发请求了 ——
+        /// 拼系统提示词会走到这里，裸解引用当场 NRE，整条回灌被丢掉。
+        /// 窗口只有一两秒，但实测撞得上。
+        /// </summary>
+        private VPet_Simulator.Core.GraphCore? AnimationGraph
+            => MW?.Main?.Core?.Graph;
+
+        /// <summary>
         /// 获取可用的动画列表
         /// </summary>
         public IEnumerable<string> GetAvailableAnimations()
         {
-            return MW.Main.Core.Graph.GraphsList.Keys;
+            return AnimationGraph?.GraphsList.Keys ?? Enumerable.Empty<string>();
         }
 
         /// <summary>
@@ -2509,7 +2518,10 @@ namespace VPetLLM
         {
             var animations = new HashSet<string>();
 
-            if (MW.Main.Core.Graph.GraphsName.TryGetValue(VPet_Simulator.Core.GraphInfo.GraphType.Say, out var sayAnimations))
+            var graphCore = AnimationGraph;
+            if (graphCore is null) return animations;
+
+            if (graphCore.GraphsName.TryGetValue(VPet_Simulator.Core.GraphInfo.GraphType.Say, out var sayAnimations))
             {
                 var modes = new[] { "happy", "nomal", "poorcondition", "ill" };
 
@@ -2534,7 +2546,7 @@ namespace VPetLLM
                                 break;
                         }
 
-                        var graph = MW.Main.Core.Graph.FindGraph(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, modeType);
+                        var graph = graphCore.FindGraph(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, modeType);
                         if (graph is not null)
                         {
                             animations.Add($"{mode}_{animName}");

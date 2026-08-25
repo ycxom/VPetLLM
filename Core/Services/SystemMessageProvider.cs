@@ -368,10 +368,22 @@ namespace VPetLLM.Core.Services
                 // 只有在EnableActionExecution开启时才添加动画列表
                 if (_settings.EnableActionExecution)
                 {
-                    parts.Add(PromptHelper.Get("Available_Animations_Prefix", lang)
-                                .Replace("{AnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableAnimations())));
-                    parts.Add(PromptHelper.Get("Available_Say_Animations_Prefix", lang)
-                                .Replace("{SayAnimationList}", string.Join(", ", VPetLLM.Instance.GetAvailableSayAnimations())));
+                    // 宿主窗口还没建好时动画表是空的（启动初期的插件回灌会撞上这个窗口）。
+                    // 这时**整段都不要写** —— 空列表在提示词里是句谎话（"可用动画：" 后面什么都没有），
+                    // 模型会据此认为一个动画都不能用；省略掉它反而只是少一条信息。
+                    var animationList = string.Join(", ", VPetLLM.Instance.GetAvailableAnimations());
+                    if (!string.IsNullOrEmpty(animationList))
+                    {
+                        parts.Add(PromptHelper.Get("Available_Animations_Prefix", lang)
+                                    .Replace("{AnimationList}", animationList));
+                    }
+
+                    var sayAnimationList = string.Join(", ", VPetLLM.Instance.GetAvailableSayAnimations());
+                    if (!string.IsNullOrEmpty(sayAnimationList))
+                    {
+                        parts.Add(PromptHelper.Get("Available_Say_Animations_Prefix", lang)
+                                    .Replace("{SayAnimationList}", sayAnimationList));
+                    }
                 }
 
                 // 只有在EnableBuy开启时才添加可购买物品列表（使用简化版本减少token）
@@ -433,6 +445,11 @@ namespace VPetLLM.Core.Services
                 {
                     parts.Add(Core.Tools.NativeToolSession.BuildPromptNotice(lang));
                 }
+
+                // 上面那段注释说的"节点混搭"是能正常工作的，但对排查很不友好 ——
+                // 同样的输入这次走工具、下次走标记，看起来像功能不稳定。提醒一次。
+                var nodeWarning = Core.Tools.NativeToolSession.TakeNodeConsistencyWarning(_settings);
+                if (nodeWarning is not null) Logger.Log(nodeWarning);
 
                 // 有插件调用还挂在后台时告诉模型，避免它以为没执行成功又发一遍
                 var running = BackgroundPluginTasks.DescribeRunning(lang);
