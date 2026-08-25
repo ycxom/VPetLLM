@@ -95,6 +95,19 @@ namespace VPetLLM
         public bool EnableNativeToolCall { get; set; } = true;
 
         /// <summary>
+        /// 同一条调用（工具名 + 参数完全一致）连续重复几次判定为打转。
+        /// 判据只认"完全相同"，不做模糊匹配 —— 越复杂越容易把正常行为误判成异常。
+        /// </summary>
+        public int ToolCallRepeatLimit { get; set; } = 5;
+
+        /// <summary>
+        /// 一轮对话最多执行几次工具调用。这是兜底，不是正常的停止条件
+        /// （正常靠 <see cref="ToolCallRepeatLimit"/>）。设太小会误伤递进式取证：
+        /// 模型查完 CPU 查内存、查完内存查显卡，几条命令各不相同却被当成打转。
+        /// </summary>
+        public int ToolCallMaxIterations { get; set; } = 10;
+
+        /// <summary>
         /// 插件调用的"让出"时限（秒）。超过这个时间还没返回，就先把控制权交回给桌宠，
         /// 让它能开口说话，插件继续在后台跑完再自动回灌结果。0 表示关闭（一直阻塞等到底）。
         /// 取自 codex code-mode 的 yield_time_ms 语义。

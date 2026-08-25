@@ -589,13 +589,22 @@ namespace VPetLLM.Handlers.Core
 
             if (segments.Count == 0)
             {
-                // 没有找到动作指令，整个消息作为文本处理
+                // 没有找到动作指令：当成 say 处理，而不是当成"纯文本"。
+                //
+                // 纯文本分支只显示气泡，不走 SayHandler，于是**说话动画不会播** ——
+                // 桌宠一直卡在思考动画上。而模型丢掉标记是常事：实测跑完 9 轮工具循环后
+                // 最终回复就变成了大白话，一长串 tool 格式的往返把输出格式冲掉了。
+                // 与其指望模型永远守规矩，不如在这里补齐：不带动画名的 say 会走默认说话动画，
+                // 和模型自己写 <|say_begin|> "文本" <|say_end|> 完全同路。
+                var plain = message.Trim();
                 segments.Add(new MessageSegment
                 {
-                    Type = SegmentType.Text,
-                    Content = message.Trim()
+                    Type = SegmentType.Talk,
+                    Content = $"<|say_begin|> {SanitizeForSayMarker(plain)} <|say_end|>",
+                    ActionType = "say",
+                    ActionValue = SanitizeForSayMarker(plain)
                 });
-                Logger.LogVerbose($"SmartMessageProcessor: 没有找到动作指令，作为纯文本处理");
+                Logger.LogVerbose($"SmartMessageProcessor: 没有找到动作指令，按默认说话动画处理");
             }
             else
             {
@@ -662,6 +671,25 @@ namespace VPetLLM.Handlers.Core
                 "plugin" => SegmentType.Action,
                 _ => SegmentType.Action
             };
+        }
+
+        /// <summary>
+        /// 把一段自由文本变成能安全放进 say 标记里的内容。
+        ///
+        /// 刻意**不加引号**：SayHandler 的解析是 <c>"文本", 动画</c>，只有以引号开头才会
+        /// 走那条带动画名的分支；不带引号时它直接把整段当文本，动画取默认值 —— 正是我们要的。
+        ///
+        /// 但文本自己带半角引号就危险了：<c>他说 "hi", 然后走了</c> 会被正则匹配成
+        /// 文本=hi、动画=然后走了，消息当场被截断。所以把半角双引号换成全角，
+        /// 顺手去掉可能撞上标记语法的 <c>&lt;|</c> / <c>|&gt;</c>。
+        /// </summary>
+        public static string SanitizeForSayMarker(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text ?? "";
+
+            return text.Replace("\"", "”")
+                       .Replace("<|", "(")
+                       .Replace("|>", ")");
         }
 
         /// <summary>

@@ -548,6 +548,11 @@ namespace VPetLLM.UI.Windows
             }
             ((CheckBox)this.FindName("CheckBox_EnableVPetSettingsControl")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableMediaPlayback")).Click += Control_Click;
+            ((CheckBox)this.FindName("CheckBox_EnableNativeToolCall")).Click += Control_Click;
+            ((TextBox)this.FindName("TextBox_ToolCallRepeatLimit")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_ToolCallRepeatLimit")).TextChanged += ToolCallLimit_TextChanged;
+            ((TextBox)this.FindName("TextBox_ToolCallMaxIterations")).TextChanged += Control_TextChanged;
+            ((TextBox)this.FindName("TextBox_ToolCallMaxIterations")).TextChanged += ToolCallLimit_TextChanged;
             ((ComboBox)this.FindName("ComboBox_CompressionMode")).SelectionChanged += Control_SelectionChanged;
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).TextChanged += Control_TextChanged;
@@ -885,6 +890,36 @@ namespace VPetLLM.UI.Windows
             UpdateOverflowCounts();
         }
 
+        private void ToolCallLimit_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateToolCallLimitHint();
+        }
+
+        /// <summary>
+        /// 单轮上限必须大于重复上限，否则预算会先耗尽，打转检测永远轮不到 ——
+        /// 症状和"按轮数硬掐"一模一样，很难看出是配置写反了。
+        /// 运行时会自动上调（见 NativeToolSession.MaxIterations），这里把这件事说给用户听，
+        /// 免得他填了 3 却看到实际按 6 执行，以为设置没生效。
+        /// </summary>
+        private void UpdateToolCallLimitHint()
+        {
+            if (this.FindName("TextBlock_ToolCallLimitHint") is not TextBlock hint) return;
+
+            var repeatOk = int.TryParse(((TextBox?)this.FindName("TextBox_ToolCallRepeatLimit"))?.Text, out var repeat);
+            var budgetOk = int.TryParse(((TextBox?)this.FindName("TextBox_ToolCallMaxIterations"))?.Text, out var budget);
+
+            if (!repeatOk || !budgetOk || budget > repeat)
+            {
+                hint.Text = "";
+                return;
+            }
+
+            var lang = _plugin?.Settings?.Language ?? "zh-hans";
+            var template = LanguageHelper.Get("Advanced_Options.ToolCallLimitAdjusted", lang,
+                lang.StartsWith("zh") ? "将按 {0} 执行（必须大于重复上限）" : "will run as {0} (must exceed the repeat limit)");
+            hint.Text = string.Format(template, repeat + 1);
+        }
+
         private void Control_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (_isLoadingSettings) return;
@@ -1088,6 +1123,11 @@ namespace VPetLLM.UI.Windows
                     break;
                 }
             }
+
+            ((CheckBox)this.FindName("CheckBox_EnableNativeToolCall")).IsChecked = _plugin.Settings.EnableNativeToolCall;
+            ((TextBox)this.FindName("TextBox_ToolCallRepeatLimit")).Text = _plugin.Settings.ToolCallRepeatLimit.ToString();
+            ((TextBox)this.FindName("TextBox_ToolCallMaxIterations")).Text = _plugin.Settings.ToolCallMaxIterations.ToString();
+            UpdateToolCallLimitHint();
 
             ((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text = _plugin.Settings.HistoryCompressionThreshold.ToString();
             ((TextBox)this.FindName("TextBox_HistoryCompressionTokenThreshold")).Text = _plugin.Settings.HistoryCompressionTokenThreshold.ToString();
@@ -1607,6 +1647,15 @@ namespace VPetLLM.UI.Windows
                     _plugin.Settings.CompressionMode = mode;
                 }
             }
+
+            if (this.FindName("CheckBox_EnableNativeToolCall") is CheckBox cbNativeTool)
+                _plugin.Settings.EnableNativeToolCall = cbNativeTool.IsChecked ?? true;
+
+            if (int.TryParse(((TextBox)this.FindName("TextBox_ToolCallRepeatLimit")).Text, out int toolCallRepeatLimit))
+                _plugin.Settings.ToolCallRepeatLimit = toolCallRepeatLimit;
+
+            if (int.TryParse(((TextBox)this.FindName("TextBox_ToolCallMaxIterations")).Text, out int toolCallMaxIterations))
+                _plugin.Settings.ToolCallMaxIterations = toolCallMaxIterations;
 
             if (int.TryParse(((TextBox)this.FindName("TextBox_HistoryCompressionThreshold")).Text, out int historyCompressionThreshold))
                 _plugin.Settings.HistoryCompressionThreshold = historyCompressionThreshold;

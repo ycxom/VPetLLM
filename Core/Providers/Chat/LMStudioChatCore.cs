@@ -166,10 +166,6 @@ namespace VPetLLM.Core.Providers.Chat
                         toolLoop = loop;
 
                         message = loop.Message;
-                        if (loop.HitLimit)
-                        {
-                            SystemLogger.Log("LM Studio: 工具调用达到轮次上限，本轮不再继续");
-                        }
                         ResponseHandler?.Invoke(message);
                     }
                     else if (useStreaming)
@@ -404,10 +400,6 @@ namespace VPetLLM.Core.Providers.Chat
                         toolLoop = loop;
 
                         message = loop.Message;
-                        if (loop.HitLimit)
-                        {
-                            SystemLogger.Log("LM Studio ChatWithImage: 工具调用达到轮次上限，本轮不再继续");
-                        }
                         ResponseHandler?.Invoke(message);
                     }
                     else if (_lmStudioSetting.EnableStreaming)

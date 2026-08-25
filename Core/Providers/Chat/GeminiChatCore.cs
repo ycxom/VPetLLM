@@ -215,10 +215,6 @@ namespace VPetLLM.Core.Providers.Chat
                         toolLoop = loop;
 
                         message = loop.Message;
-                        if (loop.HitLimit)
-                        {
-                            Logger.Log("Gemini ChatWithImage: 工具调用达到轮次上限，本轮不再继续");
-                        }
                         ResponseHandler?.Invoke(message);
                     }
                     else if (useStreaming)
@@ -396,10 +392,6 @@ namespace VPetLLM.Core.Providers.Chat
                         toolLoop = loop;
 
                         message = loop.Message;
-                        if (loop.HitLimit)
-                        {
-                            Logger.Log("Gemini ChatWithImage: 工具调用达到轮次上限，本轮不再继续");
-                        }
                         ResponseHandler?.Invoke(message);
                     }
                     else if (useStreaming)
@@ -611,10 +603,6 @@ namespace VPetLLM.Core.Providers.Chat
                         toolLoop = loop;
 
                         message = loop.Message;
-                        if (loop.HitLimit)
-                        {
-                            Logger.Log("Gemini (OpenAI兼容): 工具调用达到轮次上限，本轮不再继续");
-                        }
                         ResponseHandler?.Invoke(message);
                     }
                     else if (node.EnableStreaming)
@@ -782,10 +770,6 @@ namespace VPetLLM.Core.Providers.Chat
                         toolLoop = loop;
 
                         message = loop.Message;
-                        if (loop.HitLimit)
-                        {
-                            Logger.Log("Gemini: 工具调用达到轮次上限，本轮不再继续");
-                        }
                         ResponseHandler?.Invoke(message);
                     }
                     else if (node.EnableStreaming)

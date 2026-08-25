@@ -2324,6 +2324,54 @@
                                 </CheckBox.ToolTip>
                             </CheckBox>
 
+                            <!-- 工具调用 -->
+                            <Separator Style="{StaticResource AdvancedDivider}"/>
+                            <TextBlock Name="TextBlock_ToolCallSectionTitle"
+                                     Text="{utils:Localize KeyPath=Advanced_Options.ToolCallSectionTitle, Default=工具调用}"
+                                     Style="{StaticResource AdvancedSectionHeader}"/>
+                            <CheckBox x:Name="CheckBox_EnableNativeToolCall"
+                                    Content="{utils:Localize KeyPath=Advanced_Options.EnableNativeToolCall, Default=启用原生工具调用总开关}"
+                                    Style="{StaticResource AdvancedCheckBox}">
+                                <CheckBox.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.EnableNativeToolCallToolTip, Default=关掉它可一键停用整个原生工具调用特性；开着时仍需在各渠道单独勾选「启用原生工具调用」才会生效。}"/>
+                                    </ToolTip>
+                                </CheckBox.ToolTip>
+                            </CheckBox>
+                            <StackPanel x:Name="Panel_ToolCallLimits"
+                                    IsEnabled="{Binding ElementName=CheckBox_EnableNativeToolCall, Path=IsChecked}">
+                                <!-- 重复多少次判定为打转 -->
+                                <StackPanel Style="{StaticResource AdvancedNestedRow}">
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ToolCallRepeatLimit, Default=相同调用重复上限:}"
+                                            x:Name="TextBlock_ToolCallRepeatLimit"
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
+                                    <TextBox x:Name="TextBox_ToolCallRepeatLimit"
+                                            Style="{StaticResource AdvancedNumberBox}">
+                                        <TextBox.ToolTip>
+                                            <ToolTip>
+                                                <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ToolCallRepeatLimitToolTip, Default=工具名与参数完全一致的调用连续重复到这个次数，就判定 AI 在原地打转，改为要求它直接作答。只认完全相同，命令有任何差别都会重新计数。}"/>
+                                            </ToolTip>
+                                        </TextBox.ToolTip>
+                                    </TextBox>
+                                </StackPanel>
+                                <!-- 单轮工具预算 -->
+                                <StackPanel Style="{StaticResource AdvancedNestedRow}">
+                                    <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ToolCallMaxIterations, Default=单轮工具调用上限:}"
+                                            x:Name="TextBlock_ToolCallMaxIterations"
+                                            Style="{StaticResource AdvancedFieldLabel}"/>
+                                    <TextBox x:Name="TextBox_ToolCallMaxIterations"
+                                            Style="{StaticResource AdvancedNumberBox}">
+                                        <TextBox.ToolTip>
+                                            <ToolTip>
+                                                <TextBlock Text="{utils:Localize KeyPath=Advanced_Options.ToolCallMaxIterationsToolTip, Default=一次对话最多执行几次工具调用，仅作兜底。设得太小会误伤正常的多步查询（先查 CPU 再查内存再查显卡）。必须大于重复上限，否则会自动上调。}"/>
+                                            </ToolTip>
+                                        </TextBox.ToolTip>
+                                    </TextBox>
+                                    <TextBlock x:Name="TextBlock_ToolCallLimitHint"
+                                            Style="{StaticResource AdvancedWarningText}"/>
+                                </StackPanel>
+                            </StackPanel>
+
                             <!-- 上下文管理 -->
                             <Separator Style="{StaticResource AdvancedDivider}"/>
                             <TextBlock Name="TextBlock_ContextSectionTitle"

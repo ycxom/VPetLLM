@@ -885,10 +885,6 @@ namespace VPetLLM.Core.Providers.Chat
                 }
                 // 其余情况说明不了任何事（这轮本来就不需要工具），保持现状，下轮继续观察
 
-                if (loop.HitLimit)
-                {
-                    Logger.Log("Free: 工具调用达到轮次上限，本轮不再继续");
-                }
 
                 var message = string.IsNullOrWhiteSpace(loop.Message) ? "无回复" : loop.Message;
                 return ToolAttempt.Done(message, loop);

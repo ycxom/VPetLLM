@@ -885,6 +885,54 @@
       "zh-hans": "启动时代理自动优化（检测到可优化项时弹窗建议）",
       "zh-hant": "啟動時代理自動優化（偵測到可優化項時彈窗建議）",
       "jp": "起動時のプロキシ自動最適化（最適化可能な項目を検出した際に提案を表示）"
+    },
+    "ToolCallSectionTitle": {
+      "en": "Tool Calling",
+      "zh-hans": "工具调用",
+      "zh-hant": "工具調用",
+      "jp": "ツール呼び出し"
+    },
+    "EnableNativeToolCall": {
+      "en": "Enable native tool calling (master switch)",
+      "zh-hans": "启用原生工具调用总开关",
+      "zh-hant": "啟用原生工具調用總開關",
+      "jp": "ネイティブツール呼び出し（マスタースイッチ）"
+    },
+    "EnableNativeToolCallToolTip": {
+      "en": "Turn this off to disable native tool calling entirely. While on, each channel still needs its own \"Enable native tool calling\" checkbox.",
+      "zh-hans": "关掉它可一键停用整个原生工具调用特性；开着时仍需在各渠道单独勾选「启用原生工具调用」才会生效。",
+      "zh-hant": "關掉它可一鍵停用整個原生工具調用特性；開著時仍需在各渠道單獨勾選「啟用原生工具調用」才會生效。",
+      "jp": "オフにするとネイティブツール呼び出し全体を停止します。オンの場合でも各チャンネル側のチェックが必要です。"
+    },
+    "ToolCallRepeatLimit": {
+      "en": "Identical call repeat limit:",
+      "zh-hans": "相同调用重复上限:",
+      "zh-hant": "相同調用重複上限:",
+      "jp": "同一呼び出しの連続上限:"
+    },
+    "ToolCallRepeatLimitToolTip": {
+      "en": "When the AI repeats a call with the exact same tool name and arguments this many times in a row, it is treated as stuck and asked to answer directly. Only exact matches count; any difference in the command resets the counter.",
+      "zh-hans": "工具名与参数完全一致的调用连续重复到这个次数，就判定 AI 在原地打转，改为要求它直接作答。只认完全相同，命令有任何差别都会重新计数。",
+      "zh-hant": "工具名與參數完全一致的調用連續重複到這個次數，就判定 AI 在原地打轉，改為要求它直接作答。只認完全相同，命令有任何差別都會重新計數。",
+      "jp": "ツール名と引数が完全に同じ呼び出しがこの回数連続したら、ループと見なして直接回答させます。完全一致のみを見ます。"
+    },
+    "ToolCallMaxIterations": {
+      "en": "Tool calls per turn:",
+      "zh-hans": "单轮工具调用上限:",
+      "zh-hant": "單輪工具調用上限:",
+      "jp": "1 ターンあたりのツール呼び出し上限:"
+    },
+    "ToolCallMaxIterationsToolTip": {
+      "en": "Safety cap on how many tool calls one turn may run. Setting it too low breaks legitimate multi-step lookups (check CPU, then RAM, then GPU). Must exceed the repeat limit, otherwise it is raised automatically.",
+      "zh-hans": "一次对话最多执行几次工具调用，仅作兜底。设得太小会误伤正常的多步查询（先查 CPU 再查内存再查显卡）。必须大于重复上限，否则会自动上调。",
+      "zh-hant": "一次對話最多執行幾次工具調用，僅作兑底。設得太小會誤傷正常的多步查詢（先查 CPU 再查記憶體再查顯卡）。必須大於重複上限，否則會自動上調。",
+      "jp": "1 ターンで実行できるツール呼び出しの上限（セーフティ用）。小さすぎると正常な多段階調査を遮断します。連続上限より大きい必要があります。"
+    },
+    "ToolCallLimitAdjusted": {
+      "en": "will run as {0} (must exceed the repeat limit)",
+      "zh-hans": "将按 {0} 执行（必须大于重复上限）",
+      "zh-hant": "將按 {0} 執行（必須大於重複上限）",
+      "jp": "実際には {0} で実行されます（連続上限を超える必要）"
     }
   },
   "PluginPanels": {

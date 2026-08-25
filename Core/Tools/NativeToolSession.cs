@@ -20,8 +20,55 @@ namespace VPetLLM.Core.Tools
     /// </summary>
     public sealed class NativeToolSession
     {
-        /// <summary>一轮对话里最多允许连续调用几次工具，防止模型打转。</summary>
-        public const int MaxIterations = 5;
+        /// <summary>设置里没值或越界时用的默认值。</summary>
+        public const int DefaultRepeatLimit = 5;
+        public const int DefaultMaxIterations = 10;
+
+        /// <summary>
+        /// 同一条调用（工具名 + 参数完全一致）连续重复几次就判定为打转。
+        ///
+        /// 判据只看"完全相同"，刻意不做相似度之类的模糊匹配 —— 越复杂的判据
+        /// 越容易把正常行为误判成异常，而误判的代价是把用户的正当请求掐断。
+        /// </summary>
+        public static int RepeatLimit => CurrentLimits().RepeatLimit;
+
+        /// <summary>
+        /// 一轮对话里最多允许调用几次工具。这是**兜底**，不是正常的停止条件 ——
+        /// 正常停止靠 <see cref="RepeatLimit"/>。
+        ///
+        /// 强制保证 <c>MaxIterations &gt; RepeatLimit</c>：两者相等或更小的话，
+        /// 预算会先耗尽，打转检测永远轮不到，症状和"按轮数硬掐"一模一样。
+        /// 设置界面允许用户随便填，这个不变量在读取时兜住。
+        /// </summary>
+        public static int MaxIterations => CurrentLimits().MaxIterations;
+
+        private static (int RepeatLimit, int MaxIterations) CurrentLimits()
+        {
+            var settings = VPetLLM.Instance?.Settings;
+            return ResolveLimits(settings?.ToolCallRepeatLimit, settings?.ToolCallMaxIterations);
+        }
+
+        /// <summary>
+        /// 把设置里的两个数收敛成一对可用的值。抽成纯函数是为了能直接断言 ——
+        /// 这里的规则（尤其是"预算必须大于重复上限"）一旦悄悄失效，
+        /// 症状就是打转检测永远不触发，而外部表现和"按轮数硬掐"一模一样，很难看出来。
+        /// </summary>
+        public static (int RepeatLimit, int MaxIterations) ResolveLimits(int? repeatSetting, int? budgetSetting)
+        {
+            var repeat = Clamp(repeatSetting, DefaultRepeatLimit, 2, 20);
+            var budget = Clamp(budgetSetting, DefaultMaxIterations, 1, 50);
+
+            // 预算不大于重复上限的话，预算会先耗尽，打转检测永远轮不到
+            if (budget <= repeat) budget = repeat + 1;
+
+            return (repeat, budget);
+        }
+
+        private static int Clamp(int? value, int fallback, int min, int max)
+        {
+            if (value is not int v || v <= 0) return fallback;
+            return v < min ? min : (v > max ? max : v);
+        }
 
         private readonly IReadOnlyList<NativeToolDefinition> _definitions;
         private readonly List<HostPlugin> _plugins;

@@ -34,6 +34,18 @@ namespace VPetLLM.Core.Tools
 
             if (definition is null)
             {
+                // 模型经常把**标记指令**当成工具来调（实测 see_screen_begin）。
+                // 回一句泛泛的 "Unknown tool" 它只会放弃 —— 日志里那次就是直接
+                // 不看屏幕了，用户的请求静默落空。既然我们知道它想要什么，就直说怎么调。
+                var marker = MatchMarkerCommand(call.Name);
+                if (marker is not null)
+                {
+                    return Fail(call,
+                        $"'{call.Name}' is not a callable tool. '{marker}' is a marker command, not a function: " +
+                        $"write <|{marker}_begin|> your arguments <|{marker}_end|> directly in your reply text. " +
+                        $"Do not call it through the tool interface.");
+                }
+
                 var available = string.Join(", ", definitions.Select(d => d.Name));
                 return Fail(call, $"Unknown tool '{call.Name}'. Available tools: {available}");
             }
@@ -97,6 +109,46 @@ namespace VPetLLM.Core.Tools
                 Logger.Log($"NativeToolInvoker: {call.Name} 抛出异常: {ex.Message}");
                 return Fail(call, $"Plugin error: {ex.Message}", definition.PluginName, arguments);
             }
+        }
+
+        /// <summary>
+        /// 模型给的函数名是不是其实指向一条标记指令？是就返回那条指令的关键字。
+        ///
+        /// 会带上 <c>_begin</c> / <c>_end</c> 后缀，因为模型是照着提示词里
+        /// <c>&lt;|see_screen_begin|&gt;</c> 这种写法把整个 token 当函数名用的。
+        /// </summary>
+        public static string? MatchMarkerCommand(string? toolName)
+        {
+            if (string.IsNullOrWhiteSpace(toolName)) return null;
+
+            var name = toolName.Trim().ToLowerInvariant();
+            foreach (var suffix in new[] { "_begin", "_end" })
+            {
+                if (name.EndsWith(suffix, StringComparison.Ordinal))
+                {
+                    name = name.Substring(0, name.Length - suffix.Length);
+                    break;
+                }
+            }
+            if (name.Length == 0) return null;
+
+            try
+            {
+                var handlers = VPetLLM.Instance?.ActionProcessor?.Handlers;
+                if (handlers is null) return null;
+
+                foreach (var handler in handlers)
+                {
+                    if (string.Equals(handler.Keyword, name, StringComparison.OrdinalIgnoreCase))
+                        return handler.Keyword;
+                }
+            }
+            catch
+            {
+                // 拿不到注册表就退回泛泛的报错，不值得为此让整次调用失败
+            }
+
+            return null;
         }
 
         /// <summary>把 JSON 入参还原成插件认识的文本参数。</summary>
