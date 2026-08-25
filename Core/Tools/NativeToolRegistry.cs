@@ -84,6 +84,12 @@ namespace VPetLLM.Core.Tools
 
                 var isRawText = form.Style == ToolCallStyle.RawText;
 
+                // RawText 形态下参数名可能自带动词前缀（"search|query"）；
+                // 前缀要留着执行时拼回去，只有右半截才是模型该填的字段名
+                var (rawPrefix, rawParam) = isRawText
+                    ? SplitRawTextParameter(form.Parameters.FirstOrDefault()?.Name)
+                    : ("", null);
+
                 result.Add(new NativeToolDefinition
                 {
                     Name = name,
@@ -91,7 +97,8 @@ namespace VPetLLM.Core.Tools
                     Description = Truncate(description, 1024),
                     Parameters = BuildParameterSchema(form),
                     ArgumentStyle = isRawText ? NativeToolArgumentStyle.RawText : NativeToolArgumentStyle.NamedArguments,
-                    RawTextParameter = isRawText ? NormalizeParamName(form.Parameters.FirstOrDefault()?.Name) : null
+                    RawTextParameter = rawParam,
+                    RawTextPrefix = rawPrefix
                 });
             }
         }
@@ -123,9 +130,13 @@ namespace VPetLLM.Core.Tools
             var properties = new JObject();
             var required = new JArray();
 
+            var isRawText = form.Style == ToolCallStyle.RawText;
+
             foreach (var p in form.Parameters)
             {
-                var key = NormalizeParamName(p.Name);
+                // RawText 的参数名可能带动词前缀，暴露给模型的字段名只要右半截；
+                // 前缀由 RawTextPrefix 在执行时补回，不该让模型去填
+                var key = isRawText ? SplitRawTextParameter(p.Name).Parameter : NormalizeParamName(p.Name);
                 if (string.IsNullOrEmpty(key)) continue;
 
                 var node = new JObject { ["type"] = MapType(p.Type) };
@@ -195,6 +206,24 @@ namespace VPetLLM.Core.Tools
         /// <summary>参数名也要满足函数名字符集（Gemini 对参数名同样挑剔）。</summary>
         public static string NormalizeParamName(string? name)
             => string.IsNullOrWhiteSpace(name) ? "" : SanitizeName(name);
+
+        /// <summary>
+        /// 把 RawText 参数名拆成「固定前缀」和「模型要填的字段名」。
+        ///
+        /// <c>"search|query"</c> → <c>("search|", "query")</c>；不含分隔符时前缀为空。
+        /// 归一化只作用于右半截 —— 前缀是要原样交给插件的协议文本，
+        /// 一旦被 SanitizeName 把竖线换成下划线就再也拼不回去了。
+        /// </summary>
+        public static (string Prefix, string Parameter) SplitRawTextParameter(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return ("", "");
+
+            var trimmed = name.Trim();
+            var cut = trimmed.LastIndexOf('|');
+            if (cut < 0) return ("", NormalizeParamName(trimmed));
+
+            return (trimmed.Substring(0, cut + 1), NormalizeParamName(trimmed.Substring(cut + 1)));
+        }
 
         private static string SanitizeName(string raw)
         {

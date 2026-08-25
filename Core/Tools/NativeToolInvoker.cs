@@ -109,7 +109,17 @@ namespace VPetLLM.Core.Tools
                 var token = (!string.IsNullOrEmpty(key) ? arguments[key] : null)
                             ?? arguments.Properties().FirstOrDefault()?.Value;
 
-                return TokenToText(token);
+                var text = TokenToText(token);
+
+                // 把参数名里编码的动词前缀拼回去（"search|" + 关键词）。
+                // 模型偶尔会自己把前缀也写进值里，那就别拼第二遍。
+                var prefix = definition.RawTextPrefix;
+                if (!string.IsNullOrEmpty(prefix) && !text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    text = prefix + text;
+                }
+
+                return text;
             }
 
             var parts = new List<string>();

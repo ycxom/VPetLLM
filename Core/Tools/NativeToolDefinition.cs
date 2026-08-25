@@ -33,6 +33,19 @@ namespace VPetLLM.Core.Tools
         /// <summary>RawText 形态下，整段参数取自哪个字段。</summary>
         public string? RawTextParameter { get; init; }
 
+        /// <summary>
+        /// RawText 形态下要拼回参数前面的固定前缀（含分隔符），没有则为空。
+        ///
+        /// 有些插件把动词编在参数名里，比如 WebSearch 声明的是 <c>search|query</c>、
+        /// <c>fetch|url</c> —— 标记模式下模型照着例子写 <c>search|关键词</c>，插件靠竖线
+        /// 左边那截判断执行哪个动作。而工具模式只会把**值**回传（模型填的是 query 本身），
+        /// 竖线左边那截在参数名归一化时就没了，插件收到一个没有动词的裸字符串，
+        /// 判不出动作直接静默返回 —— 实测就是这样白跑一轮的。
+        ///
+        /// 所以这里把前缀单独记下来，执行时原样拼回去。
+        /// </summary>
+        public string RawTextPrefix { get; init; } = "";
+
         /// <summary>OpenAI / Ollama / LMStudio 格式。</summary>
         public JObject ToOpenAiFormat() => new()
         {

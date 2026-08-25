@@ -25,8 +25,141 @@ namespace VPetLLM.Utils.Plugin
         private static readonly SemaphoreSlim _updateGate = new(1, 1);
         public static string PluginPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
 
+        // 影子拷贝的落地目录。
+        //
+        // 这里刻意不用 %TEMP%：从 %TEMP% 下的随机名目录加载 DLL 是落地器(dropper)
+        // 最典型的行为特征，杀软启发式引擎对这条路径给的权重很高，会把宿主连同
+        // 插件一起判成木马。换到应用自己的 LocalAppData 子目录后，行为语义变成
+        // "程序在自己的缓存目录里工作"，静态评分显著下降。
+        //
+        // 代价是 Windows 不再帮忙兜底清理，必须自己扫孤儿目录，见 SweepOrphanedShadowCopies。
+        public static string PluginCachePath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "VPetLLM", "PluginCache");
+
+        /// <summary>建立一个新的影子拷贝目录。</summary>
+        private static string CreateShadowCopyDirectory()
+        {
+            var dir = Path.Combine(PluginCachePath, Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        /// <summary>
+        /// 清掉上次运行残留的影子拷贝目录。
+        ///
+        /// 正常退出会走 CleanupShadowDirectory，但崩溃和强杀不会。以前放 %TEMP% 时
+        /// 靠系统定期清理兜底，改到 LocalAppData 之后没人兜底，不扫就会无限堆积
+        /// （每次崩溃泄漏一整套插件 DLL）。
+        ///
+        /// 多开场景下别的实例可能正占着某个目录，所以先用独占打开探一次：探不到就
+        /// 整个目录跳过，免得把对方的 pdb 删掉只留个半残目录。删不掉的一律忽略，
+        /// 下次启动再试。
+        /// </summary>
+        private static void SweepOrphanedShadowCopies()
+        {
+            try
+            {
+                if (!Directory.Exists(PluginCachePath))
+                    return;
+
+                foreach (var dir in Directory.EnumerateDirectories(PluginCachePath))
+                {
+                    if (IsShadowDirectoryInUse(dir))
+                        continue;
+
+                    try { Directory.Delete(dir, true); }
+                    catch { /* 被占用或权限不足，下次启动再试 */ }
+                }
+            }
+            catch (Exception ex)
+            {
+                VPetLLMUtils.Logger.Log($"Sweeping orphaned plugin cache failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 一次性清掉历史版本残留在 %TEMP%\VPetLLM_Plugins 下的影子拷贝。
+        ///
+        /// 影子拷贝改到 LocalAppData 之前是落在 %TEMP% 的，退出时清理失败的目录就
+        /// 一直留在那儿——实测老机器上能攒到上千个目录、几十 MB，而新版本已经不再
+        /// 往那里写，所以没有任何代码会再回头收拾它们。
+        ///
+        /// 这里做的是迁移清扫：清空后连父目录一起删掉，之后每次启动只剩一次
+        /// Directory.Exists 的开销。仍在跑的旧版实例占着的目录会删失败，忽略即可。
+        /// </summary>
+        private static void SweepLegacyTempShadowCopies()
+        {
+            try
+            {
+                var legacyRoot = Path.Combine(Path.GetTempPath(), "VPetLLM_Plugins");
+                if (!Directory.Exists(legacyRoot)) return;
+
+                var removed = 0;
+                foreach (var dir in Directory.EnumerateDirectories(legacyRoot))
+                {
+                    if (IsShadowDirectoryInUse(dir)) continue;
+
+                    try
+                    {
+                        Directory.Delete(dir, true);
+                        removed++;
+                    }
+                    catch { /* 下次启动再试 */ }
+                }
+
+                // 全清干净了就把根目录也去掉，下次启动直接短路
+                try
+                {
+                    if (!Directory.EnumerateFileSystemEntries(legacyRoot).Any())
+                    {
+                        Directory.Delete(legacyRoot);
+                    }
+                }
+                catch { }
+
+                if (removed > 0)
+                {
+                    VPetLLMUtils.Logger.Log(
+                        $"Cleaned {removed} legacy shadow copy directories from %TEMP%\\VPetLLM_Plugins");
+                }
+            }
+            catch (Exception ex)
+            {
+                VPetLLMUtils.Logger.Log($"Sweeping legacy plugin cache failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>探测影子目录里的 DLL 是否正被本机其他 VPet 实例映射着。</summary>
+        private static bool IsShadowDirectoryInUse(string shadowDir)
+        {
+            try
+            {
+                foreach (var dll in Directory.EnumerateFiles(shadowDir, "*.dll"))
+                {
+                    using var probe = File.Open(dll, FileMode.Open, FileAccess.Read, FileShare.None);
+                }
+                return false;
+            }
+            catch (IOException)
+            {
+                return true;    // 已被映射，是别的实例在用
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return true;
+            }
+            catch
+            {
+                return false;   // 目录本身有问题，交给外层 Delete 收拾
+            }
+        }
+
         public static void LoadPlugins(IChatCore chatCore)
         {
+            SweepOrphanedShadowCopies();
+            SweepLegacyTempShadowCopies();
+
             var pluginDir = PluginPath;
 
             if (!Directory.Exists(pluginDir))
@@ -71,8 +204,7 @@ namespace VPetLLM.Utils.Plugin
                 {
                     var context = new AssemblyLoadContext($"{Path.GetFileNameWithoutExtension(file)}_{Guid.NewGuid()}", isCollectible: true);
 
-                    var shadowCopyDir = Path.Combine(Path.GetTempPath(), "VPetLLM_Plugins", Guid.NewGuid().ToString());
-                    Directory.CreateDirectory(shadowCopyDir);
+                    var shadowCopyDir = CreateShadowCopyDirectory();
                     var shadowCopiedFile = Path.Combine(shadowCopyDir, Path.GetFileName(file));
                     File.Copy(file, shadowCopiedFile, true);
 
@@ -850,8 +982,7 @@ namespace VPetLLM.Utils.Plugin
             {
                 var context = new AssemblyLoadContext($"{Path.GetFileNameWithoutExtension(pluginFilePath)}_{Guid.NewGuid()}", isCollectible: true);
 
-                var shadowCopyDir = Path.Combine(Path.GetTempPath(), "VPetLLM_Plugins", Guid.NewGuid().ToString());
-                Directory.CreateDirectory(shadowCopyDir);
+                var shadowCopyDir = CreateShadowCopyDirectory();
                 var shadowCopiedFile = Path.Combine(shadowCopyDir, Path.GetFileName(pluginFilePath));
                 File.Copy(pluginFilePath, shadowCopiedFile, true);
                 _shadowCopyDirectories[pluginFilePath] = shadowCopyDir;
@@ -1004,7 +1135,8 @@ namespace VPetLLM.Utils.Plugin
         {
             try
             {
-                var failedCleanupFile = Path.Combine(Path.GetTempPath(), "VPetLLM_FailedCleanup.txt");
+                Directory.CreateDirectory(PluginCachePath);
+                var failedCleanupFile = Path.Combine(PluginCachePath, "FailedCleanup.log");
                 File.AppendAllText(failedCleanupFile, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {directory}\n");
             }
             catch (Exception ex)

@@ -19,6 +19,8 @@ using VPetLLM.Utils.Plugin;
 using VPetLLM.Core.Data.Models;
 using VPetLLM.Core.Services;
 using NewPlugin = VPetLLM.Core.Abstractions.Interfaces.Plugin;
+using PE = System.Reflection.PortableExecutable;
+using Meta = System.Reflection.Metadata;
 
 namespace VPetLLM.UI.Windows
 {
@@ -37,6 +39,10 @@ namespace VPetLLM.UI.Windows
         public string Icon { get; set; }
         public string FileUrl { get; set; }
         public string SHA256 { get; set; }
+
+        /// <summary>与 DLL 同目录分发的附属数据文件（各自独立校验哈希）。</summary>
+        public List<PluginExtraFile> Extra { get; set; } = new();
+
         public NewPlugin.IVPetLLMPlugin LocalPlugin { get; set; }
         public FailedPlugin FailedPlugin { get; set; }
         public string Version { get; set; }
@@ -48,6 +54,20 @@ namespace VPetLLM.UI.Windows
         public bool HasSettingAction { get; set; }
         public string StatusText { get; set; }
         public string SettingActionText { get; set; }
+    }
+
+    /// <summary>
+    /// 插件的附属数据文件。
+    ///
+    /// 有些插件的数据必须以明文文件而不是编进 IL 的形式分发——比如 TerminalPlugin
+    /// 的命令安全规则表：那张黑名单一旦成为程序集里的字符串常量，杀软就会把它
+    /// 当成勒索软件的载荷清单来打分。
+    /// </summary>
+    public class PluginExtraFile
+    {
+        public string Name { get; set; }
+        public string FileUrl { get; set; }
+        public string SHA256 { get; set; }
     }
 
     public class ProviderFallbackItem : System.ComponentModel.INotifyPropertyChanged
@@ -3833,6 +3853,7 @@ namespace VPetLLM.UI.Windows
                                 localItem.RemoteVersion = remoteSha256;
                                 localItem.FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty;
                                 localItem.SHA256 = remoteSha256;
+                                localItem.Extra = ParseExtraFiles(remoteInfo);
 
                                 // 对于失败的插件，总是标记为可更新（因为它们无法正常加载）
                                 bool isUpdatable = localItem.IsFailed ||
@@ -3886,6 +3907,7 @@ namespace VPetLLM.UI.Windows
                                     Icon = "\uE753", // Cloud download icon
                                     FileUrl = remoteInfo["File"]?.ToString() ?? string.Empty,
                                     SHA256 = remoteSha256,
+                                    Extra = ParseExtraFiles(remoteInfo),
                                     RemoteVersion = remoteSha256,
                                     StatusText = LanguageHelper.Get("Plugin.StatusNotDownloaded", langCode) ?? "未下载"
                                 };
@@ -4150,6 +4172,8 @@ namespace VPetLLM.UI.Windows
                     _plugin.Plugins.Remove(localPlugin);
                     Logger.Log($"Removed loaded plugin from memory: {pluginNameToFind}");
                 }
+
+                DeleteExtraFiles(plugin);
             }
 
             if (!uninstalled)
@@ -4194,6 +4218,128 @@ namespace VPetLLM.UI.Windows
         /// 唯一保留的模态框是「哈希不匹配、要不要强装」——那是安全确认，必须当场问，
         /// 而队列保证了同一时刻最多只有这一个框。
         /// </summary>
+        /// <summary>解析插件清单里的 Extra 数组（附属数据文件）。</summary>
+        private static List<PluginExtraFile> ParseExtraFiles(JToken remoteInfo)
+        {
+            var list = new List<PluginExtraFile>();
+            if (remoteInfo?["Extra"] is not JArray array) return list;
+
+            foreach (var item in array.OfType<JObject>())
+            {
+                var name = item["Name"]?.ToString();
+                if (string.IsNullOrWhiteSpace(name)) continue;
+
+                list.Add(new PluginExtraFile
+                {
+                    Name = name,
+                    FileUrl = item["File"]?.ToString() ?? string.Empty,
+                    SHA256 = item["SHA256"]?.ToString() ?? string.Empty
+                });
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// 下载插件声明的附属数据文件，逐个校验哈希后写进插件目录。
+        ///
+        /// 任何一个下载或校验失败都判整次安装失败。附属文件里装的是安全规则这类东西，
+        /// 带着一份来路不明的版本上线，比干脆装不上危险得多——所以这里不做"尽力而为"。
+        /// </summary>
+        /// <returns>成功返回 null；失败返回给用户看的错误信息。</returns>
+        private async Task<string> DownloadExtraFilesAsync(HttpClient client, UnifiedPluginItem plugin, string targetDir)
+        {
+            if (plugin.Extra is null || plugin.Extra.Count == 0) return null;
+            if (string.IsNullOrEmpty(targetDir)) return "无法确定插件目录，附属文件安装失败";
+
+            foreach (var extra in plugin.Extra)
+            {
+                if (string.IsNullOrWhiteSpace(extra.Name) || string.IsNullOrWhiteSpace(extra.FileUrl))
+                {
+                    return $"附属文件条目不完整: {extra.Name}";
+                }
+
+                // 清单是远端内容，Name 里塞路径分隔符就能把文件写到插件目录之外
+                var safeName = Path.GetFileName(extra.Name);
+                if (string.IsNullOrEmpty(safeName) || safeName != extra.Name)
+                {
+                    return $"附属文件名非法: {extra.Name}";
+                }
+
+                // 没有哈希就等于没有校验，一律拒绝——附属文件的门槛不能比 DLL 松
+                var expected = extra.SHA256?.ToLowerInvariant() ?? "";
+                if (string.IsNullOrEmpty(expected))
+                {
+                    return $"附属文件缺少 SHA256，拒绝安装: {safeName}";
+                }
+
+                try
+                {
+                    var url = GetPluginStoreUrl(extra.FileUrl);
+                    Logger.Log($"Downloading extra file: {url}");
+                    var bytes = await client.GetByteArrayAsync(url);
+
+                    string actual;
+                    using (var sha256 = SHA256.Create())
+                    {
+                        actual = BitConverter.ToString(sha256.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
+                    }
+
+                    if (actual != expected)
+                    {
+                        Logger.Log($"Extra file hash mismatch for {safeName}: expected {expected}, got {actual}");
+                        return $"附属文件校验失败: {safeName}（期望 {expected}，实际 {actual}）";
+                    }
+
+                    var destination = Path.Combine(targetDir, safeName);
+                    File.WriteAllBytes(destination, bytes);
+                    Logger.Log($"Extra file written to: {destination}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to install extra file {safeName}: {ex.Message}");
+                    return $"附属文件下载失败: {safeName} - {ex.Message}";
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 删除插件的附属数据文件。
+        ///
+        /// 只删清单里明确列出的名字，不做通配清扫——插件目录里躺的是用户的其他插件，
+        /// 猜错一个名字就是误删。清单没加载时残留的数据文件是惰性的，重装会覆盖，无害。
+        /// </summary>
+        private void DeleteExtraFiles(UnifiedPluginItem plugin)
+        {
+            if (plugin.Extra is null || plugin.Extra.Count == 0) return;
+
+            var dir = !string.IsNullOrEmpty(plugin.LocalFilePath)
+                ? Path.GetDirectoryName(plugin.LocalFilePath)
+                : PluginManager.PluginPath;
+            if (string.IsNullOrEmpty(dir)) return;
+
+            foreach (var extra in plugin.Extra)
+            {
+                var safeName = Path.GetFileName(extra.Name ?? "");
+                if (string.IsNullOrEmpty(safeName)) continue;
+
+                var path = Path.Combine(dir, safeName);
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                        Logger.Log($"Deleted extra file: {path}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to delete extra file {path}: {ex.Message}");
+                }
+            }
+        }
+
         private async Task<PluginOperationResult> HandleInstallOrUpdatePlugin(UnifiedPluginItem plugin)
         {
             try
@@ -4278,14 +4424,29 @@ namespace VPetLLM.UI.Windows
                             // 继续安装，但使用实际下载的文件哈希值作为新的期望值
                             downloadedFileHash = downloadedFileHash ?? "unknown";
 
-                            // 额外的安全检查：验证文件是否为有效的.NET程序集
+                            // 额外的安全检查：验证文件是否为有效的 .NET 程序集。
+                            //
+                            // 这里绝不能用 Assembly.Load(byte[])：它把程序集永久载入默认
+                            // AssemblyLoadContext（卸载不掉，之后插件走可回收 ALC 加载还会撞车），
+                            // 并且会执行模块初始化器——等于在"校验"一个哈希已经对不上的下载文件时，
+                            // 先把它的代码跑一遍。这同时也是 .NET 恶意软件无文件加载的标志动作，
+                            // 杀软的启发式引擎会直接记账。
+                            //
+                            // 改成只读元数据：PEReader 不按可执行映像映射、不解析引用、不运行任何代码。
                             try
                             {
-                                using (var ms = new MemoryStream(data))
-                                {
-                                    var assembly = System.Reflection.Assembly.Load(data);
-                                    Logger.Log($"Assembly validation successful: {assembly.FullName}");
-                                }
+                                using var ms = new MemoryStream(data);
+                                using var peReader = new PE.PEReader(ms);
+
+                                if (!peReader.HasMetadata)
+                                    throw new BadImageFormatException("文件不含 CLI 元数据");
+
+                                var metadata = Meta.PEReaderExtensions.GetMetadataReader(peReader);
+                                if (!metadata.IsAssembly)
+                                    throw new BadImageFormatException("文件不是程序集(可能是 netmodule 或原生 DLL)");
+
+                                var asmDef = metadata.GetAssemblyDefinition();
+                                Logger.Log($"Assembly validation successful: {metadata.GetString(asmDef.Name)}, v{asmDef.Version}");
                             }
                             catch (Exception ex)
                             {
@@ -4344,6 +4505,14 @@ namespace VPetLLM.UI.Windows
                     {
                         Logger.Log($"Error verifying updated plugin file: {ex.Message}");
                         return PluginOperationResult.Fail($"无法验证更新后的插件文件: {ex.Message}");
+                    }
+
+                    // 附属数据文件必须赶在插件被加载之前就位：插件在 Initialize 里就要读它们，
+                    // 晚一步 TerminalPlugin 这类就会直接进 fail-closed 保护模式。
+                    var extraError = await DownloadExtraFilesAsync(client, plugin, Path.GetDirectoryName(filePath));
+                    if (extraError is not null)
+                    {
+                        return PluginOperationResult.Fail(extraError);
                     }
 
                     // 如果是更新操作，使用专门的更新方法
