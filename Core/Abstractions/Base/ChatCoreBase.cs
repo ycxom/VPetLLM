@@ -135,9 +135,18 @@ namespace VPetLLM.Core.Abstractions.Base
         protected static string DescribeImages(IReadOnlyList<byte[]> images)
             => $"{images.Count} 张，共 {images.Sum(i => i?.Length ?? 0)} bytes";
 
+        /// <summary>
+        /// 本轮请求要发往的节点是否开启了原生工具调用。各 Provider 在选定节点之后、
+        /// 构建历史之前设置；null 表示还没定（回退到按 provider 的粗略判断）。
+        ///
+        /// 节点混搭是有意的兼容配置，所以"要不要写那句优先用工具"必须跟着**这一轮**
+        /// 的节点走，不能按 provider 一刀切 —— 详见 SystemMessageProvider.GetSystemMessage。
+        /// </summary>
+        protected bool? CurrentNodeToolsEnabled { get; set; }
+
         protected string GetSystemMessage()
         {
-            return SystemMessageProvider.GetSystemMessage();
+            return SystemMessageProvider.GetSystemMessage(CurrentNodeToolsEnabled);
         }
 
         /// <summary>

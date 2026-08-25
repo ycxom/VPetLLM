@@ -294,6 +294,8 @@ namespace VPetLLM.Core.Providers.Chat
             var userContent = BuildMultimodalContent(prompt, images);
 
             // 构建历史消息（不包含图像）
+            // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+            CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, currentNode.EnableToolCall);
             List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
 
             // 构建请求消息列表
@@ -583,6 +585,8 @@ namespace VPetLLM.Core.Providers.Chat
             }
 
             // 构建请求数据，根据启用开关决定是否包含高级参数
+            // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+            CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, currentNode.EnableToolCall);
             List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
             // 如果有临时用户消息，添加到历史末尾用于API请求
             if (tempUserMessage is not null)

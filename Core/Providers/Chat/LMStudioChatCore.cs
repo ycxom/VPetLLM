@@ -90,6 +90,8 @@ namespace VPetLLM.Core.Providers.Chat
                 OnConversationTurn();
 
                 var tempUserMessage = CreateUserMessage(prompt);
+                // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _lmStudioSetting.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 if (tempUserMessage is not null)
                 {
@@ -321,6 +323,8 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var userContent = BuildMultimodalContent(prompt, images);
 
+                // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _lmStudioSetting.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 var requestMessages = new List<object>();
                 foreach (var msg in history)

@@ -110,6 +110,8 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 // 构建历史记录
+                // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _ollamaSetting.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
                 if (tempUserMessage is not null)
@@ -339,6 +341,8 @@ namespace VPetLLM.Core.Providers.Chat
                 // 使用 CreateUserMessage 自动设置时间戳和状态信息
                 var tempUserMessage = CreateUserMessage(prompt);
 
+                // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _ollamaSetting.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
                 if (tempUserMessage is not null)

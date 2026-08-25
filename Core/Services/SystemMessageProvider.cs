@@ -170,7 +170,19 @@ namespace VPetLLM.Core.Services
             return items;
         }
 
-        public string GetSystemMessage()
+        /// <param name="nodeToolsEnabled">
+        /// 本轮请求要发往的节点是否开启了原生工具调用。
+        ///
+        /// 必须按**节点**判断而不是按 provider：节点混搭是有意的兼容性配置
+        /// （新模型开工具、老模型走标记，负载均衡在它们之间轮询）。若沿用
+        /// "任一节点开了就写提示"的粗判，轮到没开工具的节点时，提示词会告诉模型
+        /// "本节点已开启原生工具调用，优先直接调用"，而请求里根本没有 tools ——
+        /// 模型只能把工具调用写进正文，实测就是 DeepSeek-R1 / Qwen2.5-7B 那种
+        /// <c>&lt;tool_call&gt;</c> 泄漏到回复里的样子。
+        ///
+        /// null 表示调用方不知道（提示词预览等场景），此时回退到粗略判断。
+        /// </param>
+        public string GetSystemMessage(bool? nodeToolsEnabled = null)
         {
             if (_settings is null || _mainWindow is null || _actionProcessor is null) return "";
 
@@ -441,15 +453,16 @@ namespace VPetLLM.Core.Services
                 // 开了原生工具调用就补一句优先级说明。
                 // 刻意**不**移除上面的标记说明：节点混搭时（有的节点开了工具、有的没开）
                 // 拿掉标记说明会让没开的那些节点彻底调不动插件，而多留着最多只是冗余。
-                if (Core.Tools.NativeToolSession.IsLikelyActive(_settings))
+                //
+                // 这句提示词说的是"**本节点**已开启原生工具调用"，所以判断依据必须是
+                // 本轮真正要发往的那个节点。调用方给了 nodeToolsEnabled 就用它；
+                // 给不了（比如提示词预览）才回退到"任一启用节点开了工具"的粗略判断。
+                var toolsForThisRequest = nodeToolsEnabled
+                                          ?? Core.Tools.NativeToolSession.IsLikelyActive(_settings);
+                if (toolsForThisRequest)
                 {
                     parts.Add(Core.Tools.NativeToolSession.BuildPromptNotice(lang));
                 }
-
-                // 上面那段注释说的"节点混搭"是能正常工作的，但对排查很不友好 ——
-                // 同样的输入这次走工具、下次走标记，看起来像功能不稳定。提醒一次。
-                var nodeWarning = Core.Tools.NativeToolSession.TakeNodeConsistencyWarning(_settings);
-                if (nodeWarning is not null) Logger.Log(nodeWarning);
 
                 // 有插件调用还挂在后台时告诉模型，避免它以为没执行成功又发一遍
                 var running = BackgroundPluginTasks.DescribeRunning(lang);

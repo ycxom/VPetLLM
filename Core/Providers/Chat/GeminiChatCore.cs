@@ -119,6 +119,8 @@ namespace VPetLLM.Core.Providers.Chat
 
             Logger.Log($"Gemini ChatWithImage: 发送多模态消息，图像大小: {DescribeImages(images)}");
 
+            // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+            CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, node.EnableToolCall);
             List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
 
             if (node.UseOpenAIAuth)
@@ -503,13 +505,9 @@ namespace VPetLLM.Core.Providers.Chat
 
             var tempUserMessage = CreateUserMessage(prompt);
 
-            List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
-            if (tempUserMessage is not null)
-            {
-                history.Add(tempUserMessage);
-            }
-            history = InjectRecordsIntoHistory(history);
-
+            // 节点必须在构建历史**之前**选好：系统提示词里那句"本节点已开启原生工具调用"
+            // 得按这一轮真正要发往的节点来写。GetCurrentGeminiSetting 会推进负载均衡的
+            // 轮换下标，所以整轮只能调这一次。
             var node = _geminiSetting.GetCurrentGeminiSetting("Chat");
             if (node is null)
             {
@@ -522,6 +520,14 @@ namespace VPetLLM.Core.Providers.Chat
                 ResponseHandler?.Invoke(noNodeError);
                 return "";
             }
+
+            CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, node.EnableToolCall);
+            List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
+            if (tempUserMessage is not null)
+            {
+                history.Add(tempUserMessage);
+            }
+            history = InjectRecordsIntoHistory(history);
 
             if (Settings?.Role?.Contains("VPetLLM_DeBug") == true)
             {
