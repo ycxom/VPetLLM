@@ -33,7 +33,11 @@ namespace VPetLLM.Handlers.Actions
                 string animation = null;
                 string bodyAnimation = null;
 
-                var match = new Regex("\"(.*?)\"(?:,\\s*([^,]*))?(?:,\\s*(.*))?").Match(value);
+                // Singleline：让 . 也匹配换行。回复本来就可能是多行的（列表、分段），
+                // 不加的话多行 say 整条匹配不上，会退回 text = value —— 连同外层引号
+                // 一起显示到气泡里。而 TTS 那侧走的是 [^"]* 字符类、本来就吃换行，
+                // 于是出现"念的是对的、显示的多了一对引号"这种别扭的不一致。
+                var match = new Regex("\"(.*?)\"(?:,\\s*([^,]*))?(?:,\\s*(.*))?", RegexOptions.Singleline).Match(value);
                 if (match.Success)
                 {
                     text = match.Groups[1].Value;

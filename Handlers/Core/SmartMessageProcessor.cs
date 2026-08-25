@@ -596,15 +596,21 @@ namespace VPetLLM.Handlers.Core
                 // 最终回复就变成了大白话，一长串 tool 格式的往返把输出格式冲掉了。
                 // 与其指望模型永远守规矩，不如在这里补齐：不带动画名的 say 会走默认说话动画，
                 // 和模型自己写 <|say_begin|> "文本" <|say_end|> 完全同路。
-                var plain = message.Trim();
+                // 必须带引号：ExtractSayText 只认 "文本"，不带引号会取出空串，
+                // 结果是动画播了但 TTS 没声音。SanitizeForSayMarker 已经把内部的
+                // 半角引号换掉了，所以这里只会有唯一一对引号，不存在歧义。
+                //
+                // 刻意**不写动画名**：SayHandler 收到 null 动画时不做临时状态切换，
+                // 直接用 Save.Mode（桌宠当前心情）去查 say 动画 —— 正好是我们要的兜底。
+                var plain = $"\"{SanitizeForSayMarker(message.Trim())}\"";
                 segments.Add(new MessageSegment
                 {
                     Type = SegmentType.Talk,
-                    Content = $"<|say_begin|> {SanitizeForSayMarker(plain)} <|say_end|>",
+                    Content = $"<|say_begin|> {plain} <|say_end|>",
                     ActionType = "say",
-                    ActionValue = SanitizeForSayMarker(plain)
+                    ActionValue = plain
                 });
-                Logger.LogVerbose($"SmartMessageProcessor: 没有找到动作指令，按默认说话动画处理");
+                Logger.LogVerbose($"SmartMessageProcessor: 没有找到动作指令，按当前心情的默认说话动画处理");
             }
             else
             {
