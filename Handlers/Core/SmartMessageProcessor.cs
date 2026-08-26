@@ -555,11 +555,23 @@ namespace VPetLLM.Handlers.Core
         /// </summary>
         /// <param name="message">原始消息</param>
         /// <returns>消息片段列表</returns>
-        private List<MessageSegment> ParseMessage(string message)
+        public static List<MessageSegment> ParseMessage(string message)
         {
             var segments = new List<MessageSegment>();
 
             Logger.LogVerbose($"SmartMessageProcessor: 开始解析消息，长度: {message.Length}");
+
+            // 先剥掉推理模型的思考块，再做任何解析。
+            //
+            // 顺序不能反：下面会把"标记之外的正文"捡回来当说话内容，而思考块整段
+            // 都在标记之外。不先剥掉的话，桌宠会把自己几百字的心理活动念出来，
+            // 思考里复述的指令格式还会被当成真指令执行。
+            if (Utils.Common.ReasoningFilter.ContainsReasoning(message))
+            {
+                var stripped = Utils.Common.ReasoningFilter.Strip(message);
+                Logger.LogVerbose($"SmartMessageProcessor: 剥离思考块 {message.Length} -> {stripped.Length} 字");
+                message = stripped;
+            }
 
             // 预处理：移除可能影响解析的多余空白字符（但保留引号内的内容）
             message = NormalizeMessage(message);
@@ -570,8 +582,22 @@ namespace VPetLLM.Handlers.Core
 
             Logger.LogVerbose($"SmartMessageProcessor: 检测到格式: {format}, 找到 {commands.Count} 个命令");
 
-            foreach (var command in commands)
+            // 按出现顺序处理，并把**落在标记之外**的正文一起捞回来。
+            //
+            // 模型经常只给正文套一对引号就完事，后面才跟命令：
+            //     "干嘛突然叫我名字呀？……"
+            //     <|happy_begin|> 5 <|happy_end|>
+            //     <|action_begin|> happy_shy <|action_end|>
+            // 这段话不在任何标记里，以前会被**整段丢掉** —— 桌宠做了表情却一声不吭。
+            // 而"零命令兜底"在这里不管用：明明有 2 条命令。
+            var ordered = commands.OrderBy(c => c.StartIndex).ToList();
+            var cursor = 0;
+
+            foreach (var command in ordered)
             {
+                AddStraySpeech(segments, message, cursor, command.StartIndex);
+                cursor = command.StartIndex + (command.FullMatch?.Length ?? 0);
+
                 string actionType = command.CommandType.ToLower();
                 string actionValue = command.Parameters;
                 string fullMatch = command.FullMatch;
@@ -587,30 +613,20 @@ namespace VPetLLM.Handlers.Core
                 });
             }
 
+            // 最后一条命令之后可能还有话
+            if (ordered.Count > 0)
+            {
+                AddStraySpeech(segments, message, cursor, message.Length);
+            }
+
             if (segments.Count == 0)
             {
-                // 没有找到动作指令：当成 say 处理，而不是当成"纯文本"。
-                //
-                // 纯文本分支只显示气泡，不走 SayHandler，于是**说话动画不会播** ——
-                // 桌宠一直卡在思考动画上。而模型丢掉标记是常事：实测跑完 9 轮工具循环后
-                // 最终回复就变成了大白话，一长串 tool 格式的往返把输出格式冲掉了。
-                // 与其指望模型永远守规矩，不如在这里补齐：不带动画名的 say 会走默认说话动画，
-                // 和模型自己写 <|say_begin|> "文本" <|say_end|> 完全同路。
-                // 必须带引号：ExtractSayText 只认 "文本"，不带引号会取出空串，
-                // 结果是动画播了但 TTS 没声音。SanitizeForSayMarker 已经把内部的
-                // 半角引号换掉了，所以这里只会有唯一一对引号，不存在歧义。
-                //
-                // 刻意**不写动画名**：SayHandler 收到 null 动画时不做临时状态切换，
-                // 直接用 Save.Mode（桌宠当前心情）去查 say 动画 —— 正好是我们要的兜底。
-                var plain = $"\"{SanitizeForSayMarker(message.Trim())}\"";
-                segments.Add(new MessageSegment
-                {
-                    Type = SegmentType.Talk,
-                    Content = $"<|say_begin|> {plain} <|say_end|>",
-                    ActionType = "say",
-                    ActionValue = plain
-                });
-                Logger.LogVerbose($"SmartMessageProcessor: 没有找到动作指令，按当前心情的默认说话动画处理");
+                // 一条命令都没有：整条消息当成 say
+                segments.Add(BuildFallbackSaySegment(message));
+                Logger.Log($"SmartMessageProcessor: 没有找到动作指令，按当前心情的默认说话动画处理");
+
+                global::VPetLLM.Core.Services.FormatComplianceTracker.Report(
+                    global::VPetLLM.Core.Services.FormatComplianceTracker.Violation.NoMarkers);
             }
             else
             {
@@ -623,7 +639,7 @@ namespace VPetLLM.Handlers.Core
         /// <summary>
         /// 标准化消息格式，移除可能影响解析的多余空白（保留引号内的内容）
         /// </summary>
-        private string NormalizeMessage(string message)
+        private static string NormalizeMessage(string message)
         {
             if (string.IsNullOrEmpty(message))
                 return message;
@@ -660,7 +676,7 @@ namespace VPetLLM.Handlers.Core
         /// <summary>
         /// 根据动作类型确定片段类型
         /// </summary>
-        private SegmentType GetSegmentTypeFromAction(string actionType)
+        private static SegmentType GetSegmentTypeFromAction(string actionType)
         {
             return actionType switch
             {
@@ -676,6 +692,58 @@ namespace VPetLLM.Handlers.Core
                 "body" => SegmentType.Action,
                 "plugin" => SegmentType.Action,
                 _ => SegmentType.Action
+            };
+        }
+
+        /// <summary>
+        /// 把 [start, end) 这段落在标记之外的文本补成一条 say 片段。
+        /// 只有纯空白或纯标点时跳过 —— 命令之间的换行、逗号不该变成一句话。
+        /// </summary>
+        private static void AddStraySpeech(List<MessageSegment> segments, string message, int start, int end)
+        {
+            if (start < 0 || end > message.Length || end <= start) return;
+
+            var stray = message.Substring(start, end - start).Trim();
+            if (stray.Length == 0) return;
+
+            // 至少要有一个字/数字才算"话"，否则命令之间的 "," "\n" 会被当成发言
+            if (!stray.Any(char.IsLetterOrDigit)) return;
+
+            segments.Add(BuildFallbackSaySegment(stray));
+            Logger.Log($"SmartMessageProcessor: 捡回标记外的正文（{stray.Length} 字），补为 say");
+
+            // 兜底能让这次不出错，但模型看不到自己被纠正过，下次照旧 —— 记一笔，
+            // 下一次请求的系统提示词里告诉它
+            global::VPetLLM.Core.Services.FormatComplianceTracker.Report(
+                global::VPetLLM.Core.Services.FormatComplianceTracker.Violation.StrayText);
+        }
+
+        /// <summary>
+        /// 把一段自由文本包成 say 片段，走和模型自己写 &lt;|say_begin|&gt; 完全相同的通路。
+        ///
+        /// 必须带引号：ExtractSayText 只认 <c>"文本"</c>，不带引号会取出空串，
+        /// 结果是动画播了但 TTS 没声音。SanitizeForSayMarker 已经把内部的半角引号
+        /// 换掉了，所以这里只会有唯一一对引号，不存在歧义。
+        ///
+        /// 刻意**不写动画名**：SayHandler 收到 null 动画时不做临时状态切换，
+        /// 直接用 Save.Mode（桌宠当前心情）去查 say 动画 —— 正好是我们要的兜底。
+        /// </summary>
+        private static MessageSegment BuildFallbackSaySegment(string text)
+        {
+            // 模型常常自己给正文套了一对引号，先剥掉，免得和下面加的那对叠成两层
+            var body = text.Trim();
+            if (body.Length >= 2 && body[0] == '"' && body[^1] == '"')
+            {
+                body = body.Substring(1, body.Length - 2).Trim();
+            }
+
+            var quoted = $"\"{SanitizeForSayMarker(body)}\"";
+            return new MessageSegment
+            {
+                Type = SegmentType.Talk,
+                Content = $"<|say_begin|> {quoted} <|say_end|>",
+                ActionType = "say",
+                ActionValue = quoted
             };
         }
 

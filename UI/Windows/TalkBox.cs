@@ -223,7 +223,11 @@ namespace VPetLLM.UI.Windows
                     return;
                 }
 
-                Logger.LogVerbose($"HandleResponse: 收到AI回复: {response}");
+                // 这条走 Log 而不是 LogVerbose：排查"消息解析对不对"时，原始回复是唯一
+                // 能作数的证据 —— 只看"检测到 N 个命令"分不清是模型没写、还是我们漏解析了。
+                // 而它偏偏是过去被静音的那一条，每次排查都得先让用户开 verbose 重现一遍。
+                // 流式分片会调很多次，所以截断；完整性判断看下面的 begin/end 计数就够。
+                Logger.Log($"HandleResponse: 收到AI回复: {Truncate(response, 400)}");
 
                 // 使用状态机管理流式处理
                 lock (_stateLock)
@@ -892,6 +896,13 @@ namespace VPetLLM.UI.Windows
         /// 修复：等待所有命令真正处理完成后再结束会话
         /// 修复：在外层管理独占会话，让会话覆盖所有命令
         /// </summary>
+        /// <summary>日志用：长回复截断，保留头部（命令都在前面）并标出原长度。</summary>
+        private static string Truncate(string text, int max)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= max) return text ?? "";
+            return text.Substring(0, max) + $"…[共 {text.Length} 字]";
+        }
+
         private async Task ProcessCompleteMessageAsStreaming(string completeMessage)
         {
             // 检查是否需要使用独占会话模式
@@ -929,9 +940,21 @@ namespace VPetLLM.UI.Windows
 
                 // 创建一个完成信号，用于等待所有命令处理完成
                 var allCommandsCompletedSource = new TaskCompletionSource<bool>();
-                var commandCount = 0;
                 var completedCount = 0;
                 var lockObject = new object();
+
+                // 命令总数必须在**投喂之前**就定下来。
+                //
+                // 原来它初值 0、等 Complete() 之后才赋值，而命令回调在投喂阶段就开始跑了：
+                // 第一条命令完成时比较的是 1 >= 0，当场判定"全部完成" —— 于是提前结束独占会话、
+                // 通知插件生命周期结束，剩下的命令在会话关闭之后才执行（实测 pinch 晚了 1 秒）。
+                //
+                // 这个数只是对原始消息做正则，不依赖 StreamingCommandProcessor 的任何状态，
+                // 放在后面纯属没必要 —— 注意它的队列是异步排空的，Complete() 返回时
+                // 后续命令可能还没派发出来，所以"派发计数"那类方案在这里同样不成立。
+                var commandCount = System.Text.RegularExpressions.Regex.Matches(
+                    completeMessage, @"<\|\w+_begin\|>").Count;
+                Logger.Log($"统一流式处理: 检测到 {commandCount} 个命令");
 
                 // 创建StreamingCommandProcessor来处理完整消息
                 var streamProcessor = new Handlers.Core.StreamingCommandProcessor(
@@ -988,24 +1011,10 @@ namespace VPetLLM.UI.Windows
                 // 完成处理（触发所有命令的处理）
                 streamProcessor.Complete();
 
-                // 获取命令总数
-                lock (lockObject)
+                // 没有命令就没有回调会来触发信号，这里直接放行
+                if (commandCount == 0)
                 {
-                    // StreamingCommandProcessor 会在 Complete() 后知道总共有多少命令
-                    // 我们需要从 StreamingCommandProcessor 获取这个信息
-                    // 暂时使用一个简单的方法：计算消息中的命令数量
-                    commandCount = System.Text.RegularExpressions.Regex.Matches(
-                        completeMessage, 
-                        @"<\|\w+_begin\|>"
-                    ).Count;
-                    
-                    Logger.Log($"统一流式处理: 检测到 {commandCount} 个命令");
-                    
-                    // 如果没有命令，直接完成
-                    if (commandCount == 0)
-                    {
-                        allCommandsCompletedSource.TrySetResult(true);
-                    }
+                    allCommandsCompletedSource.TrySetResult(true);
                 }
 
                 Logger.Log("统一流式处理: StreamingCommandProcessor.Complete() 已调用，等待所有命令处理完成...");
@@ -1014,10 +1023,22 @@ namespace VPetLLM.UI.Windows
                 // 必须同时等中断信号：中断会把队列里没执行的命令直接丢掉，
                 // 那些命令的完成计数永远补不齐，只等这个信号量就是永久挂起 ——
                 // 独占会话结束不了、_responseLock 也放不掉。
-                await Task.WhenAny(allCommandsCompletedSource.Task, InterruptManager.WhenInterruptedAsync());
-                Logger.Log(InterruptManager.IsInterrupted
-                    ? "统一流式处理: 被中断，不再等待剩余命令"
-                    : "统一流式处理: 所有命令处理完成");
+                // 再加一道超时兜底：命令总数是按消息里 <|xxx_begin|> 的出现次数数出来的，
+                // 而模型完全可能把标记字样写进 say 的文本里 —— 那时实际执行数会少于计数，
+                // 计数永远补不齐。没有超时的话这里会一直挂到用户手动中断为止，
+                // 而挂着的东西是独占会话和 _responseLock，桌宠会彻底不响应。
+                var safetyTimeout = Task.Delay(TimeSpan.FromMinutes(2));
+                var finished = await Task.WhenAny(
+                    allCommandsCompletedSource.Task,
+                    InterruptManager.WhenInterruptedAsync(),
+                    safetyTimeout);
+
+                if (InterruptManager.IsInterrupted)
+                    Logger.Log("统一流式处理: 被中断，不再等待剩余命令");
+                else if (finished == safetyTimeout)
+                    Logger.Log($"统一流式处理: 等待命令完成超时（{completedCount}/{commandCount}），继续收尾");
+                else
+                    Logger.Log("统一流式处理: 所有命令处理完成");
             }
             catch (Exception ex)
             {

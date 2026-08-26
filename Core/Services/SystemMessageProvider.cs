@@ -479,6 +479,15 @@ namespace VPetLLM.Core.Services
                 parts.Add(storedKeys);
             }
 
+            // 上一轮的格式纠正放在**最后**：越靠近输出位置的指令模型越容易照做，
+            // 而这条恰恰是要它立刻改的。取出即清，不重复唠叨。
+            var formatReminder = FormatComplianceTracker.TakeReminder(lang);
+            if (!string.IsNullOrEmpty(formatReminder))
+            {
+                Logger.Log($"SystemMessageProvider: 注入格式纠正提醒（{FormatComplianceTracker.Pending} -> 已清空）");
+                parts.Add(formatReminder);
+            }
+
             var systemMessage = string.Join("\n", parts);
             return systemMessage;
         }
