@@ -87,6 +87,13 @@ namespace VPetLLM.Core.Abstractions.Base
         protected void ReportFailure(string message)
         {
             LastCallFailed = true;
+
+            // 错误文本会和模型回复走同一条显示管线，但它**不是模型写的** ——
+            // 不打这个招呼的话，解析器会把 "OpenAI API 错误 [400]: {...}" 当成
+            // 一次"没有使用指令标记"的格式违规，于是下一次请求去教训模型：
+            // "你上一次回复完全没有使用标记"。模型压根没回过话。
+            Core.Services.FormatComplianceTracker.SuppressNext();
+
             ResponseHandler?.Invoke(message);
         }
 
@@ -768,29 +775,36 @@ namespace VPetLLM.Core.Abstractions.Base
             // 记忆检索已移至 Tool/Handler 机制 (<|retrieve_memories_begin|> query <|retrieve_memories_end|>)
             // 由 AI 主动决定何时需要检索，不再自动匹配注入
 
+            var systemContent = GetSystemMessage();
+            var keepContext = Settings?.KeepContext ?? true;
+            var overflowMode = Settings?.OverflowMode == Setting.ContextOverflowMode.Overflow;
+
+            // 长上下文模式的总结**拼进这条 system**，而不是另起一条。
+            //
+            // 原来是 history.Add 一条 role=system 放在 index 1。宽松的服务端不在乎，
+            // 但严格的 OpenAI 兼容实现（自建 vLLM 就是）要求 system 只能有一条且必须在最前，
+            // 多一条直接 400 "System message must be at the beginning." ——
+            // 于是只要历史长到产生了总结，那个节点上的对话就再也发不出去。
+            // 拼在一起对模型没有区别：两条都是系统级上下文。
+            if (keepContext && overflowMode
+                && OverflowManager?.LatestSummary is string summary && summary.Length > 0)
+            {
+                systemContent += $"\n\n[Previous Conversation Summary]\n{summary}\n[/Previous Conversation Summary]";
+            }
+
             var history = new List<Message>
             {
-                new Message { Role = "system", Content = GetSystemMessage() }
+                new Message { Role = "system", Content = systemContent }
             };
 
             // 当 KeepContext = true 时才包含历史消息，false 时只使用系统消息
-            if (Settings?.KeepContext ?? true)
+            if (keepContext)
             {
-                if (Settings?.OverflowMode == Setting.ContextOverflowMode.Overflow)
+                if (overflowMode)
                 {
                     // Overflow mode（总结+滑动窗口）：已总结的消息不再进入 prompt，
-                    // 由 [Previous Conversation Summary] 承载其信息
+                    // 由上面拼进 system 的 [Previous Conversation Summary] 承载其信息
                     var fullHistory = HistoryManager.GetHistory();
-
-                    // Inject overflow summary as a system message if it exists
-                    if (OverflowManager?.LatestSummary is string summary && summary.Length > 0)
-                    {
-                        history.Add(new Message
-                        {
-                            Role = "system",
-                            Content = $"[Previous Conversation Summary]\n{summary}\n[/Previous Conversation Summary]"
-                        });
-                    }
 
                     // 只发送检查点之后的消息（检查点可能因外部编辑超出当前历史，需钳制）
                     var windowStart = Math.Min(OverflowManager?.LastSummarizedIndex ?? 0, fullHistory.Count);

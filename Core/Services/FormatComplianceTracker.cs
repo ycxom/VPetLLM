@@ -23,6 +23,19 @@ namespace VPetLLM.Core.Services
 
         private static readonly object Gate = new();
         private static Violation _pending = Violation.None;
+        private static bool _suppressNext;
+
+        /// <summary>
+        /// 下一条走显示管线的内容不是模型写的（错误提示、系统通知等），别当成违规。
+        ///
+        /// 这些文本和模型回复共用一条管线，解析器分不出来 —— 不挡的话
+        /// "OpenAI API 错误 [400]: {...}" 会被记成"没有使用指令标记"，
+        /// 下一次请求就去教训一个压根没回过话的模型。
+        /// </summary>
+        public static void SuppressNext()
+        {
+            lock (Gate) _suppressNext = true;
+        }
 
         /// <summary>
         /// 记一次违规。同一轮里多种违规时以"完全没有标记"为准 ——
@@ -34,6 +47,13 @@ namespace VPetLLM.Core.Services
 
             lock (Gate)
             {
+                if (_suppressNext)
+                {
+                    // 只挡这一次：错误消息处理完就恢复正常判定
+                    _suppressNext = false;
+                    return;
+                }
+
                 if (_pending == Violation.NoMarkers) return;
                 _pending = violation;
             }
@@ -63,7 +83,11 @@ namespace VPetLLM.Core.Services
         /// <summary>测试与"切换 provider 重来"用：丢掉待发提醒。</summary>
         public static void Reset()
         {
-            lock (Gate) _pending = Violation.None;
+            lock (Gate)
+            {
+                _pending = Violation.None;
+                _suppressNext = false;
+            }
         }
 
         public static string Describe(Violation violation, string? language)

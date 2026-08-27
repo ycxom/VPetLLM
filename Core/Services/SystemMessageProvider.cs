@@ -481,10 +481,12 @@ namespace VPetLLM.Core.Services
 
             // 上一轮的格式纠正放在**最后**：越靠近输出位置的指令模型越容易照做，
             // 而这条恰恰是要它立刻改的。取出即清，不重复唠叨。
+            // 注意先记下种类再取 —— TakeReminder 会清空，取完再读 Pending 永远是 None
+            var pendingKind = FormatComplianceTracker.Pending;
             var formatReminder = FormatComplianceTracker.TakeReminder(lang);
             if (!string.IsNullOrEmpty(formatReminder))
             {
-                Logger.Log($"SystemMessageProvider: 注入格式纠正提醒（{FormatComplianceTracker.Pending} -> 已清空）");
+                Logger.Log($"SystemMessageProvider: 注入格式纠正提醒（{pendingKind}）");
                 parts.Add(formatReminder);
             }
 
