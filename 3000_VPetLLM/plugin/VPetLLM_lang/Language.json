@@ -136,6 +136,30 @@
       "zh-hant": "按供應商分離聊天記錄",
       "jp": "プロバイダー別にチャットを分離する"
     },
+    "RecordThinkingInContext": {
+      "en": "Record thinking content (think) in context",
+      "zh-hans": "在上下文中记录思考内容 (think)",
+      "zh-hant": "在上下文中記錄思考內容 (think)",
+      "jp": "コンテキストに思考内容 (think) を記録する"
+    },
+    "RecordThinkingInContextTip": {
+      "en": "When off, the <think> reasoning block of reasoning models is no longer written to chat history — cleaner context, fewer tokens. Bubbles and voice are unaffected.",
+      "zh-hans": "关闭后，推理模型回复中的 <think> 思考块不再写入对话历史，上下文更干净、更省 token。不影响气泡与语音。",
+      "zh-hant": "關閉後，推理模型回覆中的 <think> 思考塊不再寫入對話歷史，上下文更乾淨、更省 token。不影響氣泡與語音。",
+      "jp": "オフにすると、推論モデルの <think> 思考ブロックが会話履歴に書き込まれなくなり、コンテキストがすっきりしてトークンを節約できます。吹き出しと音声には影響しません。"
+    },
+    "ThinkingEffort": {
+      "en": "Thinking Effort",
+      "zh-hans": "思考强度",
+      "zh-hant": "思考強度",
+      "jp": "思考の強度"
+    },
+    "ThinkingEffortTip": {
+      "en": "Reasoning effort for reasoning models. Default sends no parameter and lets the server decide; keep Default for non-reasoning models or some APIs will error.",
+      "zh-hans": "推理模型的思考强度。默认为不发送该参数，交由服务端决定；非推理模型请保持默认，否则部分接口会报错。",
+      "zh-hant": "推理模型的思考強度。預設為不發送該參數，交由伺服端決定；非推理模型請保持預設，否則部分介面會報錯。",
+      "jp": "推論モデルの思考の強度。デフォルトではパラメータを送信せずサーバーに委ねます。非推論モデルではデフォルトのままにしてください。一部のAPIではエラーになります。"
+    },
     "EnableRecords": {
       "en": "Enhanced Memory (Important Records)",
       "zh-hans": "强化记忆（重要事情记录器）",
@@ -497,6 +521,38 @@
       "zh-hans": "仅聊天压缩",
       "zh-hant": "僅聊天壓縮",
       "jp": "圧縮のみ"
+    }
+  },
+  "ThinkingEffort": {
+    "Default": {
+      "en": "Default (don't send)",
+      "zh-hans": "默认（不发送）",
+      "zh-hant": "預設（不發送）",
+      "jp": "デフォルト（送信しない）"
+    },
+    "Minimal": {
+      "en": "Minimal",
+      "zh-hans": "最小",
+      "zh-hant": "最小",
+      "jp": "最小"
+    },
+    "Low": {
+      "en": "Low",
+      "zh-hans": "低",
+      "zh-hant": "低",
+      "jp": "低"
+    },
+    "Medium": {
+      "en": "Medium",
+      "zh-hans": "中",
+      "zh-hant": "中",
+      "jp": "中"
+    },
+    "High": {
+      "en": "High",
+      "zh-hans": "高",
+      "zh-hant": "高",
+      "jp": "高"
     }
   },
   "ChannelProxyMode": {

@@ -69,12 +69,17 @@ namespace VPetLLM.Core.Abstractions.Base
             if (loop is null || loop.Transcript.Count == 0) return;
             if (!(Settings?.KeepContext ?? true)) return;
 
+            var stripThinking = !(Settings?.RecordThinkingInContext ?? true);
             foreach (var entry in loop.Transcript)
             {
+                var content = entry.Content;
+                if (stripThinking && entry.Role != "user")
+                    content = Utils.Common.ReasoningFilter.Strip(content);
+
                 await HistoryManager.AddMessage(new Message
                 {
                     Role = entry.Role,
-                    Content = entry.Content,
+                    Content = content,
                     // 结果消息标成 Plugin，和 ResultAggregator 回灌的那条同类
                     MessageType = entry.Role == "user" ? "Plugin" : null
                 });
@@ -208,6 +213,20 @@ namespace VPetLLM.Core.Abstractions.Base
             return string.IsNullOrWhiteSpace(message)
                 ? InterruptedMarker.TrimStart('\n')
                 : message + InterruptedMarker;
+        }
+
+        /// <summary>
+        /// 助手回复**入库前**的统一加工：按 <see cref="Setting.RecordThinkingInContext"/> 决定是否
+        /// 剥掉思考块（&lt;think&gt;…&lt;/think&gt; 等），再补上（可能的）中断标记。
+        ///
+        /// 所有 Provider 存 assistant 消息都必须走这里，不要直接调 <see cref="AppendInterruptMarker"/>。
+        /// 气泡/语音那一层的思考剥离在 SmartMessageProcessor 里，与本方法互不影响。
+        /// </summary>
+        protected string PrepareAssistantHistoryContent(string message)
+        {
+            if (!(Settings?.RecordThinkingInContext ?? true))
+                message = Utils.Common.ReasoningFilter.Strip(message);
+            return AppendInterruptMarker(message);
         }
 
         /// <summary>

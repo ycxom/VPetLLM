@@ -462,6 +462,12 @@
                                         Margin="0,0,0,8"
                                         IsChecked="True"
                                         Style="{StaticResource ModernCheckBox}"/>
+                                <CheckBox x:Name="CheckBox_RecordThinkingInContext"
+                                        Content="{utils:Localize KeyPath=LLM_Settings.RecordThinkingInContext, Default=在上下文中记录思考内容 (think)}"
+                                        ToolTip="{utils:Localize KeyPath=LLM_Settings.RecordThinkingInContextTip, Default=关闭后，推理模型回复中的 &lt;think&gt; 思考块不再写入对话历史，上下文更干净、更省 token。不影响气泡与语音。}"
+                                        Margin="0,0,0,8"
+                                        IsChecked="True"
+                                        Style="{StaticResource ModernCheckBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableRecords"
                                         Content="{utils:Localize KeyPath=LLM_Settings.EnableRecords}"
                                         Margin="0,0,0,16"
@@ -634,6 +640,15 @@
                 <CheckBox x:Name="CheckBox_EnableVision" Content="{utils:Localize KeyPath=LLM_Settings.EnableVision}" Margin="0,0,0,8" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableVision_Checked" Unchecked="CheckBox_EnableVision_Unchecked"/>
                 <CheckBox x:Name="CheckBox_EnableToolCall" Content="{utils:Localize KeyPath=LLM_Settings.EnableToolCall, Default=启用原生工具调用 (function calling)}" Margin="0,0,0,4" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableToolCall_Checked" Unchecked="CheckBox_EnableToolCall_Unchecked"/>
                 <TextBlock x:Name="TextBlock_EnableToolCallTip" Text="{utils:Localize KeyPath=LLM_Settings.EnableToolCallTip, Default=以模型原生的 tools 参数暴露插件，替代文本标记。仅在该模型确实支持时开启；开启后本节点的回复不再流式输出。}" TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="24,0,0,16"/>
+                <Label x:Name="Label_ThinkingEffort" Content="{utils:Localize KeyPath=LLM_Settings.ThinkingEffort, Default=思考强度:}" Style="{StaticResource SettingLabel}"/>
+                <ComboBox x:Name="ComboBox_ThinkingEffort" Margin="0,0,0,16" Style="{StaticResource ModernComboBox}" SelectionChanged="ComboBox_ThinkingEffort_SelectionChanged"
+                        ToolTip="{utils:Localize KeyPath=LLM_Settings.ThinkingEffortTip, Default=推理模型的思考强度。默认为不发送该参数，交由服务端决定；非推理模型请保持默认，否则部分接口会报错。}">
+                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_Default" Content="{utils:Localize KeyPath=ThinkingEffort.Default, Default=默认（不发送）}" Tag="Default"/>
+                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_Minimal" Content="{utils:Localize KeyPath=ThinkingEffort.Minimal, Default=最小}" Tag="Minimal"/>
+                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_Low" Content="{utils:Localize KeyPath=ThinkingEffort.Low, Default=低}" Tag="Low"/>
+                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_Medium" Content="{utils:Localize KeyPath=ThinkingEffort.Medium, Default=中}" Tag="Medium"/>
+                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_High" Content="{utils:Localize KeyPath=ThinkingEffort.High, Default=高}" Tag="High"/>
+                </ComboBox>
                 <Label x:Name="Label_ChannelMode" Content="{utils:Localize KeyPath=LLM_Settings.ChannelMode, Default=渠道模式:}" Style="{StaticResource SettingLabel}"/>
                 <ComboBox x:Name="ComboBox_ChannelMode" Margin="0,0,0,16" Style="{StaticResource ModernComboBox}" SelectionChanged="ComboBox_ChannelMode_SelectionChanged">
                     <ComboBoxItem x:Name="ComboBoxItem_ChannelMode_Unrestricted" Content="{utils:Localize KeyPath=ChannelMode.Unrestricted, Default=无限制}" Tag="Unrestricted"/>

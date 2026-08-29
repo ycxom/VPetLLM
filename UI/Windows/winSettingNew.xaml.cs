@@ -526,6 +526,8 @@ namespace VPetLLM.UI.Windows
 
             ((CheckBox)this.FindName("CheckBox_KeepContext")).Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).Click += Control_Click;
+            if (this.FindName("CheckBox_RecordThinkingInContext") is CheckBox cbRecordThinkingClick)
+                cbRecordThinkingClick.Click += Control_Click;
             ((CheckBox)this.FindName("CheckBox_EnableRecords")).Click += Control_Click;
             ((TextBox)this.FindName("TextBox_WeightDecayTurns")).TextChanged += Control_TextChanged;
             ((TextBox)this.FindName("TextBox_MaxRecordsLimit")).TextChanged += Control_TextChanged;
@@ -1079,6 +1081,8 @@ namespace VPetLLM.UI.Windows
 
             ((CheckBox)this.FindName("CheckBox_KeepContext")).IsChecked = _plugin.Settings.KeepContext;
             ((CheckBox)this.FindName("CheckBox_SeparateChatByProvider")).IsChecked = _plugin.Settings.SeparateChatByProvider;
+            if (this.FindName("CheckBox_RecordThinkingInContext") is CheckBox cbRecordThinking)
+                cbRecordThinking.IsChecked = _plugin.Settings.RecordThinkingInContext;
             ((CheckBox)this.FindName("CheckBox_EnableRecords")).IsChecked = _plugin.Settings.Records?.EnableRecords ?? true;
             ((TextBox)this.FindName("TextBox_LLM_RequestTimeout")).Text = _plugin.Settings.LLMRequestTimeoutSeconds.ToString();
 
@@ -1586,6 +1590,8 @@ namespace VPetLLM.UI.Windows
 
             _plugin.Settings.KeepContext = keepContextCheckBox.IsChecked ?? true;
             _plugin.Settings.SeparateChatByProvider = separateChatByProviderCheckBox.IsChecked ?? true;
+            if (this.FindName("CheckBox_RecordThinkingInContext") is CheckBox recordThinkingCheckBox)
+                _plugin.Settings.RecordThinkingInContext = recordThinkingCheckBox.IsChecked ?? true;
             if (_plugin.Settings.Records is null) _plugin.Settings.Records = new Setting.RecordSettings();
             _plugin.Settings.Records.EnableRecords = enableRecordsCheckBox.IsChecked ?? true;
 
@@ -5888,6 +5894,21 @@ namespace VPetLLM.UI.Windows
                         }
                         break;
                 }
+
+                // 思考强度对所有渠道通用，节点类型不同但属性名一致，统一在 switch 之后回填
+                var cbThinkingEffort = this.FindName("ComboBox_ThinkingEffort") as ComboBox;
+                if (cbThinkingEffort != null)
+                {
+                    var effort = GetNodeThinkingEffort(selectedNode).ToString();
+                    foreach (ComboBoxItem item in cbThinkingEffort.Items)
+                    {
+                        if (item.Tag?.ToString() == effort)
+                        {
+                            cbThinkingEffort.SelectedItem = item;
+                            break;
+                        }
+                    }
+                }
             }
             finally
             {
@@ -6773,6 +6794,17 @@ namespace VPetLLM.UI.Windows
                     break;
             }
 
+            // 思考强度对所有渠道通用，统一在 switch 之后写回
+            var cbThinkingEffort = this.FindName("ComboBox_ThinkingEffort") as ComboBox;
+            if (cbThinkingEffort?.SelectedItem is ComboBoxItem thinkItem
+                && Enum.TryParse<Setting.ThinkingEffort>(thinkItem.Tag?.ToString() ?? "Default", out var effort))
+            {
+                SetNodeThinkingEffort(selectedNode, effort);
+                // FreeChatCore 读的是 FreeSetting 顶层属性，需同步（与上面 EnableStreaming 等一致）
+                if (selectedNode is Setting.FreeNodeSetting)
+                    _plugin.Settings.Free.ThinkingEffort = effort;
+            }
+
             // 保存并恢复滚动位置以防止刷新时回到顶部
             if (listView != null)
             {
@@ -7002,6 +7034,37 @@ namespace VPetLLM.UI.Windows
             if (_isUpdatingNodeDetails) return;
             SaveCurrentNodeChanges();
             ScheduleSecretSave();
+        }
+
+        private void ComboBox_ThinkingEffort_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingNodeDetails) return;
+            SaveCurrentNodeChanges();
+            ScheduleSecretSave();
+        }
+
+        /// <summary>读取任意渠道节点的思考强度（各节点类型属性名一致，但无公共基类，只能逐类型匹配）。</summary>
+        private static Setting.ThinkingEffort GetNodeThinkingEffort(object? node) => node switch
+        {
+            Setting.OpenAINodeSetting n => n.ThinkingEffort,
+            Setting.GeminiNodeSetting n => n.ThinkingEffort,
+            Setting.OllamaNodeSetting n => n.ThinkingEffort,
+            Setting.LMStudioNodeSetting n => n.ThinkingEffort,
+            Setting.FreeNodeSetting n => n.ThinkingEffort,
+            _ => Setting.ThinkingEffort.Default
+        };
+
+        /// <summary>把思考强度写回任意渠道节点。</summary>
+        private static void SetNodeThinkingEffort(object? node, Setting.ThinkingEffort effort)
+        {
+            switch (node)
+            {
+                case Setting.OpenAINodeSetting n: n.ThinkingEffort = effort; break;
+                case Setting.GeminiNodeSetting n: n.ThinkingEffort = effort; break;
+                case Setting.OllamaNodeSetting n: n.ThinkingEffort = effort; break;
+                case Setting.LMStudioNodeSetting n: n.ThinkingEffort = effort; break;
+                case Setting.FreeNodeSetting n: n.ThinkingEffort = effort; break;
+            }
         }
 
         private void ComboBox_UrlPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)

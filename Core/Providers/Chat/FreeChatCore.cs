@@ -200,7 +200,9 @@ namespace VPetLLM.Core.Providers.Chat
                     stream = useStreaming
                 };
 
-                var json = JsonConvert.SerializeObject(requestBody);
+                var requestPayload = JObject.FromObject(requestBody);
+                Utils.Common.ReasoningEffortHelper.Apply(requestPayload, _freeSetting.ThinkingEffort, Utils.Common.ReasoningApiStyle.OpenAIChat);
+                var json = requestPayload.ToString(Formatting.None);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 string message = "";
@@ -214,7 +216,7 @@ namespace VPetLLM.Core.Providers.Chat
                     Settings, Tools.FreeToolCapability.ShouldAttachTools());
                 if (imageToolSession is not null)
                 {
-                    var attempt = await TryChatWithNativeToolsAsync(requestBody, imageToolSession, recordVerdict: false);
+                    var attempt = await TryChatWithNativeToolsAsync(requestPayload, imageToolSession, recordVerdict: false);
                     if (attempt.Completed)
                     {
                         message = attempt.Message;
@@ -333,7 +335,7 @@ namespace VPetLLM.Core.Providers.Chat
                         await HistoryManager.AddMessage(userMessage);
                     }
                     await PersistToolCallTraceAsync(imageToolLoop);
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = PrepareAssistantHistoryContent(message) });
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
                 }
@@ -429,7 +431,9 @@ namespace VPetLLM.Core.Providers.Chat
                     stream = _freeSetting.EnableStreaming
                 };
 
-                var json = JsonConvert.SerializeObject(requestBody);
+                var requestPayload = JObject.FromObject(requestBody);
+                Utils.Common.ReasoningEffortHelper.Apply(requestPayload, _freeSetting.ThinkingEffort, Utils.Common.ReasoningApiStyle.OpenAIChat);
+                var json = requestPayload.ToString(Formatting.None);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 string message;
@@ -440,7 +444,7 @@ namespace VPetLLM.Core.Providers.Chat
                     Settings, Tools.FreeToolCapability.ShouldAttachTools());
                 if (toolSession is not null)
                 {
-                    var attempt = await TryChatWithNativeToolsAsync(requestBody, toolSession);
+                    var attempt = await TryChatWithNativeToolsAsync(requestPayload, toolSession);
                     if (attempt.Completed)
                     {
                         message = attempt.Message;
@@ -526,7 +530,7 @@ namespace VPetLLM.Core.Providers.Chat
                             {
                                 await HistoryManager.AddMessage(tempUserMessage);
                             }
-                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
+                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = PrepareAssistantHistoryContent(message) });
                             SaveHistory();
 
                             TriggerOverflowCheckAfterSuccess();
@@ -596,7 +600,7 @@ namespace VPetLLM.Core.Providers.Chat
                             {
                                 await HistoryManager.AddMessage(tempUserMessage);
                             }
-                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
+                            await HistoryManager.AddMessage(new Message { Role = "assistant", Content = PrepareAssistantHistoryContent(message) });
                             SaveHistory();
 
                             TriggerOverflowCheckAfterSuccess();
@@ -929,7 +933,7 @@ namespace VPetLLM.Core.Providers.Chat
             await HistoryManager.AddMessage(new Message
             {
                 Role = "assistant",
-                Content = AppendInterruptMarker(message)
+                Content = PrepareAssistantHistoryContent(message)
             });
             SaveHistory();
 

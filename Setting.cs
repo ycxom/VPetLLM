@@ -37,6 +37,15 @@ namespace VPetLLM
 
         public bool FollowVPetName { get; set; } = true;
         public bool KeepContext { get; set; } = true;
+
+        /// <summary>
+        /// 是否把推理模型的思考内容（&lt;think&gt;…&lt;/think&gt; 等标记块）记录进对话历史。
+        ///
+        /// 关闭后，存入历史的 assistant 消息会先经 <see cref="Utils.Common.ReasoningFilter"/>
+        /// 剥掉思考块再落库 —— 上下文更干净、更省 token，代价是模型下一轮看不到自己上一轮的
+        /// 思考过程。不影响气泡/语音（那一层本来就 always 剥），也不影响本轮解析。
+        /// </summary>
+        public bool RecordThinkingInContext { get; set; } = true;
         public bool SeparateChatByProvider { get; set; } = false;
         public bool LogAutoScroll { get; set; } = true;
         public int MaxLogCount { get; set; } = 1000;
@@ -987,6 +996,8 @@ namespace VPetLLM
             public bool EnableStreaming { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "Ollama节点";
+            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
+            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
             public bool EnableVision { get; set; } = false;
             /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
             public bool EnableToolCall { get; set; } = false;
@@ -1102,6 +1113,8 @@ namespace VPetLLM
             public bool EnableStreaming { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "OpenAI节点";
+            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
+            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
             public bool EnableVision { get; set; } = false;
             /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
             public bool EnableToolCall { get; set; } = false;
@@ -1264,6 +1277,8 @@ namespace VPetLLM
             public bool EnableStreaming { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "Gemini节点";
+            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
+            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
             public bool EnableVision { get; set; } = false;
             /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
             public bool EnableToolCall { get; set; } = false;
@@ -1396,6 +1411,8 @@ namespace VPetLLM
         public class FreeNodeSetting
         {
             public string Name { get; set; } = "Free";
+            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
+            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
             public string? Model { get; set; }
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
@@ -1415,6 +1432,8 @@ namespace VPetLLM
             public bool EnableLoadBalancing { get; set; } = true;
 
             public string? Model { get; set; }
+            /// <summary>当前 Free 节点的思考强度（由 UI 从选中节点同步过来，供 FreeChatCore 读取）。</summary>
+            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
             public double Temperature { get; set; } = 0.7;
             public int MaxTokens { get; set; } = 2048;
             public bool EnableAdvanced { get; set; } = false;
@@ -1434,6 +1453,8 @@ namespace VPetLLM
             public bool EnableStreaming { get; set; } = false;
             public bool Enabled { get; set; } = true;
             public string Name { get; set; } = "LM Studio节点";
+            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
+            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
             public bool EnableVision { get; set; } = false;
             /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
             public bool EnableToolCall { get; set; } = false;
@@ -1629,6 +1650,26 @@ namespace VPetLLM
         {
             Compression,  // 有损压缩（旧机制，默认）
             Overflow      // 溢出模式（新机制：不压缩，超出阈值的聊天内容挤出并总结为记忆点）
+        }
+
+        /// <summary>
+        /// 推理模型的思考强度（reasoning effort / thinking budget）。
+        ///
+        /// <see cref="Default"/> = 不发送任何思考相关参数，完全交给服务端/模型默认行为
+        /// （即改动前的现状）。其余档位按各家 API 的字段翻译：
+        ///   OpenAI/LMStudio/Free → reasoning_effort: minimal|low|medium|high
+        ///   OpenAI Responses     → reasoning.effort
+        ///   Gemini               → generationConfig.thinkingConfig.thinkingBudget
+        ///   Ollama               → think: low|medium|high（老版本只认 bool，字符串对它等价于 true）
+        /// 见 <see cref="Utils.Common.ReasoningEffortHelper"/>。
+        /// </summary>
+        public enum ThinkingEffort
+        {
+            Default = 0,
+            Minimal = 1,
+            Low = 2,
+            Medium = 3,
+            High = 4
         }
 
         public enum ChannelMode

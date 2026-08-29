@@ -57,6 +57,19 @@ namespace VPetLLM.Core.Providers.Chat
             return node?.ProxyMode ?? Setting.ChannelProxyMode.FollowDefault;
         }
 
+        /// <summary>
+        /// 当前节点的思考强度。单节点构造时 LMStudioNodes 里就是那一个节点（几乎总是这条路）；
+        /// 取不到就 Default（不发送该参数）。
+        /// </summary>
+        private Setting.ThinkingEffort GetThinkingEffort()
+        {
+            if (_lmStudioSetting is null) return Setting.ThinkingEffort.Default;
+            var node = _lmStudioSetting.LMStudioNodes.Count >= 1
+                ? _lmStudioSetting.LMStudioNodes[0]
+                : _lmStudioSetting.GetCurrentLMStudioSetting();
+            return node?.ThinkingEffort ?? Setting.ThinkingEffort.Default;
+        }
+
         private string GetCurrentApiUrl()
         {
             string apiUrl = _lmStudioSetting.Url;
@@ -129,6 +142,7 @@ namespace VPetLLM.Core.Providers.Chat
                     Settings, _lmStudioSetting.EnableToolCall);
 
                 var payload = JObject.FromObject(data);
+                Utils.Common.ReasoningEffortHelper.Apply(payload, GetThinkingEffort(), Utils.Common.ReasoningApiStyle.OpenAIChat);
                 if (toolSession is not null)
                 {
                     toolSession.AttachOpenAiTools(payload);
@@ -248,7 +262,7 @@ namespace VPetLLM.Core.Providers.Chat
                         await HistoryManager.AddMessage(tempUserMessage);
                     }
                     await PersistToolCallTraceAsync(toolLoop);
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = PrepareAssistantHistoryContent(message) });
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
                 }
@@ -362,6 +376,7 @@ namespace VPetLLM.Core.Providers.Chat
                     Settings, _lmStudioSetting.EnableToolCall);
 
                 var toolPayload = JObject.FromObject(data);
+                Utils.Common.ReasoningEffortHelper.Apply(toolPayload, GetThinkingEffort(), Utils.Common.ReasoningApiStyle.OpenAIChat);
                 if (toolSession is not null)
                 {
                     toolSession.AttachOpenAiTools(toolPayload);
@@ -369,7 +384,7 @@ namespace VPetLLM.Core.Providers.Chat
                     toolPayload["stream"] = false;
                 }
 
-                var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                var content = new StringContent(toolPayload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
             global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
                 string message;
 
@@ -482,7 +497,7 @@ namespace VPetLLM.Core.Providers.Chat
                         await HistoryManager.AddMessage(tempUserMessage);
                     }
                     await PersistToolCallTraceAsync(toolLoop);
-                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
+                    await HistoryManager.AddMessage(new Message { Role = "assistant", Content = PrepareAssistantHistoryContent(message) });
                     SaveHistory();
                     TriggerOverflowCheckAfterSuccess();
                 }

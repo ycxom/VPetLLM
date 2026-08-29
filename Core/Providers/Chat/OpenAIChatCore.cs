@@ -363,6 +363,8 @@ namespace VPetLLM.Core.Providers.Chat
             // 多模态请求同样可以带工具：模型看完图之后往往正需要调插件（查天气、开应用、搜网页）。
             var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, currentNode.EnableToolCall);
             var toolPayload = JObject.FromObject(data);
+            Utils.Common.ReasoningEffortHelper.Apply(toolPayload, currentNode.ThinkingEffort,
+                useResponses ? Utils.Common.ReasoningApiStyle.OpenAIResponses : Utils.Common.ReasoningApiStyle.OpenAIChat);
             if (toolSession is not null)
             {
                 if (useResponses)
@@ -373,7 +375,7 @@ namespace VPetLLM.Core.Providers.Chat
                 toolPayload["stream"] = false;
             }
 
-            var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+            var content = new StringContent(toolPayload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
             global::VPetLLM.Core.Tools.NativeToolLoopResult? toolLoop = null;
             string message;
 
@@ -529,7 +531,7 @@ namespace VPetLLM.Core.Providers.Chat
                     await HistoryManager.AddMessage(userMessage);
                 }
                 await PersistToolCallTraceAsync(toolLoop);
-                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = PrepareAssistantHistoryContent(message) });
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
             }
@@ -645,6 +647,8 @@ namespace VPetLLM.Core.Providers.Chat
             var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(Settings, currentNode.EnableToolCall);
 
             var payload = JObject.FromObject(data);
+            Utils.Common.ReasoningEffortHelper.Apply(payload, currentNode.ThinkingEffort,
+                useResponses ? Utils.Common.ReasoningApiStyle.OpenAIResponses : Utils.Common.ReasoningApiStyle.OpenAIChat);
             if (toolSession is not null)
             {
                 if (useResponses)
@@ -851,7 +855,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
                 // 再保存助手回复
                 await PersistToolCallTraceAsync(toolLoop);
-                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = AppendInterruptMarker(message) });
+                await HistoryManager.AddMessage(new Message { Role = "assistant", Content = PrepareAssistantHistoryContent(message) });
                 // 保存历史记录
                 SaveHistory();
                 TriggerOverflowCheckAfterSuccess();
