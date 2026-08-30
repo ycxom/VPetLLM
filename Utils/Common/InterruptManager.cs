@@ -99,6 +99,18 @@ namespace VPetLLM.Utils.Common
         }
 
         /// <summary>
+        /// 当前有没有一轮可以被中断的会话。
+        ///
+        /// 给"顺手触发中断"的入口用（比如关掉气泡）：这些动作在没有会话时也会频繁发生，
+        /// 直接调 <see cref="Interrupt"/> 虽然安全，但每次都会往日志里写一行
+        /// "当前没有可中断的会话"，纯属噪声。
+        /// </summary>
+        public static bool HasActiveSession
+        {
+            get { lock (_lock) return _cts is not null && !_interrupted; }
+        }
+
+        /// <summary>
         /// 请求中断当前会话。
         /// </summary>
         /// <returns>true 表示本次调用真正触发了中断；false 表示当前没有可中断的会话（或已中断过）。</returns>

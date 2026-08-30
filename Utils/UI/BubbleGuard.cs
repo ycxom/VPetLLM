@@ -226,9 +226,41 @@ namespace VPetLLM.Utils.UI
                 if (!IsEnabled || !IsHoldingLocked()) return false;
             }
 
+            // 显式声明的用户手势优先于走栈判断，理由见 EnterUserGesture
+            if (InUserGesture) return false;
+
             if (IsCallFromMessageBarItself()) return false;
 
             return decide();
+        }
+
+        /// <summary>
+        /// 当前线程正处于一次"用户亲手操作气泡"的调用里。用 <c>[ThreadStatic]</c> 而不是
+        /// 全局标记：手势必然发生在 UI 线程，别让它顺带放行了后台线程上别人的气泡。
+        /// </summary>
+        [ThreadStatic] private static int _userGestureDepth;
+
+        private static bool InUserGesture => _userGestureDepth > 0;
+
+        /// <summary>
+        /// 声明"接下来这段调用是用户亲手操作气泡"，其间的关闭一律放行。必须与
+        /// <see cref="ExitUserGesture"/> 成对（用 try/finally 或 Harmony 的 prefix + finalizer）。
+        ///
+        /// <b>为什么不能只靠 <see cref="IsCallFromMessageBarItself"/></b>：那个方法认的是
+        /// 栈上有没有 <see cref="MessageBar"/> 的方法。可一旦某个 MessageBar 的方法**自己被
+        /// Harmony 打了补丁**（我们就在 <see cref="BubbleCloseInterrupt"/> 里打了
+        /// <c>MenuItemClose_Click</c>），它在栈上就变成了一个动态方法，
+        /// <c>DeclaringType</c> 不再是 MessageBar —— 走栈判断当场失效，
+        /// 用户的关闭被当成外部调用吞掉，于是"点了关闭，气泡纹丝不动"。
+        ///
+        /// 打补丁的一方自己声明手势，是确定的；靠走栈去猜是脆的。
+        /// </summary>
+        public static void EnterUserGesture() => _userGestureDepth++;
+
+        /// <inheritdoc cref="EnterUserGesture"/>
+        public static void ExitUserGesture()
+        {
+            if (_userGestureDepth > 0) _userGestureDepth--;
         }
 
         /// <summary>调用是不是从 <see cref="MessageBar"/> 自己的方法里发出来的。</summary>

@@ -758,6 +758,11 @@ namespace VPetLLM
                 // 和上面那个守卫分开装 —— 气泡独占可以关，"别崩"不能关。
                 Utils.UI.BubbleCopyGuard.Install();
 
+                // 右键气泡 → 关闭 也算一次"停止回复"：和侧边栏状态按钮、输入框中断按钮
+                // 并列的第三个入口。只关框不停请求的话，下一段回复会自己冒出来，
+                // 用户看到的就是"关不掉"。
+                Utils.UI.BubbleCloseInterrupt.Install();
+
                 // 检测 VPet.Plugin.VPetTTS 插件
                 DetectAndHandleVPetTTSPlugin();
 
@@ -1342,6 +1347,7 @@ namespace VPetLLM
                 // 调进一个已经没人维护（甚至已卸载）的程序集
                 Run(Utils.UI.BubbleGuard.Uninstall, "卸载气泡守卫");
                 Run(Utils.UI.BubbleCopyGuard.Uninstall, "卸载气泡复制保护");
+                Run(Utils.UI.BubbleCloseInterrupt.Uninstall, "卸载气泡关闭中断");
             }
 
             // 关停动画协调器。

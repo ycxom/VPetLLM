@@ -49,6 +49,7 @@ static class Program
         Test_FieldLookup();
         Test_Switch();
         Test_CopyGuardPatches();
+        Test_CloseInterruptPatches();
 
         var ui = new Thread(Test_RuntimeBehaviour);
         ui.SetApartmentState(ApartmentState.STA);
@@ -242,6 +243,13 @@ static class Program
             // ── 这条是 Harmony 相对"换实例"多出来的风险点 ──
             // 换实例那版拦不到气泡自己内部的调用，Harmony 打在方法上会内外一起拦。
             // 双击气泡 / 右键"关闭"都是用户亲手要关掉它，拦了就成了"说起话来关都关不掉"。
+            //
+            // 关闭中断补丁必须在这里**装着**测：它把 MenuItemClose_Click 也打了补丁，
+            // 而打过补丁的方法在栈上是动态方法、DeclaringType 不再是 MessageBar，
+            // 守卫原本的走栈判断会当场失效 —— 中断照做、气泡却关不掉。
+            // 这正是它要消灭的症状，所以这一条必须在真实组合下验。
+            BubbleCloseInterrupt.Install();
+
             foreach (var handler in new[] { "UserControl_MouseDoubleClick", "MenuItemClose_Click" })
             {
                 var gestureBar = NewBar();
@@ -260,6 +268,8 @@ static class Program
             }
         }
 
+        BubbleCloseInterrupt.Uninstall();
+
         Check("退出回复作用域后立刻恢复放行",
             ReachedHost(() => bar.Show("别人", "别人的话")));
 
@@ -268,6 +278,12 @@ static class Program
         var still = Harmony.GetAllPatchedMethods()
             .Any(m => Harmony.GetPatchInfo(m)!.Owners.Contains("com.vpetllm.bubbleguard"));
         Check("★ Uninstall 之后补丁全摘干净", !still);
+
+        // 手势作用域漏出去的话，这个线程之后所有的关闭都会被无条件放行
+        var depth = typeof(BubbleGuard)
+            .GetField("_userGestureDepth", BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetValue(null);
+        Check("★★ 用户手势作用域没有泄漏（prefix/finalizer 成对）", (int)depth! == 0, $"实际 {depth}");
 
         Console.WriteLine();
     }
@@ -328,6 +344,64 @@ static class Program
             Check("没异常时 finalizer 也不无中生有",
                 finalizer.Invoke(null, new object?[] { null }) is null);
         }
+
+        Console.WriteLine();
+    }
+
+    // =================================================================
+    // 8. 右键气泡「关闭」= 停止回复（第三个中断入口）
+    //
+    //    另外两个：侧边栏状态按钮、输入框的中断按钮。
+    //    只关框不停请求的话，在途请求跑完还会再冒一段出来 —— 用户看到的是"关不掉"。
+    // =================================================================
+    const string CloseOwner = "com.vpetllm.bubblecloseinterrupt";
+
+    static MethodInfo? CloseTarget() => typeof(MessageBar).GetMethod(
+        "MenuItemClose_Click",
+        BindingFlags.NonPublic | BindingFlags.Instance,
+        null, new[] { typeof(object), typeof(System.Windows.RoutedEventArgs) }, null);
+
+    static void Test_CloseInterruptPatches()
+    {
+        Console.WriteLine("[8] 右键关闭气泡即中断");
+
+        var target = CloseTarget();
+        Check("找得到 MessageBar.MenuItemClose_Click", target is not null);
+        if (target is null) { Console.WriteLine(); return; }
+
+        BubbleCloseInterrupt.Install();
+        var info = Harmony.GetPatchInfo(target);
+        Check("★ 挂上了前置补丁", info?.Prefixes?.Any(x => x.owner == CloseOwner) == true);
+
+        // 必须是前置而不是替换：关窗口这件事本来就该发生
+        Check("★★ 不接管原方法（气泡照样要关掉）",
+            info?.Prefixes?.Any(x => x.owner == CloseOwner) == true &&
+            info.Postfixes.All(x => x.owner != CloseOwner));
+
+        BubbleCloseInterrupt.Install();
+        BubbleCloseInterrupt.Install();
+        var count = Harmony.GetPatchInfo(target)!.Prefixes.Count(x => x.owner == CloseOwner);
+        Check("★ 重复 Install 不会叠补丁", count == 1, $"实际 {count} 个");
+
+        var ours = Harmony.GetAllPatchedMethods()
+            .Where(m => Harmony.GetPatchInfo(m)!.Owners.Contains(CloseOwner))
+            .ToList();
+        Check("只补了这一个宿主方法", ours.Count == 1, $"实际补了 {ours.Count} 个");
+
+        // 双击关闭是刻意不挂的：双击桌宠是高频误触，变成中断会莫名其妙
+        var dbl = typeof(MessageBar).GetMethod("UserControl_MouseDoubleClick",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Check("★ 双击关闭刻意不挂（高频误触，不该当成中断意图）",
+            dbl is null || Harmony.GetPatchInfo(dbl)?.Owners.Contains(CloseOwner) != true);
+
+        // 没有会话时不该乱动（也不该往日志里刷"没有可中断的会话"）
+        Check("★ 没有活动会话时 HasActiveSession 为 false",
+            !VPetLLM.Utils.Common.InterruptManager.HasActiveSession);
+
+        BubbleCloseInterrupt.Uninstall();
+        var still = Harmony.GetAllPatchedMethods()
+            .Any(m => Harmony.GetPatchInfo(m)!.Owners.Contains(CloseOwner));
+        Check("★ Uninstall 之后补丁摘干净", !still);
 
         Console.WriteLine();
     }
