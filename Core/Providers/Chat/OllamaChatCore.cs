@@ -124,6 +124,8 @@ namespace VPetLLM.Core.Providers.Chat
 
                 // 构建历史记录
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+                ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
+                    "Ollama", _ollamaSetting.Url, _ollamaSetting.Model);
                 CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _ollamaSetting.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
@@ -201,14 +203,18 @@ namespace VPetLLM.Core.Providers.Chat
                                 var roundResponse = await client.PostAsync("/api/chat", roundContent, InterruptManager.Token);
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
-                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Ollama");
+                                    var errorMessage = await HandleHttpErrorAsync(roundResponse, "Ollama");
                                     ResponseHandler?.Invoke(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
                             });
 
-                        if (!loop.Success) return "";
+                        if (!loop.Success)
+                        {
+                            if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
+                            return "";
+                        }
                         toolLoop = loop;
 
                         message = loop.Message;
@@ -223,7 +229,16 @@ namespace VPetLLM.Core.Providers.Chat
                             Content = content
                         };
                         var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
-                        response.EnsureSuccessStatusCode();
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            // EnsureSuccessStatusCode 会把响应体连同错误一起丢掉，
+                            // 而"上下文超长"的窗口大小恰恰只写在响应体里
+                            var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
+                            ReportFailure(errorMessage);
+                            return "";
+                        }
 
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new StreamingCommandProcessor((cmd) =>
@@ -274,7 +289,14 @@ namespace VPetLLM.Core.Providers.Chat
                         // 非流式传输模式
                         Logger.Log("Ollama ChatWithImage: 使用非流式传输模式");
                         var response = await client.PostAsync("/api/chat", content, InterruptManager.Token);
-                        response.EnsureSuccessStatusCode();
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
+                            ReportFailure(errorMessage);
+                            return "";
+                        }
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
                         message = responseObject["message"]["content"].ToString();
@@ -352,6 +374,8 @@ namespace VPetLLM.Core.Providers.Chat
                 var tempUserMessage = CreateUserMessage(prompt);
 
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+                ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
+                    "Ollama", _ollamaSetting.Url, _ollamaSetting.Model);
                 CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _ollamaSetting.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
@@ -404,13 +428,19 @@ namespace VPetLLM.Core.Providers.Chat
                                 var roundResponse = await client.PostAsync("/api/chat", roundContent, InterruptManager.Token);
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
+                                    var errorMessage = await HandleHttpErrorAsync(roundResponse, "Ollama");
                                     Logger.Log($"Ollama: 工具调用请求失败 {(int)roundResponse.StatusCode}");
+                                    ResponseHandler?.Invoke(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
                             });
 
-                        if (!loop.Success) return "";
+                        if (!loop.Success)
+                        {
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
+                            return "";
+                        }
                         toolLoop = loop;
 
                         message = loop.Message;
@@ -425,7 +455,15 @@ namespace VPetLLM.Core.Providers.Chat
                             Content = content
                         };
                         var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
-                        response.EnsureSuccessStatusCode();
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            // EnsureSuccessStatusCode 会把响应体连同错误一起丢掉，
+                            // 而"上下文超长"的窗口大小恰恰只写在响应体里
+                            var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
+                            ReportFailure(errorMessage);
+                            return "";
+                        }
 
                         var fullMessage = new StringBuilder();
                         var streamProcessor = new StreamingCommandProcessor((cmd) =>
@@ -476,7 +514,13 @@ namespace VPetLLM.Core.Providers.Chat
                         // 非流式传输模式
                         Logger.Log("Ollama: 使用非流式传输模式");
                         var response = await client.PostAsync("/api/chat", content, InterruptManager.Token);
-                        response.EnsureSuccessStatusCode();
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
+                            ReportFailure(errorMessage);
+                            return "";
+                        }
                         var responseString = await response.Content.ReadAsStringAsync();
                         var responseObject = JObject.Parse(responseString);
                         message = responseObject["message"]["content"].ToString();
@@ -561,7 +605,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Ollama");
+                        var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
                         Logger.Log($"Ollama Summarize 错误: {errorMessage}");
                         return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败");
                     }

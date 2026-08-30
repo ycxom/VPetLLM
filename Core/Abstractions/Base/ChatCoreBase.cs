@@ -306,6 +306,187 @@ namespace VPetLLM.Core.Abstractions.Base
         protected virtual int MaxContextTokens => Settings?.MaxContextTokens ?? 0;
 
         /// <summary>
+        /// 本轮请求发往的端点标识（渠道|主机|模型），用于按节点分别记住探明的上下文上限。
+        /// 各 Provider 在选定节点之后、构建历史之前设置；见 <see cref="Utils.Common.ContextLimitGuard"/>。
+        /// </summary>
+        protected string? ContextLimitKey { get; set; }
+
+        /// <summary>
+        /// 本轮实际生效的 token 预算：用户配置与"撞出来的"服务端上限取小。
+        ///
+        /// 用户没填 MaxContextTokens（默认 0 = 不限制）时，探明值就是唯一的约束 ——
+        /// 本地推理服务端的 n_ctx 往往只有 4096~8192，不裁必然 400。
+        /// </summary>
+        /// <summary>
+        /// 本轮实际生效的 token 预算，&lt;= 0 表示不限制。对外只读，供
+        /// <see cref="Core.Data.Managers.OverflowManager"/> 拿去卡滚动总结的大小 ——
+        /// 总结是拼进 system 消息的，而 system 永远不参与裁剪，它涨过头了谁也救不回来。
+        /// </summary>
+        public int EffectiveContextTokenBudget => ResolveContextBudget();
+
+        private int ResolveContextBudget()
+        {
+            var configured = MaxContextTokens;
+            var learned = Utils.Common.ContextLimitGuard.GetLimit(ContextLimitKey);
+
+            if (learned <= 0) return configured;
+            if (configured <= 0) return learned;
+            return Math.Min(configured, learned);
+        }
+
+        /// <summary>一轮对话里最多因上下文超长重试几次。</summary>
+        private const int MaxContextLimitRetries = 3;
+
+        private int _contextRetryCount;
+        private string? _contextRetryPrompt;
+        private bool _contextLimitLearned;
+
+        /// <summary>
+        /// 本轮的 system 前缀（不参与裁剪的那几条）按我们的估算器算出来是多少 token。
+        /// </summary>
+        private int _lastSystemPrefixEstimate;
+
+        /// <summary>
+        /// 上一次的超长是"system 自己就装不下"那种 —— 裁历史救不了，重试也救不了。
+        /// 供各 Provider 把给用户看的文案换成可行动的说明，而不是甩一段 JSON。
+        /// </summary>
+        private bool _contextLimitUnfixable;
+
+        /// <summary>
+        /// 检查一次 HTTP 失败是不是"上下文超长"，是就把服务端报回来的窗口大小记下来。
+        /// 各 Provider 的错误处理入口统一调用它，所以聊天、识图、总结、工具循环都能学到。
+        /// </summary>
+        protected void LearnContextLimitFromError(int status, string? rawBody)
+        {
+            if (!Utils.Common.ContextLimitGuard.IsContextLimitError(status, rawBody))
+                return;
+
+            var contextTokens = Utils.Common.ContextLimitGuard.ParseContextTokens(rawBody);
+            if (contextTokens <= 0)
+            {
+                // 只说"太长了"却不给数字的网关：没有可信的裁剪目标，硬猜一个反而可能
+                // 把好端端的大窗口节点裁成残废，这里只留一条日志。
+                Logger.Log($"{Name}: 服务端报告上下文超长但未给出窗口大小，无法自动裁剪");
+                return;
+            }
+
+            // 服务端对"我们刚发过去那一坨"的真实计数。有它才能算出我们的估算差了多少倍 ——
+            // 只知道 n_ctx=8192 是不够的：我们按自己的尺子量出 5000 就以为没超，照发不误。
+            var serverPromptTokens = Utils.Common.ContextLimitGuard.ParsePromptTokens(rawBody);
+
+            // 光 system 前缀就塞不下时，重发多少次都不可能成功 —— 裁剪只能动 system
+            // 之后的窗口，而那部分已经空了。这时候继续"收紧预算再来一次"是纯粹的浪费：
+            //   * 每次都是一个注定 400 的 HTTP 往返；
+            //   * 收紧后的预算会**留到以后**，等用户真的调大了窗口或关掉了插件，
+            //     历史反而被一个毫无意义的小预算按着裁。
+            // 所以这里直接不学不重试，只把账摆清楚。
+            if (_lastSystemPrefixEstimate > 0 && _lastSystemPrefixEstimate >= _lastPromptEstimate * 0.9)
+            {
+                var ratioNow = Utils.Common.ContextLimitGuard.CalibrationRatio(_lastPromptEstimate, serverPromptTokens);
+                Logger.Log($"{Name}: 系统提示词本身约 {(int)(_lastSystemPrefixEstimate * ratioNow)} tokens，" +
+                           $"已超过模型上下文窗口 {contextTokens}，裁历史无法解决 —— 不再重试。" +
+                           $"请关掉部分插件、缩短角色设定，或把服务端的上下文窗口调大");
+                _contextLimitUnfixable = true;
+                return;
+            }
+
+            if (Utils.Common.ContextLimitGuard.Remember(
+                    ContextLimitKey, contextTokens, _lastPromptEstimate, serverPromptTokens))
+            {
+                _contextLimitLearned = true;
+                var effective = Utils.Common.ContextLimitGuard.GetLimit(ContextLimitKey);
+                var ratio = Utils.Common.ContextLimitGuard.CalibrationRatio(_lastPromptEstimate, serverPromptTokens);
+
+                Logger.Log($"{Name}: 服务端上下文窗口 {contextTokens} tokens" +
+                           (serverPromptTokens > 0
+                               ? $"，本次实发 {serverPromptTokens}（我们估的是 {_lastPromptEstimate}，估算系数 ×{ratio:F2}）"
+                               : "") +
+                           $"，预算按 {effective} 记录并将自动裁剪历史（节点 {ContextLimitKey}）");
+            }
+            else
+            {
+                Logger.Log($"{Name}: 上下文已收紧到下限仍然超长，放弃自动重试（节点 {ContextLimitKey}）");
+            }
+        }
+
+        /// <summary>
+        /// 刚学到新的上下文上限、且本轮重试次数还没用完时返回 true —— 调用方据此把
+        /// 整个请求重发一遍（重发时历史会按新上限裁剪，见 <see cref="ResolveContextBudget"/>）。
+        ///
+        /// 计数按 prompt 区分：换了一句话就是新的一轮，重新给满重试次数。
+        /// 不用"请求成功时清零"是因为成功路径散在各 Provider 的十几处分支里，漏一处就漏掉清零。
+        /// </summary>
+        protected bool ShouldRetryAfterContextLimit(string prompt)
+        {
+            if (!_contextLimitLearned) return false;
+            _contextLimitLearned = false;
+
+            if (!string.Equals(prompt, _contextRetryPrompt, StringComparison.Ordinal))
+            {
+                _contextRetryPrompt = prompt;
+                _contextRetryCount = 0;
+            }
+
+            if (_contextRetryCount >= MaxContextLimitRetries)
+            {
+                Logger.Log($"{Name}: 上下文超长重试已达 {MaxContextLimitRetries} 次上限，不再重试");
+                return false;
+            }
+
+            _contextRetryCount++;
+            Logger.Log($"{Name}: 上下文超长，按新上限重新裁剪历史后重发（第 {_contextRetryCount} 次）");
+            return true;
+        }
+
+        /// <summary>
+        /// 统一的 HTTP 错误出口：读一次响应体，顺手学习上下文上限，再翻译成给用户看的文案。
+        /// 替代各 Provider 直接调用 ErrorMessageHelper.HandleHttpResponseError —— 那条路
+        /// 看不到 ChatCore 实例，学不到东西。
+        /// </summary>
+        protected async Task<string> HandleHttpErrorAsync(
+            global::System.Net.Http.HttpResponseMessage response, string providerName)
+        {
+            var statusCode = response.StatusCode;
+            var rawError = await response.Content.ReadAsStringAsync();
+
+            Logger.Log($"{providerName} API 错误: {(int)statusCode} {statusCode} - {rawError}");
+            LearnContextLimitFromError((int)statusCode, rawError);
+
+            return DescribeHttpFailure(statusCode, rawError, providerName);
+        }
+
+        /// <summary>
+        /// 把一次 HTTP 失败翻译成给用户看的文案。
+        ///
+        /// "上下文装不下"单独成一句：原样甩那段 JSON 出去的话，桌宠会把
+        /// <c>{"error":{"code":400,"message":"request (13416 tokens) exceeds...</c>
+        /// 整段念出来 —— 用户既听不懂也不知道该动哪里。调试模式仍然附上原文。
+        /// </summary>
+        protected string DescribeHttpFailure(
+            global::System.Net.HttpStatusCode statusCode, string rawError, string providerName)
+        {
+            var debug = Utils.System.ErrorMessageHelper.IsDebugMode(Settings);
+
+            if (_contextLimitUnfixable)
+            {
+                _contextLimitUnfixable = false;
+
+                var window = Utils.Common.ContextLimitGuard.ParseContextTokens(rawError);
+                var sent = Utils.Common.ContextLimitGuard.ParsePromptTokens(rawError);
+
+                var message = "上下文装不下了：系统提示词本身就超过了模型的上下文窗口" +
+                              (window > 0 ? $"（{sent} / {window} tokens）" : "") +
+                              "。删聊天记录没用，请关掉部分插件、缩短角色设定，或把服务端的上下文窗口调大。";
+
+                return debug ? $"{message}\n[{(int)statusCode} {statusCode}] {rawError}" : message;
+            }
+
+            return debug
+                ? $"{providerName} API 错误 [{(int)statusCode} {statusCode}]: {rawError}"
+                : Utils.System.ErrorMessageHelper.GetFriendlyHttpError(statusCode, rawError, Settings);
+        }
+
+        /// <summary>
         /// 单次请求 messages 数组的条数上限，&lt;= 0 表示不限制。
         /// 部分 API（如 Free 通道）限制的是条数而非 token
         /// （"Too many messages (1255), max 1000 allowed"）。
@@ -351,8 +532,22 @@ namespace VPetLLM.Core.Abstractions.Base
             if (history is null || history.Count == 0)
                 return history;
 
-            return EnforceTokenBudget(EnforceMessageCountLimit(history));
+            var result = EnforceTokenBudget(EnforceMessageCountLimit(history));
+
+            // 记下本轮我们自己的估算值。撞上"上下文超长"时，服务端会在错误里
+            // 报出它对同一份内容数出来的真实 token 数，两者一比就得到校准系数。
+            _lastPromptEstimate = TokenCounter.EstimateMessagesTokenCount(result);
+
+            // 顺手记下 system 前缀的大小：它不参与裁剪，所以"它自己就超了"意味着
+            // 这次超长根本没法靠裁历史解决（见 LearnContextLimitFromError）。
+            _lastSystemPrefixEstimate = TokenCounter.EstimateMessagesTokenCount(
+                result.Take(CountLeadingSystemMessages(result)));
+
+            return result;
         }
+
+        /// <summary>本轮组装好的 prompt 按我们自己的估算器算出来是多少 token。</summary>
+        private int _lastPromptEstimate;
 
         /// <summary>
         /// 把 messages 条数压到 <see cref="MaxContextMessages"/> 以内：保留 system 前缀和
@@ -389,7 +584,7 @@ namespace VPetLLM.Core.Abstractions.Base
         /// </summary>
         private List<Message> EnforceTokenBudget(List<Message> history)
         {
-            var budget = MaxContextTokens;
+            var budget = ResolveContextBudget();
             if (budget <= 0 || history.Count == 0)
                 return history;
 
@@ -434,14 +629,69 @@ namespace VPetLLM.Core.Abstractions.Base
             }
 
             if (ReferenceEquals(result, history))
-                Logger.Log($"EnforceContextBudget: prompt {tokensBefore} tokens 超出触发线 {limit}，但窗口已无可裁剪的消息");
+                Logger.Log($"EnforceContextBudget: prompt {tokensBefore} tokens 超出触发线 {limit}，但窗口已无可裁剪的消息。" +
+                           DescribeBudgetPressure(result, systemCount));
             else if (tokens > limit)
                 Logger.Log($"EnforceContextBudget: 裁剪 {history.Count}→{result.Count} 条消息后仍超标 " +
-                           $"（{tokensBefore}→{tokens} tokens，触发线 {limit}），单条消息可能过长");
+                           $"（{tokensBefore}→{tokens} tokens，触发线 {limit}）。" +
+                           DescribeBudgetPressure(result, systemCount));
             else
                 Logger.Log($"EnforceContextBudget: prompt 超出预算，已裁剪 {history.Count}→{result.Count} 条消息，" +
                            $"{tokensBefore}→{tokens} tokens（预算 {budget}，触发线 {limit}）");
             return result;
+        }
+
+        /// <summary>
+        /// 滚动总结在 prompt 里允许占的比例。剩下的留给 system 本体和近期消息。
+        /// </summary>
+        private const double SummaryPromptShare = 0.15;
+
+        /// <summary>
+        /// 把要拼进 system 的滚动总结卡进预算。
+        ///
+        /// 为什么非卡不可：总结是**拼进 system 消息**的，而 <see cref="EnforceTokenBudget"/>
+        /// 永远不动 system 前缀 —— 一份在"还不知道上限"时生成的陈年总结可以把整个
+        /// 8192 窗口占满，之后不管裁掉多少条历史，请求都还是超长。
+        ///
+        /// 预算未知（既没配也没撞出来）时原样返回：没有可信的裁剪目标，砍了纯属白丢信息。
+        /// </summary>
+        private string ClampSummaryForPrompt(string summary)
+        {
+            var budget = ResolveContextBudget();
+            if (budget <= 0) return summary;
+
+            var allowed = Math.Max(256, (int)(budget * SummaryPromptShare));
+            var tokens = TokenCounter.EstimateTokenCount(summary);
+            if (tokens <= allowed) return summary;
+
+            // 保留末尾：滚动总结越靠后越新，新的对当前对话更有用
+            var keepRatio = (double)allowed / tokens;
+            var keepChars = Math.Max(1, (int)(summary.Length * keepRatio * 0.95));
+            var clamped = "[...早期总结已省略...]\n" + summary.Substring(summary.Length - keepChars);
+
+            Logger.Log($"{Name}: 滚动总结 {tokens} tokens 超出 prompt 内配额 {allowed}，已截断");
+            return clamped;
+        }
+
+        /// <summary>
+        /// 裁不动了的时候把账算清楚：到底是 system 太大还是历史太长。
+        ///
+        /// 这条日志是给人看的。裁剪只能动 system 之后的窗口，所以当 system 本身
+        /// （角色设定 + 样貌 + 插件/工具说明 + 技能 + 滚动总结）就把预算吃满时，
+        /// 再怎么删历史都没用 —— 用户需要知道该去关插件、缩短角色设定，还是调大服务端的窗口。
+        /// </summary>
+        private static string DescribeBudgetPressure(List<Message> messages, int systemCount)
+        {
+            var systemTokens = TokenCounter.EstimateMessagesTokenCount(messages.Take(systemCount));
+            var windowTokens = TokenCounter.EstimateMessagesTokenCount(messages.Skip(systemCount));
+
+            var hint = systemTokens > windowTokens
+                ? "系统提示词本身就占了大头（角色设定/插件说明/工具定义/滚动总结），删历史救不了；" +
+                  "可以关掉部分插件、缩短角色设定，或把服务端的上下文窗口调大"
+                : "历史仍然偏长，若持续出现可调大服务端的上下文窗口";
+
+            return $"构成：system {systemTokens} tokens（{systemCount} 条，不参与裁剪）+ " +
+                   $"窗口 {windowTokens} tokens（{messages.Count - systemCount} 条）。{hint}";
         }
 
         /// <summary>
@@ -808,7 +1058,10 @@ namespace VPetLLM.Core.Abstractions.Base
             if (keepContext && overflowMode
                 && OverflowManager?.LatestSummary is string summary && summary.Length > 0)
             {
-                systemContent += $"\n\n[Previous Conversation Summary]\n{summary}\n[/Previous Conversation Summary]";
+            // 落库的总结可能是在"还不知道上限"的时候生成的，早就长过头了。
+            // 这里再卡一刀：它拼进 system，而 system 不参与后面的窗口裁剪 ——
+            // 让一份陈年总结一直把 8192 的窗口占满，后面裁多少条历史都没用。
+                systemContent += $"\n\n[Previous Conversation Summary]\n{ClampSummaryForPrompt(summary)}\n[/Previous Conversation Summary]";
             }
 
             var history = new List<Message>
@@ -906,6 +1159,10 @@ namespace VPetLLM.Core.Abstractions.Base
         public virtual void ClearContext()
         {
             HistoryManager.ClearHistory();
+
+            // 顺便丢掉"撞出来的"上下文上限：键里虽然带了 url+model（换模型会自动失效），
+            // 但"同一个端点重启后换了更大的 n_ctx"这种情况只能靠这里给用户一个复位入口。
+            Utils.Common.ContextLimitGuard.Reset();
         }
 
         /// <summary>

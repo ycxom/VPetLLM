@@ -50,20 +50,18 @@ namespace VPetLLM.Core.Providers.Chat
         /// <summary>
         /// 包装ErrorMessageHelper.HandleHttpResponseError调用以避免类型冲突
         /// </summary>
-        private static async Task<string> HandleHttpError(HttpResponseMessage response, Setting settings, string providerName)
+        private async Task<string> HandleHttpError(HttpResponseMessage response, Setting settings, string providerName)
         {
             var statusCode = response.StatusCode;
             var rawError = await response.Content.ReadAsStringAsync();
 
             SystemLogger.Log($"{providerName} API 错误: {(int)statusCode} {statusCode} - {rawError}");
 
-            // 如果是调试模式，返回详细的原始错误
-            if (ErrorHelper.IsDebugMode(settings))
-            {
-                return $"{providerName} API 错误 [{(int)statusCode} {statusCode}]: {rawError}";
-            }
+            // 上下文超长时服务端会把真实窗口写在错误里，记下来供下一次裁剪历史
+            LearnContextLimitFromError((int)statusCode, rawError);
 
-            return ErrorHelper.GetFriendlyHttpError(statusCode, rawError, settings);
+            // 走基类那条出口：上下文装不下时给的是可行动的说明，而不是一段 JSON
+            return DescribeHttpFailure(statusCode, rawError, providerName);
         }
 
         /// <summary>
@@ -292,6 +290,8 @@ namespace VPetLLM.Core.Providers.Chat
 
             // 构建多模态消息内容
             var userContent = BuildMultimodalContent(prompt, images);
+
+            ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey("OpenAI", currentNode.Url, currentNode.Model);
 
             // 构建历史消息（不包含图像）
             // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
@@ -582,6 +582,9 @@ namespace VPetLLM.Core.Providers.Chat
                 SystemLogger.Log($"[DEBUG] OpenAI 当前调用节点: {currentNode.Name}, URL: {currentNode.Url}, Model: {currentNode.Model}");
             }
 
+            // 上下文上限按节点分别记，键必须在裁剪历史之前就位
+            ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey("OpenAI", currentNode.Url, currentNode.Model);
+
             // 构建请求数据，根据启用开关决定是否包含高级参数
             // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
             CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, currentNode.EnableToolCall);
@@ -694,7 +697,11 @@ namespace VPetLLM.Core.Providers.Chat
                             : await global::VPetLLM.Core.Tools.NativeToolLoop.RunOpenAiAsync(
                                 payload, toolSession, roundSend);
 
-                        if (!loop.Success) return "";
+                        if (!loop.Success)
+                        {
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
+                            return "";
+                        }
                         toolLoop = loop;
 
                         message = loop.Message;
@@ -712,6 +719,8 @@ namespace VPetLLM.Core.Providers.Chat
                         if (!response.IsSuccessStatusCode)
                         {
                             var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
@@ -791,6 +800,8 @@ namespace VPetLLM.Core.Providers.Chat
                         if (!response.IsSuccessStatusCode)
                         {
                             var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }

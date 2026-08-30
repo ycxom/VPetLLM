@@ -444,21 +444,40 @@ namespace VPetLLM.Core.Services
             // 只有在EnablePlugin开启时才添加插件说明（独立于EnableAction）
             if (_settings.EnablePlugin && VPetLLM.Instance.Plugins.Any(p => p.Enabled))
             {
-                // 实现了 IToolSchemaPlugin 的插件渲染成 TypeScript 风格签名，
-                // 其余仍走 "Name: Description Examples" 的老格式（见 ToolSchemaRenderer）
-                var pluginList = ToolSchemaRenderer.RenderAll(VPetLLM.Instance.Plugins.Where(p => p.Enabled));
-                parts.Add(PromptHelper.Get("Available_Plugins_Prefix", lang)
-                            .Replace("{PluginList}", pluginList));
-
-                // 开了原生工具调用就补一句优先级说明。
-                // 刻意**不**移除上面的标记说明：节点混搭时（有的节点开了工具、有的没开）
-                // 拿掉标记说明会让没开的那些节点彻底调不动插件，而多留着最多只是冗余。
-                //
                 // 这句提示词说的是"**本节点**已开启原生工具调用"，所以判断依据必须是
                 // 本轮真正要发往的那个节点。调用方给了 nodeToolsEnabled 就用它；
                 // 给不了（比如提示词预览）才回退到"任一启用节点开了工具"的粗略判断。
                 var toolsForThisRequest = nodeToolsEnabled
                                           ?? Core.Tools.NativeToolSession.IsLikelyActive(_settings);
+
+                // 本轮会挂 tools 时，只给**没进 tools 数组**的插件写标记说明。
+                //
+                // 以前这里无条件把所有插件讲一遍，理由是"节点混搭时拿掉会让没开工具的
+                // 节点调不动插件，多留着最多只是冗余"。但系统提示词是**按本轮节点**现建的，
+                // 别的节点用的是它们自己那一份，所以这里按本轮裁掉并不会影响它们；
+                // 而"最多只是冗余"这个假设在小窗口模型上直接破产 ——
+                // 实测 16 个插件讲两遍（一遍标记、一遍 tools）能把 8192 的窗口占满，
+                // 于是不管裁掉多少条历史，请求都还是 400。
+                //
+                // 依赖回复会话的插件不会进 tools 数组（见 NativeToolRegistry.Build），
+                // 它们只能靠标记调用，所以必须留下 —— 判据与那边共用同一个方法。
+                var pluginsToDocument = VPetLLM.Instance.Plugins.Where(p => p.Enabled);
+                if (toolsForThisRequest)
+                {
+                    pluginsToDocument = pluginsToDocument
+                        .Where(p => !Core.Tools.NativeToolRegistry.IsExportedAsTool(p));
+                }
+
+                // 实现了 IToolSchemaPlugin 的插件渲染成 TypeScript 风格签名，
+                // 其余仍走 "Name: Description Examples" 的老格式（见 ToolSchemaRenderer）
+                var documented = pluginsToDocument.ToList();
+                if (documented.Count > 0)
+                {
+                    var pluginList = ToolSchemaRenderer.RenderAll(documented);
+                    parts.Add(PromptHelper.Get("Available_Plugins_Prefix", lang)
+                                .Replace("{PluginList}", pluginList));
+                }
+
                 if (toolsForThisRequest)
                 {
                     parts.Add(Core.Tools.NativeToolSession.BuildPromptNotice(lang));

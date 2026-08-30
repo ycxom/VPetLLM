@@ -35,6 +35,29 @@ namespace VPetLLM.Core.Tools
         private static string _lastLoggedExclusions = "";
         private static readonly object ExclusionLogGate = new();
 
+        /// <summary>
+        /// 这个插件会不会被导出成原生工具声明。
+        ///
+        /// 判据必须和 <see cref="Build"/> 里的完全一致 —— 调用方（系统提示词）拿它来决定
+        /// "这个插件还用不用在提示词里再讲一遍标记用法"：已经进了 tools 数组的不用讲，
+        /// 没进去的（依赖回复会话的、非动作插件）只能靠标记调用，必须讲。
+        /// 两边判据一旦走偏，要么白白重复几千 token，要么让某个插件彻底调不动。
+        /// </summary>
+        public static bool IsExportedAsTool(HostPlugin plugin)
+        {
+            if (plugin is not HostActionPlugin) return false;
+
+            try
+            {
+                return (plugin as IToolSchemaPlugin)?.GetToolSchema()?.RequiresReplySession != true;
+            }
+            catch
+            {
+                // Build 在这种情况下会退到 BuildFallback，也就是照样导出
+                return true;
+            }
+        }
+
         /// <summary>构建当前所有可用工具。</summary>
         public static IReadOnlyList<NativeToolDefinition> Build(IEnumerable<HostPlugin> plugins)
         {

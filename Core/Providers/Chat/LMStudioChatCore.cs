@@ -104,6 +104,8 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var tempUserMessage = CreateUserMessage(prompt);
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+                ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
+                    "LMStudio", _lmStudioSetting.Url, _lmStudioSetting.Model);
                 CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _lmStudioSetting.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 if (tempUserMessage is not null)
@@ -176,7 +178,11 @@ namespace VPetLLM.Core.Providers.Chat
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
                             });
 
-                        if (!loop.Success) return "";
+                        if (!loop.Success)
+                        {
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
+                            return "";
+                        }
                         toolLoop = loop;
 
                         message = loop.Message;
@@ -194,6 +200,8 @@ namespace VPetLLM.Core.Providers.Chat
                         if (!response.IsSuccessStatusCode)
                         {
                             var errorMessage = await HandleHttpError(response, Settings, "LM Studio");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
@@ -243,6 +251,8 @@ namespace VPetLLM.Core.Providers.Chat
                         if (!response.IsSuccessStatusCode)
                         {
                             var errorMessage = await HandleHttpError(response, Settings, "LM Studio");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
@@ -334,6 +344,8 @@ namespace VPetLLM.Core.Providers.Chat
                 var userContent = BuildMultimodalContent(prompt, images);
 
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+                ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
+                    "LMStudio", _lmStudioSetting.Url, _lmStudioSetting.Model);
                 CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _lmStudioSetting.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 var requestMessages = new List<object>();
@@ -658,12 +670,11 @@ namespace VPetLLM.Core.Providers.Chat
 
             SystemLogger.Log($"{providerName} API 错误: {(int)statusCode} {statusCode} - {rawError}");
 
-            if (ErrorHelper.IsDebugMode(settings))
-            {
-                return $"{providerName} API 错误 [{(int)statusCode} {statusCode}]: {rawError}";
-            }
+            // 上下文超长时服务端会把真实窗口写在错误里，记下来供下一次裁剪历史
+            LearnContextLimitFromError((int)statusCode, rawError);
 
-            return ErrorHelper.GetFriendlyHttpError(statusCode, rawError, settings);
+            // 走基类那条出口：上下文装不下时给的是可行动的说明，而不是一段 JSON
+            return DescribeHttpFailure(statusCode, rawError, providerName);
         }
     }
 }

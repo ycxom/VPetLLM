@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -106,6 +106,7 @@ static class Program
 
         Check("关停确实关窗口", shutdown.Contains("CloseOwnedWindows"));
         Check("关停确实摘补丁", shutdown.Contains("BubbleGuard.Uninstall"));
+        Check("关停也摘复制保护补丁", shutdown.Contains("BubbleCopyGuard.Uninstall"));
         Check("关停确实停定时器", shutdown.Contains("_syncTimer?.Stop()"));
         Check("关停确实关停动画协调器（否则后台队列循环还攥着死窗口）",
             shutdown.Contains("AnimationHelper.Shutdown"));

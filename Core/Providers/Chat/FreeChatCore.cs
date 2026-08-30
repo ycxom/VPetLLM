@@ -177,6 +177,8 @@ namespace VPetLLM.Core.Providers.Chat
                 // 构建多模态消息内容
                 var userContent = BuildMultimodalContent(prompt, images);
 
+                ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey("Free", _apiUrl, _model);
+
                 // 构建历史消息（不包含图像）
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
 
@@ -292,6 +294,8 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         var responseContent = await response.Content.ReadAsStringAsync();
                         Logger.Log($"Free ChatWithImage API 错误: {response.StatusCode} - {responseContent}");
+                        LearnContextLimitFromError((int)response.StatusCode, responseContent);
+                        if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
                         message = ErrorMessageHelper.IsDebugMode(Settings)
                             ? $"API调用失败: {response.StatusCode} - {responseContent}"
                             : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
@@ -316,6 +320,8 @@ namespace VPetLLM.Core.Providers.Chat
                     else
                     {
                         Logger.Log($"Free ChatWithImage API 错误: {response.StatusCode} - {responseContent}");
+                        LearnContextLimitFromError((int)response.StatusCode, responseContent);
+                        if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
                         message = ErrorMessageHelper.IsDebugMode(Settings)
                             ? $"API调用失败: {response.StatusCode} - {responseContent}"
                             : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
@@ -413,6 +419,8 @@ namespace VPetLLM.Core.Providers.Chat
                 // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
                 // 使用 CreateUserMessage 自动设置时间戳和状态信息
                 var tempUserMessage = CreateUserMessage(prompt);
+
+                ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey("Free", _apiUrl, _model);
 
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
@@ -570,10 +578,13 @@ namespace VPetLLM.Core.Providers.Chat
                         else
                         {
                             Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
+                            LearnContextLimitFromError((int)response.StatusCode, responseContent);
                             message = ErrorMessageHelper.IsDebugMode(Settings)
                                 ? $"API调用失败: {response.StatusCode} - {responseContent}"
                                 : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
                         }
+                        // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                        if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
                         // 错误分支必须自己投递：底部那句"已在各分支调用过"只对成功分支成立
                         ReportFailure(message);
                     }
@@ -637,10 +648,13 @@ namespace VPetLLM.Core.Providers.Chat
                         else
                         {
                             Logger.Log($"Free API 错误: {response.StatusCode} - {responseContent}");
+                            LearnContextLimitFromError((int)response.StatusCode, responseContent);
                             message = ErrorMessageHelper.IsDebugMode(Settings)
                                 ? $"API调用失败: {response.StatusCode} - {responseContent}"
                                 : ErrorMessageHelper.GetFriendlyHttpError(response.StatusCode, responseContent, Settings);
                         }
+                        // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                        if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
                         // 错误分支必须自己投递：底部那句"已在各分支调用过"只对成功分支成立
                         ReportFailure(message);
                     }
@@ -842,6 +856,7 @@ namespace VPetLLM.Core.Providers.Chat
                     else
                     {
                         Logger.Log($"Free 工具请求错误: {roundResponse.StatusCode} - {roundText}");
+                        LearnContextLimitFromError((int)roundResponse.StatusCode, roundText);
                         hardError = ErrorMessageHelper.IsDebugMode(Settings)
                             ? $"API调用失败: {roundResponse.StatusCode} - {roundText}"
                             : ErrorMessageHelper.GetFriendlyHttpError(roundResponse.StatusCode, roundText, Settings);

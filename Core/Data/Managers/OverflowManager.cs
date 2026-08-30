@@ -93,7 +93,18 @@ namespace VPetLLM.Core.Data.Managers
             {
                 if (_settings is null) return 0;
                 if (_settings.MaxSummaryTokens > 0) return _settings.MaxSummaryTokens;
-                var ctx = _settings.MaxContextTokens;
+
+                // 用**生效**预算而不是 _settings.MaxContextTokens。
+                //
+                // 后者默认是 0（不限制），于是这里也返回 0 = 总结不设上限 —— 而总结是
+                // 拼进 system 消息的，system 又永远不参与窗口裁剪。结果就是：本地模型
+                // n_ctx 只有 8192，滚动总结却越滚越大，最后光它一个就把窗口占满，
+                // 后面裁掉多少条历史都没用，每一轮照样 400。
+                //
+                // EffectiveContextTokenBudget 里含了从 400 错误中撞出来的真实窗口，
+                // 所以哪怕用户从没手工配过 MaxContextTokens，这里也能拿到一个靠谱的数。
+                var ctx = _chatCore?.EffectiveContextTokenBudget ?? 0;
+                if (ctx <= 0) ctx = _settings.MaxContextTokens;
                 return ctx > 0 ? Math.Max(256, (int)(ctx * 0.15)) : 0;
             }
         }

@@ -753,6 +753,11 @@ namespace VPetLLM
                 // 放在这里只是先占好位；宿主中途换掉气泡实例时 BubbleGuard 会自愈重装
                 Utils.UI.BubbleGuard.Install();
 
+                // 给宿主气泡右键菜单的「复制」加保护：宿主那一行 Clipboard.SetText 没有
+                // try/catch，剪贴板被别的程序占着时会把整个 VPet 掀翻成"游戏发生错误"弹窗。
+                // 和上面那个守卫分开装 —— 气泡独占可以关，"别崩"不能关。
+                Utils.UI.BubbleCopyGuard.Install();
+
                 // 检测 VPet.Plugin.VPetTTS 插件
                 DetectAndHandleVPetTTSPlugin();
 
@@ -1336,6 +1341,7 @@ namespace VPetLLM
                 // 摘掉气泡守卫的 Harmony 补丁。不摘的话宿主之后每次说话都会
                 // 调进一个已经没人维护（甚至已卸载）的程序集
                 Run(Utils.UI.BubbleGuard.Uninstall, "卸载气泡守卫");
+                Run(Utils.UI.BubbleCopyGuard.Uninstall, "卸载气泡复制保护");
             }
 
             // 关停动画协调器。

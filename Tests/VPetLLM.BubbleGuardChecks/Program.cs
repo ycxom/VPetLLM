@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -48,11 +48,18 @@ static class Program
         Test_PatchesApplied();
         Test_FieldLookup();
         Test_Switch();
+        Test_CopyGuardPatches();
 
         var ui = new Thread(Test_RuntimeBehaviour);
         ui.SetApartmentState(ApartmentState.STA);
         ui.Start();
         ui.Join();
+
+        // 剪贴板必须在 STA 线程上访问
+        var clip = new Thread(Test_CopyGuardRuntime);
+        clip.SetApartmentState(ApartmentState.STA);
+        clip.Start();
+        clip.Join();
 
         Console.WriteLine();
         Console.WriteLine($"===== 通过 {_pass} / 失败 {_fail} =====");
@@ -261,6 +268,144 @@ static class Program
         var still = Harmony.GetAllPatchedMethods()
             .Any(m => Harmony.GetPatchInfo(m)!.Owners.Contains("com.vpetllm.bubbleguard"));
         Check("★ Uninstall 之后补丁全摘干净", !still);
+
+        Console.WriteLine();
+    }
+
+    // =================================================================
+    // 6. 气泡复制保护：宿主 MenuItemCopy_Click 里那句裸奔的 Clipboard.SetText
+    //
+    //    真实崩溃（用户报告）：
+    //      COMException (0x800401D0): OpenClipboard 失败 (CLIPBRD_E_CANT_OPEN)
+    //        at System.Windows.Clipboard.Flush()
+    //        at System.Windows.Controls.MenuItem.InvokeClickAfterRender(Object arg)
+    //    剪贴板是全局独占资源，别的程序占着的时候宿主这一行必炸，
+    //    异常一路冒到宿主全局处理 → "游戏发生错误" 弹窗。
+    // =================================================================
+    static MethodInfo? CopyTarget() => typeof(MessageBar).GetMethod(
+        "MenuItemCopy_Click",
+        BindingFlags.NonPublic | BindingFlags.Instance,
+        null, new[] { typeof(object), typeof(System.Windows.RoutedEventArgs) }, null);
+
+    const string CopyOwner = "com.vpetllm.bubblecopyguard";
+
+    static void Test_CopyGuardPatches()
+    {
+        Console.WriteLine("[6] 气泡复制保护：补丁");
+
+        var target = CopyTarget();
+        Check("找得到 MessageBar.MenuItemCopy_Click(object, RoutedEventArgs)", target is not null);
+        if (target is null) { Console.WriteLine(); return; }
+
+        BubbleCopyGuard.Install();
+        var info = Harmony.GetPatchInfo(target);
+
+        Check("★ 挂上了前置补丁（自己用带退路的方式复制）",
+            info?.Prefixes?.Any(x => x.owner == CopyOwner) == true);
+        Check("★ 挂上了 finalizer（前置放行时兜住宿主抛的异常）",
+            info?.Finalizers?.Any(x => x.owner == CopyOwner) == true);
+
+        BubbleCopyGuard.Install();
+        BubbleCopyGuard.Install();
+        var count = Harmony.GetPatchInfo(target)!.Prefixes.Count(x => x.owner == CopyOwner);
+        Check("★ 重复 Install 不会叠补丁", count == 1, $"实际 {count} 个");
+
+        var ours = Harmony.GetAllPatchedMethods()
+            .Where(m => Harmony.GetPatchInfo(m)!.Owners.Contains(CopyOwner))
+            .ToList();
+        Check("只补了这一个宿主方法（别顺手动别的）", ours.Count == 1, $"实际补了 {ours.Count} 个");
+
+        // finalizer 的契约：返回 null = 异常已处理，不再上抛
+        var finalizer = typeof(BubbleCopyGuard).GetMethod(
+            "CopyFinalizer", BindingFlags.NonPublic | BindingFlags.Static);
+        Check("找得到 CopyFinalizer", finalizer is not null);
+        if (finalizer is not null)
+        {
+            var boom = new System.Runtime.InteropServices.COMException(
+                "OpenClipboard 失败 (0x800401D0 (CLIPBRD_E_CANT_OPEN))", unchecked((int)0x800401D0));
+            var kept = finalizer.Invoke(null, new object?[] { boom });
+            Check("★★ finalizer 咽掉剪贴板 COMException（这就是崩溃的正解）", kept is null);
+            Check("没异常时 finalizer 也不无中生有",
+                finalizer.Invoke(null, new object?[] { null }) is null);
+        }
+
+        Console.WriteLine();
+    }
+
+    static void Test_CopyGuardRuntime()
+    {
+        Console.WriteLine("[7] 气泡复制保护：真跑");
+
+        // 空内容不该算失败：气泡还没说过话时右键菜单照样点得动
+        Check("空文本不报错也不算失败",
+            VPetLLM.Utils.Common.ClipboardHelper.TrySetText(null) &&
+            VPetLLM.Utils.Common.ClipboardHelper.TrySetText(""));
+
+        var marker = "VPetLLM 复制保护自检 " + Guid.NewGuid().ToString("N");
+
+        // 先探一下这台机器此刻的剪贴板能不能写。写不了正好 ——
+        // 那就是用户报的那个现场，下面可以真刀真枪地验"有没有保护"的区别。
+        bool clipboardWritable;
+        try { System.Windows.Clipboard.SetDataObject("probe", true); clipboardWritable = true; }
+        catch { clipboardWritable = false; }
+        Console.WriteLine($"  [环境] 剪贴板当前{(clipboardWritable ? "可写" : "被其它程序独占")}");
+
+        MessageBar bar;
+        try { bar = new MessageBar(null!); }
+        catch (Exception ex)
+        {
+            Check("能造出宿主气泡（测试前提）", false, ex.Message);
+            Console.WriteLine();
+            return;
+        }
+
+        var tText = bar.FindName("TText") as System.Windows.Controls.TextBox;
+        Check("拿得到气泡正文控件 TText", tText is not null);
+        if (tText is not null) tText.Text = marker;
+
+        var target = CopyTarget();
+        if (target is null) { Console.WriteLine(); return; }
+
+        Exception? Invoke()
+        {
+            try { target.Invoke(bar, new object?[] { bar, null }); return null; }
+            catch (TargetInvocationException e) { return e.InnerException ?? e; }
+            catch (Exception e) { return e; }
+        }
+
+        // ---- 没有保护时的宿主原始行为 ----
+        BubbleCopyGuard.Uninstall();
+        var bare = Invoke();
+        if (!clipboardWritable)
+        {
+            // 复现成立：这一条正是用户贴的那个 COMException
+            Check("★★ 复现：无保护时宿主复制确实抛 COMException",
+                bare is System.Runtime.InteropServices.COMException,
+                bare is null ? "居然没抛" : $"{bare.GetType().Name}");
+        }
+        else
+        {
+            Console.WriteLine("  [跳过] 剪贴板可写，这台机器上复现不了崩溃（换台占着剪贴板的机器再跑）");
+        }
+
+        // ---- 装上保护之后 ----
+        BubbleCopyGuard.Install();
+        var guarded = Invoke();
+        Check("★★ 装上保护后点「复制」不再往外抛任何异常", guarded is null,
+              guarded is null ? "" : $"{guarded.GetType().Name}: {guarded.Message}");
+
+        if (clipboardWritable)
+        {
+            string actual;
+            try { actual = System.Windows.Clipboard.GetText(); }
+            catch { actual = "<读不出来>"; }
+            Check("★ 保护没把功能弄丢：剪贴板里确实是气泡正文", actual == marker, $"实际 {actual}");
+        }
+
+        BubbleCopyGuard.Uninstall();
+        var still = Harmony.GetAllPatchedMethods()
+            .Any(m => Harmony.GetPatchInfo(m)!.Owners.Contains(CopyOwner));
+        Check("★ Uninstall 之后补丁摘干净", !still);
 
         Console.WriteLine();
     }

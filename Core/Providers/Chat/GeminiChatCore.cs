@@ -120,6 +120,7 @@ namespace VPetLLM.Core.Providers.Chat
             Logger.Log($"Gemini ChatWithImage: 发送多模态消息，图像大小: {DescribeImages(images)}");
 
             // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
+            ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey("Gemini", node.Url, node.Model);
             CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, node.EnableToolCall);
             List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
 
@@ -205,14 +206,18 @@ namespace VPetLLM.Core.Providers.Chat
                                 var roundResponse = await client.PostAsync(apiUrl, roundContent, InterruptManager.Token);
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
-                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Gemini");
+                                    var errorMessage = await HandleHttpErrorAsync(roundResponse, "Gemini");
                                     ResponseHandler?.Invoke(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
                             });
 
-                        if (!loop.Success) return "";
+                        if (!loop.Success)
+                        {
+                            if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
+                            return "";
+                        }
                         toolLoop = loop;
 
                         message = loop.Message;
@@ -226,7 +231,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                             ReportFailure(errorMessage);
                             return "";
                         }
@@ -274,7 +279,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                             ReportFailure(errorMessage);
                             return "";
                         }
@@ -383,14 +388,18 @@ namespace VPetLLM.Core.Providers.Chat
                                 var roundResponse = await client.PostAsync(apiEndpoint, roundContent, InterruptManager.Token);
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
-                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Gemini");
+                                    var errorMessage = await HandleHttpErrorAsync(roundResponse, "Gemini");
                                     ResponseHandler?.Invoke(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
                             });
 
-                        if (!loop.Success) return "";
+                        if (!loop.Success)
+                        {
+                            if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
+                            return "";
+                        }
                         toolLoop = loop;
 
                         message = loop.Message;
@@ -404,7 +413,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                             ReportFailure(errorMessage);
                             return "";
                         }
@@ -449,7 +458,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                             ReportFailure(errorMessage);
                             return "";
                         }
@@ -515,6 +524,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
+            ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey("Gemini", node.Url, node.Model);
             CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, node.EnableToolCall);
             List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
             if (tempUserMessage is not null)
@@ -595,14 +605,18 @@ namespace VPetLLM.Core.Providers.Chat
                                 var roundResponse = await client.PostAsync(apiUrl, roundContent, InterruptManager.Token);
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
-                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Gemini");
+                                    var errorMessage = await HandleHttpErrorAsync(roundResponse, "Gemini");
                                     ResponseHandler?.Invoke(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
                             });
 
-                        if (!loop.Success) return "";
+                        if (!loop.Success)
+                        {
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
+                            return "";
+                        }
                         toolLoop = loop;
 
                         message = loop.Message;
@@ -616,7 +630,9 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
@@ -673,7 +689,9 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
@@ -763,14 +781,18 @@ namespace VPetLLM.Core.Providers.Chat
                                 var roundResponse = await client.PostAsync(apiEndpoint, roundContent, InterruptManager.Token);
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
-                                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(roundResponse, Settings, "Gemini");
+                                    var errorMessage = await HandleHttpErrorAsync(roundResponse, "Gemini");
                                     ResponseHandler?.Invoke(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
                             });
 
-                        if (!loop.Success) return "";
+                        if (!loop.Success)
+                        {
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
+                            return "";
+                        }
                         toolLoop = loop;
 
                         message = loop.Message;
@@ -784,7 +806,9 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
@@ -830,7 +854,9 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!response.IsSuccessStatusCode)
                         {
-                            var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                            var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
+                            // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
+                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
                             ResponseHandler?.Invoke(errorMessage);
                             return "";
                         }
@@ -946,7 +972,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                    var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                     Logger.Log($"Gemini Summarize 错误: {errorMessage}");
                     return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试");
                 }
@@ -976,7 +1002,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    var errorMessage = await ErrorMessageHelper.HandleHttpResponseError(response, Settings, "Gemini");
+                    var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                     Logger.Log($"Gemini Summarize 错误: {errorMessage}");
                     return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
                 }
