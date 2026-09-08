@@ -14,24 +14,20 @@ namespace VPetLLM.Core.Services.Embedding
         private readonly HttpClient _http;
         private readonly string _endpoint;
         private readonly string _model;
-        private readonly Func<HttpRequestMessage, CancellationToken, Task>? _onBeforeSend;
+		private readonly bool _useSecureTransport;
 
         public string ModelKey { get; }
 
         /// <param name="baseUrl">形如 https://host/v1，末尾有无斜杠均可。</param>
-        /// <param name="onBeforeSend">
-        /// 发送前的请求装饰钩子。Free 通道用它挂签名头（<see cref="Utils.Common"/> 的签名机制）——
-        /// 免费网关对无 prompt 指纹的 embedding 请求走签名鉴权，仅 Bearer 不够。
-        /// 自配通道传 null。
-        /// </param>
+		/// <param name="useSecureTransport">Free 通道启用签名和应用层端到端加密；自配通道保持普通 HTTP 行为。</param>
         public OpenAiCompatibleEmbeddingProvider(
             HttpClient http, string baseUrl, string? apiKey, string model,
-            Func<HttpRequestMessage, CancellationToken, Task>? onBeforeSend = null)
+			bool useSecureTransport = false)
         {
             _http = http;
             _model = model;
             _endpoint = BuildEndpoint(baseUrl);
-            _onBeforeSend = onBeforeSend;
+			_useSecureTransport = useSecureTransport;
 
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
@@ -75,10 +71,10 @@ namespace VPetLLM.Core.Services.Embedding
             };
 
             // Free 通道在此挂签名头；自配通道无钩子
-            if (_onBeforeSend is not null)
-                await _onBeforeSend(request, ct);
-
-            using var response = await _http.SendAsync(request, ct);
+			using var response = _useSecureTransport
+				? await Utils.Common.SecureCommunicationBridge.SendAsync(
+					_http, request, HttpCompletionOption.ResponseContentRead, ct)
+				: await _http.SendAsync(request, ct);
 
             var payload = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode)

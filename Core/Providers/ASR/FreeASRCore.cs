@@ -18,14 +18,6 @@ namespace VPetLLM.Core.Providers.ASR
         private string _apiUrl;
         private string _model;
 
-        /// <summary>
-        /// 设置认证信息获取委托（由 VPetLLM 主类在初始化时调用）
-        /// </summary>
-        public static void SetAuthProviders(Func<ulong> getSteamId, Func<Task<int>> getAuthKey, Func<string>? getModId = null)
-        {
-            RequestSignatureHelper.Init(getSteamId, getAuthKey, getModId);
-        }
-
         public FreeASRCore(Setting settings) : base(settings)
         {
             LoadConfig();
@@ -103,11 +95,9 @@ namespace VPetLLM.Core.Providers.ASR
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
                 // 添加签名头
-                await RequestSignatureHelper.AddSignatureAsync(request);
-
                 var startTime = DateTime.Now;
                 using var client = CreateHttpClient();
-                var response = await client.SendAsync(request);
+				var response = await SecureCommunicationBridge.SendAsync(client, request);
                 var elapsed = (DateTime.Now - startTime).TotalSeconds;
 
                 Logger.Log("{2}: 响应接收完成，耗时 {0: F2} 秒，状态 {1}".Translate(elapsed, response.StatusCode, "ASR (Free)"));

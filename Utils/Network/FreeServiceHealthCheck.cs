@@ -56,7 +56,7 @@ namespace VPetLLM.Utils.Network
             string apiUrl, IWebProxy? proxy, Action<string>? log = null)
         {
             var host = GetHostKey(apiUrl);
-            if (host is null) return (true, "无法推导健康检查地址，放行");
+            if (host is null) return (false, "无法推导受保护的健康检查地址");
 
             if (TryGetCached(host, out var cached))
                 return (cached.Healthy, cached.Reason);
@@ -118,7 +118,6 @@ namespace VPetLLM.Utils.Network
             using var handler = new HttpClientHandler();
             if (proxy is not null) { handler.Proxy = proxy; handler.UseProxy = true; }
             else { handler.Proxy = null; handler.UseProxy = false; }
-
             using var client = new HttpClient(handler) { Timeout = ProbeTimeout };
 
             foreach (var probeUrl in GetProbeUrls(host, apiUrl))

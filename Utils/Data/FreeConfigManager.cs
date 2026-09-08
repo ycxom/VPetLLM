@@ -123,7 +123,7 @@ namespace VPetLLM.Utils.Data
                 try
                 {
                     // 优化：显式禁用代理以直连下载公开配置（不应走用户的代理设置）
-                    var handler = new HttpClientHandler { UseProxy = false };
+                    var handler = new HttpClientHandler { UseProxy = false, Proxy = null };
                     using var client = new HttpClient(handler);
                     client.Timeout = TimeSpan.FromSeconds(10);
                     var url = $"{baseUrl}/{VERSION_FILE}";
@@ -210,7 +210,7 @@ namespace VPetLLM.Utils.Data
                 try
                 {
                     // 优化：显式禁用代理以直连下载公开配置（不应走用户的代理设置）
-                    var handler = new HttpClientHandler { UseProxy = false };
+                    var handler = new HttpClientHandler { UseProxy = false, Proxy = null };
                     using var client = new HttpClient(handler);
                     client.Timeout = TimeSpan.FromSeconds(10);
                     var url = $"{baseUrl}/{configName}";

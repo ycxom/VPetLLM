@@ -922,7 +922,7 @@ namespace VPetLLM.Core.Abstractions.Base
 
         private HttpClient NewEmbeddingHttpClient(int timeoutSeconds)
             => Utils.Network.HttpHandlerPool.CreateClient(
-                CreateHttpClientHandler,
+				CreateHttpClientHandler,
                 TimeSpan.FromSeconds(Math.Max(1, timeoutSeconds)));
 
         private IEmbeddingProvider? CreateCustomEmbeddingProvider(Setting.EmbeddingSetting config)
@@ -944,7 +944,7 @@ namespace VPetLLM.Core.Abstractions.Base
         /// <c>Free_Embedding_Config.json</c>（由 VPetLLM_Web 管理，可随时更新而无需重编客户端）——
         /// 绝不在客户端硬编码端点。服务端尚未下发该配置时返回 null，向量路优雅缺席。
         ///
-        /// 鉴权靠签名头（<see cref="Utils.Common.RequestSignatureHelper"/>，与 Free ASR/TTS 一致）：
+        /// 鉴权靠私有通讯载荷（<see cref="Utils.Common.SecureCommunicationBridge"/>，与 Free ASR/TTS 一致）：
         /// embedding 请求体无 prompt 指纹，走不通 Chat 的关键词鉴权，只能签名。
         /// 协议默认 OpenAI 兼容，可由配置里可选的 Protocol 字段覆盖。
         /// </summary>
@@ -971,21 +971,18 @@ namespace VPetLLM.Core.Abstractions.Base
                 Enum.TryParse<Setting.EmbeddingProtocol>(p, ignoreCase: true, out var parsed))
                 protocol = parsed;
 
-            // 每请求挂签名头。RequestSignatureHelper 已由主程序初始化（Free ASR/TTS 共用）。
+            // 每请求由私有 DLL 自行获取本机身份并挂载签名头（Free ASR/TTS 共用）。
             // 目前仅 OpenAI 兼容协议接签名钩子；Free 端点即 OpenAI 兼容。
             if (protocol == Setting.EmbeddingProtocol.OpenAI)
             {
-                Func<HttpRequestMessage, CancellationToken, Task> sign =
-                    (req, _) => Utils.Common.RequestSignatureHelper.AddSignatureAsync(req);
-
                 return new OpenAiCompatibleEmbeddingProvider(
-                    NewEmbeddingHttpClient(config.TimeoutSeconds),
-                    url, string.IsNullOrEmpty(key) ? null : key, model, onBeforeSend: sign);
+					NewEmbeddingHttpClient(config.TimeoutSeconds),
+					url, string.IsNullOrEmpty(key) ? null : key, model, useSecureTransport: true);
             }
 
             return EmbeddingProviderFactory.Create(
                 protocol,
-                NewEmbeddingHttpClient(config.TimeoutSeconds),
+				NewEmbeddingHttpClient(config.TimeoutSeconds),
                 url, string.IsNullOrEmpty(key) ? null : key, model);
         }
 

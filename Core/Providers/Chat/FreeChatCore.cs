@@ -49,7 +49,8 @@ namespace VPetLLM.Core.Providers.Chat
             var timeoutSeconds = setting?.LLMRequestTimeoutSeconds ?? 30;
             if (timeoutSeconds <= 0) timeoutSeconds = 30;
             _httpClient = Utils.Network.HttpHandlerPool.CreateClient(
-                CreateHttpClientHandler, TimeSpan.FromSeconds(timeoutSeconds));
+                CreateHttpClientHandler,
+                TimeSpan.FromSeconds(timeoutSeconds));
 
             // 设置API密钥
             _httpClient.DefaultRequestHeaders.Authorization =
@@ -115,6 +116,27 @@ namespace VPetLLM.Core.Providers.Chat
                 _apiUrl = "";
                 _model = "";
             }
+        }
+
+        private async Task<HttpResponseMessage> SendSignedAsync(
+            HttpRequestMessage request,
+            HttpCompletionOption completionOption,
+            CancellationToken cancellationToken)
+        {
+			return await SecureCommunicationBridge.SendAsync(
+				_httpClient, request, completionOption, cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task<HttpResponseMessage> PostSignedAsync(
+            HttpContent content,
+            CancellationToken cancellationToken = default)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl)
+            {
+                Content = content
+            };
+            return await SendSignedAsync(
+                request, HttpCompletionOption.ResponseContentRead, cancellationToken).ConfigureAwait(false);
         }
 
         public override Task<string> Chat(string prompt)
@@ -249,7 +271,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         Content = content
                     };
-                    var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
+                    var response = await SendSignedAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -307,7 +329,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     // 非流式传输模式
                     Logger.Log("Free ChatWithImage: 使用非流式传输模式");
-                    var response = await _httpClient.PostAsync(_apiUrl, content, InterruptManager.Token);
+                    var response = await PostSignedAsync(content, InterruptManager.Token);
                     var responseContent = await response.Content.ReadAsStringAsync();
 
                     if (response.IsSuccessStatusCode)
@@ -479,7 +501,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         Content = content
                     };
-                    var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
+                    var response = await SendSignedAsync(request, HttpCompletionOption.ResponseHeadersRead, InterruptManager.Token);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -593,7 +615,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     // 非流式传输模式
                     Logger.Log("Free: 使用非流式传输模式");
-                    var response = await _httpClient.PostAsync(_apiUrl, content, InterruptManager.Token);
+                    var response = await PostSignedAsync(content, InterruptManager.Token);
                     var responseContent = await response.Content.ReadAsStringAsync();
 
                     if (response.IsSuccessStatusCode)
@@ -743,7 +765,7 @@ namespace VPetLLM.Core.Providers.Chat
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PostAsync(_apiUrl, content);
+                var response = await PostSignedAsync(content);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
@@ -843,7 +865,7 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 var roundContent = new StringContent(
                     body.ToString(Formatting.None), Encoding.UTF8, "application/json");
-                var roundResponse = await _httpClient.PostAsync(_apiUrl, roundContent, InterruptManager.Token);
+                var roundResponse = await PostSignedAsync(roundContent, InterruptManager.Token);
                 var roundText = await roundResponse.Content.ReadAsStringAsync();
 
                 if (!roundResponse.IsSuccessStatusCode)
@@ -988,7 +1010,7 @@ namespace VPetLLM.Core.Providers.Chat
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
-                var response = await _httpClient.PostAsync(_apiUrl, content, cts.Token);
+                var response = await PostSignedAsync(content, cts.Token);
 
                 if (response.IsSuccessStatusCode)
                 {

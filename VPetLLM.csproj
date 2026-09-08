@@ -17,6 +17,7 @@
 	<ItemGroup>
 		<!-- 气泡独占守卫要改宿主 MessageBar 的行为但不能改它的身份，只能打补丁，理由见 BubbleGuard -->
 		<PackageReference Include="Lib.Harmony" Version="2.3.3" />
+		<!-- 仅用于 net8 编译；运行时使用 VPet 宿主提供的 NAudio，不随 MOD 重复发布。 -->
 		<PackageReference Include="NAudio" Version="2.2.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
@@ -31,7 +32,15 @@
 		<Compile Remove="Tests\**\*.cs" />
 	</ItemGroup>
 
-
+	<ItemGroup>
+		<!-- 私有原生通讯载荷按宿主进程架构加载，不把实现源码放入开源托管程序集。 -->
+		<None Include="Native\win-x64\VPetLLM.SecureCommunication.dll"
+			  CopyToOutputDirectory="PreserveNewest"
+			  TargetPath="runtimes\win-x64\native\VPetLLM.SecureCommunication.dll" />
+		<None Include="Native\win-x86\VPetLLM.SecureCommunication.dll"
+			  CopyToOutputDirectory="PreserveNewest"
+			  TargetPath="runtimes\win-x86\native\VPetLLM.SecureCommunication.dll" />
+	</ItemGroup>
 
 
 	<ItemGroup>
@@ -52,18 +61,30 @@
 	<Target Name="CopyResources" AfterTargets="Build" Condition="'$(SkipPluginCopy)' != 'true'">
 		<ItemGroup>
 			<!-- 只复制 Windows x64/x86 运行时，排除其他平台和 e_sqlite3.dll -->
-			<FilesToCopy Include="$(OutDir)**\*"
-				Exclude="$(OutDir)**\e_sqlite3.dll;
-				$(OutDir)runtimes\linux-**\**;
-				$(OutDir)runtimes\osx-**\**;
-				$(OutDir)runtimes\alpine-**\**;
-				$(OutDir)runtimes\browser-**\**;
-				$(OutDir)runtimes\win-arm**\**" />
+			<FilesToCopy Include="$(OutDir)*"
+				Exclude="$(OutDir)e_sqlite3.dll;
+				$(OutDir)LinePutScript.dll;
+				$(OutDir)LinePutScript.Localization.WPF.dll;
+				$(OutDir)NAudio*.dll;
+				$(OutDir)Panuon.WPF*.dll;
+				$(OutDir)SkiaSharp.dll;
+				$(OutDir)VPet-Simulator.Core.dll;
+				$(OutDir)VPet-Simulator.Windows.Interface.dll" />
 		</ItemGroup>
 		<Copy
 				SourceFiles="@(FilesToCopy)"
 				DestinationFiles="@(FilesToCopy->'$(ProjectDir)3000_VPetLLM\plugin\%(RecursiveDir)%(Filename)%(Extension)')"
 				SkipUnchangedFiles="true" />
+
+		<!-- Architecture-specific private payloads must remain in their runtime folders. -->
+		<Copy SourceFiles="$(OutDir)runtimes\win-x64\native\VPetLLM.SecureCommunication.dll"
+			DestinationFolder="$(ProjectDir)3000_VPetLLM\plugin\runtimes\win-x64\native"
+			SkipUnchangedFiles="true"
+			Condition="Exists('$(OutDir)runtimes\win-x64\native\VPetLLM.SecureCommunication.dll')" />
+		<Copy SourceFiles="$(OutDir)runtimes\win-x86\native\VPetLLM.SecureCommunication.dll"
+			DestinationFolder="$(ProjectDir)3000_VPetLLM\plugin\runtimes\win-x86\native"
+			SkipUnchangedFiles="true"
+			Condition="Exists('$(OutDir)runtimes\win-x86\native\VPetLLM.SecureCommunication.dll')" />
 		
 		<!-- 单独复制 SQLite 本地库到正确位置（仅 x64） -->
 		<ItemGroup>

@@ -124,7 +124,11 @@ namespace VPetLLM.Core.Abstractions.Base
                 handler.Proxy = null;
             }
 
+            ConfigureHttpClientHandler(handler);
             return handler;
         }
+
+        /// <summary>Provider-specific transport hardening applied before handler pooling.</summary>
+        protected virtual void ConfigureHttpClientHandler(HttpClientHandler handler) { }
     }
 }

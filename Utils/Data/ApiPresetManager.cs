@@ -97,7 +97,7 @@ namespace VPetLLM.Utils.Data
             try
             {
                 // 优化：显式禁用代理以直连下载公开配置
-                var handler = new HttpClientHandler { UseProxy = false };
+                var handler = new HttpClientHandler { UseProxy = false, Proxy = null };
                 using var client = new HttpClient(handler);
                 client.Timeout = TimeSpan.FromSeconds(10);
                 var versionJson = await client.GetStringAsync(VERSION_URL);
