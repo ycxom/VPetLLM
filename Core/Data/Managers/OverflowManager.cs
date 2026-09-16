@@ -1,4 +1,5 @@
-using VPetLLM.Core.Data.Database;
+﻿using VPetLLM.Core.Data.Database;
+using VPetLLM.Infrastructure.Exceptions;
 
 namespace VPetLLM.Core.Data.Managers
 {
@@ -306,7 +307,19 @@ namespace VPetLLM.Core.Data.Managers
                 if (_settings.EnableCompressionRecords && _recordManager is not null)
                     systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RecordHint", _settings.PromptLanguage);
 
-                var summary = await _chatCore.Summarize(systemPrompt, historyText);
+                string summary;
+                try
+                {
+                    summary = await _chatCore.Summarize(systemPrompt, historyText);
+                }
+                catch (SummarizeFailedException ex)
+                {
+                    // 失败时必须原样退出：不推进 _lastSummarizedIndex、不动 _currentSummary。
+                    // 这一段消息会留在窗口里，下次溢出检查重新尝试总结。
+                    Logger.Log($"OverflowManager: 总结失败，检查点保持在 {_lastSummarizedIndex}，" +
+                               $"[{segmentStart}..{segmentEnd}) 留待下次重试: {ex.Message}");
+                    return;
+                }
 
                 if (string.IsNullOrWhiteSpace(summary))
                 {
@@ -388,6 +401,8 @@ namespace VPetLLM.Core.Data.Managers
                 if (!string.IsNullOrWhiteSpace(compacted))
                     summary = compacted;
             }
+            // SummarizeFailedException 也走这里：压缩失败时保留未压缩的原总结，
+            // 交给下面的硬截断，绝不能用失败文案替换掉一份本来有效的总结。
             catch (Exception ex)
             {
                 Logger.Log($"OverflowManager: 总结压缩失败，改用硬截断: {ex.Message}");

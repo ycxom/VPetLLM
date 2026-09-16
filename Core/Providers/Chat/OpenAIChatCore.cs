@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Infrastructure.Exceptions;
 using ErrorHelper = global::VPetLLM.Utils.System.ErrorMessageHelper;
 using SystemLogger = global::VPetLLM.Utils.System.Logger;
 
@@ -572,7 +573,7 @@ namespace VPetLLM.Core.Providers.Chat
                     noNodeError = "没有启用的OpenAI 节点，请在设置中启用至少一个节点";
                 }
                 SystemLogger.Log($"OpenAI Chat 错误: {noNodeError}");
-                ResponseHandler?.Invoke(noNodeError);
+                ReportFailure(noNodeError);
                 return "";
             }
 
@@ -685,7 +686,7 @@ namespace VPetLLM.Core.Providers.Chat
                             if (!roundResponse.IsSuccessStatusCode)
                             {
                                 var errorMessage = await HandleHttpError(roundResponse, Settings, "OpenAI");
-                                ResponseHandler?.Invoke(errorMessage);
+                                ReportFailure(errorMessage);
                                 return null;
                             }
                             return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
@@ -721,7 +722,7 @@ namespace VPetLLM.Core.Providers.Chat
                             var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
                             if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -802,7 +803,7 @@ namespace VPetLLM.Core.Providers.Chat
                             var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
                             if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -849,7 +850,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "OpenAI");
                 SystemLogger.Log($"OpenAI Chat 异常: {ex.Message}");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
 
                 // 重置已尝试节点列表
                 _triedNodeIndices.Clear();
@@ -900,7 +901,9 @@ namespace VPetLLM.Core.Providers.Chat
                         noNodeError = "没有启用的OpenAI 节点，请在设置中启用至少一个节点";
                     }
                     SystemLogger.Log($"OpenAI Summarize 错误: {noNodeError}");
-                    return ErrorHelper.IsDebugMode(Settings) ? noNodeError : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试");
+                    throw new SummarizeFailedException(ErrorHelper.IsDebugMode(Settings)
+                        ? noNodeError
+                        : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试"));
                 }
 
                 object data;
@@ -962,7 +965,9 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
                         SystemLogger.Log($"OpenAI Summarize 错误: {errorMessage}");
-                        return ErrorHelper.IsDebugMode(Settings) ? errorMessage : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试");
+                        throw new SummarizeFailedException(ErrorHelper.IsDebugMode(Settings)
+                            ? errorMessage
+                            : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试"));
                     }
 
                     var responseString = await response.Content.ReadAsStringAsync();
@@ -977,12 +982,18 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                 }
             }
+            // 必须在 catch(Exception) 之前重抛，否则上面抛出的失败会被兜底分支
+            // 重新变回「返回错误字符串」，这正是本次要修掉的行为。
+            catch (SummarizeFailedException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 SystemLogger.Log($"OpenAI Summarize 异常: {ex.Message}");
-                return ErrorHelper.IsDebugMode(Settings)
+                throw new SummarizeFailedException(ErrorHelper.IsDebugMode(Settings)
                     ? $"OpenAI Summarize 异常: {ex.Message}\n{ex.StackTrace}"
-                    : (ErrorHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试");
+                    : (ErrorHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试"), ex);
             }
         }
 

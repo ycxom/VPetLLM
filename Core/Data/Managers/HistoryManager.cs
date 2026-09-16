@@ -1,4 +1,5 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
+using VPetLLM.Infrastructure.Exceptions;
 
 namespace VPetLLM.Core.Data.Managers
 {
@@ -288,7 +289,19 @@ namespace VPetLLM.Core.Data.Managers
                 systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RecordHint", _settings.PromptLanguage);
             }
 
-            var summary = await _chatCore.Summarize(systemPrompt, historyText);
+            string summary;
+            try
+            {
+                summary = await _chatCore.Summarize(systemPrompt, historyText);
+            }
+            catch (SummarizeFailedException ex)
+            {
+                // 压缩失败就让历史原样留着，下次再试。两个方向都必须挡住：
+                // 异常逃逸会打断调用方 AddMessage，而把失败文案当总结写下去
+                // 会用一行报错替换掉 historyToCompress 里的全部原文。
+                Logger.Log($"HistoryManager: 压缩失败，历史保持不变: {ex.Message}");
+                return;
+            }
 
             if (string.IsNullOrWhiteSpace(summary))
             {

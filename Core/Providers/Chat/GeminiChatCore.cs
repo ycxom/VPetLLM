@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Infrastructure.Exceptions;
 
 namespace VPetLLM.Core.Providers.Chat
 {
@@ -207,7 +208,7 @@ namespace VPetLLM.Core.Providers.Chat
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
                                     var errorMessage = await HandleHttpErrorAsync(roundResponse, "Gemini");
-                                    ResponseHandler?.Invoke(errorMessage);
+                                    ReportFailure(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
@@ -389,7 +390,7 @@ namespace VPetLLM.Core.Providers.Chat
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
                                     var errorMessage = await HandleHttpErrorAsync(roundResponse, "Gemini");
-                                    ResponseHandler?.Invoke(errorMessage);
+                                    ReportFailure(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
@@ -520,7 +521,7 @@ namespace VPetLLM.Core.Providers.Chat
                     noNodeError = "没有启用的 Gemini 节点，请在设置中启用至少一个节点";
                 }
                 Logger.Log($"Gemini Chat 错误: {noNodeError}");
-                ResponseHandler?.Invoke(noNodeError);
+                ReportFailure(noNodeError);
                 return "";
             }
 
@@ -606,7 +607,7 @@ namespace VPetLLM.Core.Providers.Chat
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
                                     var errorMessage = await HandleHttpErrorAsync(roundResponse, "Gemini");
-                                    ResponseHandler?.Invoke(errorMessage);
+                                    ReportFailure(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
@@ -633,7 +634,7 @@ namespace VPetLLM.Core.Providers.Chat
                             var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
                             if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -692,7 +693,7 @@ namespace VPetLLM.Core.Providers.Chat
                             var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
                             if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -714,7 +715,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
                 Logger.Log($"Gemini Chat 异常: {ex.Message}");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
 
@@ -782,7 +783,7 @@ namespace VPetLLM.Core.Providers.Chat
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
                                     var errorMessage = await HandleHttpErrorAsync(roundResponse, "Gemini");
-                                    ResponseHandler?.Invoke(errorMessage);
+                                    ReportFailure(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
@@ -809,7 +810,7 @@ namespace VPetLLM.Core.Providers.Chat
                             var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
                             if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -857,7 +858,7 @@ namespace VPetLLM.Core.Providers.Chat
                             var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
                             if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, true);
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -880,7 +881,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Gemini");
                 Logger.Log($"Gemini Chat 异常: {ex.Message}");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
 
@@ -912,7 +913,9 @@ namespace VPetLLM.Core.Providers.Chat
                         noNodeError = "没有启用的 Gemini 节点，请在设置中启用至少一个节点";
                     }
                     Logger.Log($"Gemini Summarize 错误: {noNodeError}");
-                    return ErrorMessageHelper.IsDebugMode(Settings) ? noNodeError : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
+                    throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                        ? noNodeError
+                        : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。"));
                 }
 
                 if (node.UseOpenAIAuth)
@@ -924,12 +927,18 @@ namespace VPetLLM.Core.Providers.Chat
                     return await SummarizeGemini(systemPrompt, userContent, node);
                 }
             }
+            // 必须在 catch(Exception) 之前重抛，否则上面抛出的失败会被兜底分支
+            // 重新变回「返回错误字符串」，这正是本次要修掉的行为。
+            catch (SummarizeFailedException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 Logger.Log($"Gemini Summarize 异常: {ex.Message}");
-                return ErrorMessageHelper.IsDebugMode(Settings)
+                throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Gemini Summarize 异常: {ex.Message}\n{ex.StackTrace}"
-                    : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试。");
+                    : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试。"), ex);
             }
         }
 
@@ -974,7 +983,9 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                     Logger.Log($"Gemini Summarize 错误: {errorMessage}");
-                    return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试");
+                    throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                        ? errorMessage
+                        : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试"));
                 }
 
                 var responseString = await response.Content.ReadAsStringAsync();
@@ -1004,7 +1015,9 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                     Logger.Log($"Gemini Summarize 错误: {errorMessage}");
-                    return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。");
+                    throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                        ? errorMessage
+                        : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。"));
                 }
 
                 var responseString = await response.Content.ReadAsStringAsync();

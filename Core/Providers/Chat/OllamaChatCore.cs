@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Infrastructure.Exceptions;
 
 namespace VPetLLM.Core.Providers.Chat
 {
@@ -204,7 +205,7 @@ namespace VPetLLM.Core.Providers.Chat
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
                                     var errorMessage = await HandleHttpErrorAsync(roundResponse, "Ollama");
-                                    ResponseHandler?.Invoke(errorMessage);
+                                    ReportFailure(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
@@ -430,7 +431,7 @@ namespace VPetLLM.Core.Providers.Chat
                                 {
                                     var errorMessage = await HandleHttpErrorAsync(roundResponse, "Ollama");
                                     Logger.Log($"Ollama: 工具调用请求失败 {(int)roundResponse.StatusCode}");
-                                    ResponseHandler?.Invoke(errorMessage);
+                                    ReportFailure(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
@@ -559,7 +560,7 @@ namespace VPetLLM.Core.Providers.Chat
                 Logger.Log($"Ollama Chat 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorMessageHelper.GetOllamaTimeoutError(Settings)
                     ?? $"Ollama 请求超时: {tcEx.Message}\n{tcEx.StackTrace}";
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (HttpRequestException httpEx)
@@ -567,7 +568,7 @@ namespace VPetLLM.Core.Providers.Chat
                 Logger.Log($"Ollama Chat 网络异常: {httpEx.Message}");
                 var errorMessage = ErrorMessageHelper.GetOllamaConnectionError(Settings)
                     ?? $"Ollama 网络异常: {httpEx.Message}\n{httpEx.StackTrace}";
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (Exception ex)
@@ -581,7 +582,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 Logger.Log($"Ollama Chat 异常: {ex.Message}");
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
         }
@@ -607,7 +608,9 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
                         Logger.Log($"Ollama Summarize 错误: {errorMessage}");
-                        return ErrorMessageHelper.IsDebugMode(Settings) ? errorMessage : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败");
+                        throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                            ? errorMessage
+                            : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败"));
                     }
 
                     var responseString = await response.Content.ReadAsStringAsync();
@@ -618,19 +621,26 @@ namespace VPetLLM.Core.Providers.Chat
             catch (TaskCanceledException tcEx)
             {
                 Logger.Log($"Ollama Summarize 请求超时: {tcEx.Message}");
-                return ErrorMessageHelper.GetOllamaTimeoutError(Settings)
-                    ?? $"Ollama Summarize 请求超时: {tcEx.Message}";
+                throw new SummarizeFailedException(ErrorMessageHelper.GetOllamaTimeoutError(Settings)
+                    ?? $"Ollama Summarize 请求超时: {tcEx.Message}", tcEx);
             }
             catch (HttpRequestException httpEx)
             {
                 Logger.Log($"Ollama Summarize 网络异常: {httpEx.Message}");
-                return ErrorMessageHelper.GetOllamaConnectionError(Settings)
-                    ?? $"Ollama Summarize 网络异常: {httpEx.Message}";
+                throw new SummarizeFailedException(ErrorMessageHelper.GetOllamaConnectionError(Settings)
+                    ?? $"Ollama Summarize 网络异常: {httpEx.Message}", httpEx);
+            }
+            // 必须在 catch(Exception) 之前重抛，否则上面抛出的失败会被兜底分支
+            // 重新变回「返回错误字符串」，这正是本次要修掉的行为。
+            catch (SummarizeFailedException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 Logger.Log($"Ollama Summarize 异常: {ex.Message}");
-                return ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama");
+                throw new SummarizeFailedException(
+                    ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Ollama"), ex);
             }
         }
 

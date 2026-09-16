@@ -1,4 +1,4 @@
-using VPet_Simulator.Windows.Interface;
+﻿using VPet_Simulator.Windows.Interface;
 using System.Net;
 using System.Net.Http;
 using VPetLLM.Core.Data.Managers;
@@ -27,6 +27,11 @@ namespace VPetLLM.Core.Abstractions.Base
         protected Action<string> ResponseHandler;
         protected Action<string> StreamingChunkHandler;
 
+        /// <summary>
+        /// 错误通道：ReportFailure 的错误文本优先走这里，与模型回复管线分离。
+        /// </summary>
+        protected Action<string> FailureHandler;
+
         protected ChatCoreBase()
         {
             ResponseHandler = response => global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.CaptureAssistant(response);
@@ -34,6 +39,7 @@ namespace VPetLLM.Core.Abstractions.Base
         }
         public abstract Task<string> Chat(string prompt);
         public abstract Task<string> Chat(string prompt, bool isRetry);
+        /// <inheritdoc cref="VPetLLM.Core.Abstractions.Interfaces.IChatCore.Summarize"/>
         public abstract Task<string> Summarize(string systemPrompt, string userContent);
 
         /// <summary>
@@ -50,9 +56,10 @@ namespace VPetLLM.Core.Abstractions.Base
         /// <summary>
         /// 最近一次调用是否失败。
         ///
-        /// 为什么需要它：错误文本和正常回复都是经 ResponseHandler 送出、随后 return ""，
-        /// 两者在调用方看来完全一样。前置多模态因此会把「API调用失败: Forbidden ...」
-        /// 当成图片描述返回成功，导致视觉节点容灾形同虚设。这个标志位就是用来区分的。
+        /// 为什么需要它：错误文本经 ReportFailure 送出（优先走错误通道）、正常回复经
+        /// ResponseHandler 送出，但两者之后一律 return ""，返回值无法区分成败。
+        /// 前置多模态因此差点把「API调用失败: Forbidden ...」当成图片描述返回成功，
+        /// 导致视觉节点容灾形同虚设。这个标志位就是用来区分的。
         /// </summary>
         public bool LastCallFailed { get; protected set; }
 
@@ -87,19 +94,25 @@ namespace VPetLLM.Core.Abstractions.Base
         }
 
         /// <summary>
-        /// 上报一次失败：置位标志并把错误文本照常送给 ResponseHandler
+        /// 上报一次失败：置位标志，错误文本送错误通道（SetErrorHandler）。
+        /// 各 provider 的失败分支一律走这里，禁止直接 ResponseHandler?.Invoke(错误文本)。
         /// </summary>
         protected void ReportFailure(string message)
         {
             LastCallFailed = true;
 
-            // 错误文本会和模型回复走同一条显示管线，但它**不是模型写的** ——
-            // 不打这个招呼的话，解析器会把 "OpenAI API 错误 [400]: {...}" 当成
-            // 一次"没有使用指令标记"的格式违规，于是下一次请求去教训模型：
-            // "你上一次回复完全没有使用标记"。模型压根没回过话。
+            // 错误文本**不是模型写的** —— 不打这个招呼的话，解析器会把
+            // "OpenAI API 错误 [400]: {...}" 当成一次"没有使用指令标记"的格式违规，
+            // 于是下一次请求去教训模型："你上一次回复完全没有使用标记"。模型压根没回过话。
             Core.Services.FormatComplianceTracker.SuppressNext();
 
-            ResponseHandler?.Invoke(message);
+            // 错误文本绝不能混进 ResponseHandler：那条管线的终点是 say→TTS，
+            // 曾经把 2302 字符的网络异常堆栈整段朗读了出来。没人挂错误通道时
+            // （识图的临时 core 等场景）退回 ResponseHandler，维持原有行为。
+            if (FailureHandler is not null)
+                FailureHandler.Invoke(message);
+            else
+                ResponseHandler?.Invoke(message);
         }
 
         /// <summary>
@@ -115,7 +128,7 @@ namespace VPetLLM.Core.Abstractions.Base
         public virtual Task<string> ChatWithImages(string prompt, IReadOnlyList<byte[]> images)
         {
             Logger.Log($"{Name} 不支持多模态消息");
-            ResponseHandler?.Invoke("当前模型不支持图像输入");
+            ReportFailure("当前模型不支持图像输入");
             return Task.FromResult("");
         }
 
@@ -1258,6 +1271,23 @@ namespace VPetLLM.Core.Abstractions.Base
 
                 global::VPetLLM.Core.RemoteChat.RemoteChatSessionContext.CaptureAssistant(response);
                 handler?.Invoke(response);
+            };
+        }
+
+        /// <summary>
+        /// 挂错误通道：ReportFailure 的错误文本走这里，不进 ResponseHandler 的回复管线
+        /// ——错误不是模型说的话，不该被拆成 say 命令送去 TTS 朗读。
+        /// 不捕获错误文本进 RemoteChatSessionContext：它不是助手回复，不该回灌远端会话。
+        /// </summary>
+        public void SetErrorHandler(Action<string> handler)
+        {
+            FailureHandler = message =>
+            {
+                // 与 SetResponseHandler 同款拦截：中断后迟到的错误没有展示价值
+                if (Utils.Common.InterruptManager.IsInterrupted)
+                    return;
+
+                handler?.Invoke(message);
             };
         }
 

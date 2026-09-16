@@ -40,6 +40,7 @@ namespace VPetLLM.UI.Windows
             if (_plugin.ChatCore is not null)
             {
                 _plugin.ChatCore.SetResponseHandler(HandleResponse);
+                _plugin.ChatCore.SetErrorHandler(HandleErrorResponse);
             }
 
             // 预初始化 MessageBarHelper
@@ -65,6 +66,52 @@ namespace VPetLLM.UI.Windows
         {
             // 使用直接气泡管理器
             DirectBubbleManager.ShowBubble(_plugin, message);
+        }
+
+        /// <summary>
+        /// 处理调用失败的错误文本（SetErrorHandler 挂进来的通道）——只给用户看一句话，全程不碰 TTS。
+        ///
+        /// 错误一旦混进 <see cref="HandleResponse"/> 的回复管线，会被 SmartMessageProcessor
+        /// 当成没带命令的模型回复拆成 say 命令送去 TTS —— 真实事故：2302 字符的网络异常
+        /// 堆栈被整段朗读了出来。所以错误走独立通道：完整文本只进日志，
+        /// 气泡上只放第一行截断后的人话，不经过消息处理器，自然不会变成语音。
+        /// </summary>
+        public void HandleErrorResponse(string message)
+        {
+            // 本轮已被用户中断：迟到的错误没有展示价值
+            if (InterruptManager.IsInterrupted)
+                return;
+
+            // 完整错误（可能含堆栈）只进日志，供排查
+            Logger.Log($"HandleErrorResponse: {message}");
+
+            try
+            {
+                // 复用 HandleResponse 首响分支的收尾：停思考动画、复位流式状态
+                _isThinking = false;
+                var cts = _thinkingCancellationTokenSource;
+                if (cts is not null)
+                {
+                    _thinkingCancellationTokenSource = null;
+                    try { cts.Cancel(); cts.Dispose(); } catch { }
+                }
+                ResetStreamingState();
+
+                // 状态灯置错误态，等下一轮对话自然恢复
+                _plugin.FloatingSidebarManager?.SetErrorStatus();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"HandleErrorResponse: 收尾失败: {ex.Message}");
+            }
+
+            // 气泡只放第一行截断后的人话；异常堆栈从第二行起，全部留在日志里
+            var display = (message ?? string.Empty).Split('\n')[0].Trim();
+            if (display.Length == 0)
+                return;
+            if (display.Length > 80)
+                display = display[..80] + "…";
+            DirectBubbleManager.ShowBubble(_plugin, display);
         }
 
         /// <summary>

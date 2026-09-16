@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Infrastructure.Exceptions;
 using VPetLLM.Utils.Data;
 
 namespace VPetLLM.Core.Providers.Chat
@@ -424,7 +425,7 @@ namespace VPetLLM.Core.Providers.Chat
                     var errorMessage = ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded")
                         ?? "Free Chat 配置未加载，请等待配置下载完成后重启程序";
                     Logger.Log(errorMessage);
-                    ResponseHandler?.Invoke(errorMessage);
+                    ReportFailure(errorMessage);
                     return "";
                 }
 
@@ -700,7 +701,7 @@ namespace VPetLLM.Core.Providers.Chat
                 var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free Chat 网络异常: {httpEx.Message}\n{httpEx.StackTrace}"
                     : ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (TaskCanceledException tcEx)
@@ -716,7 +717,7 @@ namespace VPetLLM.Core.Providers.Chat
                 var errorMessage = ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free Chat 请求超时: {tcEx.Message}\n{tcEx.StackTrace}"
                     : ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (Exception ex)
@@ -730,7 +731,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 Logger.Log($"Free Chat 异常: {ex.Message}");
                 var errorMessage = ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
         }
@@ -744,8 +745,9 @@ namespace VPetLLM.Core.Providers.Chat
                 if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
                 {
                     Logger.Log("Free Chat 配置未加载，总结功能不可用");
-                    return ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded")
-                        ?? "配置未加载，总结功能暂时不可用";
+                    throw new SummarizeFailedException(
+                        ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded")
+                        ?? "配置未加载，总结功能暂时不可用");
                 }
 
                 var messages = new[]
@@ -780,32 +782,41 @@ namespace VPetLLM.Core.Providers.Chat
                         responseContent.Contains("INTERNAL_SERVER_ERROR"))
                     {
                         Logger.Log($"Free Summarize 服务器内部错误: {responseContent}");
-                        return ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable")
-                            ?? "Free API 服务暂时不可用，总结功能无法使用。";
+                        throw new SummarizeFailedException(
+                            ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable")
+                            ?? "Free API 服务暂时不可用，总结功能无法使用。");
                     }
 
                     Logger.Log($"Free Summarize 错误: {response.StatusCode} - {responseContent}");
-                    return ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败";
+                    throw new SummarizeFailedException(
+                        ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败");
                 }
             }
             catch (HttpRequestException httpEx)
             {
                 Logger.Log($"Free Summarize 网络异常: {httpEx.Message}");
-                return ErrorMessageHelper.IsDebugMode(Settings)
+                throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free Summarize 网络异常: {httpEx.Message}"
-                    : ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free");
+                    : ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free"), httpEx);
             }
             catch (TaskCanceledException tcEx)
             {
                 Logger.Log($"Free Summarize 请求超时: {tcEx.Message}");
-                return ErrorMessageHelper.IsDebugMode(Settings)
+                throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
                     ? $"Free Summarize 请求超时: {tcEx.Message}"
-                    : ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free");
+                    : ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free"), tcEx);
+            }
+            // 必须在 catch(Exception) 之前重抛，否则上面刚抛出的失败会被兜底分支
+            // 重新变回「返回错误字符串」，这正是本次要修掉的行为。
+            catch (SummarizeFailedException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 Logger.Log($"Free Summarize 异常: {ex.Message}");
-                return ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free");
+                throw new SummarizeFailedException(
+                    ErrorMessageHelper.GetFriendlyExceptionError(ex, Settings, "Free"), ex);
             }
         }
 

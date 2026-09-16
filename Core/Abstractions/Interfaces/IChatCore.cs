@@ -1,4 +1,4 @@
-namespace VPetLLM.Core.Abstractions.Interfaces
+﻿namespace VPetLLM.Core.Abstractions.Interfaces
 {
     public interface IChatCore
     {
@@ -20,6 +20,15 @@ namespace VPetLLM.Core.Abstractions.Interfaces
         /// 注意：它与「函数调用」无关，早期曾被命名为 isFunctionCall。
         /// </param>
         Task<string> Chat(string prompt, bool isRetry);
+        /// <summary>
+        /// 生成总结。失败时抛 <see cref="VPetLLM.Infrastructure.Exceptions.SummarizeFailedException"/>，
+        /// 异常消息是可直接展示的文案。
+        /// </summary>
+        /// <remarks>
+        /// 实现绝不能把错误文案当返回值：调用方无法与真总结区分，OverflowManager 曾因此
+        /// 把一行报错当成 2151 条消息的总结提交，并推进检查点把原文永久丢掉。
+        /// 成功时允许返回空串，调用方按「无内容」处理。
+        /// </remarks>
         Task<string> Summarize(string systemPrompt, string userContent);
 
         /// <summary>
@@ -45,8 +54,9 @@ namespace VPetLLM.Core.Abstractions.Interfaces
         Task<string> ChatWithImages(string prompt, IReadOnlyList<byte[]> images);
 
         /// <summary>
-        /// 最近一次调用是否失败。错误文本与正常回复都经 ResponseHandler 送出、
-        /// 随后一律 return ""，调用方只能靠这个标志位区分两者。
+        /// 最近一次调用是否失败。错误文本经 ReportFailure 送出（优先走错误通道）、
+        /// 正常回复经 ResponseHandler 送出，随后一律 return ""，
+        /// 调用方只能靠这个标志位区分两者。
         /// </summary>
         bool LastCallFailed { get; }
 
@@ -57,6 +67,12 @@ namespace VPetLLM.Core.Abstractions.Interfaces
         void MarkLastResponseInterrupted();
 
         void SetResponseHandler(Action<string> handler);
+
+        /// <summary>
+        /// 挂错误通道：调用失败的错误文本走这里，与模型回复管线分离
+        /// ——否则错误会被当回复拆成 say 命令送去 TTS。未挂时错误退回 ResponseHandler。
+        /// </summary>
+        void SetErrorHandler(Action<string> handler);
         void SaveHistory();
         void LoadHistory();
         List<string> GetModels();

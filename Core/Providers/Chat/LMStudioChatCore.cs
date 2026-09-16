@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Linq;
 using VPet_Simulator.Windows.Interface;
+using VPetLLM.Infrastructure.Exceptions;
 using ErrorHelper = global::VPetLLM.Utils.System.ErrorMessageHelper;
 using SystemLogger = global::VPetLLM.Utils.System.Logger;
 
@@ -202,7 +203,7 @@ namespace VPetLLM.Core.Providers.Chat
                             var errorMessage = await HandleHttpError(response, Settings, "LM Studio");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
                             if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -253,7 +254,7 @@ namespace VPetLLM.Core.Providers.Chat
                             var errorMessage = await HandleHttpError(response, Settings, "LM Studio");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
                             if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
-                            ResponseHandler?.Invoke(errorMessage);
+                            ReportFailure(errorMessage);
                             return "";
                         }
 
@@ -291,7 +292,7 @@ namespace VPetLLM.Core.Providers.Chat
                 SystemLogger.Log($"LM Studio Chat 请求超时: {tcEx.Message}");
                 var errorMessage = ErrorHelper.GetOllamaTimeoutError(Settings)
                     ?? $"LM Studio 请求超时: {tcEx.Message}";
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (HttpRequestException httpEx)
@@ -299,7 +300,7 @@ namespace VPetLLM.Core.Providers.Chat
                 SystemLogger.Log($"LM Studio Chat 网络异常: {httpEx.Message}");
                 var errorMessage = ErrorHelper.GetOllamaConnectionError(Settings)
                     ?? $"LM Studio 网络异常: {httpEx.Message}";
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
             catch (Exception ex)
@@ -313,7 +314,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 SystemLogger.Log($"LM Studio Chat 异常: {ex.Message}");
                 var errorMessage = ErrorHelper.GetFriendlyExceptionError(ex, Settings, "LM Studio");
-                ResponseHandler?.Invoke(errorMessage);
+                ReportFailure(errorMessage);
                 return "";
             }
         }
@@ -582,7 +583,9 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         var errorMessage = await HandleHttpError(response, Settings, "LM Studio");
                         SystemLogger.Log($"LM Studio Summarize 错误: {errorMessage}");
-                        return ErrorHelper.IsDebugMode(Settings) ? errorMessage : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败");
+                        throw new SummarizeFailedException(ErrorHelper.IsDebugMode(Settings)
+                            ? errorMessage
+                            : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败"));
                     }
 
                     var responseString = await response.Content.ReadAsStringAsync();
@@ -593,19 +596,26 @@ namespace VPetLLM.Core.Providers.Chat
             catch (TaskCanceledException tcEx)
             {
                 SystemLogger.Log($"LM Studio Summarize 请求超时: {tcEx.Message}");
-                return ErrorHelper.GetOllamaTimeoutError(Settings)
-                    ?? $"LM Studio Summarize 请求超时: {tcEx.Message}";
+                throw new SummarizeFailedException(ErrorHelper.GetOllamaTimeoutError(Settings)
+                    ?? $"LM Studio Summarize 请求超时: {tcEx.Message}", tcEx);
             }
             catch (HttpRequestException httpEx)
             {
                 SystemLogger.Log($"LM Studio Summarize 网络异常: {httpEx.Message}");
-                return ErrorHelper.GetOllamaConnectionError(Settings)
-                    ?? $"LM Studio Summarize 网络异常: {httpEx.Message}";
+                throw new SummarizeFailedException(ErrorHelper.GetOllamaConnectionError(Settings)
+                    ?? $"LM Studio Summarize 网络异常: {httpEx.Message}", httpEx);
+            }
+            // 必须在 catch(Exception) 之前重抛，否则上面抛出的失败会被兜底分支
+            // 重新变回「返回错误字符串」，这正是本次要修掉的行为。
+            catch (SummarizeFailedException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 SystemLogger.Log($"LM Studio Summarize 异常: {ex.Message}");
-                return ErrorHelper.GetFriendlyExceptionError(ex, Settings, "LM Studio");
+                throw new SummarizeFailedException(
+                    ErrorHelper.GetFriendlyExceptionError(ex, Settings, "LM Studio"), ex);
             }
         }
 
