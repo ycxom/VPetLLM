@@ -110,13 +110,18 @@ namespace VPetLLM.Core.Data.Managers
             }
         }
 
-        public OverflowManager(Setting settings, string providerName, ChatCoreBase chatCore, RecordManager? recordManager)
+        /// <param name="databasePath">
+        /// 覆盖数据库位置。生产代码不传，走「我的文档」下的固定路径；
+        /// 回归检查传一个临时库，免得测试写进使用者的真实聊天记录。
+        /// </param>
+        public OverflowManager(Setting settings, string providerName, ChatCoreBase chatCore,
+            RecordManager? recordManager, string? databasePath = null)
         {
             _settings = settings;
             _providerName = providerName;
             _chatCore = chatCore;
             _recordManager = recordManager;
-            _database = new OverflowDatabase(GetDatabasePath());
+            _database = new OverflowDatabase(databasePath ?? GetDatabasePath());
 
             // 从数据库恢复上次的溢出状态，避免重启后重复处理全部历史
             RestoreFromDatabase();
@@ -278,96 +283,250 @@ namespace VPetLLM.Core.Data.Managers
 
                 Logger.Log($"OverflowManager: Triggering incremental summary for messages [{segmentStart}..{segmentEnd}) ({overflowedMessages.Count} msgs)");
 
-                var historyText = string.Join("\n", overflowedMessages
-                    .Where(m => !string.IsNullOrWhiteSpace(m.Content))
-                    .Select(m => $"[{m.Role}]: {m.Content}"));
+                // 积压可能远超单次请求能装下的量（回滚后、或长时间没总结过），
+                // 所以这里不再一次性发全部，而是按预算切片、逐片提交、逐片推进检查点。
+                // 每片成功即落库，中途失败也不会丢掉已经做完的部分。
+                var cursor = 0;
+                var committed = 0;
+                var skippedOversize = 0;
+                var consecutiveApiFailures = 0;
 
-                if (string.IsNullOrWhiteSpace(historyText))
+                while (cursor < overflowedMessages.Count)
                 {
-                    Logger.Log("OverflowManager: No content to summarize, skipping");
-                    return;
+                    if (generation != _generation)
+                    {
+                        Logger.Log("OverflowManager: 总结期间上下文已被清空，停止后续分批");
+                        return;
+                    }
+
+                    var budget = ResolveRequestTokenBudget();
+                    var batchSize = TakeBatchSize(overflowedMessages, cursor, budget);
+                    var batch = overflowedMessages.GetRange(cursor, batchSize);
+                    var batchStart = segmentStart + cursor;
+
+                    // 单条就超预算：再切也切不小了，发出去必定失败。直接跳过这一条，
+                    // 推进检查点让它不再挡住后面的消息。原文仍在 chat_history 里。
+                    if (batchSize == 1 && ExceedsBudget(batch[0], budget))
+                    {
+                        Logger.Log($"OverflowManager: 第 {batchStart} 条单条即超预算" +
+                                   $"（{TokenCounter.EstimateTokenCount(batch[0].Content ?? "")} tokens > {budget}），跳过该条");
+                        cursor += 1;
+                        _lastSummarizedIndex = segmentStart + cursor;
+                        skippedOversize++;
+                        consecutiveApiFailures = 0;
+                        continue;
+                    }
+
+                    SummarizeOutcome outcome;
+                    try
+                    {
+                        outcome = await SummarizeBatchAsync(batch, batchStart, msgThreshold, generation);
+                    }
+                    catch (SummarizeFailedException ex)
+                    {
+                        if (batchSize > 1)
+                        {
+                            // 还能再切：对半退让后重试，不推进游标。
+                            // 这条路同时兜住了「我们估的 token 数比模型实际算的小」。
+                            _retreatBatchSize = Math.Max(1, batchSize / 2);
+                            Logger.Log($"OverflowManager: [{batchStart}..{batchStart + batchSize}) 总结失败，" +
+                                       $"批量退让至 {_retreatBatchSize} 重试: {ex.Message}");
+                            continue;
+                        }
+
+                        // 已经只剩一条还失败。按要求跳过这一条，但连续失败说明多半是
+                        // 服务不可用而不是消息太长——那样一条条跳下去会把整段积压静默吞掉，
+                        // 所以到阈值就整轮放弃，留给下次触发重试。
+                        consecutiveApiFailures++;
+                        if (consecutiveApiFailures >= MaxConsecutiveSingleFailures)
+                        {
+                            Logger.Log($"OverflowManager: 单条总结连续失败 {consecutiveApiFailures} 次，" +
+                                       $"判定为服务不可用而非内容过长；检查点停在 {_lastSummarizedIndex}，" +
+                                       $"[{segmentStart + cursor}..{segmentEnd}) 留待下次重试: {ex.Message}");
+                            break;
+                        }
+
+                        Logger.Log($"OverflowManager: 第 {batchStart} 条单条总结失败，跳过该条: {ex.Message}");
+                        cursor += 1;
+                        _lastSummarizedIndex = segmentStart + cursor;
+                        continue;
+                    }
+
+                    if (outcome == SummarizeOutcome.Stale)
+                        return;
+
+                    // 空结果不算失败，也没东西可提交，照常跳过这一片
+                    if (outcome == SummarizeOutcome.Empty)
+                        Logger.Log($"OverflowManager: [{batchStart}..{batchStart + batchSize}) 总结为空，跳过该片");
+                    else
+                        committed++;
+
+                    cursor += batchSize;
+                    _lastSummarizedIndex = segmentStart + cursor;
+                    _retreatBatchSize = 0;
+                    consecutiveApiFailures = 0;
                 }
 
-                var systemPrompt = PromptHelper.Get("Overflow_Summary_Prefix", _settings.PromptLanguage);
-                if (systemPrompt.StartsWith("[Prompt Missing"))
-                    systemPrompt = PromptHelper.Get("Context_Summary_Prefix", _settings.PromptLanguage);
-
-                // If we already have a prior summary, tell the LLM to extend it
-                if (!string.IsNullOrEmpty(_currentSummary))
-                {
-                    systemPrompt += "\n\nPrevious summary context:\n" + _currentSummary;
-                    systemPrompt += "\n\nThe above is the existing summary. Please EXTEND it with the new information below, keeping all prior facts. Output the COMPLETE updated summary.";
-
-                    // 没有上限时滚动总结会单调增长，最终成为 prompt 里最大的一块
-                    var budget = SummaryTokenBudget;
-                    if (budget > 0)
-                        systemPrompt += $"\nKeep the complete summary under roughly {budget} tokens. If it would exceed that, merge or drop the least important facts rather than growing.";
-                }
-
-                if (_settings.EnableCompressionRecords && _recordManager is not null)
-                    systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RecordHint", _settings.PromptLanguage);
-
-                string summary;
-                try
-                {
-                    summary = await _chatCore.Summarize(systemPrompt, historyText);
-                }
-                catch (SummarizeFailedException ex)
-                {
-                    // 失败时必须原样退出：不推进 _lastSummarizedIndex、不动 _currentSummary。
-                    // 这一段消息会留在窗口里，下次溢出检查重新尝试总结。
-                    Logger.Log($"OverflowManager: 总结失败，检查点保持在 {_lastSummarizedIndex}，" +
-                               $"[{segmentStart}..{segmentEnd}) 留待下次重试: {ex.Message}");
-                    return;
-                }
-
-                if (string.IsNullOrWhiteSpace(summary))
-                {
-                    Logger.Log("OverflowManager: Summary returned empty");
-                    return;
-                }
-
-                // 上下文在总结期间被清空 — 丢弃过期结果
-                if (generation != _generation)
-                {
-                    Logger.Log("OverflowManager: 总结期间上下文已被清空，丢弃本次结果");
-                    return;
-                }
-
-                // Extract record commands
-                if (_settings.EnableCompressionRecords && _recordManager is not null)
-                    summary = ExtractAndExecuteRecordCommands(summary);
-
-                summary = await CompactSummaryIfNeededAsync(summary);
-
-                // Store in database
-                var tokenCount = TokenCounter.EstimateMessagesTokenCount(overflowedMessages);
-                var summaryId = _database.CreateSummary(EffectiveProvider, summary, segmentStart, segmentEnd - 1, tokenCount, msgThreshold);
-
-                var segments = overflowedMessages.Select((m, i) => new OverflowSegmentData
-                {
-                    ContentHash = ComputeSimpleHash(m.Content ?? ""),
-                    MessageIndex = segmentStart + i,
-                    Role = m.Role,
-                    ContentPreview = Truncate(m.Content, 200),
-                    TokenCount = TokenCounter.EstimateTokenCount(m.Content ?? "")
-                }).ToList();
-
-                if (summaryId > 0)
-                    _database.AddSegments(summaryId, segments);
-
-                // Replace the rolling summary and advance the checkpoint
-                _currentSummary = summary;
-                _lastSummarizedIndex = segmentEnd;
                 AccumulatedOverflowMessageCount = 0;
                 AccumulatedOverflowTokens = 0;
 
-                Logger.Log($"OverflowManager: Incremental summary completed. SummaryId={summaryId}, lastSummarizedIndex={_lastSummarizedIndex}");
+                Logger.Log($"OverflowManager: Incremental summary completed. 提交 {committed} 片，" +
+                           $"跳过超长 {skippedOversize} 条，lastSummarizedIndex={_lastSummarizedIndex}");
             }
             catch (Exception ex)
             {
                 Logger.Log($"OverflowManager: Failed to trigger overflow summary: {ex.Message}");
             }
+        }
+
+        private enum SummarizeOutcome
+        {
+            Committed,
+            Empty,
+            Stale
+        }
+
+        /// <summary>单条消息都总结不了时，最多连着跳过几条就判定为服务故障、整轮放弃。</summary>
+        private const int MaxConsecutiveSingleFailures = 3;
+
+        /// <summary>预算未知时单次请求携带的历史文本上限。</summary>
+        private const int FallbackRequestTokenBudget = 24000;
+
+        /// <summary>失败退让后指定的下一批条数；0 表示按预算自由计算。</summary>
+        private int _retreatBatchSize;
+
+        /// <summary>
+        /// 单次总结请求能携带多少 token 的历史文本。
+        ///
+        /// 从生效上下文预算里扣掉三块：滚动总结（它每片都会变长，所以每片都要重算）、
+        /// 提示词本身、以及留给模型写新总结的输出空间。
+        /// </summary>
+        private int ResolveRequestTokenBudget()
+        {
+            var context = _chatCore?.EffectiveContextTokenBudget ?? 0;
+            if (context <= 0) context = _settings?.MaxContextTokens ?? 0;
+            if (context <= 0) return FallbackRequestTokenBudget;
+
+            var rollingSummary = string.IsNullOrEmpty(_currentSummary)
+                ? 0
+                : TokenCounter.EstimateTokenCount(_currentSummary);
+
+            // 输出空间：新总结至多 SummaryTokenBudget，没配就按上下文的 15% 估
+            var output = SummaryTokenBudget;
+            if (output <= 0) output = Math.Max(256, (int)(context * 0.15));
+
+            // 提示词模板 + 估算误差的余量
+            const int promptOverhead = 512;
+
+            var available = context - rollingSummary - output - promptOverhead;
+
+            // 预算被滚动总结挤没了也要留一条能走的路：给一个下限，让流程继续推进，
+            // 真发不出去会由失败退让那条分支接住。
+            return Math.Max(MinRequestTokenBudget, available);
+        }
+
+        private const int MinRequestTokenBudget = 512;
+
+        /// <summary>
+        /// 从 <paramref name="start"/> 起最多能放进预算的条数，至少 1 条。
+        /// 上一轮失败退让指定了条数时以它为准。
+        /// </summary>
+        private int TakeBatchSize(List<Message> messages, int start, int budget)
+        {
+            var available = messages.Count - start;
+            if (_retreatBatchSize > 0)
+                return Math.Min(_retreatBatchSize, available);
+
+            var used = 0;
+            var count = 0;
+            while (count < available)
+            {
+                var tokens = TokenCounter.EstimateTokenCount(messages[start + count].Content ?? "");
+                if (count > 0 && used + tokens > budget)
+                    break;
+                used += tokens;
+                count++;
+            }
+
+            return Math.Max(1, count);
+        }
+
+        private static bool ExceedsBudget(Message message, int budget)
+            => TokenCounter.EstimateTokenCount(message.Content ?? "") > budget;
+
+        /// <summary>
+        /// 总结一片消息并提交。成功时替换滚动总结——下一片会拿它当
+        /// "Previous summary context"，分片之间正是靠这个串起来的。
+        /// 失败抛 <see cref="SummarizeFailedException"/> 由调用方决定退让还是跳过。
+        /// </summary>
+        private async Task<SummarizeOutcome> SummarizeBatchAsync(
+            List<Message> batch, int batchStart, int msgThreshold, int generation)
+        {
+            var historyText = string.Join("\n", batch
+                .Where(m => !string.IsNullOrWhiteSpace(m.Content))
+                .Select(m => $"[{m.Role}]: {m.Content}"));
+
+            if (string.IsNullOrWhiteSpace(historyText))
+                return SummarizeOutcome.Empty;
+
+            var systemPrompt = PromptHelper.Get("Overflow_Summary_Prefix", _settings.PromptLanguage);
+            if (systemPrompt.StartsWith("[Prompt Missing"))
+                systemPrompt = PromptHelper.Get("Context_Summary_Prefix", _settings.PromptLanguage);
+
+            // If we already have a prior summary, tell the LLM to extend it
+            if (!string.IsNullOrEmpty(_currentSummary))
+            {
+                systemPrompt += "\n\nPrevious summary context:\n" + _currentSummary;
+                systemPrompt += "\n\nThe above is the existing summary. Please EXTEND it with the new information below, keeping all prior facts. Output the COMPLETE updated summary.";
+
+                // 没有上限时滚动总结会单调增长，最终成为 prompt 里最大的一块
+                var budget = SummaryTokenBudget;
+                if (budget > 0)
+                    systemPrompt += $"\nKeep the complete summary under roughly {budget} tokens. If it would exceed that, merge or drop the least important facts rather than growing.";
+            }
+
+            if (_settings.EnableCompressionRecords && _recordManager is not null)
+                systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RecordHint", _settings.PromptLanguage);
+
+            var summary = await _chatCore.Summarize(systemPrompt, historyText);
+
+            if (string.IsNullOrWhiteSpace(summary))
+                return SummarizeOutcome.Empty;
+
+            // 上下文在总结期间被清空 — 丢弃过期结果
+            if (generation != _generation)
+            {
+                Logger.Log("OverflowManager: 总结期间上下文已被清空，丢弃本次结果");
+                return SummarizeOutcome.Stale;
+            }
+
+            // Extract record commands
+            if (_settings.EnableCompressionRecords && _recordManager is not null)
+                summary = ExtractAndExecuteRecordCommands(summary);
+
+            // 每片都压一次：滚动总结是下一片的输入，放任它涨会把后续预算吃光
+            summary = await CompactSummaryIfNeededAsync(summary);
+
+            var batchEnd = batchStart + batch.Count;
+            var tokenCount = TokenCounter.EstimateMessagesTokenCount(batch);
+            var summaryId = _database.CreateSummary(
+                EffectiveProvider, summary, batchStart, batchEnd - 1, tokenCount, msgThreshold);
+
+            var segments = batch.Select((m, i) => new OverflowSegmentData
+            {
+                ContentHash = ComputeSimpleHash(m.Content ?? ""),
+                MessageIndex = batchStart + i,
+                Role = m.Role,
+                ContentPreview = Truncate(m.Content, 200),
+                TokenCount = TokenCounter.EstimateTokenCount(m.Content ?? "")
+            }).ToList();
+
+            if (summaryId > 0)
+                _database.AddSegments(summaryId, segments);
+
+            _currentSummary = summary;
+            Logger.Log($"OverflowManager: 已提交分片 #{summaryId} 覆盖 [{batchStart}..{batchEnd})，{batch.Count} 条");
+            return SummarizeOutcome.Committed;
         }
 
         private const string CompactPromptFallback =
