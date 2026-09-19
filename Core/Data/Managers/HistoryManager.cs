@@ -142,6 +142,9 @@ namespace VPetLLM.Core.Data.Managers
 
         public async Task AddMessage(Message message)
         {
+            // 本轮的临时附注（格式纠正）只属于那一次请求，不能跟着消息进历史
+            message.RequestNote = null;
+
             // Only use compression path in Compression mode; in Overflow mode we never compress
             if (_settings.OverflowMode != Setting.ContextOverflowMode.Overflow
                 && _settings.EnableHistoryCompression && ShouldCompress())

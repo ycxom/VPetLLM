@@ -170,11 +170,6 @@ namespace VPetLLM.Core.Abstractions.Base
         {
             LastCallFailed = true;
 
-            // 错误文本**不是模型写的** —— 不打这个招呼的话，解析器会把
-            // "OpenAI API 错误 [400]: {...}" 当成一次"没有使用指令标记"的格式违规，
-            // 于是下一次请求去教训模型："你上一次回复完全没有使用标记"。模型压根没回过话。
-            Core.Services.FormatComplianceTracker.SuppressNext();
-
             // 错误文本绝不能混进 ResponseHandler：那条管线的终点是 say→TTS，
             // 曾经把 2302 字符的网络异常堆栈整段朗读了出来。没人挂错误通道时
             // （识图的临时 core 等场景）退回 ResponseHandler，维持原有行为。
@@ -291,7 +286,7 @@ namespace VPetLLM.Core.Abstractions.Base
             "\n[System: Interrupted by user — the rest of this reply was never delivered. 用户中断了本次回复，后续内容未送出。]";
 
         /// <summary>去掉首尾修饰后的标记特征串，用于判重</summary>
-        private const string InterruptedMarkerTag = "Interrupted by user";
+        internal const string InterruptedMarkerTag = "Interrupted by user";
 
         /// <summary>
         /// 本轮回复是否已经写进历史。中断发生在写库之后（气泡/语音还在播）时，
@@ -829,6 +824,12 @@ namespace VPetLLM.Core.Abstractions.Base
 
             var message = new Message { Role = "user", Content = content, MessageType = messageType };
 
+            // 格式纠正贴在本轮输入的末尾 —— 离输出位置最近，长对话里也压得住。
+            // 只随这次请求发出、不入库：历史里的错误回复发送时会被改写成规范写法
+            // （见 ReplyFormatInspector），要是纠正也存进记录，模型就会读到
+            // "你上次没用标记"而上次那条明明是规范的，自己又造出一处矛盾。
+            message.RequestNote = Core.Services.FormatComplianceTracker.CurrentReminder(Settings?.PromptLanguage);
+
             // 如果允许获取当前时间，设置Unix时间戳
             if (Settings?.EnableTime == true)
             {
@@ -1222,6 +1223,12 @@ namespace VPetLLM.Core.Abstractions.Base
                     history.AddRange(fullHistory.Skip(windowStart));
                 }
             }
+
+            // 历史里格式写错的回复换成规范写法再发：模型会照着上下文里自己的先例写，
+            // 这是长对话后期格式越跑越偏的主因。只改这份请求副本，聊天记录不动。
+            var normalized = Core.Services.ReplyFormatInspector.NormalizeAssistantHistory(history);
+            if (normalized > 0)
+                Logger.Log($"{Name}: 发送前规范化了 {normalized} 条格式错误的历史回复");
 
             // Inject important records into history (only when explicitly requested)
             if (injectRecords)
@@ -1619,101 +1626,122 @@ namespace VPetLLM.Core.Abstractions.Base
         [JsonProperty(Order = 6)]
         public string? MessageType { get; set; }
 
+        /// <summary>
+        /// 只随本次请求发出的系统附注（格式纠正等），追加在 <see cref="DisplayContent"/> 末尾。
+        /// 不入库，入库时由 HistoryManager 清掉，免得留在内存历史里被之后的请求再带一遍。
+        /// </summary>
+        [JsonIgnore]
+        public string? RequestNote { get; set; }
+
+        /// <summary>内容换成 <paramref name="content"/> 的浅拷贝（图片等其余字段共用）。</summary>
+        public Message WithContent(string content)
+        {
+            var copy = (Message)MemberwiseClone();
+            copy.Content = content;
+            return copy;
+        }
+
         [JsonIgnore]
         public string DisplayContent
         {
             get
             {
-                // 对于 assistant 角色，直接返回原始内容
-                if (Role == "assistant")
-                {
-                    return Content ?? "";
-                }
-
-                // 对于 user 角色，构建 JSON 格式
-                var baseText = Content ?? "";
-
-                // 构建时间字符串（ISO 8601 格式，使用本地时区）
-                string nowTime = "";
-                if (UnixTime.HasValue)
-                {
-                    try
-                    {
-                        // 从Unix时间戳转换为DateTimeOffset，然后转换为本地时间
-                        var utcTime = DateTimeOffset.FromUnixTimeSeconds(UnixTime.Value);
-                        var localTime = utcTime.ToLocalTime();
-                        // 使用带时区偏移的格式，如 "2025-12-07T15:30:00+08:00"
-                        nowTime = localTime.ToString("yyyy-MM-ddTHH:mm:sszzz");
-                    }
-                    catch
-                    {
-                        // 忽略解析异常
-                    }
-                }
-
-                // 提取状态信息（兼容旧版本，去掉可能存在的前缀）
-                string vpetStatus = "";
-                if (!string.IsNullOrEmpty(StatusInfo))
-                {
-                    vpetStatus = StatusInfo
-                        .Replace("[桌宠状态] ", "")
-                        .Replace("[Pet Status] ", "")
-                        .TrimStart();
-                }
-
-                // 如果没有时间和状态信息，直接返回原始内容
-                if (string.IsNullOrEmpty(nowTime) && string.IsNullOrEmpty(vpetStatus))
-                {
-                    return baseText;
-                }
-
-                // 构建 JSON 格式输出
-                var parts = new List<string>();
-
-                if (!string.IsNullOrEmpty(nowTime))
-                {
-                    parts.Add($"\"NowTime\": \"{nowTime}\"");
-                }
-
-                if (!string.IsNullOrEmpty(vpetStatus))
-                {
-                    // 键名必须自带主语。这段状态是桌宠**自己**的身体数值，但它渲染在
-                    // user 角色的消息里，紧挨着用户说的话和插件结果 —— 模型没有别的
-                    // 依据判断它属于谁。旧键名 "VPetStatus" 不带人称，实测会被读成
-                    // 用户的状态（"主人你已经饿了3小时了"，实际饿的是桌宠自己）。
-                    // 完整提示词路径里的 Status_Prefix 本来就写着「你（桌宠）的当前状态」，
-                    // 这条省 token 的路径当初漏抄了那个主语，这里用键名补回来。
-                    parts.Add($"\"YourStatus\": \"{vpetStatus}\"");
-                }
-
-                // 检测是否为插件消息（格式：[Plugin Result: XXX] 内容）
-                var pluginMatch = System.Text.RegularExpressions.Regex.Match(baseText, @"^\[Plugin Result:\s*([^\]]+)\]\s*(.*)$", System.Text.RegularExpressions.RegexOptions.Singleline);
-                if (pluginMatch.Success)
-                {
-                    var pluginName = pluginMatch.Groups[1].Value.Trim();
-                    var pluginContent = pluginMatch.Groups[2].Value.Trim();
-                    parts.Add($"\"Plugin\": \"[{EscapeJsonString(pluginName)}] {EscapeJsonString(pluginContent)}\"");
-                }
-                else
-                {
-                    // 根据消息类型选择对应的字段名
-                    var msgType = MessageType ?? "User";
-                    switch (msgType)
-                    {
-                        case "System":
-                            parts.Add($"\"System\": \"{EscapeJsonString(baseText)}\"");
-                            break;
-                        case "Plugin":
-                            parts.Add($"\"Plugin\": \"{EscapeJsonString(baseText)}\"");
-                            break;
-                        default: // User
-                            parts.Add($"\"UserSay\": \"{EscapeJsonString(baseText)}\"");
-                            break;
-                    }
-                }
-
-                return "{" + string.Join(", ", parts) + "}";
+                var display = BuildDisplayContent();
+                return string.IsNullOrEmpty(RequestNote) ? display : $"{display}\n[System: {RequestNote}]";
             }
+        }
+
+        private string BuildDisplayContent()
+        {
+            // 对于 assistant 角色，直接返回原始内容
+            if (Role == "assistant")
+            {
+                return Content ?? "";
+            }
+
+            // 对于 user 角色，构建 JSON 格式
+            var baseText = Content ?? "";
+
+            // 构建时间字符串（ISO 8601 格式，使用本地时区）
+            string nowTime = "";
+            if (UnixTime.HasValue)
+            {
+                try
+                {
+                    // 从Unix时间戳转换为DateTimeOffset，然后转换为本地时间
+                    var utcTime = DateTimeOffset.FromUnixTimeSeconds(UnixTime.Value);
+                    var localTime = utcTime.ToLocalTime();
+                    // 使用带时区偏移的格式，如 "2025-12-07T15:30:00+08:00"
+                    nowTime = localTime.ToString("yyyy-MM-ddTHH:mm:sszzz");
+                }
+                catch
+                {
+                    // 忽略解析异常
+                }
+            }
+
+            // 提取状态信息（兼容旧版本，去掉可能存在的前缀）
+            string vpetStatus = "";
+            if (!string.IsNullOrEmpty(StatusInfo))
+            {
+                vpetStatus = StatusInfo
+                    .Replace("[桌宠状态] ", "")
+                    .Replace("[Pet Status] ", "")
+                    .TrimStart();
+            }
+
+            // 如果没有时间和状态信息，直接返回原始内容
+            if (string.IsNullOrEmpty(nowTime) && string.IsNullOrEmpty(vpetStatus))
+            {
+                return baseText;
+            }
+
+            // 构建 JSON 格式输出
+            var parts = new List<string>();
+
+            if (!string.IsNullOrEmpty(nowTime))
+            {
+                parts.Add($"\"NowTime\": \"{nowTime}\"");
+            }
+
+            if (!string.IsNullOrEmpty(vpetStatus))
+            {
+                // 键名必须自带主语。这段状态是桌宠**自己**的身体数值，但它渲染在
+                // user 角色的消息里，紧挨着用户说的话和插件结果 —— 模型没有别的
+                // 依据判断它属于谁。旧键名 "VPetStatus" 不带人称，实测会被读成
+                // 用户的状态（"主人你已经饿了3小时了"，实际饿的是桌宠自己）。
+                // 完整提示词路径里的 Status_Prefix 本来就写着「你（桌宠）的当前状态」，
+                // 这条省 token 的路径当初漏抄了那个主语，这里用键名补回来。
+                parts.Add($"\"YourStatus\": \"{vpetStatus}\"");
+            }
+
+            // 检测是否为插件消息（格式：[Plugin Result: XXX] 内容）
+            var pluginMatch = System.Text.RegularExpressions.Regex.Match(baseText, @"^\[Plugin Result:\s*([^\]]+)\]\s*(.*)$", System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (pluginMatch.Success)
+            {
+                var pluginName = pluginMatch.Groups[1].Value.Trim();
+                var pluginContent = pluginMatch.Groups[2].Value.Trim();
+                parts.Add($"\"Plugin\": \"[{EscapeJsonString(pluginName)}] {EscapeJsonString(pluginContent)}\"");
+            }
+            else
+            {
+                // 根据消息类型选择对应的字段名
+                var msgType = MessageType ?? "User";
+                switch (msgType)
+                {
+                    case "System":
+                        parts.Add($"\"System\": \"{EscapeJsonString(baseText)}\"");
+                        break;
+                    case "Plugin":
+                        parts.Add($"\"Plugin\": \"{EscapeJsonString(baseText)}\"");
+                        break;
+                    default: // User
+                        parts.Add($"\"UserSay\": \"{EscapeJsonString(baseText)}\"");
+                        break;
+                }
+            }
+
+            return "{" + string.Join(", ", parts) + "}";
         }
 
         /// <summary>

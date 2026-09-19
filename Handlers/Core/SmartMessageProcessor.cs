@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using VPetLLM.Utils.Audio;
 using VPetLLM.Core.TTS;
 
@@ -556,10 +556,22 @@ namespace VPetLLM.Handlers.Core
         /// <param name="message">原始消息</param>
         /// <returns>消息片段列表</returns>
         public static List<MessageSegment> ParseMessage(string message)
+            => ParseMessage(message, quiet: false, out _);
+
+        /// <summary>
+        /// 解析并顺带给出这条回复的格式问题。
+        ///
+        /// 这里只判定、不记账：同一条管线也跑错误提示、插件通知这类不是模型写的文本，
+        /// 在这里记违规会去"纠正"一个根本没说话的模型。记账在路由拿到完整回复时做，
+        /// 见 <see cref="global::VPetLLM.Core.Services.ReplyFormatInspector"/>。
+        /// </summary>
+        /// <param name="quiet">不写日志（给每次请求都要扫一遍历史的检查用）</param>
+        public static List<MessageSegment> ParseMessage(string message, bool quiet, out global::VPetLLM.Core.Services.FormatComplianceTracker.Violation violation)
         {
             var segments = new List<MessageSegment>();
+            violation = global::VPetLLM.Core.Services.FormatComplianceTracker.Violation.None;
 
-            Logger.LogVerbose($"SmartMessageProcessor: 开始解析消息，长度: {message.Length}");
+            if (!quiet) Logger.LogVerbose($"SmartMessageProcessor: 开始解析消息，长度: {message.Length}");
 
             // 先剥掉推理模型的思考块，再做任何解析。
             //
@@ -569,7 +581,7 @@ namespace VPetLLM.Handlers.Core
             if (Utils.Common.ReasoningFilter.ContainsReasoning(message))
             {
                 var stripped = Utils.Common.ReasoningFilter.Strip(message);
-                Logger.LogVerbose($"SmartMessageProcessor: 剥离思考块 {message.Length} -> {stripped.Length} 字");
+                if (!quiet) Logger.LogVerbose($"SmartMessageProcessor: 剥离思考块 {message.Length} -> {stripped.Length} 字");
                 message = stripped;
             }
 
@@ -580,7 +592,7 @@ namespace VPetLLM.Handlers.Core
             var commands = CommandFormatParser.Parse(message);
             var format = CommandFormatParser.DetectFormat(message);
 
-            Logger.LogVerbose($"SmartMessageProcessor: 检测到格式: {format}, 找到 {commands.Count} 个命令");
+            if (!quiet) Logger.LogVerbose($"SmartMessageProcessor: 检测到格式: {format}, 找到 {commands.Count} 个命令");
 
             // 按出现顺序处理，并把**落在标记之外**的正文一起捞回来。
             //
@@ -595,14 +607,14 @@ namespace VPetLLM.Handlers.Core
 
             foreach (var command in ordered)
             {
-                AddStraySpeech(segments, message, cursor, command.StartIndex);
+                AddStraySpeech(segments, message, cursor, command.StartIndex, quiet, ref violation);
                 cursor = command.StartIndex + (command.FullMatch?.Length ?? 0);
 
                 string actionType = command.CommandType.ToLower();
                 string actionValue = command.Parameters;
                 string fullMatch = command.FullMatch;
 
-                Logger.LogVerbose($"SmartMessageProcessor: 解析到动作指令 - 类型: {actionType}, 格式: {command.Format}, 值长度: {actionValue.Length}");
+                if (!quiet) Logger.LogVerbose($"SmartMessageProcessor: 解析到动作指令 - 类型: {actionType}, 格式: {command.Format}, 值长度: {actionValue.Length}");
 
                 segments.Add(new MessageSegment
                 {
@@ -616,21 +628,23 @@ namespace VPetLLM.Handlers.Core
             // 最后一条命令之后可能还有话
             if (ordered.Count > 0)
             {
-                AddStraySpeech(segments, message, cursor, message.Length);
+                AddStraySpeech(segments, message, cursor, message.Length, quiet, ref violation);
             }
 
             if (segments.Count == 0)
             {
                 // 一条命令都没有：整条消息当成 say
                 segments.Add(BuildFallbackSaySegment(message));
-                Logger.Log($"SmartMessageProcessor: 没有找到动作指令，按当前心情的默认说话动画处理");
+                if (!quiet) Logger.Log($"SmartMessageProcessor: 没有找到动作指令，按当前心情的默认说话动画处理");
 
-                global::VPetLLM.Core.Services.FormatComplianceTracker.Report(
-                    global::VPetLLM.Core.Services.FormatComplianceTracker.Violation.NoMarkers);
+                // 只有真有话时才算违规；空回复（被中断、只调了工具）不是格式问题。
+                // 写了标记却没写全，比"完全没写"更值得单独指出 —— 两者的纠正说法不一样
+                if (message.Any(char.IsLetterOrDigit))
+                    violation = LooksLikeBrokenMarker(message) ? global::VPetLLM.Core.Services.FormatComplianceTracker.Violation.BrokenMarker : global::VPetLLM.Core.Services.FormatComplianceTracker.Violation.NoMarkers;
             }
             else
             {
-                Logger.LogVerbose($"SmartMessageProcessor: 解析完成，共 {segments.Count} 个片段");
+                if (!quiet) Logger.LogVerbose($"SmartMessageProcessor: 解析完成，共 {segments.Count} 个片段");
             }
 
             return segments;
@@ -699,7 +713,8 @@ namespace VPetLLM.Handlers.Core
         /// 把 [start, end) 这段落在标记之外的文本补成一条 say 片段。
         /// 只有纯空白或纯标点时跳过 —— 命令之间的换行、逗号不该变成一句话。
         /// </summary>
-        private static void AddStraySpeech(List<MessageSegment> segments, string message, int start, int end)
+        private static void AddStraySpeech(List<MessageSegment> segments, string message, int start, int end,
+            bool quiet, ref global::VPetLLM.Core.Services.FormatComplianceTracker.Violation violation)
         {
             if (start < 0 || end > message.Length || end <= start) return;
 
@@ -710,13 +725,21 @@ namespace VPetLLM.Handlers.Core
             if (!stray.Any(char.IsLetterOrDigit)) return;
 
             segments.Add(BuildFallbackSaySegment(stray));
-            Logger.Log($"SmartMessageProcessor: 捡回标记外的正文（{stray.Length} 字），补为 say");
+            if (!quiet) Logger.Log($"SmartMessageProcessor: 捡回标记外的正文（{stray.Length} 字），补为 say");
 
-            // 兜底能让这次不出错，但模型看不到自己被纠正过，下次照旧 —— 记一笔，
-            // 下一次请求的系统提示词里告诉它
-            global::VPetLLM.Core.Services.FormatComplianceTracker.Report(
-                global::VPetLLM.Core.Services.FormatComplianceTracker.Violation.StrayText);
+            // 兜底能让这次不出错，但模型看不到自己被纠正过，下次照旧 —— 只判定，
+            // 由路由在拿到完整回复后统一记账（见 ReplyFormatInspector）
+            var kind = LooksLikeBrokenMarker(stray) ? global::VPetLLM.Core.Services.FormatComplianceTracker.Violation.BrokenMarker : global::VPetLLM.Core.Services.FormatComplianceTracker.Violation.StrayText;
+            violation = global::VPetLLM.Core.Services.FormatComplianceTracker.Worse(violation, kind);
         }
+
+        /// <summary>
+        /// 标记之外还残留着标记语法：开了没关、拼错、少了竖线。
+        /// 这种不是"忘了用标记"，而是"标记写坏了"，纠正时要说清楚是哪种。
+        /// </summary>
+        private static bool LooksLikeBrokenMarker(string text)
+            => text.Contains("<|") || text.Contains("|>")
+               || System.Text.RegularExpressions.Regex.IsMatch(text, @"\b[a-z_]+_(begin|end)\b");
 
         /// <summary>
         /// 把一段自由文本包成 say 片段，走和模型自己写 &lt;|say_begin|&gt; 完全相同的通路。

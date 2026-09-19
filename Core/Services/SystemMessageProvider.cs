@@ -1,4 +1,4 @@
-using VPet_Simulator.Windows.Interface;
+﻿using VPet_Simulator.Windows.Interface;
 using VPetLLM.Handlers.Infrastructure;
 using VPetLLM.Core.Data.Managers;
 
@@ -498,16 +498,8 @@ namespace VPetLLM.Core.Services
                 parts.Add(storedKeys);
             }
 
-            // 上一轮的格式纠正放在**最后**：越靠近输出位置的指令模型越容易照做，
-            // 而这条恰恰是要它立刻改的。取出即清，不重复唠叨。
-            // 注意先记下种类再取 —— TakeReminder 会清空，取完再读 Pending 永远是 None
-            var pendingKind = FormatComplianceTracker.Pending;
-            var formatReminder = FormatComplianceTracker.TakeReminder(lang);
-            if (!string.IsNullOrEmpty(formatReminder))
-            {
-                Logger.Log($"SystemMessageProvider: 注入格式纠正提醒（{pendingKind}）");
-                parts.Add(formatReminder);
-            }
+            // 格式纠正不放这里：system 在整段上下文的最前面，长对话里离输出最远、最压不住。
+            // 它贴在本轮用户输入末尾（Message.RequestNote），见 FormatComplianceTracker。
 
             var systemMessage = string.Join("\n", parts);
             return systemMessage;

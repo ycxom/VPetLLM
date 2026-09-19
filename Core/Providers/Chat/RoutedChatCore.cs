@@ -110,9 +110,12 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var emitted = false;
                 string? failure = null;
+                // 攒下完整回复用于格式判定：流式时原始增量才是全文（回复回调收到的是拆好的单条指令）
+                var chunks = new StringBuilder();
+                var replies = new StringBuilder();
                 worker.BeginRoutedCall(this,
-                    text => { emitted = true; ResponseHandler?.Invoke(text); },
-                    chunk => { emitted = true; StreamingChunkHandler?.Invoke(chunk); },
+                    text => { emitted = true; replies.AppendLine(text); ResponseHandler?.Invoke(text); },
+                    chunk => { emitted = true; chunks.Append(chunk); StreamingChunkHandler?.Invoke(chunk); },
                     error => failure = error);
                 worker.SuppressTurnBookkeeping = i > 0;
                 LastChannel = node;
@@ -138,6 +141,7 @@ namespace VPetLLM.Core.Providers.Chat
                 if (!failed)
                 {
                     LastTokenUsage = worker.LastTokenUsage;
+                    RecordReplyFormat(chunks.Length > 0 ? chunks.ToString() : replies.ToString());
                     return;
                 }
 
@@ -154,6 +158,20 @@ namespace VPetLLM.Core.Providers.Chat
             }
 
             ReportFailure(lastError ?? NoChannelMessage(requireVision));
+        }
+
+        /// <summary>
+        /// 一条完整的模型回复落定后判一次格式，推进动态纠正的状态。
+        /// 只在这里记：错误提示、插件通知走的是同一条显示管线，但它们不经过这里。
+        /// </summary>
+        private static void RecordReplyFormat(string reply)
+        {
+            if (string.IsNullOrWhiteSpace(reply)) return;
+
+            var result = ReplyFormatInspector.Inspect(reply);
+            FormatComplianceTracker.RecordReply(result.Violation);
+            if (!result.IsCompliant)
+                Logger.Log($"回复格式不合规（{result.Violation}），当前纠正级别: {FormatComplianceTracker.CurrentLevel}");
         }
 
         private string NoChannelMessage(bool requireVision)
