@@ -23,6 +23,37 @@ namespace VPetLLM.Core.Providers.Chat
             _setting = setting;
         }
 
+        /// <summary>路由模式的工作 core：只服务 <paramref name="node"/> 这一个渠道，服务全部借宿主的。</summary>
+        internal LMStudioChatCore(Setting.LMStudioNodeSetting node, ChatCoreBase host)
+            : base(host)
+        {
+            _lmStudioSetting = new Setting.LMStudioSetting
+            {
+                LMStudioNodes = new List<Setting.LMStudioNodeSetting> { node }
+            };
+            _setting = Settings!;
+            PinnedChannel = node;
+        }
+
+        /// <summary>
+        /// 本次请求用的节点，读的是它的实时值。理由同 OllamaChatCore.Node：
+        /// 单节点构造从没把 EnableToolCall / EnableVision 拷进容器，读容器等于这两个开关永远是关的。
+        /// </summary>
+        private Setting.LMStudioNodeSetting Node => _lmStudioSetting.LMStudioNodes.Count >= 1
+            ? _lmStudioSetting.LMStudioNodes[0]
+            : _legacyNode ??= new Setting.LMStudioNodeSetting
+            {
+                Url = _lmStudioSetting.Url,
+                Model = _lmStudioSetting.Model ?? "",
+                Temperature = _lmStudioSetting.Temperature,
+                MaxTokens = _lmStudioSetting.MaxTokens,
+                EnableAdvanced = _lmStudioSetting.EnableAdvanced,
+                EnableStreaming = _lmStudioSetting.EnableStreaming,
+                EnableVision = _lmStudioSetting.EnableVision,
+                EnableToolCall = _lmStudioSetting.EnableToolCall
+            };
+        private Setting.LMStudioNodeSetting? _legacyNode;
+
         public LMStudioChatCore(Setting.LMStudioNodeSetting lmStudioNodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
         {
@@ -73,7 +104,7 @@ namespace VPetLLM.Core.Providers.Chat
 
         private string GetCurrentApiUrl()
         {
-            string apiUrl = _lmStudioSetting.Url;
+            string apiUrl = Node.Url;
             if (!apiUrl.Contains("/chat/completions"))
             {
                 var baseUrl = apiUrl.TrimEnd('/');
@@ -106,8 +137,8 @@ namespace VPetLLM.Core.Providers.Chat
                 var tempUserMessage = CreateUserMessage(prompt);
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
                 ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
-                    "LMStudio", _lmStudioSetting.Url, _lmStudioSetting.Model);
-                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _lmStudioSetting.EnableToolCall);
+                    "LMStudio", Node.Url, Node.Model);
+                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, Node.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 if (tempUserMessage is not null)
                 {
@@ -117,17 +148,17 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }).ToList();
 
-                var useStreaming = UseStreaming(_lmStudioSetting.EnableStreaming);
+                var useStreaming = UseStreaming(Node.EnableStreaming);
 
                 object data;
-                if (_lmStudioSetting.EnableAdvanced)
+                if (Node.EnableAdvanced)
                 {
                     data = new
                     {
-                        model = _lmStudioSetting.Model ?? "local-model",
+                        model = Node.Model ?? "local-model",
                         messages = messages,
-                        temperature = _lmStudioSetting.Temperature,
-                        max_tokens = _lmStudioSetting.MaxTokens,
+                        temperature = Node.Temperature,
+                        max_tokens = Node.MaxTokens,
                         stream = useStreaming
                     };
                 }
@@ -135,14 +166,14 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     data = new
                     {
-                        model = _lmStudioSetting.Model ?? "local-model",
+                        model = Node.Model ?? "local-model",
                         messages = messages,
                         stream = useStreaming
                     };
                 }
 
                 var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(
-                    Settings, _lmStudioSetting.EnableToolCall);
+                    Settings, Node.EnableToolCall);
 
                 var payload = JObject.FromObject(data);
                 Utils.Common.ReasoningEffortHelper.Apply(payload, GetThinkingEffort(), Utils.Common.ReasoningApiStyle.OpenAIChat);
@@ -330,7 +361,7 @@ namespace VPetLLM.Core.Providers.Chat
             // 历史只有一个图像槽位，先留第一张（见 README 已知限制）
             var imageData = images[0];
 
-            if (!_lmStudioSetting.EnableVision)
+            if (!Node.EnableVision)
             {
                 var visionError = "LM Studio 未启用视觉能力，请在设置中启用 EnableVision";
                 SystemLogger.Log($"LM Studio ChatWithImage 错误: {visionError}");
@@ -346,8 +377,8 @@ namespace VPetLLM.Core.Providers.Chat
 
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
                 ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
-                    "LMStudio", _lmStudioSetting.Url, _lmStudioSetting.Model);
-                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _lmStudioSetting.EnableToolCall);
+                    "LMStudio", Node.Url, Node.Model);
+                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, Node.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 var requestMessages = new List<object>();
                 foreach (var msg in history)
@@ -363,30 +394,30 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 object data;
-                if (_lmStudioSetting.EnableAdvanced)
+                if (Node.EnableAdvanced)
                 {
                     data = new
                     {
-                        model = _lmStudioSetting.Model ?? "local-model",
+                        model = Node.Model ?? "local-model",
                         messages = requestMessages,
-                        temperature = _lmStudioSetting.Temperature,
-                        max_tokens = _lmStudioSetting.MaxTokens,
-                        stream = _lmStudioSetting.EnableStreaming
+                        temperature = Node.Temperature,
+                        max_tokens = Node.MaxTokens,
+                        stream = Node.EnableStreaming
                     };
                 }
                 else
                 {
                     data = new
                     {
-                        model = _lmStudioSetting.Model ?? "local-model",
+                        model = Node.Model ?? "local-model",
                         messages = requestMessages,
-                        stream = _lmStudioSetting.EnableStreaming
+                        stream = Node.EnableStreaming
                     };
                 }
 
                 // 多模态同样挂工具
                 var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(
-                    Settings, _lmStudioSetting.EnableToolCall);
+                    Settings, Node.EnableToolCall);
 
                 var toolPayload = JObject.FromObject(data);
                 Utils.Common.ReasoningEffortHelper.Apply(toolPayload, GetThinkingEffort(), Utils.Common.ReasoningApiStyle.OpenAIChat);
@@ -430,7 +461,7 @@ namespace VPetLLM.Core.Providers.Chat
                         message = loop.Message;
                         ResponseHandler?.Invoke(message);
                     }
-                    else if (_lmStudioSetting.EnableStreaming)
+                    else if (Node.EnableStreaming)
                     {
                         SystemLogger.Log("LM Studio ChatWithImage: 使用流式传输模式");
                         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
@@ -568,7 +599,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var data = new
                 {
-                    model = _lmStudioSetting.Model ?? "local-model",
+                    model = Node.Model ?? "local-model",
                     messages = messages,
                     stream = false
                 };
@@ -583,7 +614,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         var errorMessage = await HandleHttpError(response, Settings, "LM Studio");
                         SystemLogger.Log($"LM Studio Summarize 错误: {errorMessage}");
-                        throw new SummarizeFailedException(ErrorHelper.IsDebugMode(Settings)
+                        throw new SummarizeFailedException(ShowDetailedErrors
                             ? errorMessage
                             : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败"));
                     }
@@ -625,7 +656,7 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 using (var client = GetClient())
                 {
-                    var baseUrl = _lmStudioSetting.Url.TrimEnd('/');
+                    var baseUrl = Node.Url.TrimEnd('/');
                     if (baseUrl.EndsWith("/v1"))
                     {
                         baseUrl = baseUrl.Substring(0, baseUrl.Length - 3);

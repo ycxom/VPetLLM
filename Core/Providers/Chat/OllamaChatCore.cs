@@ -18,6 +18,40 @@ namespace VPetLLM.Core.Providers.Chat
             _setting = setting;
         }
 
+        /// <summary>路由模式的工作 core：只服务 <paramref name="node"/> 这一个渠道，服务全部借宿主的。</summary>
+        internal OllamaChatCore(Setting.OllamaNodeSetting node, ChatCoreBase host)
+            : base(host)
+        {
+            _ollamaSetting = new Setting.OllamaSetting
+            {
+                OllamaNodes = new List<Setting.OllamaNodeSetting> { node }
+            };
+            _setting = Settings!;
+            PinnedChannel = node;
+        }
+
+        /// <summary>
+        /// 本次请求用的节点。单节点构造（几乎总是这条路）时就是那一个节点，读的是它的实时值；
+        /// 只有整份设置构造且没有节点时，才用容器上的旧字段拼一个。
+        ///
+        /// 以前这里读的是容器字段，而单节点构造只往容器里拷了一部分（没拷 EnableToolCall /
+        /// EnableVision），于是本渠道的原生工具调用和识图开关实际上一直不生效。
+        /// </summary>
+        private Setting.OllamaNodeSetting Node => _ollamaSetting.OllamaNodes.Count >= 1
+            ? _ollamaSetting.OllamaNodes[0]
+            : _legacyNode ??= new Setting.OllamaNodeSetting
+            {
+                Url = _ollamaSetting.Url,
+                Model = _ollamaSetting.Model ?? "",
+                Temperature = _ollamaSetting.Temperature,
+                MaxTokens = _ollamaSetting.MaxTokens,
+                EnableAdvanced = _ollamaSetting.EnableAdvanced,
+                EnableStreaming = _ollamaSetting.EnableStreaming,
+                EnableVision = _ollamaSetting.EnableVision,
+                EnableToolCall = _ollamaSetting.EnableToolCall
+            };
+        private Setting.OllamaNodeSetting? _legacyNode;
+
         public OllamaChatCore(Setting.OllamaNodeSetting ollamaNodeSetting, Setting setting, IMainWindow mainWindow, ActionProcessor actionProcessor)
             : base(setting, mainWindow, actionProcessor)
         {
@@ -93,7 +127,7 @@ namespace VPetLLM.Core.Providers.Chat
                 OnConversationTurn();
 
                 // 检查视觉能力是否启用
-                if (!_ollamaSetting.EnableVision)
+                if (!Node.EnableVision)
                 {
                     var visionError = "Ollama 未启用视觉能力，请在设置中启用 EnableVision";
                     Logger.Log($"Ollama ChatWithImage 错误: {visionError}");
@@ -126,8 +160,8 @@ namespace VPetLLM.Core.Providers.Chat
                 // 构建历史记录
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
                 ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
-                    "Ollama", _ollamaSetting.Url, _ollamaSetting.Model);
-                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _ollamaSetting.EnableToolCall);
+                    "Ollama", Node.Url, Node.Model);
+                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, Node.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
                 if (tempUserMessage is not null)
@@ -158,23 +192,23 @@ namespace VPetLLM.Core.Providers.Chat
                     messages.Add(messageObj);
                 }
 
-                var useStreaming = UseStreaming(_ollamaSetting.EnableStreaming);
+                var useStreaming = UseStreaming(Node.EnableStreaming);
 
                 var data = new
                 {
-                    model = _ollamaSetting.Model,
+                    model = Node.Model,
                     messages = messages,
                     stream = useStreaming,
-                    options = _ollamaSetting.EnableAdvanced ? new
+                    options = Node.EnableAdvanced ? new
                     {
-                        temperature = _ollamaSetting.Temperature,
-                        num_predict = _ollamaSetting.MaxTokens
+                        temperature = Node.Temperature,
+                        num_predict = Node.MaxTokens
                     } : null
                 };
                 // 多模态同样挂工具。Ollama 认 OpenAI 那套 tools 声明，但响应是自己的格式
                 // （message.tool_calls，无 id），所以解析走 RunOllamaAsync。
                 var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(
-                    Settings, _ollamaSetting.EnableToolCall);
+                    Settings, Node.EnableToolCall);
 
                 var toolPayload = JObject.FromObject(data);
                 Utils.Common.ReasoningEffortHelper.Apply(toolPayload, GetThinkingEffort(), Utils.Common.ReasoningApiStyle.Ollama);
@@ -191,7 +225,7 @@ namespace VPetLLM.Core.Providers.Chat
                 string message;
                 using (var client = GetClient())
                 {
-                    client.BaseAddress = new System.Uri(_ollamaSetting.Url);
+                    client.BaseAddress = new System.Uri(Node.Url);
 
                     if (toolSession is not null)
                     {
@@ -376,8 +410,8 @@ namespace VPetLLM.Core.Providers.Chat
 
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
                 ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
-                    "Ollama", _ollamaSetting.Url, _ollamaSetting.Model);
-                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, _ollamaSetting.EnableToolCall);
+                    "Ollama", Node.Url, Node.Model);
+                CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, Node.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
                 if (tempUserMessage is not null)
@@ -389,17 +423,17 @@ namespace VPetLLM.Core.Providers.Chat
 
                 var data = new
                 {
-                    model = _ollamaSetting.Model,
+                    model = Node.Model,
                     messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
-                    stream = _ollamaSetting.EnableStreaming,
-                    options = _ollamaSetting.EnableAdvanced ? new
+                    stream = Node.EnableStreaming,
+                    options = Node.EnableAdvanced ? new
                     {
-                        temperature = _ollamaSetting.Temperature,
-                        num_predict = _ollamaSetting.MaxTokens
+                        temperature = Node.Temperature,
+                        num_predict = Node.MaxTokens
                     } : null
                 };
                 var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(
-                    Settings, _ollamaSetting.EnableToolCall);
+                    Settings, Node.EnableToolCall);
 
                 var payload = JObject.FromObject(data);
                 Utils.Common.ReasoningEffortHelper.Apply(payload, GetThinkingEffort(), Utils.Common.ReasoningApiStyle.Ollama);
@@ -416,7 +450,7 @@ namespace VPetLLM.Core.Providers.Chat
                 string message;
                 using (var client = GetClient())
                 {
-                    client.BaseAddress = new System.Uri(_ollamaSetting.Url);
+                    client.BaseAddress = new System.Uri(Node.Url);
 
                     if (toolSession is not null)
                     {
@@ -447,7 +481,7 @@ namespace VPetLLM.Core.Providers.Chat
                         message = loop.Message;
                         ResponseHandler?.Invoke(message);
                     }
-                    else if (_ollamaSetting.EnableStreaming)
+                    else if (Node.EnableStreaming)
                     {
                         // 流式传输模式
                         Logger.Log("Ollama: 使用流式传输模式");
@@ -594,21 +628,21 @@ namespace VPetLLM.Core.Providers.Chat
                 var combinedPrompt = $"{systemPrompt}\n\n{userContent}";
                 var data = new
                 {
-                    model = _ollamaSetting.Model,
+                    model = Node.Model,
                     prompt = combinedPrompt,
                     stream = false
                 };
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
                 using (var client = GetClient())
                 {
-                    client.BaseAddress = new System.Uri(_ollamaSetting.Url);
+                    client.BaseAddress = new System.Uri(Node.Url);
                     var response = await client.PostAsync("/api/generate", content);
 
                     if (!response.IsSuccessStatusCode)
                     {
                         var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
                         Logger.Log($"Ollama Summarize 错误: {errorMessage}");
-                        throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                        throw new SummarizeFailedException(ShowDetailedErrors
                             ? errorMessage
                             : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败"));
                     }
@@ -658,7 +692,7 @@ namespace VPetLLM.Core.Providers.Chat
             {
                 using (var client = GetClient())
                 {
-                    client.BaseAddress = new System.Uri(_ollamaSetting.Url);
+                    client.BaseAddress = new System.Uri(Node.Url);
                     var response = client.GetAsync("/api/tags").Result;
 
                     if (!response.IsSuccessStatusCode)

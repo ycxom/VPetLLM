@@ -1,4 +1,4 @@
-<Window x:Class="VPetLLM.UI.Windows.winSettingNew"
+﻿<Window x:Class="VPetLLM.UI.Windows.winSettingNew"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -9,8 +9,9 @@
         Title="VPetLLM"
         xmlns:utils="clr-namespace:VPetLLM.Utils.Localization"
         xmlns:converters="clr-namespace:VPetLLM.Utils.UI"
+        xmlns:controls="clr-namespace:VPetLLM.UI.Controls"
         Height="907"
-        Width="1117"
+        Width="1380"
         Background="{DynamicResource BackgroundBrush}">
     <Window.Resources>
         <ResourceDictionary>
@@ -240,169 +241,23 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <ScrollViewer Grid.Column="0"
-                            VerticalScrollBarVisibility="Auto">
-                        <Border Style="{StaticResource CardContainer}" Margin="0,0,10,0">
+                    <!-- 渠道管理：统一的渠道表 + 二级编辑页 -->
+                    <Border x:Name="Panel_LLMChannels" Grid.Column="1" Style="{StaticResource CardContainer}">
+                        <controls:ChannelManagerView/>
+                    </Border>
+
+                    <!-- 对话与角色 -->
+                    <ScrollViewer x:Name="Panel_LLMConversation" Grid.Column="0" Width="320" Margin="0,0,14,0"
+                                  VerticalScrollBarVisibility="Auto">
+                        <Border Style="{StaticResource CardContainer}">
                             <StackPanel Style="{StaticResource SettingGroup}">
-                                <Label Content="{utils:Localize KeyPath=LLM_Settings.Provider}"
-                                        x:Name="Label_Provider"
-                                        Style="{StaticResource SettingLabel}"/>
-                                <ComboBox x:Name="ComboBox_Provider"
-                                        Margin="0,0,0,16"
-                                        SelectionChanged="ComboBox_Provider_SelectionChanged"
-                                        Style="{StaticResource ModernComboBox}">
-                                    <!-- 简化的ComboBoxItem样式 -->
-                                    <ComboBox.ItemContainerStyle>
-                                        <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
-                                            <Setter Property="Padding" Value="12,8"/>
-                                            <Setter Property="FontSize" Value="14"/>
-                                            <Setter Property="ContentTemplate">
-                                                <Setter.Value>
-                                                    <DataTemplate>
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <!-- 提供商图标-->
-                                                            <Border x:Name="ItemIcon"
-                                                                    Background="{StaticResource AccentBrush}"
-                                                                    CornerRadius="3"
-                                                                    Width="18"
-                                                                    Height="18"
-                                                                    Margin="0,0,8,0">
-                                                                <TextBlock x:Name="ItemIconText"
-                                                                        Text="⚡"
-                                                                        FontSize="9"
-                                                                        Foreground="White"
-                                                                        HorizontalAlignment="Center"
-                                                                        VerticalAlignment="Center"/>
-                                                            </Border>
-
-                                                            <!-- 提供商名称-->
-                                                            <TextBlock Text="{Binding}"
-                                                                    VerticalAlignment="Center"/>
-                                                        </StackPanel>
-                                                        <DataTemplate.Triggers>
-                                                            <!-- 根据不同提供商设置图标-->
-                                                            <DataTrigger Binding="{Binding}" Value="Ollama">
-                                                                <Setter TargetName="ItemIconText" Property="Text" Value="O"/>
-                                                                <Setter TargetName="ItemIcon" Property="Background" Value="#FF6B35"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding}" Value="OpenAI">
-                                                                <Setter TargetName="ItemIconText" Property="Text" Value="AI"/>
-                                                                <Setter TargetName="ItemIcon" Property="Background" Value="#10A37F"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding}" Value="Gemini">
-                                                                <Setter TargetName="ItemIconText" Property="Text" Value="G"/>
-                                                                <Setter TargetName="ItemIcon" Property="Background" Value="#4285F4"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding}" Value="Free">
-                                                                <Setter TargetName="ItemIconText" Property="Text" Value="F"/>
-                                                                <Setter TargetName="ItemIcon" Property="Background" Value="#28A745"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding}" Value="LMStudio">
-                                                                <Setter TargetName="ItemIconText" Property="Text" Value="LM"/>
-                                                                <Setter TargetName="ItemIcon" Property="Background" Value="#FF6B35"/>
-                                                            </DataTrigger>
-                                                        </DataTemplate.Triggers>
-                                                    </DataTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </ComboBox.ItemContainerStyle>
-                                </ComboBox>
-
-                                <CheckBox x:Name="CheckBox_EnableFallback"
-                                        Content="{utils:Localize KeyPath=LLM_Settings.EnableFallback}"
-                                        ToolTip="{utils:Localize KeyPath=LLM_Settings.EnableFallbackTooltip}"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource ModernCheckBox}"
-                                        Checked="CheckBox_EnableFallback_Checked"
-                                        Unchecked="CheckBox_EnableFallback_Unchecked"/>
-
-                                <StackPanel x:Name="Panel_FallbackPriority" Visibility="Collapsed" Margin="0,0,0,16">
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                        <Label Content="{utils:Localize KeyPath=LLM_Settings.FallbackPriority}"
-                                                x:Name="Label_FallbackPriority"
-                                                Style="{StaticResource SettingLabel}"
-                                                Padding="0,0,0,0"/>
-                                        <TextBlock Text="{utils:Localize KeyPath=LLM_Settings.FallbackPriorityTip}"
-                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                                FontSize="11"
-                                                VerticalAlignment="Center"
-                                                Margin="8,0,0,0"/>
-                                    </StackPanel>
-                                    <ListBox x:Name="ListBox_FallbackProviders"
-                                            AllowDrop="True"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            SelectionMode="Single"
-                                            PreviewMouseLeftButtonDown="ListBox_FallbackProviders_PreviewMouseLeftButtonDown"
-                                            PreviewMouseMove="ListBox_FallbackProviders_PreviewMouseMove"
-                                            Drop="ListBox_FallbackProviders_Drop"
-                                            DragOver="ListBox_FallbackProviders_DragOver"
-                                            DragEnter="ListBox_FallbackProviders_DragEnter"
-                                            ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="{StaticResource SecondaryBackgroundBrush}"
-                                                        BorderBrush="{StaticResource BorderBrush}"
-                                                        BorderThickness="1"
-                                                        CornerRadius="4"
-                                                        Padding="8,6"
-                                                        Margin="0,2">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="☰"
-                                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                                                FontSize="14"
-                                                                VerticalAlignment="Center"
-                                                                Margin="0,0,8,0"
-                                                                Cursor="SizeAll"/>
-                                                        <CheckBox Grid.Column="1"
-                                                                IsChecked="{Binding IsEnabled}"
-                                                                Margin="0,0,8,0"
-                                                                VerticalAlignment="Center"/>
-                                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                                            <Border Background="{Binding ProviderColor}"
-                                                                    CornerRadius="3"
-                                                                    Width="16"
-                                                                    Height="16"
-                                                                    Margin="0,0,6,0"
-                                                                    VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding ProviderIcon}"
-                                                                        FontSize="8"
-                                                                        Foreground="White"
-                                                                        HorizontalAlignment="Center"
-                                                                        VerticalAlignment="Center"/>
-                                                            </Border>
-                                                            <TextBlock Text="{Binding ProviderName}"
-                                                                    VerticalAlignment="Center"
-                                                                    Foreground="{StaticResource PrimaryTextBrush}"/>
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                        <ListBox.ItemContainerStyle>
-                                            <Style TargetType="ListBoxItem">
-                                                <Setter Property="Padding" Value="0"/>
-                                                <Setter Property="Margin" Value="0"/>
-                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                                <Setter Property="Background" Value="Transparent"/>
-                                            </Style>
-                                        </ListBox.ItemContainerStyle>
-                                    </ListBox>
-                                </StackPanel>
-
                                 <Label Content="{utils:Localize KeyPath=LLM_Settings.AiName}"
                                         VerticalAlignment="Top"
                                         Margin="0,0,0,0"
                                         x:Name="Label_AiName"
                                         Style="{StaticResource SettingLabel}"/>
                                 <TextBox x:Name="TextBox_AiName"
-                                         MaxWidth="300"
+                                         HorizontalAlignment="Stretch"
                                          Margin="0,0,0,16"
                                          Style="{StaticResource ModernTextBox}"
                                          IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
@@ -412,7 +267,7 @@
                                          x:Name="Label_UserName"
                                          Style="{StaticResource SettingLabel}"/>
                                 <TextBox x:Name="TextBox_UserName"
-                                         MaxWidth="300"
+                                         HorizontalAlignment="Stretch"
                                          Margin="0,0,0,16"
                                          Style="{StaticResource ModernTextBox}"
                                          IsEnabled="{Binding IsChecked, ElementName=CheckBox_FollowVPetName, Converter={StaticResource BoolInverter}}"/>
@@ -431,7 +286,7 @@
                                         VerticalScrollBarVisibility="Auto"
                                         HorizontalScrollBarVisibility="Auto"
                                         Height="120"
-                                        Width="300"
+                                        HorizontalAlignment="Stretch"
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernTextBox}"/>
                                 <CheckBox x:Name="CheckBox_EnableAppearance"
@@ -444,7 +299,7 @@
                                         x:Name="Label_Emphasis"
                                         Style="{StaticResource SettingLabel}"/>
                                 <TextBox x:Name="TextBox_Emphasis"
-                                        Width="300"
+                                        HorizontalAlignment="Stretch"
                                         Margin="0,0,0,16"
                                         Style="{StaticResource ModernTextBox}"/>
 
@@ -514,169 +369,6 @@
                             </StackPanel>
                         </Border>
                     </ScrollViewer>
-
-                    <ScrollViewer Grid.Column="1"
-        VerticalScrollBarVisibility="Auto">
-    <Border Style="{StaticResource CardContainer}">
-        <StackPanel Style="{StaticResource SettingGroup}">
-            <Label x:Name="Label_ChannelManagement" Content="{utils:Localize KeyPath=LLM_Settings.ChannelManagement}"
-                    Style="{StaticResource SettingLabel}"
-                    FontSize="16"
-                    FontWeight="Bold"/>
-            <TextBlock x:Name="TextBlock_ChannelManagementDesc" Text="{utils:Localize KeyPath=LLM_Settings.ChannelManagementDesc}"
-                    TextWrapping="Wrap"
-                    Foreground="{StaticResource SecondaryTextBrush}"
-                    Margin="0,0,0,16"
-                    FontSize="12"/>
-            <ComboBox x:Name="ComboBox_ChannelType"
-                    Margin="0,0,0,16"
-                    SelectionChanged="ComboBox_ChannelType_SelectionChanged"
-                    Style="{StaticResource ModernComboBox}">
-                <ComboBoxItem Content="OpenAI" Tag="OpenAI"/>
-                <ComboBoxItem Content="Gemini" Tag="Gemini"/>
-                <ComboBoxItem Content="Ollama" Tag="Ollama"/>
-                <ComboBoxItem Content="LMStudio" Tag="LMStudio"/>
-                <ComboBoxItem Content="Free" Tag="Free"/>
-            </ComboBox>
-            <CheckBox x:Name="CheckBox_EnableLoadBalancing"
-                    Content="{utils:Localize KeyPath=LLM_Settings.EnableLoadBalancing}"
-                    Margin="0,0,0,16"
-                    IsChecked="True"
-                    Style="{StaticResource ModernCheckBox}"
-                    Checked="CheckBox_EnableLoadBalancing_Checked"
-                    Unchecked="CheckBox_EnableLoadBalancing_Unchecked"/>
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                <Button x:Name="Button_AddChannel"
-                        Content="{utils:Localize KeyPath=LLM_Settings.AddChannel}"
-                        Click="Button_AddChannel_Click"
-                        Style="{StaticResource ModernButton}"/>
-                <Button x:Name="Button_RemoveChannel"
-                        Content="{utils:Localize KeyPath=LLM_Settings.RemoveSelectedChannel}"
-                        Click="Button_RemoveChannel_Click"
-                        Margin="10,0,0,0"
-                        Style="{StaticResource SecondaryButton}"/>
-            </StackPanel>
-            <ListView x:Name="ListView_Channels"
-                      Height="200"
-                      Margin="0,0,0,16"
-                      SelectionMode="Single"
-                      SelectionChanged="ListView_Channels_SelectionChanged">
-                <ListView.View>
-                    <GridView>
-                        <GridViewColumn x:Name="GridViewColumn_Enabled" Header="{utils:Localize KeyPath=LLM_Settings.Enabled}" Width="50">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <CheckBox IsChecked="{Binding Enabled}"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
-                        <GridViewColumn x:Name="GridViewColumn_ChannelName" Header="{utils:Localize KeyPath=LLM_Settings.ChannelName}" Width="120" DisplayMemberBinding="{Binding Name}"/>
-                        <GridViewColumn x:Name="GridViewColumn_Model" Header="{utils:Localize KeyPath=LLM_Settings.Model}" Width="120" DisplayMemberBinding="{Binding Model}"/>
-                        <GridViewColumn x:Name="GridViewColumn_ApiAddress" Header="{utils:Localize KeyPath=LLM_Settings.ApiAddress}" Width="180" DisplayMemberBinding="{Binding Url}"/>
-                    </GridView>
-                </ListView.View>
-            </ListView>
-            <StackPanel x:Name="StackPanel_ChannelDetails" Margin="0,0,0,16">
-                <Label x:Name="Label_ChannelConfig" Content="{utils:Localize KeyPath=LLM_Settings.ChannelConfig}"
-                        Style="{StaticResource SettingLabel}"
-                        FontSize="14"/>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Label x:Name="Label_ChannelName" Content="{utils:Localize KeyPath=LLM_Settings.ChannelName, Suffix=:}"
-                            Grid.Row="0" Grid.Column="0"
-                            Style="{StaticResource SettingLabel}"/>
-                    <TextBox x:Name="TextBox_ChannelName"
-                            Grid.Row="0" Grid.Column="1"
-                            Margin="10,0,0,8"
-                            Style="{StaticResource ModernTextBox}"
-                            TextChanged="TextBox_ChannelName_TextChanged"/>
-                    <Label x:Name="Label_ApiKey" Content="{utils:Localize KeyPath=LLM_Settings.ApiKey, Suffix=:}"
-                            Grid.Row="1" Grid.Column="0"
-                            Style="{StaticResource SettingLabel}"/>
-                    <Grid x:Name="Grid_ApiKey" Grid.Row="1" Grid.Column="1" Margin="10,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <PasswordBox x:Name="PasswordBox_OpenAIApiKey" Grid.Column="0" PasswordChar="*" PasswordChanged="PasswordBox_OpenAIApiKey_PasswordChanged"/>
-                        <TextBox x:Name="TextBox_OpenAIApiKey_Plain" Grid.Column="0" Visibility="Collapsed" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="60" ToolTip="{utils:Localize KeyPath=LLM_Settings.ApiKeyTooltip}" FontFamily="Consolas" Style="{StaticResource ModernTextBox}" TextChanged="TextBox_OpenAIApiKey_Plain_TextChanged"/>
-                        <Button x:Name="Button_Toggle_OpenAIApiKey" Grid.Column="1" Content="👁" ToolTip="{utils:Localize KeyPath=LLM_Settings.ToggleApiKeyVisibility}" Click="Button_Toggle_ApiKey_Click" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"/>
-                    </Grid>
-                    <Label x:Name="Label_ApiAddress" Content="{utils:Localize KeyPath=LLM_Settings.ApiAddress, Suffix=:}"
-                            Grid.Row="2" Grid.Column="0"
-                            Style="{StaticResource SettingLabel}"/>
-                    <Grid x:Name="Grid_ApiAddress" Grid.Row="2" Grid.Column="1" Margin="10,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="TextBox_ApiUrl" Grid.Column="0" Style="{StaticResource ModernTextBox}" TextChanged="TextBox_ApiUrl_TextChanged"/>
-                        <ComboBox x:Name="ComboBox_UrlPreset" Grid.Column="1" Width="120" Margin="8,0,0,0" SelectionChanged="ComboBox_UrlPreset_SelectionChanged" ToolTip="{utils:Localize KeyPath=LLM_Settings.PresetTip}" Style="{StaticResource ModernComboBox}"/>
-                    </Grid>
-                    <Label x:Name="Label_Model" Content="{utils:Localize KeyPath=LLM_Settings.Model, Suffix=:}"
-                            Grid.Row="3" Grid.Column="0"
-                            Style="{StaticResource SettingLabel}"/>
-                    <Grid Grid.Row="3" Grid.Column="1" Margin="10,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <ComboBox x:Name="ComboBox_Model" Grid.Column="0" IsEditable="True" Style="{StaticResource ModelComboBox}" SelectionChanged="ComboBox_Model_SelectionChanged" LostFocus="ComboBox_Model_LostFocus"/>
-                        <Button x:Name="Button_RefreshModels" Grid.Column="1" Content="{utils:Localize KeyPath=LLM_Settings.Refresh}" Click="Button_RefreshModels_Click" Margin="10,0,0,0" Style="{StaticResource SecondaryButton}"/>
-                    </Grid>
-                </Grid>
-                <CheckBox x:Name="CheckBox_EnableStreaming" Content="{utils:Localize KeyPath=LLM_Settings.EnableStreaming}" Margin="0,16,0,8" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableStreaming_Checked" Unchecked="CheckBox_EnableStreaming_Unchecked"/>
-                <CheckBox x:Name="CheckBox_EnableVision" Content="{utils:Localize KeyPath=LLM_Settings.EnableVision}" Margin="0,0,0,8" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableVision_Checked" Unchecked="CheckBox_EnableVision_Unchecked"/>
-                <CheckBox x:Name="CheckBox_EnableToolCall" Content="{utils:Localize KeyPath=LLM_Settings.EnableToolCall, Default=启用原生工具调用 (function calling)}" Margin="0,0,0,4" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableToolCall_Checked" Unchecked="CheckBox_EnableToolCall_Unchecked"/>
-                <TextBlock x:Name="TextBlock_EnableToolCallTip" Text="{utils:Localize KeyPath=LLM_Settings.EnableToolCallTip, Default=以模型原生的 tools 参数暴露插件，替代文本标记。仅在该模型确实支持时开启；开启后本节点的回复不再流式输出。}" TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="24,0,0,16"/>
-                <Label x:Name="Label_ThinkingEffort" Content="{utils:Localize KeyPath=LLM_Settings.ThinkingEffort, Default=思考强度:}" Style="{StaticResource SettingLabel}"/>
-                <ComboBox x:Name="ComboBox_ThinkingEffort" Margin="0,0,0,16" Style="{StaticResource ModernComboBox}" SelectionChanged="ComboBox_ThinkingEffort_SelectionChanged"
-                        ToolTip="{utils:Localize KeyPath=LLM_Settings.ThinkingEffortTip, Default=推理模型的思考强度。默认为不发送该参数，交由服务端决定；非推理模型请保持默认，否则部分接口会报错。}">
-                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_Default" Content="{utils:Localize KeyPath=ThinkingEffort.Default, Default=默认（不发送）}" Tag="Default"/>
-                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_Minimal" Content="{utils:Localize KeyPath=ThinkingEffort.Minimal, Default=最小}" Tag="Minimal"/>
-                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_Low" Content="{utils:Localize KeyPath=ThinkingEffort.Low, Default=低}" Tag="Low"/>
-                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_Medium" Content="{utils:Localize KeyPath=ThinkingEffort.Medium, Default=中}" Tag="Medium"/>
-                    <ComboBoxItem x:Name="ComboBoxItem_ThinkingEffort_High" Content="{utils:Localize KeyPath=ThinkingEffort.High, Default=高}" Tag="High"/>
-                </ComboBox>
-                <Label x:Name="Label_ChannelMode" Content="{utils:Localize KeyPath=LLM_Settings.ChannelMode, Default=渠道模式:}" Style="{StaticResource SettingLabel}"/>
-                <ComboBox x:Name="ComboBox_ChannelMode" Margin="0,0,0,16" Style="{StaticResource ModernComboBox}" SelectionChanged="ComboBox_ChannelMode_SelectionChanged">
-                    <ComboBoxItem x:Name="ComboBoxItem_ChannelMode_Unrestricted" Content="{utils:Localize KeyPath=ChannelMode.Unrestricted, Default=无限制}" Tag="Unrestricted"/>
-                    <ComboBoxItem x:Name="ComboBoxItem_ChannelMode_ChatOnly" Content="{utils:Localize KeyPath=ChannelMode.ChatOnly, Default=仅聊天}" Tag="ChatOnly"/>
-                    <ComboBoxItem x:Name="ComboBoxItem_ChannelMode_CompressionOnly" Content="{utils:Localize KeyPath=ChannelMode.CompressionOnly, Default=仅聊天压缩}" Tag="CompressionOnly"/>
-                </ComboBox>
-                <Label x:Name="Label_ChannelProxyMode" Content="{utils:Localize KeyPath=LLM_Settings.ChannelProxyMode, Default=代理模式:}" Style="{StaticResource SettingLabel}"/>
-                <ComboBox x:Name="ComboBox_ChannelProxyMode" Margin="0,0,0,16" Style="{StaticResource ModernComboBox}" SelectionChanged="ComboBox_ChannelProxyMode_SelectionChanged">
-                    <ComboBoxItem x:Name="ComboBoxItem_ChannelProxyMode_FollowDefault" Content="{utils:Localize KeyPath=ChannelProxyMode.FollowDefault, Default=跟随默认}" Tag="FollowDefault"/>
-                    <ComboBoxItem x:Name="ComboBoxItem_ChannelProxyMode_Direct" Content="{utils:Localize KeyPath=ChannelProxyMode.Direct, Default=直连}" Tag="Direct"/>
-                    <ComboBoxItem x:Name="ComboBoxItem_ChannelProxyMode_ForceProxy" Content="{utils:Localize KeyPath=ChannelProxyMode.ForceProxy, Default=强制代理}" Tag="ForceProxy"/>
-                </ComboBox>
-                <CheckBox x:Name="CheckBox_EnableAdvanced" Content="{utils:Localize KeyPath=LLM_Settings.EnableAdvanced}" Margin="0,0,0,16" Style="{StaticResource ModernCheckBox}" Checked="CheckBox_EnableAdvanced_Checked" Unchecked="CheckBox_EnableAdvanced_Unchecked"/>
-                <StackPanel x:Name="StackPanel_Advanced" Margin="20,0,0,0" IsEnabled="{Binding ElementName=CheckBox_EnableAdvanced, Path=IsChecked}">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <TextBlock x:Name="TextBlock_Temperature" Text="{utils:Localize KeyPath=LLM_Settings.Temperature}" Width="80" VerticalAlignment="Center" Foreground="{StaticResource PrimaryTextBrush}" FontSize="14"/>
-                        <Slider x:Name="Slider_Temperature" Minimum="0" Maximum="2" Width="125" Margin="10,0" VerticalAlignment="Center" ValueChanged="Slider_Temperature_ValueChanged"/>
-                        <TextBlock x:Name="TextBlock_TemperatureValue" Width="40" VerticalAlignment="Center" Foreground="{StaticResource SecondaryTextBrush}" FontSize="14"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
-                        <TextBlock x:Name="TextBlock_MaxTokens" Text="{utils:Localize KeyPath=LLM_Settings.MaxTokens}" Width="80" VerticalAlignment="Center" Foreground="{StaticResource PrimaryTextBrush}" FontSize="14"/>
-                        <TextBox x:Name="TextBox_MaxTokens" Width="125" Margin="10,0" VerticalAlignment="Center" Style="{StaticResource ModernTextBox}" TextChanged="TextBox_MaxTokens_TextChanged"/>
-                    </StackPanel>
-                </StackPanel>
-            </StackPanel>
-        </StackPanel>
-    </Border>
-</ScrollViewer>
                 </Grid>
             </TabItem>
             <TabItem Header="{utils:Localize KeyPath=Proxy.Tab}"

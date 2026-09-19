@@ -413,45 +413,9 @@ namespace VPetLLM
                     Logger.Log("Chat history and database features will be limited");
                 }
 
-                switch (Settings.Provider)
-                {
-                    case SettingClass.LLMType.Ollama:
-                        var ollamaNode = Settings.Ollama.GetCurrentOllamaSetting();
-                        if (ollamaNode != null)
-                        {
-                            ChatCore = new OllamaChatCore(ollamaNode, Settings, MW, ActionProcessor);
-                            Logger.Log("Chat core set to Ollama.");
-                        }
-                        else
-                        {
-                            Logger.Log("WARNING: No enabled Ollama node found.");
-                        }
-                        break;
-                    case SettingClass.LLMType.OpenAI:
-                        ChatCore = new OpenAIChatCore(Settings.OpenAI, Settings, MW, ActionProcessor);
-                        Logger.Log("Chat core set to OpenAI.");
-                        break;
-                    case SettingClass.LLMType.Gemini:
-                        ChatCore = new GeminiChatCore(Settings.Gemini, Settings, MW, ActionProcessor);
-                        Logger.Log("Chat core set to Gemini.");
-                        break;
-                    case SettingClass.LLMType.Free:
-                        ChatCore = new FreeChatCore(Settings.Free, Settings, MW, ActionProcessor);
-                        Logger.Log("Chat core set to Free.");
-                        break;
-                    case SettingClass.LLMType.LMStudio:
-                        var lmStudioNode = Settings.LMStudio.GetCurrentLMStudioSetting();
-                        if (lmStudioNode != null)
-                        {
-                            ChatCore = new LMStudioChatCore(lmStudioNode, Settings, MW, ActionProcessor);
-                            Logger.Log("Chat core set to LM Studio.");
-                        }
-                        else
-                        {
-                            Logger.Log("WARNING: No enabled LM Studio node found.");
-                        }
-                        break;
-                }
+                // 所有渠道走统一路由：按优先级 + 权重选，失败自动转移（见 ChannelRouter）
+                ChatCore = new RoutedChatCore(Settings, MW, ActionProcessor);
+                Logger.Log($"Chat core set to unified channel routing ({Settings.EnumerateChannels().Count(c => c.Enabled)} enabled channels).");
                 
                 if (ChatCore != null)
                 {

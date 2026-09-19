@@ -1,4 +1,4 @@
-using VPetLLM.Utils.Localization;
+﻿using VPetLLM.Utils.Localization;
 
 namespace VPetLLM.Services
 {
@@ -58,19 +58,11 @@ namespace VPetLLM.Services
                 return PreprocessingResult.CreateFailure("图片数据为空");
             }
 
-            var providerType = _settings.Provider switch
+            // 与聊天同一套选路：按优先级 + 权重排出开了视觉的渠道，失败依次换下一个
+            var plan = Core.Routing.ChannelRouter.Plan(_settings, "Chat", requireVision: true);
+            if (plan.Count == 0)
             {
-                Setting.LLMType.Free => "Free",
-                Setting.LLMType.OpenAI => "OpenAI",
-                Setting.LLMType.Gemini => "Gemini",
-                Setting.LLMType.Ollama => "Ollama",
-                Setting.LLMType.LMStudio => "LMStudio",
-                _ => ""
-            };
-
-            if (string.IsNullOrEmpty(providerType))
-            {
-                return PreprocessingResult.CreateFailure($"未知的主渠道类型: {_settings.Provider}");
+                return PreprocessingResult.CreateFailure("没有启用视觉能力的渠道，请在渠道管理中为至少一个渠道开启「视觉」");
             }
 
             var lang = _settings.PromptLanguage ?? "zh";
@@ -78,26 +70,29 @@ namespace VPetLLM.Services
                 ? (_settings.Screenshot?.MultimodalProvider ?? new MultimodalProviderConfig()).GetEffectivePrompt(lang)
                 : customPrompt;
 
-            try
+            string? lastError = null;
+            foreach (var channel in plan)
             {
-                Logger.Log($"PreprocessingMultimodal: 原生多模态 - 使用主渠道 {providerType} 分析图片，大小: {imageData.Length} bytes");
-
-                // 主渠道走 OpenAI/Gemini 这类多节点配置时，节点由各自 ChatCore 自行挑选，
-                // 这里不指定 node，交给 provider 用它当前生效的那个
-                var description = await CallChatWithImageForDescription(providerType, null, imageData, prompt);
-
-                if (string.IsNullOrWhiteSpace(description))
+                var providerType = Setting.FamilyOf(channel.Kind).ToString();
+                try
                 {
-                    return PreprocessingResult.CreateFailure($"主渠道 {providerType} 未返回图片描述（可能未启用视觉能力）");
-                }
+                    Logger.Log($"PreprocessingMultimodal: 原生多模态 - 使用渠道 #{channel.Id} {channel.Name} 分析图片，大小: {imageData.Length} bytes");
 
-                return PreprocessingResult.CreateSuccess(description, providerType);
+                    var description = await CallChatWithImageForDescription(providerType, null, imageData, prompt, channel);
+                    if (!string.IsNullOrWhiteSpace(description))
+                    {
+                        return PreprocessingResult.CreateSuccess(description, providerType);
+                    }
+                    lastError = $"渠道 {channel.Name} 未返回图片描述";
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"PreprocessingMultimodal: 渠道 #{channel.Id} {channel.Name} 分析失败: {ex.Message}");
+                    lastError = $"渠道 {channel.Name} 分析失败: {ex.Message}";
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Log($"PreprocessingMultimodal: 主渠道 {providerType} 分析失败: {ex.Message}");
-                return PreprocessingResult.CreateFailure($"主渠道 {providerType} 分析失败: {ex.Message}");
-            }
+
+            return PreprocessingResult.CreateFailure(lastError ?? "图片分析失败");
         }
 
         /// <summary>
@@ -206,7 +201,8 @@ namespace VPetLLM.Services
         /// 注意：前置多模态处理不应该保存历史记录到主上下文
         /// </summary>
         private async Task<string> CallChatWithImageForDescription(
-            string providerType, VisionNodeIdentifier? node, byte[] imageData, string prompt)
+            string providerType, VisionNodeIdentifier? node, byte[] imageData, string prompt,
+            Setting.ChannelNodeBase? channel = null)
         {
             string? capturedResponse = null;
 
@@ -235,7 +231,19 @@ namespace VPetLLM.Services
                 // 获取 MainWindow 引用
                 var mainWindow = _plugin.MW;
 
-                switch (providerType)
+                // 已经选定了具体渠道（原生多模态）：直接用它，不再按类型另挑节点
+                if (channel is not null)
+                {
+                    chatCore = channel switch
+                    {
+                        Setting.OpenAINodeSetting n => new OpenAIChatCore(n, _settings, mainWindow, null!),
+                        Setting.GeminiNodeSetting n => new GeminiChatCore(n, _settings, mainWindow, null!),
+                        Setting.OllamaNodeSetting n => new OllamaChatCore(n, _settings, mainWindow, null!),
+                        Setting.LMStudioNodeSetting n => new LMStudioChatCore(n, _settings, mainWindow, null!),
+                        _ => new FreeChatCore(_settings.Free, _settings, mainWindow, null!)
+                    };
+                }
+                else switch (providerType)
                 {
                     case "Free":
                         if (_settings.Free is not null)
@@ -278,7 +286,9 @@ namespace VPetLLM.Services
                         break;
 
                     case "Ollama":
-                        var ollamaVisionNode = _settings.Ollama?.GetCurrentOllamaSetting();
+                        var ollamaVisionNode = node is not null
+                            ? _settings.Ollama?.OllamaNodes?.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
+                            : _settings.Ollama?.GetCurrentOllamaSetting();
                         if (ollamaVisionNode != null && ollamaVisionNode.EnableVision)
                         {
                             chatCore = new OllamaChatCore(ollamaVisionNode, _settings, mainWindow, null!);
@@ -405,15 +415,18 @@ namespace VPetLLM.Services
                 }
             }
 
-            // 收集 Ollama 视觉节点
-            if (_settings.Ollama?.EnableVision == true)
+            // 收集 Ollama 视觉节点（以前只看容器上的旧开关，节点上勾了视觉也列不出来）
+            if (_settings.Ollama?.OllamaNodes is not null)
             {
-                nodes.Add(new VisionNodeIdentifier
+                foreach (var node in _settings.Ollama.OllamaNodes.Where(n => n.Enabled && n.EnableVision))
                 {
-                    ProviderType = "Ollama",
-                    NodeName = "Default",
-                    Model = _settings.Ollama.Model ?? ""
-                });
+                    nodes.Add(new VisionNodeIdentifier
+                    {
+                        ProviderType = "Ollama",
+                        NodeName = node.Name,
+                        Model = node.Model ?? ""
+                    });
+                }
             }
 
             return nodes;

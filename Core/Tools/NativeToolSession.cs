@@ -119,18 +119,15 @@ namespace VPetLLM.Core.Tools
 
             try
             {
-                return settings.Provider switch
+                // 统一路由下任何一个启用的渠道都可能接到这一轮，逐个看
+                return settings.EnumerateChannels().Any(c => c.Enabled && c switch
                 {
-                    Setting.LLMType.OpenAI => settings.OpenAI.OpenAINodes.Any(n => n.Enabled && n.EnableToolCall),
-                    Setting.LLMType.Gemini => settings.Gemini.GeminiNodes.Any(n => n.Enabled && n.EnableToolCall),
-                    Setting.LLMType.Ollama => settings.Ollama.OllamaNodes.Any(n => n.Enabled && n.EnableToolCall),
-                    Setting.LLMType.LMStudio => settings.LMStudio.LMStudioNodes.Any(n => n.Enabled && n.EnableToolCall),
                     // Free 没有可勾选的节点开关：模型由云端下发，能力由云端策略 + 本地探测决定。
                     // 注意这里用 IsProven 而不是 ShouldAttachTools：探测期照挂 tools，
                     // 但**不**写"优先用工具调用"那句提示 —— 详见 FreeToolCapability.IsProven。
-                    Setting.LLMType.Free => FreeToolCapability.IsProven(),
-                    _ => false
-                };
+                    Setting.FreeNodeSetting => FreeToolCapability.IsProven(),
+                    _ => c.EnableToolCall
+                });
             }
             catch
             {

@@ -48,6 +48,20 @@ namespace VPetLLM.Core.Providers.Chat
             _setting = setting;
         }
 
+        /// <summary>路由模式的工作 core：只服务 <paramref name="node"/> 这一个渠道，服务全部借宿主的。</summary>
+        internal OpenAIChatCore(Setting.OpenAINodeSetting node, ChatCoreBase host)
+            : base(host)
+        {
+            _openAISetting = new Setting.OpenAISetting
+            {
+                Enabled = true,
+                Name = node.Name,
+                OpenAINodes = new List<Setting.OpenAINodeSetting> { node }
+            };
+            _setting = Settings!;
+            PinnedChannel = node;
+        }
+
         /// <summary>
         /// 包装ErrorMessageHelper.HandleHttpResponseError调用以避免类型冲突
         /// </summary>
@@ -141,41 +155,58 @@ namespace VPetLLM.Core.Providers.Chat
         }
 
         /// <summary>
-        /// 检测是否使用 Responses API（新 API）格式
-        /// 根据 URL 是否包含 /responses 自动判断
+        /// 本节点走 Responses API 还是 Chat Completions。由节点上显式选的协议决定 ——
+        /// 以前按 URL 里有没有 "/responses" 猜，填 base URL 的用户永远用不上 Responses。
         /// </summary>
-        private static bool IsResponsesApi(string url)
-        {
-            return url.IndexOf("/responses", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
+        private static bool IsResponsesApi(Setting.OpenAINodeSetting node)
+            => node.ApiFormat == Setting.OpenAIApiFormat.Responses;
 
         /// <summary>
-        /// 从 Responses API 的响应中提取文本内容
-        /// Responses API 返回 output[] 数组，需遍历 type:"message" 项的 content[].text
+        /// 从 Responses API 的响应中提取文本内容。
+        /// output[] 里可能有多条 message、每条又可能有多个 output_text 部件（推理模型、
+        /// 分段输出都会这样），必须全部拼起来 —— 只取第一段会把后半截回复丢掉。
         /// </summary>
-        private static string ExtractTextFromResponsesOutput(JObject responseObject)
+        internal static string ExtractTextFromResponsesOutput(JObject responseObject)
         {
-            var output = responseObject["output"] as JArray;
-            if (output == null) return "";
-
-            foreach (var item in output)
+            var sb = new StringBuilder();
+            if (responseObject["output"] is JArray output)
             {
-                if (item["type"]?.ToString() == "message")
+                foreach (var item in output)
                 {
-                    var content = item["content"] as JArray;
-                    if (content != null)
+                    if (item["type"]?.ToString() != "message") continue;
+                    if (item["content"] is not JArray content) continue;
+                    foreach (var part in content)
                     {
-                        foreach (var part in content)
-                        {
-                            if (part["type"]?.ToString() == "output_text")
-                            {
-                                return part["text"]?.ToString() ?? "";
-                            }
-                        }
+                        if (part["type"]?.ToString() == "output_text")
+                            sb.Append(part["text"]?.ToString());
                     }
                 }
             }
-            return "";
+
+            // 部分兼容网关只给顶层的便捷字段
+            if (sb.Length == 0 && responseObject["output_text"] is JToken flat && flat.Type == JTokenType.String)
+                sb.Append(flat.ToString());
+
+            return sb.ToString();
+        }
+
+        /// <summary>Responses 流里的错误事件（error / response.failed）。返回 null 表示不是错误事件。</summary>
+        internal static string? ReadResponsesStreamError(JObject chunk)
+        {
+            var type = chunk["type"]?.ToString();
+            if (type == "error")
+                return chunk["message"]?.ToString() ?? chunk["error"]?["message"]?.ToString() ?? chunk.ToString(Formatting.None);
+            if (type == "response.failed")
+                return chunk["response"]?["error"]?["message"]?.ToString() ?? "response.failed";
+            return null;
+        }
+
+        /// <summary>从一段响应（完整响应或流里的某一块）里读 total_tokens，没有就是 0。</summary>
+        internal static long ReadTotalTokens(JObject obj)
+        {
+            var usage = obj["usage"] ?? obj["response"]?["usage"];
+            var total = usage?["total_tokens"];
+            return total is not null && total.Type == JTokenType.Integer ? total.Value<long>() : 0;
         }
 
         protected override Setting.ChannelProxyMode GetChannelProxyMode()
@@ -219,23 +250,29 @@ namespace VPetLLM.Core.Providers.Chat
 
             var currentApiKey = GetCurrentApiKey(currentNode);
 
-            string apiUrl = currentNode.Url;
-            // 如果 URL 已包含具体端点路径（/chat/completions 或 /responses），直接使用
-            if (apiUrl.Contains("/chat/completions") || apiUrl.Contains("/responses"))
+            return (BuildEndpointUrl(currentNode), currentApiKey, currentNode);
+        }
+
+        /// <summary>
+        /// 按节点选的协议得出请求地址。
+        ///
+        /// 地址可以填到 /v1 为止，也可以填完整端点；填了完整端点但和所选协议不一致时，
+        /// 以协议为准换掉结尾（用户把协议从 Chat 切到 Responses 时不必再去改地址）。
+        /// </summary>
+        internal static string BuildEndpointUrl(Setting.OpenAINodeSetting node)
+        {
+            var suffix = IsResponsesApi(node) ? "/responses" : "/chat/completions";
+            var url = (node.Url ?? "").Trim().TrimEnd('/');
+
+            foreach (var known in new[] { "/chat/completions", "/responses" })
             {
-                // 已是完整端点 URL，无需拼接
-            }
-            else
-            {
-                var baseUrl = apiUrl.TrimEnd('/');
-                if (!baseUrl.EndsWith("/v1") && !baseUrl.EndsWith("/v1/"))
-                {
-                    baseUrl += "/v1";
-                }
-                apiUrl = baseUrl.TrimEnd('/') + "/chat/completions";
+                if (url.EndsWith(known, StringComparison.OrdinalIgnoreCase))
+                    return url.Substring(0, url.Length - known.Length) + suffix;
             }
 
-            return (apiUrl, currentApiKey, currentNode);
+            if (!url.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
+                url += "/v1";
+            return url + suffix;
         }
 
         public override Task<string> Chat(string prompt)
@@ -289,8 +326,11 @@ namespace VPetLLM.Core.Providers.Chat
 
 
 
-            // 构建多模态消息内容
-            var userContent = BuildMultimodalContent(prompt, images);
+            // 构建多模态消息内容：两种协议的图片部件格式不同，见 BuildResponsesMultimodalContent
+            bool useResponses = IsResponsesApi(currentNode);
+            var userContent = useResponses
+                ? BuildResponsesMultimodalContent(prompt, images)
+                : BuildMultimodalContent(prompt, images);
 
             ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey("OpenAI", currentNode.Url, currentNode.Model);
 
@@ -311,8 +351,7 @@ namespace VPetLLM.Core.Providers.Chat
             var useStreaming = UseStreaming(currentNode.EnableStreaming);
 
             object data;
-            bool useResponses = IsResponsesApi(apiUrl);
-            if (_openAISetting.EnableAdvanced)
+            if (currentNode.EnableAdvanced)
             {
                 if (useResponses)
                 {
@@ -320,8 +359,8 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         model = currentNode.Model,
                         input = requestMessages,
-                        temperature = _openAISetting.Temperature,
-                        max_output_tokens = _openAISetting.MaxTokens,
+                        temperature = currentNode.Temperature,
+                        max_output_tokens = currentNode.MaxTokens,
                         stream = useStreaming
                     };
                 }
@@ -331,8 +370,8 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         model = currentNode.Model,
                         messages = requestMessages,
-                        temperature = _openAISetting.Temperature,
-                        max_tokens = _openAISetting.MaxTokens,
+                        temperature = currentNode.Temperature,
+                        max_tokens = currentNode.MaxTokens,
                         stream = useStreaming
                     };
                 }
@@ -500,8 +539,9 @@ namespace VPetLLM.Core.Providers.Chat
                         }
                         else
                         {
-                            message = responseObject["choices"][0]["message"]["content"].ToString();
+                            message = responseObject["choices"]?[0]?["message"]?["content"]?.ToString() ?? "";
                         }
+                        LastTokenUsage = ReadTotalTokens(responseObject);
                         ResponseHandler?.Invoke(message);
                     }
                 }
@@ -555,6 +595,8 @@ namespace VPetLLM.Core.Providers.Chat
                 // 首次调用：重置已尝试节点列表并清除上一次请求的节点缓存，确保重新选择节点
                 _triedNodeIndices.Clear();
                 ClearNodeContext();
+                LastCallFailed = false;
+                LastTokenUsage = 0;
             }
 
             // 临时构建包含当前用户消息的历史记录（用于API请求），但不立即保存到数据库
@@ -599,8 +641,8 @@ namespace VPetLLM.Core.Providers.Chat
             history = InjectRecordsIntoHistory(history);
 
             object data;
-            bool useResponses = IsResponsesApi(apiUrl);
-            if (_openAISetting.EnableAdvanced)
+            bool useResponses = IsResponsesApi(currentNode);
+            if (currentNode.EnableAdvanced)
             {
                 if (useResponses)
                 {
@@ -608,8 +650,8 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         model = currentNode.Model,
                         input = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
-                        temperature = _openAISetting.Temperature,
-                        max_output_tokens = _openAISetting.MaxTokens,
+                        temperature = currentNode.Temperature,
+                        max_output_tokens = currentNode.MaxTokens,
                         stream = currentNode.EnableStreaming
                     };
                 }
@@ -619,8 +661,8 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         model = currentNode.Model,
                         messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
-                        temperature = _openAISetting.Temperature,
-                        max_tokens = _openAISetting.MaxTokens,
+                        temperature = currentNode.Temperature,
+                        max_tokens = currentNode.MaxTokens,
                         stream = currentNode.EnableStreaming
                     };
                 }
@@ -738,7 +780,7 @@ namespace VPetLLM.Core.Providers.Chat
                         int batchWindow = Settings?.StreamingBatchWindowMs ?? 100;
                         streamProcessor.SetBatchingConfig(useBatch, batchWindow);
 
-                        var TotalUsage = 0;
+                        string? streamError = null;
                         using (var stream = await response.Content.ReadAsStreamAsync())
                         using (var reader = new System.IO.StreamReader(stream))
                         {
@@ -763,12 +805,18 @@ namespace VPetLLM.Core.Providers.Chat
                                         {
                                             delta = chunk["delta"]?.ToString();
                                         }
+                                        streamError ??= ReadResponsesStreamError(chunk);
                                     }
                                     else
                                     {
                                         // Chat Completions API: delta in choices[0].delta.content
                                         delta = chunk["choices"]?[0]?["delta"]?["content"]?.ToString();
                                     }
+
+                                    // usage 只出现在最后一块（Responses 在 response.completed 里），取到就记
+                                    var usage = ReadTotalTokens(chunk);
+                                    if (usage > 0) LastTokenUsage = usage;
+
                                     if (!string.IsNullOrEmpty(delta))
                                     {
                                         fullMessage.Append(delta);
@@ -776,8 +824,6 @@ namespace VPetLLM.Core.Providers.Chat
                                         streamProcessor.AddChunk(delta);
                                         // 通知流式文本更新（用于显示）
                                         StreamingChunkHandler?.Invoke(delta);
-                                        var usage = chunk["usage"]?["total_tokens"]?.ToObject<int>() ?? 0;
-                                        TotalUsage += usage;
                                     }
                                 }
                                 catch
@@ -790,6 +836,14 @@ namespace VPetLLM.Core.Providers.Chat
 
                         // 刷新批处理器，确保所有待处理命令都被处理
                         streamProcessor.FlushBatch();
+
+                        // Responses 的流以 200 开头，出错是通过事件告知的；一个字都没收到时按失败处理，
+                        // 否则会被当成"模型回了空话"，路由也就不会去试下一个渠道
+                        if (streamError is not null && fullMessage.Length == 0)
+                        {
+                            ReportFailure($"OpenAI Responses 错误: {streamError}");
+                            return "";
+                        }
 
                         // 注意：流式模式下不再调用 ResponseHandler，因为已经通过 streamProcessor 逐个处理了
                     }
@@ -812,13 +866,12 @@ namespace VPetLLM.Core.Providers.Chat
                         if (useResponses)
                         {
                             message = ExtractTextFromResponsesOutput(responseObject);
-                            var tokenUsage = responseObject["usage"]?["total_tokens"]?.ToString() ?? "0";
                         }
                         else
                         {
-                            message = responseObject["choices"][0]["message"]["content"].ToString();
-                            var tokenUsage = responseObject["usage"]["total_tokens"].ToString();
+                            message = responseObject["choices"]?[0]?["message"]?["content"]?.ToString() ?? "";
                         }
+                        LastTokenUsage = ReadTotalTokens(responseObject);
                         // 非流式模式下，一次性处理完整消息
                         ResponseHandler?.Invoke(message);
                     }
@@ -901,14 +954,14 @@ namespace VPetLLM.Core.Providers.Chat
                         noNodeError = "没有启用的OpenAI 节点，请在设置中启用至少一个节点";
                     }
                     SystemLogger.Log($"OpenAI Summarize 错误: {noNodeError}");
-                    throw new SummarizeFailedException(ErrorHelper.IsDebugMode(Settings)
+                    throw new SummarizeFailedException(ShowDetailedErrors
                         ? noNodeError
                         : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试"));
                 }
 
                 object data;
-                bool useResponses = IsResponsesApi(apiUrl);
-                if (_openAISetting.EnableAdvanced)
+                bool useResponses = IsResponsesApi(currentNode);
+                if (currentNode.EnableAdvanced)
                 {
                     if (useResponses)
                     {
@@ -916,8 +969,8 @@ namespace VPetLLM.Core.Providers.Chat
                         {
                             model = currentNode.Model,
                             input = messages,
-                            temperature = _openAISetting.Temperature,
-                            max_output_tokens = _openAISetting.MaxTokens
+                            temperature = currentNode.Temperature,
+                            max_output_tokens = currentNode.MaxTokens
                         };
                     }
                     else
@@ -926,8 +979,8 @@ namespace VPetLLM.Core.Providers.Chat
                         {
                             model = currentNode.Model,
                             messages = messages,
-                            temperature = _openAISetting.Temperature,
-                            max_tokens = _openAISetting.MaxTokens
+                            temperature = currentNode.Temperature,
+                            max_tokens = currentNode.MaxTokens
                         };
                     }
                 }
@@ -965,7 +1018,7 @@ namespace VPetLLM.Core.Providers.Chat
                     {
                         var errorMessage = await HandleHttpError(response, Settings, "OpenAI");
                         SystemLogger.Log($"OpenAI Summarize 错误: {errorMessage}");
-                        throw new SummarizeFailedException(ErrorHelper.IsDebugMode(Settings)
+                        throw new SummarizeFailedException(ShowDetailedErrors
                             ? errorMessage
                             : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试"));
                     }
@@ -991,7 +1044,7 @@ namespace VPetLLM.Core.Providers.Chat
             catch (Exception ex)
             {
                 SystemLogger.Log($"OpenAI Summarize 异常: {ex.Message}");
-                throw new SummarizeFailedException(ErrorHelper.IsDebugMode(Settings)
+                throw new SummarizeFailedException(ShowDetailedErrors
                     ? $"OpenAI Summarize 异常: {ex.Message}\n{ex.StackTrace}"
                     : (ErrorHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试"), ex);
             }

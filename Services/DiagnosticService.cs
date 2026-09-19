@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Text;
@@ -263,7 +263,7 @@ namespace VPetLLM.Services
                 var r = await CheckOpenAIChannelAsync(node);
                 results.Add(r);
             }
-            if (!_settings.OpenAI.OpenAINodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.OpenAI.ApiKey))
+            if (!_settings.ChannelsUnified && !_settings.OpenAI.OpenAINodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.OpenAI.ApiKey))
             {
                 var legacyNode = new Setting.OpenAINodeSetting
                 {
@@ -284,7 +284,7 @@ namespace VPetLLM.Services
                 var r = await CheckGeminiChannelAsync(node);
                 results.Add(r);
             }
-            if (!_settings.Gemini.GeminiNodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.Gemini.ApiKey))
+            if (!_settings.ChannelsUnified && !_settings.Gemini.GeminiNodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.Gemini.ApiKey))
             {
                 var legacyNode = new Setting.GeminiNodeSetting
                 {
@@ -305,7 +305,7 @@ namespace VPetLLM.Services
                 var r = await CheckOllamaChannelAsync(node);
                 results.Add(r);
             }
-            if (!_settings.Ollama.OllamaNodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.Ollama.Url))
+            if (!_settings.ChannelsUnified && !_settings.Ollama.OllamaNodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.Ollama.Url))
             {
                 var legacyNode = new Setting.OllamaNodeSetting
                 {
@@ -324,7 +324,7 @@ namespace VPetLLM.Services
                 var r = await CheckLMStudioChannelAsync(node);
                 results.Add(r);
             }
-            if (!_settings.LMStudio.LMStudioNodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.LMStudio.Url))
+            if (!_settings.ChannelsUnified && !_settings.LMStudio.LMStudioNodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.LMStudio.Url))
             {
                 var legacyNode = new Setting.LMStudioNodeSetting
                 {
@@ -950,19 +950,22 @@ namespace VPetLLM.Services
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", node.ApiKey);
 
             var model = !string.IsNullOrEmpty(channelResult.Model) ? channelResult.Model : "gpt-3.5-turbo";
-            var baseUrl = channelResult.ApiUrl.TrimEnd('/');
 
-            // 根据 URL 判断 API 格式偏好，依次尝试两种格式
-            var prefersResponses = IsResponsesApiUrl(channelResult.ApiUrl);
+            // 先按渠道选的协议测，失败再试另一种 —— 另一种通了说明协议选错了，报告里会提示。
+            // 两个端点都用聊天时的同一套规则拼（地址填到 /v1 或填完整端点都行）。
+            var prefersResponses = node.ApiFormat == Setting.OpenAIApiFormat.Responses
+                                   || IsResponsesApiUrl(channelResult.ApiUrl);
+            var probe = new Setting.OpenAINodeSetting { Url = channelResult.ApiUrl };
+            probe.ApiFormat = Setting.OpenAIApiFormat.ChatCompletions;
+            var chatEndpoint = OpenAIChatCore.BuildEndpointUrl(probe);
+            probe.ApiFormat = Setting.OpenAIApiFormat.Responses;
+            var responsesEndpoint = OpenAIChatCore.BuildEndpointUrl(probe);
+
+            var chatFormat = (endpoint: chatEndpoint, body: BuildChatCompletionsRequestBody(model, prompt), name: "Chat Completions");
+            var responsesFormat = (endpoint: responsesEndpoint, body: BuildResponsesRequestBody(model, prompt), name: "Responses");
             var formats = prefersResponses
-                ? new[] { (endpoint: $"{baseUrl}", body: BuildResponsesRequestBody(model, prompt), name: "Responses") }
-                : new[] { (endpoint: $"{baseUrl}/chat/completions", body: BuildChatCompletionsRequestBody(model, prompt), name: "Chat Completions") };
-
-            // 如果首选格式失败，补充另一种格式作为 fallback
-            if (prefersResponses)
-                formats = formats.Append((endpoint: $"{baseUrl}/chat/completions", body: BuildChatCompletionsRequestBody(model, prompt), name: "Chat Completions")).ToArray();
-            else
-                formats = formats.Append((endpoint: $"{baseUrl}/responses", body: BuildResponsesRequestBody(model, prompt), name: "Responses")).ToArray();
+                ? new[] { responsesFormat, chatFormat }
+                : new[] { chatFormat, responsesFormat };
 
             foreach (var (endpoint, body, name) in formats)
             {
@@ -1394,9 +1397,11 @@ namespace VPetLLM.Services
             var recommendations = new List<RecommendedSetting>();
 
             var hasAnyApiConfig = HasAnyApiConfigured();
+            // 统一渠道下"降级到 Free"= 失败转移打开 + 有一个启用的 Free 渠道。
+            // 必须和 ApplyRecommendedSettings 里 "Fallback.Free" 的落地方式对得上，
+            // 否则应用完下次还判"不存在"，建议会每次启动原样弹回来。
             var freeFallbackExists = _settings.EnableFallback
-                && _settings.FallbackProviders.Any(fp =>
-                    fp.ProviderType == "Free" && fp.IsEnabled);
+                && _settings.Free?.FreeNodes?.Any(n => n.Enabled) == true;
 
             if (!hasAnyApiConfig)
             {
@@ -1634,11 +1639,31 @@ namespace VPetLLM.Services
                 switch (rec.Key)
                 {
                     case "Provider":
+                        // "主提供商"= 优先级最高的启用渠道：把该类型的渠道启用并顶到最前
                         if (Enum.TryParse<Setting.LLMType>(rec.RecommendedValue, out var providerType))
-                            _settings.Provider = providerType;
+                        {
+                            var channels = _settings.EnumerateChannels();
+                            var targets = channels.Where(c => Setting.FamilyOf(c.Kind) == providerType).ToList();
+                            if (targets.Count == 0 && providerType == Setting.LLMType.Free)
+                            {
+                                var free = Setting.CreateChannel(Setting.ChannelKind.Free);
+                                _settings.AddChannel(free);
+                                targets.Add(free);
+                            }
+                            var top = channels.Count == 0 ? 0 : channels.Max(c => c.Priority);
+                            foreach (var c in targets)
+                            {
+                                c.Enabled = true;
+                                c.Priority = top + 10;
+                            }
+                            if (targets.Count == 0) unapplied.Add(rec.Key);
+                            _settings.SyncPrimaryProvider();
+                        }
                         break;
 
                     case "Free.EnableAdvanced":
+                        foreach (var n in _settings.Free.FreeNodes)
+                            n.EnableAdvanced = rec.RecommendedValue == "true";
                         _settings.Free.EnableAdvanced = rec.RecommendedValue == "true";
                         break;
 
@@ -1651,23 +1676,26 @@ namespace VPetLLM.Services
                         break;
 
                     case "Fallback.Free":
-                        var existingFree = _settings.FallbackProviders
-                            .FirstOrDefault(fp => fp.ProviderType == "Free");
-                        if (existingFree == null)
+                    {
+                        // 把 Free 渠道放在所有其它渠道之后当兜底：启用、优先级低于最低的那一层
+                        var channels = _settings.EnumerateChannels();
+                        var freeNodes = _settings.Free.FreeNodes;
+                        if (freeNodes.Count == 0)
                         {
-                            _settings.FallbackProviders.Add(new Setting.ProviderFallbackConfig
-                            {
-                                ProviderType = "Free",
-                                IsEnabled = true,
-                                Priority = 0
-                            });
+                            _settings.AddChannel(Setting.CreateChannel(Setting.ChannelKind.Free));
+                            channels = _settings.EnumerateChannels();
                         }
-                        else
+                        var others = channels.Where(c => c is not Setting.FreeNodeSetting && c.Enabled).ToList();
+                        var floor = others.Count == 0 ? 0 : others.Min(c => c.Priority) - 10;
+                        foreach (var n in freeNodes)
                         {
-                            existingFree.IsEnabled = true;
-                            existingFree.Priority = 0;
+                            n.Enabled = true;
+                            if (others.Count > 0) n.Priority = floor;
                         }
+                        _settings.EnableFallback = true;
+                        _settings.SyncFreeContainer();
                         break;
+                    }
 
                     case "Proxy.IsEnabled":
                         if (_settings.Proxy != null)

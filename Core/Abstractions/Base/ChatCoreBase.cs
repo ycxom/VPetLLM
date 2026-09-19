@@ -63,6 +63,75 @@ namespace VPetLLM.Core.Abstractions.Base
         /// </summary>
         public bool LastCallFailed { get; protected set; }
 
+        /// <summary>最近一次成功调用消耗的 token（服务端没回 usage 时为 0）。供渠道统计用。</summary>
+        public long LastTokenUsage { get; protected set; }
+
+        // ───────────────────────── 路由模式 ─────────────────────────
+        //
+        // RoutedChatCore 是唯一对外的 core，按请求把活儿派给某个类型的"工作 core"。
+        // 工作 core 只负责协议，历史 / 记录 / 技能 / 溢出 / 向量这些服务一律借宿主的：
+        // 它们各自持有数据库连接，并且会注册进 ActionProcessor，同时存在两份会互相覆盖。
+
+        /// <summary>路由模式下的宿主；独立使用时为 null。</summary>
+        protected ChatCoreBase? Host { get; }
+
+        /// <summary>本工作 core 服务的那个渠道（路由模式下由宿主设置）。</summary>
+        internal Setting.ChannelNodeBase? PinnedChannel { get; set; }
+
+        /// <summary>
+        /// 失败转移的第二次及之后的尝试：同一轮对话已经记过一次"轮次"了，
+        /// 重试不能再把记录权重多扣一遍。
+        /// </summary>
+        internal bool SuppressTurnBookkeeping { get; set; }
+
+        /// <summary>
+        /// 渠道测试时打开：失败信息给出真实原因（状态码、服务端报错），
+        /// 而不是面向桌宠对话的那句"总结失败，请稍后再试"。
+        /// </summary>
+        internal bool DetailedErrors { get; set; }
+
+        protected bool ShowDetailedErrors => DetailedErrors || Utils.System.ErrorMessageHelper.IsDebugMode(Settings);
+
+        /// <summary>工作 core 专用：共享宿主的全部服务，不新建、不注册。</summary>
+        protected ChatCoreBase(ChatCoreBase host) : this()
+        {
+            Host = host;
+            Settings = host.Settings;
+            MainWindow = host.MainWindow;
+            ActionProcessor = host.ActionProcessor;
+            HistoryManager = host.HistoryManager;
+            RecordManager = host.RecordManager;
+            SkillManager = host.SkillManager;
+            OverflowManager = host.OverflowManager;
+            EmbeddingService = host.EmbeddingService;
+            SystemMessageProvider = host.SystemMessageProvider;
+            ContextFilter = host.ContextFilter;
+        }
+
+        /// <summary>
+        /// 宿主在每次派活前调用：换上这一次的回调，清掉上一次的结果。
+        /// 回复 / 流式片段原样转给宿主（宿主那边已经挂好了中断拦截和远端会话捕获），
+        /// 错误先交给宿主暂存 —— 还有下一个渠道可试时不该让用户看到这次的报错。
+        /// </summary>
+        internal void BeginRoutedCall(ChatCoreBase host, Action<string> onResponse, Action<string> onChunk, Action<string> onFailure)
+        {
+            ResponseHandler = onResponse;
+            StreamingChunkHandler = onChunk;
+            FailureHandler = onFailure;
+            ForceStreaming = host.ForceStreaming;
+            LastCallFailed = false;
+            LastTokenUsage = 0;
+            OnBeforeRoutedCall();
+        }
+
+        /// <summary>派活前的钩子：需要从渠道节点同步参数的工作 core 在这里做。</summary>
+        internal virtual void OnBeforeRoutedCall() { }
+
+        /// <summary>宿主转发回复用（宿主访问不到别的实例上的 protected 成员）。</summary>
+        internal void ForwardResponse(string text) => ResponseHandler?.Invoke(text);
+        internal void ForwardChunk(string text) => StreamingChunkHandler?.Invoke(text);
+        internal void ForwardFailure(string text) => ReportFailure(text);
+
         /// <summary>
         /// 把原生工具循环里发生的调用与结果补进历史 —— 已还原成标记协议，
         /// 和标记模式产出的历史完全同形。
@@ -136,6 +205,25 @@ namespace VPetLLM.Core.Abstractions.Base
         /// 构造 OpenAI 兼容格式的多模态 content 数组：一段文本 + N 张图。
         /// 五个 provider 里有四个用的是同一套结构，抽出来避免各写各的。
         /// </summary>
+        /// <summary>
+        /// OpenAI Responses API 的多模态 content：部件类型叫 input_text / input_image，
+        /// 且 image_url 是字符串而不是 {url} 对象。拿 Chat Completions 的格式发过去会被 400。
+        /// </summary>
+        protected static object[] BuildResponsesMultimodalContent(string prompt, IReadOnlyList<byte[]> images)
+        {
+            var parts = new List<object> { new { type = "input_text", text = prompt } };
+            foreach (var image in images)
+            {
+                if (image is null || image.Length == 0) continue;
+                parts.Add(new
+                {
+                    type = "input_image",
+                    image_url = $"data:image/png;base64,{Convert.ToBase64String(image)}"
+                });
+            }
+            return parts.ToArray();
+        }
+
         protected static object[] BuildMultimodalContent(string prompt, IReadOnlyList<byte[]> images)
         {
             var parts = new List<object> { new { type = "text", text = prompt } };
@@ -217,7 +305,8 @@ namespace VPetLLM.Core.Abstractions.Base
         /// </summary>
         protected string AppendInterruptMarker(string message)
         {
-            _responseSavedThisTurn = true;
+            // 中断是对宿主调的 MarkLastResponseInterrupted，标记位必须记在宿主身上
+            (Host ?? this)._responseSavedThisTurn = true;
 
             if (!Utils.Common.InterruptManager.IsInterrupted)
                 return message;
@@ -322,7 +411,17 @@ namespace VPetLLM.Core.Abstractions.Base
         /// 本轮请求发往的端点标识（渠道|主机|模型），用于按节点分别记住探明的上下文上限。
         /// 各 Provider 在选定节点之后、构建历史之前设置；见 <see cref="Utils.Common.ContextLimitGuard"/>。
         /// </summary>
-        protected string? ContextLimitKey { get; set; }
+        protected string? ContextLimitKey
+        {
+            get => _contextLimitKey;
+            set
+            {
+                _contextLimitKey = value;
+                // 溢出总结拿的是宿主的 EffectiveContextTokenBudget，宿主得知道这一轮打去了哪
+                if (Host is not null) Host._contextLimitKey = value;
+            }
+        }
+        private string? _contextLimitKey;
 
         /// <summary>
         /// 本轮实际生效的 token 预算：用户配置与"撞出来的"服务端上限取小。
@@ -717,8 +816,9 @@ namespace VPetLLM.Core.Abstractions.Base
             if (string.IsNullOrEmpty(content))
                 return null;
 
-            // 新一次请求开始（多模态路径是在存档前才建用户消息，此时紧跟着就会置回 true）
-            _responseSavedThisTurn = false;
+            // 新一次请求开始（多模态路径是在存档前才建用户消息，此时紧跟着就会置回 true）。
+            // 与 AppendInterruptMarker 一样记在宿主身上：中断时被问的是宿主。
+            (Host ?? this)._responseSavedThisTurn = false;
 
             if (messageType == "User" && SystemMessageProvider is not null)
             {
@@ -753,6 +853,9 @@ namespace VPetLLM.Core.Abstractions.Base
         /// </summary>
         protected void OnConversationTurn()
         {
+            if (SuppressTurnBookkeeping)
+                return;
+
             try
             {
                 if (RecordManager is not null && Settings?.Records?.AutoDecrementWeights == true)
@@ -1141,6 +1244,9 @@ namespace VPetLLM.Core.Abstractions.Base
         /// </summary>
         protected bool CheckVisionSupport()
         {
+            // 路由模式下看的是这一次实际发往的渠道，而不是某个"当前提供商"
+            if (PinnedChannel is not null)
+                return PinnedChannel.EnableVision;
             return ContextFilter?.CheckVisionSupport(Settings) ?? false;
         }
 
@@ -1315,7 +1421,7 @@ namespace VPetLLM.Core.Abstractions.Base
 
         protected virtual Setting.ChannelProxyMode GetChannelProxyMode()
         {
-            return Setting.ChannelProxyMode.FollowDefault;
+            return PinnedChannel?.ProxyMode ?? Setting.ChannelProxyMode.FollowDefault;
         }
 
         public IWebProxy GetProxy(string? requestType = null)

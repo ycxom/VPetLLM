@@ -4388,5 +4388,663 @@
       "zh-hant": "Gemini",
       "jp": "Gemini"
     }
+  },
+  "Channels": {
+    "Title": {
+      "en": "Channels",
+      "zh-hans": "渠道管理",
+      "zh-hant": "渠道管理",
+      "jp": "チャネル管理"
+    },
+    "Nav": {
+      "en": "Channels",
+      "zh-hans": "渠道管理",
+      "zh-hant": "渠道管理",
+      "jp": "チャネル"
+    },
+    "NavConversation": {
+      "en": "Conversation & Role",
+      "zh-hans": "对话与角色",
+      "zh-hant": "對話與角色",
+      "jp": "会話とキャラクター"
+    },
+    "Add": {
+      "en": "Add channel",
+      "zh-hans": "添加渠道",
+      "zh-hant": "新增渠道",
+      "jp": "チャネルを追加"
+    },
+    "TestAll": {
+      "en": "Test all enabled",
+      "zh-hans": "测试全部启用渠道",
+      "zh-hant": "測試全部啟用渠道",
+      "jp": "有効なチャネルをすべてテスト"
+    },
+    "Failover": {
+      "en": "Fail over to the next channel",
+      "zh-hans": "失败时自动切换到下一个渠道",
+      "zh-hant": "失敗時自動切換到下一個渠道",
+      "jp": "失敗時に次のチャネルへ切り替え"
+    },
+    "FailoverTip": {
+      "en": "When off, only the top-ranked channel is used. When on, a failed channel hands over to the next one by priority; an error is shown only if all fail. A reply that has already started streaming is never switched, so nothing is said twice.",
+      "zh-hans": "关闭时每次只用排在最前面的一个渠道；打开后该渠道失败会按优先级依次换下一个，全部失败才报错。已经开始输出的回复不会切换，避免同一句话说两遍。",
+      "zh-hant": "關閉時每次只用排在最前面的一個渠道；開啟後該渠道失敗會按優先級依次換下一個，全部失敗才報錯。已經開始輸出的回覆不會切換，避免同一句話說兩遍。",
+      "jp": "オフの場合は最上位のチャネルのみ使用します。オンにすると、失敗時に優先度順で次のチャネルへ切り替え、すべて失敗した場合のみエラーを表示します。出力が始まった返信は切り替えません。"
+    },
+    "Search": {
+      "en": "Search name / model / URL",
+      "zh-hans": "搜索名称 / 模型 / 地址",
+      "zh-hant": "搜尋名稱 / 模型 / 位址",
+      "jp": "名前・モデル・URL で検索"
+    },
+    "RoutingHint": {
+      "en": "Routing: only enabled channels are used. Higher priority goes first; channels with equal priority share traffic by weight (equally if all weights are 0). Channels whose purpose does not match a request are skipped. Double-click a row to edit.",
+      "zh-hans": "选路规则：只在启用的渠道中挑选；优先级数值越大越先用，同一优先级内按权重随机分配（权重都为 0 时平均分配）；用途不匹配的渠道不参与对应请求。双击一行可直接编辑。",
+      "zh-hant": "選路規則：只在啟用的渠道中挑選；優先級數值越大越先用，同一優先級內按權重隨機分配（權重都為 0 時平均分配）；用途不匹配的渠道不參與對應請求。雙擊一列可直接編輯。",
+      "jp": "ルーティング：有効なチャネルのみ使用します。優先度の高いものから使い、同じ優先度では重みに応じてランダムに分配します（重みがすべて 0 なら均等）。用途が合わないチャネルは使われません。行をダブルクリックで編集。"
+    },
+    "Back": {
+      "en": "Back to channels",
+      "zh-hans": "返回渠道列表",
+      "zh-hant": "返回渠道列表",
+      "jp": "チャネル一覧に戻る"
+    },
+    "Save": {
+      "en": "Save",
+      "zh-hans": "保存",
+      "zh-hant": "儲存",
+      "jp": "保存"
+    },
+    "Cancel": {
+      "en": "Cancel",
+      "zh-hans": "取消",
+      "zh-hant": "取消",
+      "jp": "キャンセル"
+    },
+    "TestThis": {
+      "en": "Test connection",
+      "zh-hans": "测试连接",
+      "zh-hant": "測試連線",
+      "jp": "接続テスト"
+    },
+    "FetchModels": {
+      "en": "Fetch models",
+      "zh-hans": "获取模型",
+      "zh-hant": "取得模型",
+      "jp": "モデルを取得"
+    },
+    "Section": {
+      "Basic": {
+        "en": "Basics",
+        "zh-hans": "基本信息",
+        "zh-hant": "基本資訊",
+        "jp": "基本情報"
+      },
+      "Routing": {
+        "en": "Routing",
+        "zh-hans": "路由",
+        "zh-hant": "路由",
+        "jp": "ルーティング"
+      },
+      "Capability": {
+        "en": "Capabilities",
+        "zh-hans": "模型能力",
+        "zh-hant": "模型能力",
+        "jp": "モデル機能"
+      },
+      "Generation": {
+        "en": "Generation",
+        "zh-hans": "生成参数",
+        "zh-hant": "生成參數",
+        "jp": "生成パラメーター"
+      }
+    },
+    "Field": {
+      "Type": {
+        "en": "Type",
+        "zh-hans": "类型",
+        "zh-hant": "類型",
+        "jp": "種類"
+      },
+      "Name": {
+        "en": "Name",
+        "zh-hans": "名称",
+        "zh-hant": "名稱",
+        "jp": "名前"
+      },
+      "Url": {
+        "en": "API URL",
+        "zh-hans": "API 地址",
+        "zh-hant": "API 位址",
+        "jp": "API URL"
+      },
+      "ApiKey": {
+        "en": "API key",
+        "zh-hans": "API Key",
+        "zh-hant": "API Key",
+        "jp": "API キー"
+      },
+      "Model": {
+        "en": "Model",
+        "zh-hans": "模型",
+        "zh-hant": "模型",
+        "jp": "モデル"
+      },
+      "GeminiOpenAIAuth": {
+        "en": "Use Bearer auth (OpenAI-compatible gateway)",
+        "zh-hans": "使用 Bearer 鉴权（OpenAI 兼容网关）",
+        "zh-hant": "使用 Bearer 驗證（OpenAI 相容閘道）",
+        "jp": "Bearer 認証を使用（OpenAI 互換ゲートウェイ）"
+      },
+      "Enabled": {
+        "en": "Enable this channel",
+        "zh-hans": "启用此渠道",
+        "zh-hant": "啟用此渠道",
+        "jp": "このチャネルを有効にする"
+      },
+      "Priority": {
+        "en": "Priority",
+        "zh-hans": "优先级",
+        "zh-hant": "優先級",
+        "jp": "優先度"
+      },
+      "Weight": {
+        "en": "Weight",
+        "zh-hans": "权重",
+        "zh-hant": "權重",
+        "jp": "重み"
+      },
+      "Mode": {
+        "en": "Purpose",
+        "zh-hans": "用途",
+        "zh-hant": "用途",
+        "jp": "用途"
+      },
+      "Proxy": {
+        "en": "Proxy",
+        "zh-hans": "代理",
+        "zh-hant": "代理",
+        "jp": "プロキシ"
+      },
+      "Thinking": {
+        "en": "Reasoning effort",
+        "zh-hans": "思考强度",
+        "zh-hant": "思考強度",
+        "jp": "思考の強さ"
+      },
+      "Advanced": {
+        "en": "Custom temperature and max output (not sent when unchecked)",
+        "zh-hans": "自定义温度和最大输出（不勾选则不发送这两个参数）",
+        "zh-hant": "自訂溫度和最大輸出（不勾選則不傳送這兩個參數）",
+        "jp": "温度と最大出力を指定（オフの場合は送信しない）"
+      }
+    },
+    "Hint": {
+      "ApiKey": {
+        "en": "Multiple keys allowed (one per line or comma-separated); one is picked at random per request.",
+        "zh-hans": "可填多个 Key（换行或逗号分隔），每次请求随机选用一个。",
+        "zh-hant": "可填多個 Key（換行或逗號分隔），每次請求隨機選用一個。",
+        "jp": "複数のキーを入力できます（改行またはカンマ区切り）。リクエストごとにランダムに使用します。"
+      },
+      "Priority": {
+        "en": "Higher priority is used first; the next tier is tried only if the whole tier fails. Within a tier, traffic is split by weight (equally if all are 0).",
+        "zh-hans": "优先级越大越先用，整层失败才轮到下一层；同一优先级内按权重随机分配，权重都为 0 时平均分配。",
+        "zh-hant": "優先級越大越先用，整層失敗才輪到下一層；同一優先級內按權重隨機分配，權重都為 0 時平均分配。",
+        "jp": "優先度が高いほど先に使われ、その層がすべて失敗した場合のみ次の層へ進みます。同じ層では重みで分配します（すべて 0 なら均等）。"
+      },
+      "GeminiUrl": {
+        "en": "Up to the version, e.g. https://generativelanguage.googleapis.com/v1beta",
+        "zh-hans": "填到版本号即可，例如 https://generativelanguage.googleapis.com/v1beta",
+        "zh-hant": "填到版本號即可，例如 https://generativelanguage.googleapis.com/v1beta",
+        "jp": "バージョンまで入力します。例：https://generativelanguage.googleapis.com/v1beta"
+      },
+      "ActualUrl": {
+        "en": "Requests go to: {0}",
+        "zh-hans": "实际请求：{0}",
+        "zh-hant": "實際請求：{0}",
+        "jp": "実際のリクエスト先：{0}"
+      }
+    },
+    "Action": {
+      "Edit": {
+        "en": "Edit",
+        "zh-hans": "编辑",
+        "zh-hant": "編輯",
+        "jp": "編集"
+      },
+      "Test": {
+        "en": "Test",
+        "zh-hans": "测试",
+        "zh-hant": "測試",
+        "jp": "テスト"
+      },
+      "More": {
+        "en": "More",
+        "zh-hans": "更多",
+        "zh-hant": "更多",
+        "jp": "その他"
+      },
+      "Enable": {
+        "en": "Enable",
+        "zh-hans": "启用",
+        "zh-hant": "啟用",
+        "jp": "有効にする"
+      },
+      "Disable": {
+        "en": "Disable",
+        "zh-hans": "停用",
+        "zh-hant": "停用",
+        "jp": "無効にする"
+      },
+      "MakeTop": {
+        "en": "Make top priority",
+        "zh-hans": "设为最高优先级",
+        "zh-hant": "設為最高優先級",
+        "jp": "最優先にする"
+      },
+      "Copy": {
+        "en": "Duplicate",
+        "zh-hans": "复制渠道",
+        "zh-hant": "複製渠道",
+        "jp": "複製"
+      },
+      "ResetStats": {
+        "en": "Reset statistics",
+        "zh-hans": "清空统计",
+        "zh-hant": "清空統計",
+        "jp": "統計をリセット"
+      },
+      "Delete": {
+        "en": "Delete",
+        "zh-hans": "删除",
+        "zh-hant": "刪除",
+        "jp": "削除"
+      }
+    },
+    "CopySuffix": {
+      "en": " (copy)",
+      "zh-hans": " - 副本",
+      "zh-hant": " - 副本",
+      "jp": "（コピー）"
+    },
+    "Confirm": {
+      "Delete": {
+        "en": "Delete channel #{0} \"{1}\"?",
+        "zh-hans": "确定删除渠道 #{0}「{1}」吗？",
+        "zh-hant": "確定刪除渠道 #{0}「{1}」嗎？",
+        "jp": "チャネル #{0}「{1}」を削除しますか？"
+      }
+    },
+    "NoCore": {
+      "en": "The chat core is not ready yet. Try again shortly.",
+      "zh-hans": "聊天核心尚未就绪，稍后再试。",
+      "zh-hant": "聊天核心尚未就緒，稍後再試。",
+      "jp": "チャットコアの準備ができていません。しばらくしてからお試しください。"
+    },
+    "Status": {
+      "Enabled": {
+        "en": "Enabled",
+        "zh-hans": "已启用",
+        "zh-hant": "已啟用",
+        "jp": "有効"
+      },
+      "Disabled": {
+        "en": "Disabled",
+        "zh-hans": "已禁用",
+        "zh-hant": "已停用",
+        "jp": "無効"
+      }
+    },
+    "Mode": {
+      "Unrestricted": {
+        "en": "All",
+        "zh-hans": "全部",
+        "zh-hant": "全部",
+        "jp": "すべて"
+      },
+      "ChatOnly": {
+        "en": "Chat",
+        "zh-hans": "仅聊天",
+        "zh-hant": "僅聊天",
+        "jp": "チャット"
+      },
+      "CompressionOnly": {
+        "en": "Summary",
+        "zh-hans": "仅总结",
+        "zh-hant": "僅總結",
+        "jp": "要約"
+      },
+      "Plugin": {
+        "en": "Plugin",
+        "zh-hans": "插件",
+        "zh-hant": "外掛",
+        "jp": "プラグイン"
+      },
+      "UnrestrictedLong": {
+        "en": "All (chat and summaries)",
+        "zh-hans": "全部（聊天和总结都用）",
+        "zh-hant": "全部（聊天和總結都用）",
+        "jp": "すべて（チャットと要約）"
+      },
+      "ChatOnlyLong": {
+        "en": "Chat only",
+        "zh-hans": "仅聊天",
+        "zh-hant": "僅聊天",
+        "jp": "チャットのみ"
+      },
+      "CompressionOnlyLong": {
+        "en": "Summaries / context compression only",
+        "zh-hans": "仅总结 / 上下文压缩",
+        "zh-hant": "僅總結 / 上下文壓縮",
+        "jp": "要約・コンテキスト圧縮のみ"
+      }
+    },
+    "Usage": {
+      "Requests": {
+        "en": "{0} req",
+        "zh-hans": "{0} 次",
+        "zh-hant": "{0} 次",
+        "jp": "{0} 回"
+      },
+      "Failures": {
+        "en": "{0} failed",
+        "zh-hans": "失败 {0}",
+        "zh-hant": "失敗 {0}",
+        "jp": "失敗 {0}"
+      }
+    },
+    "Test": {
+      "Running": {
+        "en": "Testing…",
+        "zh-hans": "测试中…",
+        "zh-hant": "測試中…",
+        "jp": "テスト中…"
+      },
+      "Ok": {
+        "en": "✓ OK · {0} ms · reply: {1}",
+        "zh-hans": "✓ 可用 · {0} 毫秒 · 回复：{1}",
+        "zh-hant": "✓ 可用 · {0} 毫秒 · 回覆：{1}",
+        "jp": "✓ 利用可能 · {0} ms · 返信：{1}"
+      },
+      "Fail": {
+        "en": "✗ Failed · {0}",
+        "zh-hans": "✗ 失败 · {0}",
+        "zh-hant": "✗ 失敗 · {0}",
+        "jp": "✗ 失敗 · {0}"
+      }
+    },
+    "Latency": {
+      "Ms": {
+        "en": "{0} ms",
+        "zh-hans": "{0} 毫秒",
+        "zh-hant": "{0} 毫秒",
+        "jp": "{0} ms"
+      },
+      "Failed": {
+        "en": "Failed",
+        "zh-hans": "失败",
+        "zh-hant": "失敗",
+        "jp": "失敗"
+      },
+      "Untested": {
+        "en": "Not tested",
+        "zh-hans": "未测试",
+        "zh-hant": "未測試",
+        "jp": "未テスト"
+      }
+    },
+    "Time": {
+      "JustNow": {
+        "en": "just now",
+        "zh-hans": "刚刚",
+        "zh-hant": "剛剛",
+        "jp": "たった今"
+      },
+      "MinutesAgo": {
+        "en": "{0} min ago",
+        "zh-hans": "{0} 分钟前",
+        "zh-hant": "{0} 分鐘前",
+        "jp": "{0} 分前"
+      },
+      "HoursAgo": {
+        "en": "{0} h ago",
+        "zh-hans": "{0} 小时前",
+        "zh-hant": "{0} 小時前",
+        "jp": "{0} 時間前"
+      },
+      "DaysAgo": {
+        "en": "{0} d ago",
+        "zh-hans": "{0} 天前",
+        "zh-hant": "{0} 天前",
+        "jp": "{0} 日前"
+      }
+    },
+    "Summary": {
+      "en": "{0} channels, {1} enabled.",
+      "zh-hans": "共 {0} 个渠道，已启用 {1} 个。",
+      "zh-hant": "共 {0} 個渠道，已啟用 {1} 個。",
+      "jp": "チャネル {0} 件、有効 {1} 件。",
+      "Tier": {
+        "en": "Top tier: priority {0}, {1} channels sharing by weight.",
+        "zh-hans": "当前首选层：优先级 {0}，{1} 个渠道按权重分担。",
+        "zh-hant": "目前首選層：優先級 {0}，{1} 個渠道按權重分擔。",
+        "jp": "最上位層：優先度 {0}、{1} 件のチャネルで重み分配。"
+      },
+      "Primary": {
+        "en": "Primary: #{0} {1} (priority {2}).",
+        "zh-hans": "当前首选：#{0} {1}（优先级 {2}）。",
+        "zh-hant": "目前首選：#{0} {1}（優先級 {2}）。",
+        "jp": "現在の優先チャネル：#{0} {1}（優先度 {2}）。"
+      },
+      "NoneEnabled": {
+        "en": "No channel is enabled; conversations will fail.",
+        "zh-hans": "没有启用的渠道，对话将无法进行。",
+        "zh-hant": "沒有啟用的渠道，對話將無法進行。",
+        "jp": "有効なチャネルがないため、会話できません。"
+      }
+    },
+    "Empty": {
+      "en": "No channels yet. Click \"Add channel\" to start.",
+      "zh-hans": "还没有渠道，点「添加渠道」开始。",
+      "zh-hant": "還沒有渠道，點「新增渠道」開始。",
+      "jp": "チャネルがありません。「チャネルを追加」から始めましょう。"
+    },
+    "EmptyFiltered": {
+      "en": "No channel matches the filter",
+      "zh-hans": "没有符合筛选条件的渠道",
+      "zh-hant": "沒有符合篩選條件的渠道",
+      "jp": "条件に一致するチャネルはありません"
+    },
+    "NewName": {
+      "en": "{0} channel",
+      "zh-hans": "{0} 渠道",
+      "zh-hant": "{0} 渠道",
+      "jp": "{0} チャネル"
+    },
+    "Editor": {
+      "AddTitle": {
+        "en": "Add channel",
+        "zh-hans": "添加渠道",
+        "zh-hant": "新增渠道",
+        "jp": "チャネルを追加"
+      },
+      "EditTitle": {
+        "en": "Edit channel #{0} {1}",
+        "zh-hans": "编辑渠道 #{0} {1}",
+        "zh-hant": "編輯渠道 #{0} {1}",
+        "jp": "チャネル #{0} {1} を編集"
+      }
+    },
+    "Error": {
+      "Url": {
+        "en": "Invalid API URL: it must start with http:// or https://",
+        "zh-hans": "API 地址无效，需要以 http:// 或 https:// 开头",
+        "zh-hant": "API 位址無效，需要以 http:// 或 https:// 開頭",
+        "jp": "API URL が無効です。http:// または https:// で始めてください"
+      },
+      "Priority": {
+        "en": "Priority must be an integer",
+        "zh-hans": "优先级必须是整数",
+        "zh-hant": "優先級必須是整數",
+        "jp": "優先度は整数で入力してください"
+      },
+      "Weight": {
+        "en": "Weight must be an integer of 0 or more",
+        "zh-hans": "权重必须是不小于 0 的整数",
+        "zh-hant": "權重必須是不小於 0 的整數",
+        "jp": "重みは 0 以上の整数で入力してください"
+      },
+      "MaxTokens": {
+        "en": "Max output must be a positive integer",
+        "zh-hans": "最大输出必须是正整数",
+        "zh-hant": "最大輸出必須是正整數",
+        "jp": "最大出力は正の整数で入力してください"
+      }
+    },
+    "Models": {
+      "Fetching": {
+        "en": "Fetching models…",
+        "zh-hans": "正在获取模型列表…",
+        "zh-hant": "正在取得模型列表…",
+        "jp": "モデル一覧を取得中…"
+      },
+      "Fetched": {
+        "en": "{0} models found",
+        "zh-hans": "获取到 {0} 个模型",
+        "zh-hant": "取得 {0} 個模型",
+        "jp": "{0} 件のモデルを取得しました"
+      },
+      "Failed": {
+        "en": "Failed: {0}",
+        "zh-hans": "获取失败：{0}",
+        "zh-hant": "取得失敗：{0}",
+        "jp": "取得に失敗しました：{0}"
+      }
+    },
+    "Col": {
+      "Name": {
+        "en": "Name",
+        "zh-hans": "名称",
+        "zh-hant": "名稱",
+        "jp": "名前"
+      },
+      "Type": {
+        "en": "Type",
+        "zh-hans": "类型",
+        "zh-hant": "類型",
+        "jp": "種類"
+      },
+      "Status": {
+        "en": "Status",
+        "zh-hans": "状态",
+        "zh-hant": "狀態",
+        "jp": "状態"
+      },
+      "Mode": {
+        "en": "Purpose",
+        "zh-hans": "用途",
+        "zh-hant": "用途",
+        "jp": "用途"
+      },
+      "Priority": {
+        "en": "Priority",
+        "zh-hans": "优先级",
+        "zh-hant": "優先級",
+        "jp": "優先度"
+      },
+      "Weight": {
+        "en": "Weight",
+        "zh-hans": "权重",
+        "zh-hant": "權重",
+        "jp": "重み"
+      },
+      "Usage": {
+        "en": "Usage",
+        "zh-hans": "已用",
+        "zh-hant": "已用",
+        "jp": "使用量"
+      },
+      "Latency": {
+        "en": "Latency",
+        "zh-hans": "响应",
+        "zh-hant": "回應",
+        "jp": "応答"
+      },
+      "LastTest": {
+        "en": "Last test",
+        "zh-hans": "上次测试",
+        "zh-hant": "上次測試",
+        "jp": "前回のテスト"
+      },
+      "Actions": {
+        "en": "Actions",
+        "zh-hans": "操作",
+        "zh-hant": "操作",
+        "jp": "操作"
+      }
+    },
+    "Filter": {
+      "AllTypes": {
+        "en": "All types",
+        "zh-hans": "全部类型",
+        "zh-hant": "全部類型",
+        "jp": "すべての種類"
+      }
+    },
+    "Kind": {
+      "Free": {
+        "en": "Free",
+        "zh-hans": "Free（免费）",
+        "zh-hant": "Free（免費）",
+        "jp": "Free（無料）"
+      }
+    },
+    "KindHint": {
+      "OpenAIChat": {
+        "en": "POST /v1/chat/completions. Used by most OpenAI-compatible services (relays, DeepSeek, Qwen, vLLM…).",
+        "zh-hans": "POST /v1/chat/completions。绝大多数 OpenAI 兼容服务（中转站、DeepSeek、Qwen、vLLM…）用这个。",
+        "zh-hant": "POST /v1/chat/completions。絕大多數 OpenAI 相容服務（中轉站、DeepSeek、Qwen、vLLM…）用這個。",
+        "jp": "POST /v1/chat/completions。ほとんどの OpenAI 互換サービス（中継、DeepSeek、Qwen、vLLM など）はこちら。"
+      },
+      "OpenAIResponses": {
+        "en": "POST /v1/responses. OpenAI's newer API for reasoning models and built-in tools; pick it only if the server supports Responses.",
+        "zh-hans": "POST /v1/responses。OpenAI 新接口，推理模型和内置工具走这里；只有服务端支持 Responses 时才选。",
+        "zh-hant": "POST /v1/responses。OpenAI 新介面，推理模型和內建工具走這裡；只有伺服端支援 Responses 時才選。",
+        "jp": "POST /v1/responses。OpenAI の新しい API（推論モデル・組み込みツール向け）。サーバーが Responses に対応している場合のみ選択。"
+      },
+      "Gemini": {
+        "en": "Native Google Gemini API.",
+        "zh-hans": "Google Gemini 原生接口。",
+        "zh-hant": "Google Gemini 原生介面。",
+        "jp": "Google Gemini ネイティブ API。"
+      },
+      "Ollama": {
+        "en": "Local Ollama (/api/chat).",
+        "zh-hans": "本地 Ollama（/api/chat）。",
+        "zh-hant": "本機 Ollama（/api/chat）。",
+        "jp": "ローカル Ollama（/api/chat）。"
+      },
+      "LMStudio": {
+        "en": "Local LM Studio (OpenAI-compatible).",
+        "zh-hans": "本地 LM Studio（OpenAI 兼容）。",
+        "zh-hant": "本機 LM Studio（OpenAI 相容）。",
+        "jp": "ローカル LM Studio（OpenAI 互換）。"
+      },
+      "Free": {
+        "en": "Built-in free service: no URL or key needed; the server picks the model.",
+        "zh-hans": "内置的免费服务，无需地址和密钥，模型由服务端分配。",
+        "zh-hant": "內建的免費服務，無需位址和金鑰，模型由伺服端分配。",
+        "jp": "組み込みの無料サービス。URL とキーは不要で、モデルはサーバー側が割り当てます。"
+      }
+    },
+    "Free": {
+      "NotReady": {
+        "en": "The free service configuration has not finished downloading.",
+        "zh-hans": "免费服务配置尚未下载完成。",
+        "zh-hant": "免費服務設定尚未下載完成。",
+        "jp": "無料サービスの設定はまだダウンロードされていません。"
+      }
+    }
   }
 }

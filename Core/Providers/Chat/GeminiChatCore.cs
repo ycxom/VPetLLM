@@ -46,6 +46,18 @@ namespace VPetLLM.Core.Providers.Chat
             _setting = setting;
         }
 
+        /// <summary>路由模式的工作 core：只服务 <paramref name="node"/> 这一个渠道，服务全部借宿主的。</summary>
+        internal GeminiChatCore(Setting.GeminiNodeSetting node, ChatCoreBase host)
+            : base(host)
+        {
+            _geminiSetting = new Setting.GeminiSetting
+            {
+                GeminiNodes = new List<Setting.GeminiNodeSetting> { node }
+            };
+            _setting = Settings!;
+            PinnedChannel = node;
+        }
+
         /// <summary>
         /// 指定单个节点构造（与 OpenAIChatCore / LMStudioChatCore 同形）。
         /// 前置多模态要把图发给用户挑定的那个视觉节点，若传整份 GeminiSetting，
@@ -913,7 +925,7 @@ namespace VPetLLM.Core.Providers.Chat
                         noNodeError = "没有启用的 Gemini 节点，请在设置中启用至少一个节点";
                     }
                     Logger.Log($"Gemini Summarize 错误: {noNodeError}");
-                    throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                    throw new SummarizeFailedException(ShowDetailedErrors
                         ? noNodeError
                         : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。"));
                 }
@@ -936,7 +948,7 @@ namespace VPetLLM.Core.Providers.Chat
             catch (Exception ex)
             {
                 Logger.Log($"Gemini Summarize 异常: {ex.Message}");
-                throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                throw new SummarizeFailedException(ShowDetailedErrors
                     ? $"Gemini Summarize 异常: {ex.Message}\n{ex.StackTrace}"
                     : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结功能暂时不可用，请稍后再试。"), ex);
             }
@@ -983,7 +995,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                     Logger.Log($"Gemini Summarize 错误: {errorMessage}");
-                    throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                    throw new SummarizeFailedException(ShowDetailedErrors
                         ? errorMessage
                         : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试"));
                 }
@@ -1015,7 +1027,7 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     var errorMessage = await HandleHttpErrorAsync(response, "Gemini");
                     Logger.Log($"Gemini Summarize 错误: {errorMessage}");
-                    throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                    throw new SummarizeFailedException(ShowDetailedErrors
                         ? errorMessage
                         : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。"));
                 }

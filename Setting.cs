@@ -224,6 +224,18 @@ namespace VPetLLM
             
             // Ensure all properties have default values (legacy compatibility)
             EnsureDefaultValues();
+
+            // 旧的"提供商 + 节点"选路规则折算成统一渠道（只做一次）
+            try
+            {
+                var migrated = UnifyChannelsIfNeeded();
+                SyncPrimaryProvider();
+                if (migrated) Save();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"渠道统一迁移失败: {ex.Message}");
+            }
         }
 
         private void InitializeStorage(string path, string? instanceId)
@@ -387,6 +399,8 @@ namespace VPetLLM
                 {
                     Gemini.GeminiNodes = geminiNodeConfigs;
                 }
+
+                _providerNodesLoaded = true;
 
                 // Load plugin/tool data
                 LoadPluginData(connection);
@@ -605,7 +619,10 @@ namespace VPetLLM
                 !OpenAI.Enabled ||
                 (OpenAI.Name is not null && OpenAI.Name != "OpenAI节点");
 
-            if (OpenAI.OpenAINodes.Count == 0 && hasLegacyOpenAI)
+            // 渠道统一之后，节点列表就是唯一事实：用户删光了就是删光了。
+            // 这里的"旧字段"判断包含 Url 非空，而 Url 有默认值 —— 不加这道闸，删掉最后一个
+            // OpenAI 渠道后每次启动都会冒出一个没有 Key 的默认节点，混进路由里报错。
+            if (!ChannelsUnified && OpenAI.OpenAINodes.Count == 0 && hasLegacyOpenAI)
             {
                 OpenAI.OpenAINodes.Add(new OpenAINodeSetting
                 {
@@ -647,7 +664,7 @@ namespace VPetLLM
                 Gemini.MaxTokens != 2048 ||
                 Gemini.EnableAdvanced;
 
-            if (Gemini.GeminiNodes.Count == 0 && hasLegacyGemini)
+            if (!ChannelsUnified && Gemini.GeminiNodes.Count == 0 && hasLegacyGemini)
             {
                 Gemini.GeminiNodes.Add(new GeminiNodeSetting
                 {
@@ -863,7 +880,9 @@ namespace VPetLLM
                 var nodeService = new ProviderNodeService(connection);
 
                 // Save OpenAI nodes
-                if (OpenAI?.OpenAINodes != null && OpenAI.OpenAINodes.Count > 0)
+                // 空列表也要落库（删光渠道就是删光），但前提是启动时确实从表里读成功过 ——
+                // 读失败时内存里的空列表不代表用户意图，拿它去覆盖会把表里的渠道全删掉。
+                if (OpenAI?.OpenAINodes != null && (OpenAI.OpenAINodes.Count > 0 || _providerNodesLoaded))
                 {
                     // Get existing nodes
                     var existingNodes = nodeService.GetNodes("OpenAI", enabledOnly: false);
@@ -895,7 +914,7 @@ namespace VPetLLM
                 }
 
                 // Save Gemini nodes
-                if (Gemini?.GeminiNodes != null && Gemini.GeminiNodes.Count > 0)
+                if (Gemini?.GeminiNodes != null && (Gemini.GeminiNodes.Count > 0 || _providerNodesLoaded))
                 {
                     // Get existing nodes
                     var existingNodes = nodeService.GetNodes("Gemini", enabledOnly: false);
@@ -986,24 +1005,18 @@ namespace VPetLLM
             }
         }
 
-        public class OllamaNodeSetting
+        public class OllamaNodeSetting : ChannelNodeBase
         {
-            public string Model { get; set; } = "";
+            public OllamaNodeSetting()
+            {
+                Model = "";
+                Name = "Ollama节点";
+            }
+
             public string Url { get; set; } = "http://localhost:11434";
-            public double Temperature { get; set; } = 0.7;
-            public int MaxTokens { get; set; } = 2048;
-            public bool EnableAdvanced { get; set; } = false;
-            public bool EnableStreaming { get; set; } = false;
-            public bool Enabled { get; set; } = true;
-            public string Name { get; set; } = "Ollama节点";
-            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
-            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
-            public bool EnableVision { get; set; } = false;
-            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
-            public bool EnableToolCall { get; set; } = false;
-            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
-            public string? PluginModeId { get; set; }
-            public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
+
+            [JsonIgnore] public override ChannelKind Kind => ChannelKind.Ollama;
+            [JsonIgnore] public override string? Endpoint => Url;
         }
 
         public class OllamaSetting
@@ -1102,25 +1115,29 @@ namespace VPetLLM
             }
         }
 
-        public class OpenAINodeSetting
+        public class OpenAINodeSetting : ChannelNodeBase
         {
+            public OpenAINodeSetting()
+            {
+                Model = "gpt-4";
+                Name = "OpenAI节点";
+            }
+
             public string? ApiKey { get; set; }
-            public string Model { get; set; } = "gpt-4";
             public string Url { get; set; } = "https://api.openai.com/v1";
-            public double Temperature { get; set; } = 0.7;
-            public int MaxTokens { get; set; } = 2048;
-            public bool EnableAdvanced { get; set; } = false;
-            public bool EnableStreaming { get; set; } = false;
-            public bool Enabled { get; set; } = true;
-            public string Name { get; set; } = "OpenAI节点";
-            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
-            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
-            public bool EnableVision { get; set; } = false;
-            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
-            public bool EnableToolCall { get; set; } = false;
-            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
-            public string? PluginModeId { get; set; }
-            public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
+
+            /// <summary>
+            /// 请求协议：Chat Completions 或 Responses。显式选择，不再靠 URL 里有没有
+            /// "/responses" 去猜 —— 两种协议的请求体、图片格式、流式事件全都不同，猜错就是 400。
+            /// </summary>
+            public OpenAIApiFormat ApiFormat { get; set; } = OpenAIApiFormat.ChatCompletions;
+
+            [JsonIgnore]
+            public override ChannelKind Kind => ApiFormat == OpenAIApiFormat.Responses
+                ? ChannelKind.OpenAIResponses
+                : ChannelKind.OpenAIChat;
+
+            [JsonIgnore] public override string? Endpoint => Url;
 
             public OpenAISetting GetCurrentOpenAISetting()
             {
@@ -1266,26 +1283,20 @@ namespace VPetLLM
             }
         }
 
-        public class GeminiNodeSetting
+        public class GeminiNodeSetting : ChannelNodeBase
         {
+            public GeminiNodeSetting()
+            {
+                Model = "gemini-pro";
+                Name = "Gemini节点";
+            }
+
             public string? ApiKey { get; set; }
-            public string Model { get; set; } = "gemini-pro";
             public string Url { get; set; } = "https://generativelanguage.googleapis.com/v1beta";
-            public double Temperature { get; set; } = 0.7;
-            public int MaxTokens { get; set; } = 2048;
-            public bool EnableAdvanced { get; set; } = false;
-            public bool EnableStreaming { get; set; } = false;
-            public bool Enabled { get; set; } = true;
-            public string Name { get; set; } = "Gemini节点";
-            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
-            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
-            public bool EnableVision { get; set; } = false;
-            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
-            public bool EnableToolCall { get; set; } = false;
-            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
-            public string? PluginModeId { get; set; }
-            public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
             public bool UseOpenAIAuth { get; set; } = false;
+
+            [JsonIgnore] public override ChannelKind Kind => ChannelKind.Gemini;
+            [JsonIgnore] public override string? Endpoint => Url;
         }
 
         public class GeminiSetting
@@ -1408,21 +1419,15 @@ namespace VPetLLM
             }
         }
 
-        public class FreeNodeSetting
+        public class FreeNodeSetting : ChannelNodeBase
         {
-            public string Name { get; set; } = "Free";
-            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
-            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
-            public string? Model { get; set; }
-            public double Temperature { get; set; } = 0.7;
-            public int MaxTokens { get; set; } = 2048;
-            public bool EnableAdvanced { get; set; } = false;
-            public bool EnableStreaming { get; set; } = false;
-            public bool EnableVision { get; set; } = false;
-            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
-            public bool EnableToolCall { get; set; } = false;
-            public bool Enabled { get; set; } = true;
-            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
+            public FreeNodeSetting()
+            {
+                Model = null;
+                Name = "Free";
+            }
+
+            [JsonIgnore] public override ChannelKind Kind => ChannelKind.Free;
         }
 
         public class FreeSetting
@@ -1443,24 +1448,18 @@ namespace VPetLLM
             public bool EnableToolCall { get; set; } = false;
         }
 
-        public class LMStudioNodeSetting
+        public class LMStudioNodeSetting : ChannelNodeBase
         {
-            public string Model { get; set; } = "";
+            public LMStudioNodeSetting()
+            {
+                Model = "";
+                Name = "LM Studio节点";
+            }
+
             public string Url { get; set; } = "http://localhost:1234";
-            public double Temperature { get; set; } = 0.7;
-            public int MaxTokens { get; set; } = 2048;
-            public bool EnableAdvanced { get; set; } = false;
-            public bool EnableStreaming { get; set; } = false;
-            public bool Enabled { get; set; } = true;
-            public string Name { get; set; } = "LM Studio节点";
-            /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
-            public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
-            public bool EnableVision { get; set; } = false;
-            /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
-            public bool EnableToolCall { get; set; } = false;
-            public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
-            public string? PluginModeId { get; set; }
-            public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
+
+            [JsonIgnore] public override ChannelKind Kind => ChannelKind.LMStudio;
+            [JsonIgnore] public override string? Endpoint => Url;
         }
 
         public class LMStudioSetting

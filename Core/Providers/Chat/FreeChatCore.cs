@@ -65,6 +65,52 @@ namespace VPetLLM.Core.Providers.Chat
             }
         }
 
+        /// <summary>
+        /// 路由模式的工作 core。Free 的参数原本读 FreeSetting 顶层字段，这里给它一份私有的
+        /// FreeSetting，每次派活前从渠道节点同步（见 <see cref="OnBeforeRoutedCall"/>）。
+        /// 构造成本比其它渠道高（读云端配置、建 HttpClient），所以由宿主按节点缓存复用。
+        /// </summary>
+        internal FreeChatCore(Setting.FreeNodeSetting node, ChatCoreBase host)
+            : base(host)
+        {
+            _freeSetting = new Setting.FreeSetting();
+            _node = node;
+            PinnedChannel = node;
+            SyncFromNode();
+
+            LoadConfig();
+
+            var timeoutSeconds = Settings?.LLMRequestTimeoutSeconds ?? 30;
+            if (timeoutSeconds <= 0) timeoutSeconds = 30;
+            _httpClient = Utils.Network.HttpHandlerPool.CreateClient(
+                CreateHttpClientHandler,
+                TimeSpan.FromSeconds(timeoutSeconds));
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+            var decodedUA = DecodeString(ENCODED_UA);
+            if (!string.IsNullOrEmpty(decodedUA))
+            {
+                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(decodedUA);
+            }
+        }
+
+        private readonly Setting.FreeNodeSetting? _node;
+
+        internal override void OnBeforeRoutedCall() => SyncFromNode();
+
+        private void SyncFromNode()
+        {
+            if (_node is null) return;
+            _freeSetting.Model = _node.Model;
+            _freeSetting.Temperature = _node.Temperature;
+            _freeSetting.MaxTokens = _node.MaxTokens;
+            _freeSetting.EnableAdvanced = _node.EnableAdvanced;
+            _freeSetting.EnableStreaming = _node.EnableStreaming;
+            _freeSetting.EnableVision = _node.EnableVision;
+            _freeSetting.EnableToolCall = _node.EnableToolCall;
+            _freeSetting.ThinkingEffort = _node.ThinkingEffort;
+        }
+
         private void LoadConfig()
         {
             try
@@ -795,14 +841,14 @@ namespace VPetLLM.Core.Providers.Chat
             catch (HttpRequestException httpEx)
             {
                 Logger.Log($"Free Summarize 网络异常: {httpEx.Message}");
-                throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                throw new SummarizeFailedException(ShowDetailedErrors
                     ? $"Free Summarize 网络异常: {httpEx.Message}"
                     : ErrorMessageHelper.GetFriendlyExceptionError(httpEx, Settings, "Free"), httpEx);
             }
             catch (TaskCanceledException tcEx)
             {
                 Logger.Log($"Free Summarize 请求超时: {tcEx.Message}");
-                throw new SummarizeFailedException(ErrorMessageHelper.IsDebugMode(Settings)
+                throw new SummarizeFailedException(ShowDetailedErrors
                     ? $"Free Summarize 请求超时: {tcEx.Message}"
                     : ErrorMessageHelper.GetFriendlyExceptionError(tcEx, Settings, "Free"), tcEx);
             }

@@ -1,0 +1,631 @@
+<UserControl x:Class="VPetLLM.UI.Controls.ChannelManagerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:utils="clr-namespace:VPetLLM.Utils.Localization">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+            <!-- 表格里的小图标按钮 -->
+            <Style x:Key="IconButton" TargetType="Button">
+                <Setter Property="Width" Value="28"/>
+                <Setter Property="Height" Value="28"/>
+                <Setter Property="Margin" Value="1,0"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource PressedBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.4"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- 表格里就地编辑优先级 / 权重的小输入框 -->
+            <Style x:Key="CellNumberBox" TargetType="TextBox">
+                <Setter Property="Width" Value="50"/>
+                <Setter Property="Height" Value="28"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TextBox">
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="14">
+                                <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="4,0"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource HoverBorderBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="ChannelGridHeader" TargetType="DataGridColumnHeader">
+                <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Padding" Value="10,10"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                <Setter Property="Cursor" Value="Hand"/>
+            </Style>
+
+            <Style x:Key="ChannelGridCell" TargetType="DataGridCell">
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="8,0"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="DataGridCell">
+                            <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="ChannelGridRow" TargetType="DataGridRow">
+                <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                <Setter Property="MinHeight" Value="56"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="#F7F9FC"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="#EEF5FC"/>
+                    </Trigger>
+                    <!-- 停用的渠道整行弱化，一眼看出哪些在参与路由 -->
+                    <DataTrigger Binding="{Binding Enabled}" Value="False">
+                        <Setter Property="Opacity" Value="0.62"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- 编辑页 -->
+            <Style x:Key="KeyPasswordBox" TargetType="PasswordBox">
+                <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="10,5"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="MinHeight" Value="34"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="PasswordBox">
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                                <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource HoverBorderBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="FormTextBox" TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+                <Setter Property="Padding" Value="10,5"/>
+                <Setter Property="MinHeight" Value="34"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+            <Style x:Key="FormComboBox" TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}">
+                <Setter Property="Padding" Value="10,6"/>
+                <Setter Property="MinHeight" Value="34"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+
+            <Style x:Key="FormSection" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="8"/>
+                <Setter Property="Padding" Value="20,16"/>
+                <Setter Property="Margin" Value="0,0,0,14"/>
+            </Style>
+            <Style x:Key="FormSectionTitle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="15"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="Margin" Value="0,0,0,12"/>
+            </Style>
+            <Style x:Key="FormLabel" TargetType="TextBlock">
+                <Setter Property="Width" Value="112"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+            <Style x:Key="FormHint" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="Margin" Value="112,4,0,0"/>
+            </Style>
+            <Style x:Key="FormRow" TargetType="DockPanel">
+                <Setter Property="Margin" Value="0,0,0,12"/>
+                <Setter Property="LastChildFill" Value="True"/>
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- ═══════════════════════ 列表页 ═══════════════════════ -->
+        <Grid x:Name="Page_List">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- 标题 + 概要 -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="{utils:Localize KeyPath=Channels.Title, Default=渠道管理}"
+                           FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}"/>
+                <TextBlock x:Name="Text_Summary" Margin="0,4,0,0" FontSize="12"
+                           Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- 工具栏 -->
+            <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="False">
+                <Button x:Name="Button_Add" DockPanel.Dock="Left" Style="{StaticResource PrimaryButton}"
+                        Padding="14,6" Click="Button_Add_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="{utils:Localize KeyPath=Channels.Add, Default=添加渠道}" VerticalAlignment="Center"/>
+                        <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="9" VerticalAlignment="Center" Margin="8,1,0,0"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="Button_TestAll" DockPanel.Dock="Left" Style="{StaticResource SecondaryButton}"
+                        Padding="12,6" Margin="8,0,0,0" Click="Button_TestAll_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xEC4A;" FontFamily="{StaticResource IconFont}" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="{utils:Localize KeyPath=Channels.TestAll, Default=测试全部启用渠道}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <CheckBox x:Name="CheckBox_Failover" DockPanel.Dock="Left" Margin="16,0,0,0" VerticalAlignment="Center"
+                          Style="{StaticResource ModernCheckBox}" FontSize="13"
+                          Content="{utils:Localize KeyPath=Channels.Failover, Default=失败时自动切换到下一个渠道}"
+                          ToolTip="{utils:Localize KeyPath=Channels.FailoverTip, Default=关闭时每次只用排在最前面的一个渠道；打开后该渠道失败会按优先级依次换下一个，全部失败才报错。已经开始输出的回复不会切换，避免同一句话说两遍。}"
+                          Click="CheckBox_Failover_Click"/>
+
+                <ComboBox x:Name="ComboBox_TypeFilter" DockPanel.Dock="Right" Width="130" Margin="8,0,0,0"
+                          Style="{StaticResource ModernComboBox}" FontSize="13" MinHeight="32" Padding="10,5"
+                          SelectionChanged="Filter_Changed"/>
+                <Grid DockPanel.Dock="Right" Width="200">
+                    <TextBox x:Name="TextBox_Search" Style="{StaticResource ModernTextBox}" FontSize="13"
+                             MinHeight="32" Padding="28,5,8,5" TextChanged="Filter_Changed"/>
+                    <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="12" IsHitTestVisible="False"
+                               Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    <TextBlock x:Name="Text_SearchPlaceholder" IsHitTestVisible="False" FontSize="13" Margin="29,0,0,0"
+                               VerticalAlignment="Center" Foreground="{StaticResource DisabledTextBrush}"
+                               Text="{utils:Localize KeyPath=Channels.Search, Default=搜索名称 / 模型 / 地址}"/>
+                </Grid>
+            </DockPanel>
+
+            <!-- 表格 -->
+            <Border Grid.Row="2" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8"
+                    Background="{StaticResource SecondaryBackgroundBrush}" ClipToBounds="True">
+                <Grid>
+                    <DataGrid x:Name="Grid_Channels"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              CanUserResizeRows="False"
+                              CanUserReorderColumns="False"
+                              CanUserSortColumns="True"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="None"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              RowHeaderWidth="0"
+                              FontSize="13"
+                              Foreground="{StaticResource PrimaryTextBrush}"
+                              ColumnHeaderStyle="{StaticResource ChannelGridHeader}"
+                              CellStyle="{StaticResource ChannelGridCell}"
+                              RowStyle="{StaticResource ChannelGridRow}"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              Sorting="Grid_Channels_Sorting"
+                              MouseDoubleClick="Grid_Channels_MouseDoubleClick">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn x:Name="Col_Id" Header="ID" Width="44" SortMemberPath="Id">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Id}" Foreground="{StaticResource SecondaryTextBrush}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_Name" Header="名称" Width="*" MinWidth="150" SortMemberPath="Name">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel ToolTip="{Binding EndpointText}">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding ModelText}" FontSize="11" Margin="0,2,0,0"
+                                                       Foreground="{StaticResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_Type" Header="类型" Width="104" SortMemberPath="TypeText">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Background="{Binding TypeBrush}" CornerRadius="5" Width="22" Height="22" Margin="0,0,8,0">
+                                                <TextBlock Text="{Binding TypeBadge}" FontSize="9" FontWeight="Bold" Foreground="White"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding TypeText}"/>
+                                                <TextBlock Text="{Binding TypeSubText}" FontSize="10" Foreground="{StaticResource SecondaryTextBrush}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding TypeSubText}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_Status" Header="状态" Width="84" SortMemberPath="Enabled">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{Binding StatusBackground}" CornerRadius="10" Padding="8,2" HorizontalAlignment="Left">
+                                            <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusForeground}" FontSize="12"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_Mode" Header="用途" Width="72" SortMemberPath="ModeText">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding ModeText}" Foreground="{Binding ModeBrush}" TextTrimming="CharacterEllipsis"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_Priority" Header="优先级" Width="70" SortMemberPath="Priority">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Style="{StaticResource CellNumberBox}" HorizontalAlignment="Left"
+                                                 Text="{Binding PriorityText, UpdateSourceTrigger=LostFocus}"
+                                                 KeyDown="CellNumberBox_KeyDown"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_Weight" Header="权重" Width="70" SortMemberPath="Weight">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Style="{StaticResource CellNumberBox}" HorizontalAlignment="Left"
+                                                 Text="{Binding WeightText, UpdateSourceTrigger=LostFocus}"
+                                                 KeyDown="CellNumberBox_KeyDown"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_Usage" Header="已用" Width="122" SortMemberPath="RequestCount">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding UsageText}"/>
+                                            <TextBlock Text="{Binding UsageDetailText}" FontSize="11" Margin="0,2,0,0"
+                                                       Foreground="{Binding UsageDetailBrush}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasUsageDetail}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_Latency" Header="响应" Width="80" SortMemberPath="LatencySort">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding LatencyText}" Foreground="{Binding LatencyBrush}" ToolTip="{Binding LatencyTip}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_LastTest" Header="上次测试" Width="74" SortMemberPath="LastTestSort">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding LastTestText}" Foreground="{StaticResource SecondaryTextBrush}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn x:Name="Col_Actions" Header="操作" Width="128" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Style="{StaticResource IconButton}" Content="&#xE70F;" Tag="{Binding}"
+                                                    ToolTip="{utils:Localize KeyPath=Channels.Action.Edit, Default=编辑}" Click="RowEdit_Click"/>
+                                            <Button Style="{StaticResource IconButton}" Content="&#xEC4A;" Tag="{Binding}"
+                                                    ToolTip="{utils:Localize KeyPath=Channels.Action.Test, Default=测试}" Click="RowTest_Click"/>
+                                            <Button Style="{StaticResource IconButton}" Content="{Binding ToggleGlyph}" Tag="{Binding}"
+                                                    Foreground="{Binding ToggleBrush}" ToolTip="{Binding ToggleTip}" Click="RowToggle_Click"/>
+                                            <Button Style="{StaticResource IconButton}" Content="&#xE712;" Tag="{Binding}"
+                                                    ToolTip="{utils:Localize KeyPath=Channels.Action.More, Default=更多}" Click="RowMore_Click"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- 空状态 -->
+                    <StackPanel x:Name="Panel_Empty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+                        <TextBlock Text="&#xE968;" FontFamily="{StaticResource IconFont}" FontSize="32" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource DisabledTextBrush}"/>
+                        <TextBlock x:Name="Text_Empty" Margin="0,10,0,0" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource SecondaryTextBrush}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <TextBlock Grid.Row="3" Margin="2,10,0,0" FontSize="12" TextWrapping="Wrap"
+                       Foreground="{StaticResource SecondaryTextBrush}"
+                       Text="{utils:Localize KeyPath=Channels.RoutingHint, Default=选路规则：只在启用的渠道中挑选；优先级数值越大越先用，同一优先级内按权重随机分配（权重都为 0 时平均分配）；用途不匹配的渠道不参与对应请求。双击一行可直接编辑。}"/>
+        </Grid>
+
+        <!-- ═══════════════════════ 编辑页（二级页面） ═══════════════════════ -->
+        <Grid x:Name="Page_Editor" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- 面包屑 -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="True">
+                <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Width="32" Height="32" FontSize="14"
+                        Content="&#xE72B;" Click="Button_Back_Click"
+                        ToolTip="{utils:Localize KeyPath=Channels.Back, Default=返回渠道列表}"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                    <TextBlock Cursor="Hand" FontSize="14" Foreground="{StaticResource AccentBrush}" MouseLeftButtonUp="Breadcrumb_Click"
+                               Text="{utils:Localize KeyPath=Channels.Title, Default=渠道管理}"/>
+                    <TextBlock Text="  /  " FontSize="14" Foreground="{StaticResource DisabledTextBrush}"/>
+                    <TextBlock x:Name="Text_EditorTitle" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}"/>
+                </StackPanel>
+            </DockPanel>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel MaxWidth="780" HorizontalAlignment="Stretch" Margin="0,0,8,0">
+
+                    <!-- 基本信息 -->
+                    <Border Style="{StaticResource FormSection}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FormSectionTitle}" Text="{utils:Localize KeyPath=Channels.Section.Basic, Default=基本信息}"/>
+
+                            <DockPanel Style="{StaticResource FormRow}">
+                                <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Type, Default=类型}"/>
+                                <ComboBox x:Name="Ed_Type" Style="{StaticResource FormComboBox}" SelectionChanged="Ed_Type_SelectionChanged"/>
+                            </DockPanel>
+                            <TextBlock x:Name="Ed_TypeHint" Style="{StaticResource FormHint}" Margin="112,-8,0,12"/>
+
+                            <DockPanel Style="{StaticResource FormRow}">
+                                <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Name, Default=名称}"/>
+                                <TextBox x:Name="Ed_Name" Style="{StaticResource FormTextBox}"/>
+                            </DockPanel>
+
+                            <StackPanel x:Name="Ed_UrlRow" Margin="0,0,0,12">
+                                <DockPanel LastChildFill="True">
+                                    <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Url, Default=API 地址}"/>
+                                    <ComboBox x:Name="Ed_UrlPreset" DockPanel.Dock="Right" Width="150" Margin="8,0,0,0"
+                                              Style="{StaticResource FormComboBox}" SelectionChanged="Ed_UrlPreset_SelectionChanged"
+                                              ToolTip="{utils:Localize KeyPath=LLM_Settings.PresetTip, Default=选择预设地址}"/>
+                                    <TextBox x:Name="Ed_Url" Style="{StaticResource FormTextBox}" TextChanged="Ed_Url_TextChanged"/>
+                                </DockPanel>
+                                <TextBlock x:Name="Ed_UrlPreview" Style="{StaticResource FormHint}"/>
+                            </StackPanel>
+
+                            <StackPanel x:Name="Ed_KeyRow" Margin="0,0,0,12">
+                                <DockPanel LastChildFill="True">
+                                    <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.ApiKey, Default=API Key}" VerticalAlignment="Top" Margin="0,9,0,0"/>
+                                    <Button x:Name="Ed_KeyToggle" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                            Padding="10,6" VerticalAlignment="Top" FontFamily="{StaticResource IconFont}" Content="&#xE7B3;"
+                                            ToolTip="{utils:Localize KeyPath=LLM_Settings.ToggleApiKeyVisibility, Default=显示/隐藏}" Click="Ed_KeyToggle_Click"/>
+                                    <Grid>
+                                        <PasswordBox x:Name="Ed_KeyPassword" Style="{StaticResource KeyPasswordBox}" PasswordChar="●"/>
+                                        <TextBox x:Name="Ed_KeyPlain" Style="{StaticResource FormTextBox}" Visibility="Collapsed"
+                                                 AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" MaxHeight="120"
+                                                 VerticalScrollBarVisibility="Auto" FontFamily="Consolas" VerticalContentAlignment="Top"/>
+                                    </Grid>
+                                </DockPanel>
+                                <TextBlock Style="{StaticResource FormHint}"
+                                           Text="{utils:Localize KeyPath=Channels.Hint.ApiKey, Default=可填多个 Key（换行或逗号分隔），每次请求随机选用一个。}"/>
+                            </StackPanel>
+
+                            <StackPanel x:Name="Ed_ModelRow" Margin="0,0,0,12">
+                                <DockPanel LastChildFill="True">
+                                    <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Model, Default=模型}"/>
+                                    <Button x:Name="Ed_RefreshModels" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                            Padding="12,6" Click="Ed_RefreshModels_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE72C;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="{utils:Localize KeyPath=Channels.FetchModels, Default=获取模型}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <ComboBox x:Name="Ed_Model" Style="{StaticResource ModelComboBox}" IsEditable="True"/>
+                                </DockPanel>
+                                <TextBlock x:Name="Ed_ModelStatus" Style="{StaticResource FormHint}" Visibility="Collapsed"/>
+                            </StackPanel>
+
+                            <CheckBox x:Name="Ed_GeminiOpenAIAuth" Style="{StaticResource ModernCheckBox}" Margin="112,0,0,12" FontSize="13"
+                                      Content="{utils:Localize KeyPath=Channels.Field.GeminiOpenAIAuth, Default=使用 Bearer 鉴权（OpenAI 兼容网关）}"/>
+
+                            <TextBlock x:Name="Ed_FreeInfo" Style="{StaticResource FormHint}" Margin="112,0,0,4"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 路由 -->
+                    <Border Style="{StaticResource FormSection}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FormSectionTitle}" Text="{utils:Localize KeyPath=Channels.Section.Routing, Default=路由}"/>
+
+                            <CheckBox x:Name="Ed_Enabled" Style="{StaticResource ModernCheckBox}" Margin="112,0,0,12" FontSize="13"
+                                      Content="{utils:Localize KeyPath=Channels.Field.Enabled, Default=启用此渠道}"/>
+
+                            <DockPanel Style="{StaticResource FormRow}" LastChildFill="False">
+                                <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Priority, Default=优先级}"/>
+                                <TextBox x:Name="Ed_Priority" Style="{StaticResource FormTextBox}" Width="110"/>
+                                <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Weight, Default=权重}" Width="auto" Margin="28,0,12,0"/>
+                                <TextBox x:Name="Ed_Weight" Style="{StaticResource FormTextBox}" Width="110"/>
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource FormHint}" Margin="112,-8,0,12"
+                                       Text="{utils:Localize KeyPath=Channels.Hint.Priority, Default=优先级越大越先用，整层失败才轮到下一层；同一优先级内按权重随机分配，权重都为 0 时平均分配。}"/>
+
+                            <DockPanel Style="{StaticResource FormRow}">
+                                <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Mode, Default=用途}"/>
+                                <ComboBox x:Name="Ed_Mode" Style="{StaticResource FormComboBox}"/>
+                            </DockPanel>
+
+                            <DockPanel x:Name="Ed_ProxyRow" Style="{StaticResource FormRow}">
+                                <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Proxy, Default=代理}"/>
+                                <ComboBox x:Name="Ed_Proxy" Style="{StaticResource FormComboBox}"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 模型能力 -->
+                    <Border Style="{StaticResource FormSection}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FormSectionTitle}" Text="{utils:Localize KeyPath=Channels.Section.Capability, Default=模型能力}"/>
+                            <CheckBox x:Name="Ed_Streaming" Style="{StaticResource ModernCheckBox}" Margin="112,0,0,10" FontSize="13"
+                                      Content="{utils:Localize KeyPath=LLM_Settings.EnableStreaming, Default=流式输出}"/>
+                            <CheckBox x:Name="Ed_Vision" Style="{StaticResource ModernCheckBox}" Margin="112,0,0,10" FontSize="13"
+                                      Content="{utils:Localize KeyPath=LLM_Settings.EnableVision, Default=视觉（可接收图片）}"/>
+                            <CheckBox x:Name="Ed_ToolCall" Style="{StaticResource ModernCheckBox}" Margin="112,0,0,2" FontSize="13"
+                                      Content="{utils:Localize KeyPath=LLM_Settings.EnableToolCall, Default=启用原生工具调用 (function calling)}"/>
+                            <TextBlock x:Name="Ed_ToolCallTip" Style="{StaticResource FormHint}" Margin="136,0,0,12"
+                                       Text="{utils:Localize KeyPath=LLM_Settings.EnableToolCallTip, Default=以模型原生的 tools 参数暴露插件，替代文本标记。仅在该模型确实支持时开启；开启后本节点的回复不再流式输出。}"/>
+                            <DockPanel Style="{StaticResource FormRow}" Margin="0,4,0,0">
+                                <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Thinking, Default=思考强度}"/>
+                                <ComboBox x:Name="Ed_Thinking" Style="{StaticResource FormComboBox}"
+                                          ToolTip="{utils:Localize KeyPath=LLM_Settings.ThinkingEffortTip, Default=推理模型的思考强度。默认为不发送该参数，交由服务端决定；非推理模型请保持默认，否则部分接口会报错。}"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 生成参数 -->
+                    <Border Style="{StaticResource FormSection}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FormSectionTitle}" Text="{utils:Localize KeyPath=Channels.Section.Generation, Default=生成参数}"/>
+                            <CheckBox x:Name="Ed_Advanced" Style="{StaticResource ModernCheckBox}" Margin="112,0,0,12" FontSize="13"
+                                      Content="{utils:Localize KeyPath=Channels.Field.Advanced, Default=自定义温度和最大输出（不勾选则不发送这两个参数）}"
+                                      Click="Ed_Advanced_Click"/>
+                            <StackPanel x:Name="Ed_AdvancedPanel">
+                                <DockPanel Style="{StaticResource FormRow}" LastChildFill="False">
+                                    <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=LLM_Settings.Temperature, Default=温度}"/>
+                                    <Slider x:Name="Ed_Temperature" Minimum="0" Maximum="2" Width="220" VerticalAlignment="Center"
+                                            TickFrequency="0.05" IsSnapToTickEnabled="True" ValueChanged="Ed_Temperature_ValueChanged"/>
+                                    <TextBlock x:Name="Ed_TemperatureValue" Margin="12,0,0,0" VerticalAlignment="Center" Width="40"
+                                               Foreground="{StaticResource SecondaryTextBrush}"/>
+                                </DockPanel>
+                                <DockPanel Style="{StaticResource FormRow}" LastChildFill="False">
+                                    <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=LLM_Settings.MaxTokens, Default=最大输出}"/>
+                                    <TextBox x:Name="Ed_MaxTokens" Style="{StaticResource FormTextBox}" Width="120"/>
+                                </DockPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 底栏 -->
+            <Border Grid.Row="2" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                <DockPanel LastChildFill="True">
+                    <Button x:Name="Ed_Save" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="22,7" Margin="8,0,0,0"
+                            Content="{utils:Localize KeyPath=Channels.Save, Default=保存}" Click="Ed_Save_Click"/>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Padding="18,7"
+                            Content="{utils:Localize KeyPath=Channels.Cancel, Default=取消}" Click="Button_Back_Click"/>
+                    <Button x:Name="Ed_Test" DockPanel.Dock="Left" Style="{StaticResource SecondaryButton}" Padding="14,7" Click="Ed_Test_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xEC4A;" FontFamily="{StaticResource IconFont}" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock Text="{utils:Localize KeyPath=Channels.TestThis, Default=测试连接}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <TextBlock x:Name="Ed_TestResult" Margin="12,0,12,0" VerticalAlignment="Center" FontSize="12"
+                               TextTrimming="CharacterEllipsis"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
