@@ -210,111 +210,76 @@ namespace VPetLLM.Handlers.Actions
                         Logger.Log($"SayHandler: 准备播放Say动画");
 
                         // 解析动画参数（支持"状态_动画"格式）
-                        var (animName, modeType) = ParseAnimationParameter(sayAnimation);
+                        var (animName, requestedMode) = ParseAnimationParameter(sayAnimation);
+                        var main = mainWindow.Main;
+                        var graphCore = main.Core.Graph;
+                        var currentMode = main.Core.Save.Mode;
 
-                        // 如果指定了状态模式，临时切换到该状态
-                        VPet_Simulator.Core.IGameSave.ModeType? originalMode = null;
-                        if (modeType.HasValue)
-                        {
-                            originalMode = mainWindow.Main.Core.Save.Mode;
-                            mainWindow.Main.Core.Save.Mode = modeType.Value;
-                            Logger.Log($"SayHandler: 临时切换到状态模式 {modeType.Value}");
-                        }
-
-                        // 验证动画是否可用
                         // 关键：动画名字不一定叫"say"！VPet通过路径解析动画名，
                         // 例如 happy/say/a/shy_500.png 的Name是"shy"而非"say"
                         // 必须使用 FindName(GraphType.Say) 获取实际注册名，与VPet内部SayRndFunction一致
-                        // 同时 Main.Say 硬编码 AnimatType.A_Start，很多mod只有Single类型，需分别处理
-                        var currentMode = mainWindow.Main.Core.Save.Mode;
-                        var graphCore = mainWindow.Main.Core.Graph;
-
-                        // 如果animName是默认的"say"，使用FindName获取VPet实际注册的Say动画名
-                        if (animName == "say")
+                        var registeredSayName = graphCore.FindName(GraphType.Say);
+                        if (animName == "say" && !string.IsNullOrEmpty(registeredSayName))
                         {
-                            var registeredName = graphCore.FindName(VPet_Simulator.Core.GraphInfo.GraphType.Say);
-                            if (!string.IsNullOrEmpty(registeredName))
-                            {
-                                Logger.Log($"SayHandler: FindName(GraphType.Say) returned '{registeredName}', using it instead of 'say'");
-                                animName = registeredName;
-                            }
+                            animName = registeredSayName;
                         }
 
-                        // 使用 FindGraphs 查找动画（支持mode回退，且最终回退返回所有非Ill动画）
-                        var graphsStart = graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, currentMode);
-                        var graphsSingle = graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.Single, currentMode);
-                        var graphStart = graphsStart?.Count > 0 ? graphsStart[VPet_Simulator.Core.Function.Rnd.Next(graphsStart.Count)] : null;
-                        var graphSingle = graphsSingle?.Count > 0 ? graphsSingle[VPet_Simulator.Core.Function.Rnd.Next(graphsSingle.Count)] : null;
-
-                        if (graphStart is null && graphSingle is null)
+                        // 心情：没指定就跟随宠物当前心情；指定了但和实际冲突（涉及生病）以实际为准
+                        var targetMode = SayAnimationPlanner.ResolveTargetMode(requestedMode, currentMode);
+                        if (requestedMode.HasValue && targetMode != requestedMode.Value)
                         {
-                            // 指定动画不存在，尝试用FindName回退到默认Say动画
-                            var fallbackName = graphCore.FindName(VPet_Simulator.Core.GraphInfo.GraphType.Say);
-                            if (!string.IsNullOrEmpty(fallbackName) && fallbackName != animName)
-                            {
-                                Logger.Log($"SayHandler: Animation '{animName}' not found, falling back to FindName result '{fallbackName}'");
-                                animName = fallbackName;
-                                graphsStart = graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, currentMode);
-                                graphsSingle = graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.Single, currentMode);
-                                graphStart = graphsStart?.Count > 0 ? graphsStart[VPet_Simulator.Core.Function.Rnd.Next(graphsStart.Count)] : null;
-                                graphSingle = graphsSingle?.Count > 0 ? graphsSingle[VPet_Simulator.Core.Function.Rnd.Next(graphsSingle.Count)] : null;
-                            }
+                            Logger.Log($"SayHandler: 指定心情 {requestedMode.Value} 与当前心情 {currentMode} 冲突，按当前心情播放");
                         }
 
-                        if (graphStart is null && graphSingle is null)
-                        {
-                            // 完全没有say动画，仅显示气泡
-                            Logger.Log($"SayHandler: No say animation available for '{animName}' in mode '{currentMode}', showing bubble only.");
-                            await ShowBubbleOnlyAsync(mainWindow, text);
+                        var graphs = new SayGraphLookup(graphCore, animName);
+                        var plan = SayAnimationPlanner.Plan(graphs.Has, targetMode, currentMode);
 
-                            if (originalMode.HasValue)
-                            {
-                                await Task.Delay(200);
-                                mainWindow.Main.Core.Save.Mode = originalMode.Value;
-                                Logger.Log($"SayHandler: 恢复到原始状态模式 {originalMode.Value}");
-                            }
-                            return;
+                        if (plan.Kind == SayPlanKind.BubbleOnly && !string.IsNullOrEmpty(registeredSayName) && registeredSayName != animName)
+                        {
+                            // 指定的动画不存在，回退到默认说话动画
+                            Logger.Log($"SayHandler: Animation '{animName}' not found, falling back to '{registeredSayName}'");
+                            animName = registeredSayName;
+                            graphs = new SayGraphLookup(graphCore, animName);
+                            plan = SayAnimationPlanner.Plan(graphs.Has, targetMode, currentMode);
                         }
 
-                        // 如果找到的动画mode与当前mode不同，需要临时切换mode
-                        // 因为Main.Say内部使用FindGraph（i>=1无法回退到Happy），必须确保mode匹配
-                        var animMode = graphStart?.GraphInfo.ModeType ?? graphSingle?.GraphInfo.ModeType;
-                        if (animMode.HasValue && animMode.Value != currentMode)
+                        // 自己串的循环段必须是说话类动画：气泡结束时宿主只给说话类动画收尾，
+                        // 其他类型会一直循环下去。不满足就退回交给宿主（按当前心情）。
+                        if (plan.Kind == SayPlanKind.OwnLoop && !graphs.AllSayType(AnimatType.B_Loop, plan.Mode))
                         {
-                            if (!originalMode.HasValue)
-                                originalMode = currentMode;
-                            mainWindow.Main.Core.Save.Mode = animMode.Value;
-                            currentMode = animMode.Value;
-                            Logger.Log($"SayHandler: 临时切换mode {originalMode.Value} -> {animMode.Value} 以匹配Say动画");
+                            Logger.Log($"SayHandler: '{animName}' 不是说话类动画，无法自行循环，交给宿主按当前心情播放");
+                            plan = new SayPlan(SayPlanKind.HostSay, currentMode);
                         }
+
+                        Logger.Log($"SayHandler: 说话动画 '{animName}'，当前心情 {currentMode}，目标心情 {targetMode} -> {plan.Kind}({plan.Mode})");
 
                         // 添加UI操作延迟，减少瞬时性能压力
                         Utils.UI.BubbleDelayController.ApplyUIDelay();
 
-                        if (graphStart is not null)
+                        switch (plan.Kind)
                         {
-                            // 有A_Start动画，使用VPet原生Say API（支持A_Start→B_Loop→C_End完整流程）
-                            mainWindow.Main.SayGuarded(text, animName, true);
-                            Logger.Log($"SayHandler: 显示完成(A_Start模式) - 文本: \"{text}\", 动画: {animName}, 模式: {currentMode}");
-                        }
-                        else
-                        {
-                            // 只有Single动画，Main.Say无法使用（它硬编码A_Start）
-                            // 改为：先显示气泡，再直接播放Single动画
-                            Logger.Log($"SayHandler: Animation '{animName}' has only Single type, using direct display instead of Main.Say.");
-                            await ShowBubbleOnlyAsync(mainWindow, text);
-                            mainWindow.Main.Display(animName, VPet_Simulator.Core.GraphInfo.AnimatType.Single, mainWindow.Main.DisplayToNomal);
-                            Logger.Log($"SayHandler: 显示完成(Single模式) - 文本: \"{text}\", 动画: {animName}, 模式: {currentMode}");
-                        }
+                            case SayPlanKind.HostSay:
+                                // 宿主按当前心情选出的开始/循环/结束段就是这一套（A_Start→B_Loop→C_End 完整流程）
+                                main.SayGuarded(text, animName, true);
+                                break;
 
-                        // 恢复原始状态模式
-                        // 注意：Main.Say 内部使用 Task.Run 异步执行 Display，
-                        // 必须等待 Task.Run 启动并读取 Core.Save.Mode 后再恢复
-                        if (originalMode.HasValue)
-                        {
-                            await Task.Delay(200);
-                            mainWindow.Main.Core.Save.Mode = originalMode.Value;
-                            Logger.Log($"SayHandler: 恢复到原始状态模式 {originalMode.Value}");
+                            case SayPlanKind.OwnLoop:
+                                // 先显示气泡（照常触发 SayProcess：TTS、表情包），再用同一心情的开始段接循环段。
+                                // 气泡结束时宿主会对说话类动画执行 DisplayCEndtoNomal 收尾。
+                                await ShowBubbleOnlyAsync(mainWindow, text);
+                                PlayOwnLoop(main, animName, graphs.Get(AnimatType.A_Start, plan.Mode), graphs.Get(AnimatType.B_Loop, plan.Mode));
+                                break;
+
+                            case SayPlanKind.Single:
+                                // Main.Say 硬编码 A_Start，只有 Single 的动画不能交给它：先显示气泡，再直接播放
+                                await ShowBubbleOnlyAsync(mainWindow, text);
+                                main.Display(Pick(graphs.Get(AnimatType.Single, plan.Mode)), main.DisplayToNomal);
+                                break;
+
+                            default:
+                                // 当前心情下没有可用的说话动画（例如生病但没有生病的说话动画），仅显示气泡
+                                await ShowBubbleOnlyAsync(mainWindow, text);
+                                break;
                         }
 
                         // SayHandler 不再负责等待，由 SmartMessageProcessor 统一处理
@@ -378,6 +343,85 @@ namespace VPetLLM.Handlers.Actions
         }
 
         /// <summary>
+        /// 自己串的循环段最长持续多久。正常情况下气泡结束时宿主会收尾（DisplayCEndtoNomal），
+        /// 这里只防"气泡被别的途径关掉、宿主没收尾"时无限循环。
+        /// </summary>
+        private static readonly TimeSpan OwnLoopMaxDuration = TimeSpan.FromMinutes(2);
+
+        /// <summary>
+        /// 用同一心情的开始段接循环段，全程不碰 Core.Save.Mode。
+        /// 新动画接手时宿主会 Stop(true) 丢弃本动画的结束回调，循环自然停止。
+        /// </summary>
+        private static void PlayOwnLoop(VPet_Simulator.Core.Main main, string animName,
+            List<VPet_Simulator.Core.IGraph> starts, List<VPet_Simulator.Core.IGraph> loops)
+        {
+            var deadline = DateTime.UtcNow + OwnLoopMaxDuration;
+
+            void Loop()
+            {
+                // 动画没加载好时宿主会同步回调"播完了"，不拦着就会在 UI 线程上无限递归
+                var ready = loops.Where(g => g.IsReady).ToList();
+                if (ready.Count == 0 || DateTime.UtcNow > deadline)
+                {
+                    main.DisplayCEndtoNomal(animName);
+                    return;
+                }
+                main.Display(Pick(ready), Loop);
+            }
+
+            main.Display(Pick(starts), Loop);
+        }
+
+        private static VPet_Simulator.Core.IGraph Pick(List<VPet_Simulator.Core.IGraph> graphs) =>
+            graphs.Count == 1 ? graphs[0] : graphs[VPet_Simulator.Core.Function.Rnd.Next(graphs.Count)];
+
+        /// <summary>
+        /// 按"段 + 心情"精确查动画：只要该心情本身的、已加载好的，不要宿主的跨心情回退结果。
+        /// 结果在本次调用内缓存。
+        /// </summary>
+        private sealed class SayGraphLookup
+        {
+            private readonly VPet_Simulator.Core.GraphCore _core;
+            private readonly string _name;
+            private readonly Dictionary<(AnimatType, VPet_Simulator.Core.IGameSave.ModeType), List<VPet_Simulator.Core.IGraph>> _cache = new();
+
+            public SayGraphLookup(VPet_Simulator.Core.GraphCore core, string name)
+            {
+                _core = core;
+                _name = name;
+            }
+
+            public List<VPet_Simulator.Core.IGraph> Get(AnimatType animat, VPet_Simulator.Core.IGameSave.ModeType mode)
+            {
+                if (!_cache.TryGetValue((animat, mode), out var list))
+                {
+                    list = (_core.FindGraphs(_name, animat, mode) ?? new List<VPet_Simulator.Core.IGraph>())
+                        .Where(g => g.GraphInfo.ModeType == mode && g.IsReady)
+                        .ToList();
+                    _cache[(animat, mode)] = list;
+                }
+                return list;
+            }
+
+            public bool Has(AnimatType animat, VPet_Simulator.Core.IGameSave.ModeType mode) => Get(animat, mode).Count > 0;
+
+            public bool AllSayType(AnimatType animat, VPet_Simulator.Core.IGameSave.ModeType mode) =>
+                Get(animat, mode).All(g => g.GraphInfo.Type == GraphType.Say);
+        }
+
+        /// <summary>
+        /// 心情名 → 宿主心情。除宿主拼写外，也认模型常写的 normal / poor。
+        /// </summary>
+        private static VPet_Simulator.Core.IGameSave.ModeType? ParseMoodName(string name) => name switch
+        {
+            "happy" => VPet_Simulator.Core.IGameSave.ModeType.Happy,
+            "nomal" or "normal" => VPet_Simulator.Core.IGameSave.ModeType.Nomal,
+            "poorcondition" or "poor" => VPet_Simulator.Core.IGameSave.ModeType.PoorCondition,
+            "ill" => VPet_Simulator.Core.IGameSave.ModeType.Ill,
+            _ => null
+        };
+
+        /// <summary>
         /// 解析动画参数，支持"状态_动画"格式
         /// 例如：happy_shy -> 在happy状态下播放shy动画
         ///       shy -> 在当前状态下播放shy动画
@@ -398,14 +442,7 @@ namespace VPetLLM.Handlers.Actions
                 var animName = string.Join("_", parts.Skip(1));
 
                 // 检查第一部分是否为有效的状态模式
-                VPet_Simulator.Core.IGameSave.ModeType? mode = potentialMode switch
-                {
-                    "happy" => VPet_Simulator.Core.IGameSave.ModeType.Happy,
-                    "nomal" => VPet_Simulator.Core.IGameSave.ModeType.Nomal,
-                    "poorcondition" => VPet_Simulator.Core.IGameSave.ModeType.PoorCondition,
-                    "ill" => VPet_Simulator.Core.IGameSave.ModeType.Ill,
-                    _ => null
-                };
+                VPet_Simulator.Core.IGameSave.ModeType? mode = ParseMoodName(potentialMode);
 
                 if (mode.HasValue)
                 {
@@ -415,14 +452,7 @@ namespace VPetLLM.Handlers.Actions
             }
 
             // 检查是否为纯状态名（如happy, nomal等），映射到该状态的默认say动画
-            var stateOnlyMode = animLower switch
-            {
-                "happy" => VPet_Simulator.Core.IGameSave.ModeType.Happy,
-                "nomal" => VPet_Simulator.Core.IGameSave.ModeType.Nomal,
-                "poorcondition" => VPet_Simulator.Core.IGameSave.ModeType.PoorCondition,
-                "ill" => VPet_Simulator.Core.IGameSave.ModeType.Ill,
-                _ => (VPet_Simulator.Core.IGameSave.ModeType?)null
-            };
+            var stateOnlyMode = ParseMoodName(animLower);
 
             if (stateOnlyMode.HasValue)
             {

@@ -2450,33 +2450,25 @@ namespace VPetLLM
 
             if (graphCore.GraphsName.TryGetValue(VPet_Simulator.Core.GraphInfo.GraphType.Say, out var sayAnimations))
             {
-                var modes = new[] { "happy", "nomal", "poorcondition", "ill" };
+                // ill 不列：生病不能主动指定（SayAnimationPlanner.ResolveTargetMode），生病时自动用生病动画
+                var modes = new (string Key, VPet_Simulator.Core.IGameSave.ModeType Mode)[]
+                {
+                    ("happy", VPet_Simulator.Core.IGameSave.ModeType.Happy),
+                    ("nomal", VPet_Simulator.Core.IGameSave.ModeType.Nomal),
+                    ("poorcondition", VPet_Simulator.Core.IGameSave.ModeType.PoorCondition),
+                };
 
                 foreach (var animName in sayAnimations)
                 {
-                    foreach (var mode in modes)
+                    foreach (var (key, modeType) in modes)
                     {
-                        VPet_Simulator.Core.IGameSave.ModeType modeType;
-                        switch (mode)
+                        // 只列这个心情真正有的：FindGraph 会跨心情回退，拿它判断会列出不存在的组合
+                        var exists = graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, modeType)
+                            .Concat(graphCore.FindGraphs(animName, VPet_Simulator.Core.GraphInfo.AnimatType.Single, modeType))
+                            .Any(g => g.GraphInfo.ModeType == modeType);
+                        if (exists)
                         {
-                            case "happy":
-                                modeType = VPet_Simulator.Core.IGameSave.ModeType.Happy;
-                                break;
-                            case "poorcondition":
-                                modeType = VPet_Simulator.Core.IGameSave.ModeType.PoorCondition;
-                                break;
-                            case "ill":
-                                modeType = VPet_Simulator.Core.IGameSave.ModeType.Ill;
-                                break;
-                            default:
-                                modeType = VPet_Simulator.Core.IGameSave.ModeType.Nomal;
-                                break;
-                        }
-
-                        var graph = graphCore.FindGraph(animName, VPet_Simulator.Core.GraphInfo.AnimatType.A_Start, modeType);
-                        if (graph is not null)
-                        {
-                            animations.Add($"{mode}_{animName}");
+                            animations.Add($"{key}_{animName}");
                         }
                     }
 

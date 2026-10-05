@@ -275,6 +275,7 @@ namespace VPetLLM.Core.Services
                         .Replace("{ThirstDesc}", thirstDesc);
 
                     parts.Add(status);
+                    parts.Add(GetExpressionStateText(core, lang));
                 }
 
 
@@ -568,7 +569,8 @@ namespace VPetLLM.Core.Services
                 $"{lang switch { "zh" => "心情", _ => "Mood" }}:{moodPercent:F0}%({moodDesc})",
                 $"{lang switch { "zh" => "好感", _ => "Likability" }}:{likabilityPercent:F0}%({likabilityDesc})",
                 $"{lang switch { "zh" => "饱食", _ => "Hunger" }}:{hungerPercent:F0}%({hungerDesc})",
-                $"{lang switch { "zh" => "口渴", _ => "Thirst" }}:{thirstPercent:F0}%({thirstDesc})"
+                $"{lang switch { "zh" => "口渴", _ => "Thirst" }}:{thirstPercent:F0}%({thirstDesc})",
+                GetExpressionStateText(core, lang)
             };
 
             // 如果启用了拓展状态获取，添加工作状态信息
@@ -582,6 +584,40 @@ namespace VPetLLM.Core.Services
             }
 
             return string.Join(";", statusParts);
+        }
+
+        /// <summary>
+        /// 宿主实际用来挑动画的心情（Core.Save.Mode，由心情、饱食、口渴、健康综合算出）。
+        /// 上面的"心情 xx%"只是心情值，两者常常不一致：饿着时心情值可能还很高，动画却已是"状态不佳"。
+        /// 不告诉模型的话，它会照着心情值去写 happy_xxx，让饿着的宠物播开心动画。
+        /// 键名与 say 动作里"状态_动画"的写法一致，方便模型直接对照。
+        /// </summary>
+        private static string GetExpressionStateText(VPet_Simulator.Core.GameCore core, string lang)
+        {
+            var mode = core.Save.Mode;
+            var key = mode switch
+            {
+                VPet_Simulator.Core.IGameSave.ModeType.Happy => "happy",
+                VPet_Simulator.Core.IGameSave.ModeType.PoorCondition => "poorcondition",
+                VPet_Simulator.Core.IGameSave.ModeType.Ill => "ill",
+                _ => "nomal"
+            };
+            var name = lang == "zh"
+                ? mode switch
+                {
+                    VPet_Simulator.Core.IGameSave.ModeType.Happy => "开心",
+                    VPet_Simulator.Core.IGameSave.ModeType.PoorCondition => "状态不佳",
+                    VPet_Simulator.Core.IGameSave.ModeType.Ill => "生病",
+                    _ => "正常"
+                }
+                : mode switch
+                {
+                    VPet_Simulator.Core.IGameSave.ModeType.Happy => "happy",
+                    VPet_Simulator.Core.IGameSave.ModeType.PoorCondition => "poor condition",
+                    VPet_Simulator.Core.IGameSave.ModeType.Ill => "ill",
+                    _ => "normal"
+                };
+            return lang == "zh" ? $"表现状态:{key}({name})" : $"Expression:{key}({name})";
         }
 
         /// <summary>
