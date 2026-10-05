@@ -217,7 +217,7 @@ namespace VPetLLM.Handlers.Animation
         /// 获取阻塞原因。null = 当前可以执行动画。
         /// 这是「能不能动画」的唯一实现：宿主动画那部分统一走
         /// <see cref="VPetMovementPolicy.GetAnimationOverrideBlockReason"/>，本方法只额外加上
-        /// VPetLLM 自己的两层门（用户交互中 / 宠物处于工作·睡眠·旅行会话）。
+        /// VPetLLM 自己的两层门（用户交互中 / 宠物处于工作·睡眠会话）。
         /// </summary>
         public string GetBlockingReason(IMainWindow mainWindow)
         {
@@ -232,8 +232,7 @@ namespace VPetLLM.Handlers.Animation
                 return "VPet is working";
             if (workingState == Main.WorkingState.Sleep)
                 return "VPet is sleeping";
-            if (workingState == Main.WorkingState.Travel)
-                return "VPet is traveling";
+            // Travel 只拦状态切换（AnimationCoordinator.ProcessRequestAsync），普通动画放行
 
             // 宿主动画的保护清单只有 VPetMovementPolicy 一份，别在这里再抄。
             return VPetMovementPolicy.GetAnimationOverrideBlockReason(mainWindow);

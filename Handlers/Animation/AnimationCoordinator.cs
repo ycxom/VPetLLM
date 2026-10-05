@@ -275,6 +275,16 @@ namespace VPetLLM.Handlers.Animation
         {
             Logger.Log($"AnimationCoordinator: Processing request {request}");
 
+            // 旅行的起止归宿主/旅行 DLC 管，插件改 State 会和 DLC 失去同步。
+            // 放在入队之后、执行之前判：请求可能是在进入旅行之前排进来的。
+            // 直接返回而不是走失败分支，免得兜底回收再白白重绘一次。
+            if (request.Type == AnimationRequestType.StateChange
+                && global::VPetLLM.Utils.UI.AnimationStateChecker.IsTraveling(_mainWindow))
+            {
+                Logger.Log($"AnimationCoordinator: VPet正在旅行，放弃状态切换到 {request.TargetState} (source: {request.Source})");
+                return;
+            }
+
             try
             {
                 // 记录动画切换

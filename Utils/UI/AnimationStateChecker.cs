@@ -54,10 +54,9 @@ namespace VPetLLM.Utils.UI
                     Logger.Log($"AnimationStateChecker: VPet正在睡觉 (Sleep)，阻止VPetLLM动作执行");
                     return true;
 
-                case VPet_Simulator.Core.Main.WorkingState.Travel:
-                    // 旅游状态 - 不应该被打断
-                    Logger.Log($"AnimationStateChecker: VPet正在旅游 (Travel)，阻止VPetLLM动作执行");
-                    return true;
+                // Travel 不在这里拦：宿主（11073 起）的旅行态是"其他动作正常播放，
+                // 播完经 DisplayToNomal 回到 DisplayTravel"，单次动作不会把旅行打断。
+                // 会改 State 的那一类（切状态、开始工作、移动）由 IsTraveling 单独拦。
             }
 
             // 方法2：检查DisplayType（辅助检查特殊动画）
@@ -112,6 +111,18 @@ namespace VPetLLM.Utils.UI
         }
 
         /// <summary>
+        /// 宠物是否处于旅行（Travel）状态。
+        ///
+        /// 旅行由宿主/旅行 DLC 掌控起止，插件发起的状态切换（Nomal/Sleep/Work…）、
+        /// 开始工作和窗口移动都会直接覆盖 State 或把宠物拖离场景，造成和 DLC 不同步，
+        /// 所以这几类操作在旅行中一律放弃；普通单次动作不受影响。
+        /// </summary>
+        public static bool IsTraveling(IMainWindow mainWindow)
+        {
+            return mainWindow?.Main?.State == VPet_Simulator.Core.Main.WorkingState.Travel;
+        }
+
+        /// <summary>
         /// 获取当前动画状态的描述（用于日志）
         /// </summary>
         public static string GetCurrentAnimationDescription(IMainWindow mainWindow)
@@ -149,6 +160,12 @@ namespace VPetLLM.Utils.UI
                 return true;
             }
 
+            if (IsTraveling(mainWindow))
+            {
+                Logger.Log($"AnimationStateChecker: VPet正在旅行 (Travel)，放弃状态切换到 {targetState} (action: {actionName})");
+                return false;
+            }
+
             var displayType = mainWindow.Main.DisplayType;
             if (displayType is not null && VPetMovementPolicy.IsAnimationProtected(displayType.Type))
             {
@@ -156,7 +173,7 @@ namespace VPetLLM.Utils.UI
                 return false;
             }
 
-            // Preserve the existing state-transition behavior for Work/Sleep/Travel.
+            // Preserve the existing state-transition behavior for Work/Sleep.
             // StateManager handles host-controlled display animations in its queue.
             if (IsPlayingImportantAnimation(mainWindow))
             {

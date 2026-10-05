@@ -118,6 +118,16 @@ namespace VPetLLM.Core.Services
             try
             {
                 var value = Enum.Parse(stateType, stateName, ignoreCase: true);
+
+                // 旅行的起止归宿主/旅行 DLC 管；返回 false 让调用方走 DisplayToNomal 兜底，
+                // 宿主会把它带回 DisplayTravel
+                if (mainWindow.Main?.State == VPet_Simulator.Core.Main.WorkingState.Travel
+                    && !Equals(value, VPet_Simulator.Core.Main.WorkingState.Travel))
+                {
+                    Logger.Log($"VPetHostAdapter: 宠物正在旅行，放弃把状态改为 '{stateName}'");
+                    return false;
+                }
+
                 return SetState(mainWindow, value);
             }
             catch (ArgumentException)

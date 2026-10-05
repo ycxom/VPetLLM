@@ -63,6 +63,14 @@ namespace VPetLLM.Handlers.Actions
                 return false;
             }
 
+            // 宿主的随机移动只挂在 DisplayNomal 上，旅行时走 DisplayTravel，宿主自己从不移动；
+            // 插件把窗口拖走会让宠物离开旅行场景
+            if (AnimationStateChecker.IsTraveling(mainWindow))
+            {
+                Logger.Log("MoveHandler: VPet is traveling; ignoring move request");
+                return false;
+            }
+
             var displayType = mainWindow.Main.DisplayType;
             if (displayType is not null && VPetMovementPolicy.IsAnimationProtected(displayType.Type))
             {

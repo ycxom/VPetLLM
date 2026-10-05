@@ -62,10 +62,13 @@ namespace VPetLLM.Handlers.Actions
                                     || q.Contains("消费") || q.Contains("buy") || q.Contains("food") || q.Contains("spend");
             bool wantNeglect = wantAll || q.Contains("饿") || q.Contains("渴") || q.Contains("病") || q.Contains("难过")
                                     || q.Contains("委屈") || q.Contains("hungry") || q.Contains("ill") || q.Contains("neglect");
+            bool wantHabit = wantAll || wantTime || q.Contains("陪") || q.Contains("连续") || q.Contains("天")
+                                    || q.Contains("最近") || q.Contains("习惯") || q.Contains("完成")
+                                    || q.Contains("streak") || q.Contains("recent") || q.Contains("habit") || q.Contains("day");
 
             // 一个都没命中：按概览给，别让 AI 拿到空结果
-            if (!wantTouch && !wantTime && !wantBuy && !wantNeglect)
-                wantTouch = wantTime = wantBuy = wantNeglect = true;
+            if (!wantTouch && !wantTime && !wantBuy && !wantNeglect && !wantHabit)
+                wantTouch = wantTime = wantBuy = wantNeglect = wantHabit = true;
 
             if (wantTouch)
             {
@@ -77,9 +80,12 @@ namespace VPetLLM.Handlers.Actions
             if (wantTime)
             {
                 sb.AppendLine("时长：");
-                sb.AppendLine($"  工作 {Hours(SafeInt(stats, "stat_work_time"))}，学习 {Hours(SafeInt(stats, "stat_study_time"))}，睡觉 {Hours(SafeInt(stats, "stat_sleep_time"))}");
-                sb.AppendLine($"  累计陪伴 {Hours(SafeInt(stats, "stat_total_time"))}，启动 {SafeInt(stats, "stat_open_times")} 次");
+                sb.AppendLine($"  工作 {Hours(SafeLong(stats, "stat_work_time"))}，学习 {Hours(SafeLong(stats, "stat_study_time"))}，睡觉 {Hours(SafeLong(stats, "stat_sleep_time"))}");
+                sb.AppendLine($"  累计陪伴 {Hours(SafeLong(stats, "stat_total_time"))}，启动 {SafeInt(stats, "stat_open_times")} 次");
             }
+
+            if (wantHabit)
+                AppendHabits(sb, stats);
 
             if (wantBuy)
             {
@@ -104,8 +110,47 @@ namespace VPetLLM.Handlers.Actions
             return sb.ToString().TrimEnd();
         }
 
-        private static string Hours(int minutes)
-            => minutes >= 60 ? $"{minutes / 60.0:F1} 小时" : $"{minutes} 分钟";
+        /// <summary>
+        /// stat_*_time / eval_*_seconds 都是秒：宿主每个逻辑帧加一次 LogicInterval（秒）。
+        /// </summary>
+        private static string Hours(long seconds)
+        {
+            if (seconds >= 3600) return $"{seconds / 3600.0:F1} 小时";
+            return $"{seconds / 60} 分钟";
+        }
+
+        /// <summary>
+        /// 宿主 11073 起新增的 eval_* 本地统计（活跃天数、连续天数、最近陪伴、完成率）。
+        /// 旧宿主没有这些键，读出来全是 0 —— 整段跳过，别给 AI 一串"0 天"让它误以为被冷落。
+        /// </summary>
+        private static void AppendHabits(StringBuilder sb, Statistics stats)
+        {
+            var activeDays = SafeInt(stats, "eval_active_days");
+            if (activeDays <= 0)
+                return;
+
+            sb.AppendLine("陪伴习惯：");
+            sb.AppendLine($"  一起度过 {activeDays} 天，当前连续 {SafeInt(stats, "eval_active_streak")} 天，" +
+                          $"最长连续 {SafeInt(stats, "eval_longest_active_streak")} 天");
+            sb.AppendLine($"  最近 7 天陪伴 {Hours(SafeLong(stats, "eval_recent_7_days_seconds"))}，" +
+                          $"最近 30 天 {Hours(SafeLong(stats, "eval_recent_30_days_seconds"))}，" +
+                          $"最长一次 {Hours(SafeLong(stats, "eval_longest_session_seconds"))}");
+
+            AppendCompletion(sb, stats, "work", "工作", "赚了", "eval_work_total_money", "$");
+            AppendCompletion(sb, stats, "study", "学习", "获得经验", "eval_study_total_exp", "");
+        }
+
+        private static void AppendCompletion(StringBuilder sb, Statistics stats,
+            string type, string label, string yieldVerb, string yieldKey, string unit)
+        {
+            var started = SafeInt(stats, $"eval_{type}_started");
+            if (started <= 0)
+                return;
+
+            var completed = SafeInt(stats, $"eval_{type}_completed");
+            sb.AppendLine($"  {label}开始 {started} 次、做完 {completed} 次（完成率 {SafeDouble(stats, $"eval_{type}_completion_rate"):P0}），" +
+                          $"共{yieldVerb} {unit}{SafeDouble(stats, yieldKey):F0}");
+        }
 
         /// <summary>
         /// 逐商品购买次数存在 "buy_商品名" 键里。
@@ -151,6 +196,12 @@ namespace VPetLLM.Handlers.Actions
         private static int SafeInt(Statistics stats, string key)
         {
             try { return stats[(gint)key]; }
+            catch { return 0; }
+        }
+
+        private static long SafeLong(Statistics stats, string key)
+        {
+            try { return stats[(gi64)key]; }
             catch { return 0; }
         }
 

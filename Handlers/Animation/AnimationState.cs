@@ -37,9 +37,9 @@ namespace VPetLLM.Handlers.Animation
         /// </summary>
         public bool IsInImportantState()
         {
+            // Travel 不算：旅行中单次动作播完会回到 DisplayTravel，见 AnimationStateChecker.IsTraveling
             return WorkingState == Main.WorkingState.Work ||
                    WorkingState == Main.WorkingState.Sleep ||
-                   WorkingState == Main.WorkingState.Travel ||
                    IsUserInteracting;
         }
 

@@ -191,6 +191,13 @@ namespace VPetLLM.Handlers.Infrastructure
                 return false;
             }
 
+            // 宿主 StartWork 不拦旅行，开工会直接把 State 改成 Work，和旅行 DLC 失去同步
+            if (AnimationStateChecker.IsTraveling(mainWindow))
+            {
+                Logger.Log("WorkManager: VPet正在旅行，放弃开始工作/学习");
+                return false;
+            }
+
             try
             {
                 var workName = GetWorkProperty(work, "NameTrans") ?? GetWorkProperty(work, "Name");
@@ -400,6 +407,12 @@ namespace VPetLLM.Handlers.Infrastructure
             if (mainWindow?.Main is null || work is null)
             {
                 Logger.Log("WorkManager: Invalid parameters for StartWorkWithRate");
+                return false;
+            }
+
+            if (AnimationStateChecker.IsTraveling(mainWindow))
+            {
+                Logger.Log("WorkManager: VPet正在旅行，放弃开始工作/学习");
                 return false;
             }
 
