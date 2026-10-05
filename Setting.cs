@@ -215,7 +215,10 @@ namespace VPetLLM
         {
             _path = Path.Combine(path, "VPetLLM.json");
             _instanceId = instanceId;
-            
+
+            // 本轮加载是否读到了明文 API Key（已发布版本写进库里的都是明文），加载完成后据此转换
+            SecretProtector.SawPlaintext = false;
+
             // Initialize storage system
             InitializeStorage(path, instanceId);
             
@@ -235,6 +238,65 @@ namespace VPetLLM
             catch (Exception ex)
             {
                 Logger.Log($"渠道统一迁移失败: {ex.Message}");
+            }
+
+            // 已发布版本把 API Key 明文存在 settings.db 里：读到明文就整体重写成密文，并清掉残留副本
+            ProtectStoredSecretsIfNeeded();
+        }
+
+        /// <summary>
+        /// 加载时读到了明文 API Key（来自已发布版本写下的 settings.db / 旧 JSON）：
+        /// 整体 Save 一遍（密钥字段经 ProtectedStringConverter 变成密文），
+        /// 再清掉各处残留的明文副本——不清的话加密就形同虚设：
+        /// 迁移旧 JSON 时留下的 .backup、BackupManager 在每次保存前复制的整库备份（最多 5 份），
+        /// 以及 SQLite 改写行之后留在空闲页/WAL 里的旧明文。
+        /// 任何一步失败只记日志：密钥此时要么已是密文，要么还是原样，不会丢。
+        /// </summary>
+        private void ProtectStoredSecretsIfNeeded()
+        {
+            if (!SecretProtector.SawPlaintext)
+                return;
+
+            try
+            {
+                Save();
+                Logger.Log("检测到明文 API Key，已转为加密存储");
+
+                ProtectLegacyJsonBackup();
+
+                if (_storage is SQLiteSettingStorage sqliteStorage)
+                    sqliteStorage.PurgeResidualPlaintext();
+
+                SecretProtector.SawPlaintext = false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"API Key 加密存储转换失败（下次启动重试）: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 旧版 JSON 迁移时留下的 VPetLLM.json.backup 原地转成“密钥已加密”的版本：
+        /// 不删，因为 LoadPluginData 在工具表为空时会从它恢复 Tools；那里读取走转换器，密文照常解得开
+        /// </summary>
+        private void ProtectLegacyJsonBackup()
+        {
+            try
+            {
+                var backupPath = _path + ".backup";
+                if (!File.Exists(backupPath))
+                    return;
+
+                var original = File.ReadAllText(backupPath);
+                var protectedText = SecretProtector.ProtectJsonSecrets(original);
+                var tmp = backupPath + ".tmp";
+                File.WriteAllText(tmp, protectedText);
+                File.Move(tmp, backupPath, overwrite: true);
+                Logger.Log($"旧 JSON 备份中的明文 API Key 已转为加密: {backupPath}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"处理旧 JSON 备份失败（其中可能含明文密钥，建议手动删除）: {ex.Message}");
             }
         }
 
@@ -290,9 +352,9 @@ namespace VPetLLM
                                     Logger.Log("Successfully saved provider nodes and plugin data");
                                 }
                                 
-                                // Create backup of JSON file
+                                // Create backup of JSON file（其中的 API Key 写成密文版本，不留明文副本）
                                 var backupPath = jsonPath + ".backup";
-                                File.Copy(jsonPath, backupPath, overwrite: true);
+                                File.WriteAllText(backupPath, SecretProtector.ProtectJsonSecrets(json));
                                 Logger.Log($"Created backup: {backupPath}");
                                 
                                 // Delete original JSON file to mark migration as complete
@@ -1123,6 +1185,7 @@ namespace VPetLLM
                 Name = "OpenAI节点";
             }
 
+            [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
             public string? ApiKey { get; set; }
             public string Url { get; set; } = "https://api.openai.com/v1";
 
@@ -1164,6 +1227,7 @@ namespace VPetLLM
             public bool EnableLoadBalancing { get; set; } = true;
 
             // 向后兼容的属性
+            [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
             public string? ApiKey { get; set; }
             public string? Model { get; set; }
             public string Url { get; set; } = "https://api.openai.com/v1";
@@ -1291,6 +1355,7 @@ namespace VPetLLM
                 Name = "Gemini节点";
             }
 
+            [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
             public string? ApiKey { get; set; }
             public string Url { get; set; } = "https://generativelanguage.googleapis.com/v1beta";
             public bool UseOpenAIAuth { get; set; } = false;
@@ -1306,6 +1371,7 @@ namespace VPetLLM
             public bool EnableLoadBalancing { get; set; } = true;
 
             // 向后兼容的属性（用于旧版自动迁移/回退）
+            [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
             public string? ApiKey { get; set; }
             public string Model { get; set; } = "gemini-pro";
             public string Url { get; set; } = "https://generativelanguage.googleapis.com/v1beta";
@@ -1569,6 +1635,7 @@ namespace VPetLLM
         {
             public string Name { get; set; } = "";
             public string Url { get; set; } = "";
+            [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
             public string ApiKey { get; set; } = "";
             public string Description { get; set; } = "";
             public bool IsEnabled { get; set; } = true;
@@ -1628,6 +1695,7 @@ namespace VPetLLM
             /// <summary>自配端点 base url。含义随协议而变，见各 Provider 注释。</summary>
             public string Url { get; set; } = "";
 
+            [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
             public string? ApiKey { get; set; }
 
             /// <summary>Qwen3-Embedding-0.6B 输出 1024 维。</summary>
@@ -1777,6 +1845,7 @@ namespace VPetLLM
 
         public class OpenAITTSSetting
         {
+            [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
             public string ApiKey { get; set; } = "";
             public string BaseUrl { get; set; } = "https://api.fish.audio/v1";
             public string Model { get; set; } = "tts-1";
@@ -1898,6 +1967,7 @@ namespace VPetLLM
 
         public class OpenAIASRSetting
         {
+            [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
             public string ApiKey { get; set; } = "";
             public string BaseUrl { get; set; } = "https://api.openai.com/v1";
             public string Model { get; set; } = "whisper-1";
@@ -1905,6 +1975,7 @@ namespace VPetLLM
 
         public class SonioxASRSetting
         {
+            [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
             public string ApiKey { get; set; } = "";
             public string BaseUrl { get; set; } = "https://api.soniox.com";
             public string Model { get; set; } = "stt-rt-v3";

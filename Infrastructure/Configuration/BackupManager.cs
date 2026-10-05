@@ -90,6 +90,40 @@ public class BackupManager
     }
 
     /// <summary>
+    /// 删除全部数据库备份（逐个零覆盖再删）。
+    /// 备份是保存前对整库的复制，加密改造之前产生的备份里 API Key 是明文，
+    /// 不清掉的话要等 5 次保存后才会被轮换掉。清理后下一次保存会产生新的（密文）备份
+    /// </summary>
+    /// <returns>删除的备份数量</returns>
+    public int PurgeAllBackups()
+    {
+        var purged = 0;
+        try
+        {
+            if (!Directory.Exists(_backupDirectory))
+                return 0;
+
+            foreach (var file in Directory.GetFiles(_backupDirectory, "*.db"))
+            {
+                try
+                {
+                    SecretProtector.ShredFile(file);
+                    purged++;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to purge backup {file}: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Failed to purge backups: {ex.Message}");
+        }
+        return purged;
+    }
+
+    /// <summary>
     /// Rotate backups, keeping only the most recent MaxBackups files
     /// </summary>
     private void RotateBackups()

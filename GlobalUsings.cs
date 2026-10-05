@@ -61,6 +61,7 @@ global using VPetLLM.Configuration;
 global using VPetLLM.Models;
 global using VPetLLM.Services;
 global using VPetLLM.Utils.Common;
+global using VPetLLM.Utils.Security;
 global using VPetLLM.Utils.System;
 global using VPetLLM.Utils.UI;
 

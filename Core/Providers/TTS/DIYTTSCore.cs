@@ -80,7 +80,7 @@ namespace VPetLLM.Core.Providers.TTS
                             try
                             {
                                 request.Headers.Add(header.Key, header.Value);
-                                Logger.Log($"TTS (DIY): 已设置请求头: {header.Key}: {header.Value}");
+                                Logger.Log($"TTS (DIY): 已设置请求头: {header.Key}");
                             }
                             catch (Exception ex)
                             {
@@ -166,7 +166,7 @@ namespace VPetLLM.Core.Providers.TTS
                             try
                             {
                                 request.Headers.Add(header.Key, header.Value);
-                                Logger.Log($"TTS (DIY): 已设置请求头: {header.Key}: {header.Value}");
+                                Logger.Log($"TTS (DIY): 已设置请求头: {header.Key}");
                             }
                             catch (Exception ex)
                             {

@@ -193,6 +193,7 @@ namespace VPetLLM.Configuration
         /// <summary>
         /// API Key
         /// </summary>
+        [global::Newtonsoft.Json.JsonConverter(typeof(global::VPetLLM.Utils.Security.ProtectedStringConverter))]
         public string ApiKey { get; set; } = "";
 
         /// <summary>
