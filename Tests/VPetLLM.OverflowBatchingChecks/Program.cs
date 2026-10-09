@@ -11,11 +11,17 @@ using VPetLLM.Infrastructure.Exceptions;
 //   1. Summarize 失败改为抛异常（错误文案再也不会被当成总结）；
 //   2. 积压按预算切片、逐片提交、逐片推进检查点，这份检查钉的是第 2 层。
 //
-// 四个必须成立的性质：
+// 必须成立的性质：
 //   A. 超预算的积压会被切成多片，而不是一次性发出去；
 //   B. 分片之间靠滚动总结串起来——第 N 片的结果是第 N+1 片的 previous context；
 //   C. 单条消息本身就超预算时跳过它，不卡住后面的消息；
-//   D. 连续失败视为服务故障而非内容过长，整轮放弃，绝不逐条跳完整段积压。
+//   D. 连续失败视为服务故障而非内容过长，整轮放弃，绝不逐条跳完整段积压；
+//   F. 与长度无关的失败（传输异常/超时/网关错误页）不退让、不跳过，检查点原地不动；
+//   G. 单条小消息被 400 时不跳过——毛病不在它；
+//   H. 退让条数不跨轮残留。
+//
+// F~H 的起因是 2026-10-08 的日志：EdgeOne 15 秒回源超时被当成「内容太长」，
+// 175 条积压一路二分到单条，几轮下来连跳 6 条，且下一轮一上来就是单条。
 
 static class Program
 {
@@ -45,6 +51,9 @@ static class Program
         Test_SkipsSingleOversizeMessage();
         Test_AbortsAfterConsecutiveFailures();
         Test_RetreatsOnFailureThenSucceeds();
+        Test_TransportFailureNeitherRetreatsNorSkips();
+        Test_SmallSingleMessageRejectedIsNotSkipped();
+        Test_RetreatDoesNotLeakIntoNextRound();
 
         Console.WriteLine();
         Console.WriteLine($"通过 {_pass}，失败 {_fail}");
@@ -117,14 +126,15 @@ static class Program
             $"rows={harness.SummaryRowCount}");
     }
 
-    // D：服务故障时不能把积压逐条跳完
+    // D：一直被 400、且每条都大到「可能是它太长」——最多跳两条就判定为故障
     static void Test_AbortsAfterConsecutiveFailures()
     {
         Console.WriteLine("D. 连续失败中止而非逐条跳过");
         using var harness = new Harness(contextTokens: 4000);
-        harness.Core.FailAlways = true;
+        harness.Core.FailAlwaysBadRequest = true;
 
-        harness.Run(MakeMessages(50, tokensEach: 100));
+        // 每条约 1600 tokens：超过预算的一半，又不至于单条就超预算被预先跳过
+        harness.Run(MakeMessages(50, tokensEach: 1600));
 
         Check("检查点没有推到底", harness.Checkpoint < 50, $"checkpoint={harness.Checkpoint}");
         Check("跳过的条数很少（未吞掉整段积压）", harness.Checkpoint <= 3,
@@ -146,6 +156,58 @@ static class Program
         Check("成功的请求都不超过 8 条",
             harness.Core.Calls.Where(c => c.Succeeded).All(c => c.MessageCount <= 8));
         Check("确实发生过退让", harness.Core.Calls.Any(c => !c.Succeeded));
+    }
+
+    // F：日志原样复现——传输层失败时既不切小，也不跳过
+    static void Test_TransportFailureNeitherRetreatsNorSkips()
+    {
+        Console.WriteLine("F. 传输失败不退让不跳过");
+        using var harness = new Harness(contextTokens: 100000);
+        harness.Core.FailAlwaysTransport = true;
+
+        harness.Run(MakeMessages(176, tokensEach: 70));
+
+        Check("只发了一次就放弃", harness.Core.Calls.Count == 1, $"实际 {harness.Core.Calls.Count} 次");
+        Check("检查点原地不动", harness.Checkpoint == 0, $"checkpoint={harness.Checkpoint}");
+        Check("没有落任何总结", harness.SummaryRowCount == 0, $"rows={harness.SummaryRowCount}");
+
+        // 服务恢复后下一轮照常做完
+        harness.Core.FailAlwaysTransport = false;
+        harness.Run(MakeMessages(176, tokensEach: 70));
+        Check("恢复后全部覆盖", harness.Checkpoint == 175, $"checkpoint={harness.Checkpoint}");
+    }
+
+    // G：单条小消息被 400——问题不在它，不能跳过
+    static void Test_SmallSingleMessageRejectedIsNotSkipped()
+    {
+        Console.WriteLine("G. 小消息被拒不跳过");
+        using var harness = new Harness(contextTokens: 4000);
+        harness.Core.FailAlwaysBadRequest = true;
+
+        harness.Run(MakeMessages(50, tokensEach: 100));
+
+        Check("确实退让到了单条", harness.Core.Calls.Any(c => c.MessageCount == 1));
+        Check("检查点原地不动", harness.Checkpoint == 0, $"checkpoint={harness.Checkpoint}");
+    }
+
+    // H：上一轮退让到单条后中止，下一轮必须回到按预算取批
+    static void Test_RetreatDoesNotLeakIntoNextRound()
+    {
+        Console.WriteLine("H. 退让条数不跨轮残留");
+        using var harness = new Harness(contextTokens: 100000);
+        harness.Core.FailAlwaysBadRequest = true;
+
+        var messages = MakeMessages(40, tokensEach: 50);
+        harness.Run(messages);
+        var firstRoundCalls = harness.Core.Calls.Count;
+
+        harness.Core.FailAlwaysBadRequest = false;
+        harness.Run(messages);
+
+        var nextRoundFirst = harness.Core.Calls[firstRoundCalls];
+        Check("下一轮第一片不是单条", nextRoundFirst.MessageCount > 1,
+            $"实际 {nextRoundFirst.MessageCount} 条");
+        Check("下一轮做完", harness.Checkpoint == 39, $"checkpoint={harness.Checkpoint}");
     }
 
     static List<Message> MakeMessages(int count, int tokensEach)

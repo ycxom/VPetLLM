@@ -997,7 +997,8 @@ namespace VPetLLM.Core.Providers.Chat
                     Logger.Log($"Gemini Summarize 错误: {errorMessage}");
                     throw new SummarizeFailedException(ShowDetailedErrors
                         ? errorMessage
-                        : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试"));
+                        : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试"))
+                    { StatusCode = response.StatusCode };
                 }
 
                 var responseString = await response.Content.ReadAsStringAsync();
@@ -1029,7 +1030,8 @@ namespace VPetLLM.Core.Providers.Chat
                     Logger.Log($"Gemini Summarize 错误: {errorMessage}");
                     throw new SummarizeFailedException(ShowDetailedErrors
                         ? errorMessage
-                        : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。"));
+                        : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败，请稍后再试。"))
+                    { StatusCode = response.StatusCode };
                 }
 
                 var responseString = await response.Content.ReadAsStringAsync();

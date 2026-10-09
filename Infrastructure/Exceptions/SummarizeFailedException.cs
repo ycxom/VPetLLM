@@ -25,4 +25,11 @@ public class SummarizeFailedException : Exception
         : base(message, innerException)
     {
     }
+
+    /// <summary>
+    /// 服务端回了非成功状态码时的那个码；连不上、超时、没有可用渠道等没拿到
+    /// HTTP 响应的失败为 null。OverflowManager 靠它区分「这一片太大」和
+    /// 「服务出了问题」——前者值得切小重试，后者切多小都一样失败。
+    /// </summary>
+    public System.Net.HttpStatusCode? StatusCode { get; init; }
 }

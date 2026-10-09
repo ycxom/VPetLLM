@@ -616,7 +616,8 @@ namespace VPetLLM.Core.Providers.Chat
                         SystemLogger.Log($"LM Studio Summarize 错误: {errorMessage}");
                         throw new SummarizeFailedException(ShowDetailedErrors
                             ? errorMessage
-                            : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败"));
+                            : (ErrorHelper.GetSummarizeError(Settings) ?? "总结失败"))
+                        { StatusCode = response.StatusCode };
                     }
 
                     var responseString = await response.Content.ReadAsStringAsync();

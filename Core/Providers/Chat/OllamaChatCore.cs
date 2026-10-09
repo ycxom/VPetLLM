@@ -644,7 +644,8 @@ namespace VPetLLM.Core.Providers.Chat
                         Logger.Log($"Ollama Summarize 错误: {errorMessage}");
                         throw new SummarizeFailedException(ShowDetailedErrors
                             ? errorMessage
-                            : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败"));
+                            : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败"))
+                        { StatusCode = response.StatusCode };
                     }
 
                     var responseString = await response.Content.ReadAsStringAsync();

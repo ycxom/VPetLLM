@@ -291,6 +291,10 @@ namespace VPetLLM.Core.Data.Managers
                 var skippedOversize = 0;
                 var consecutiveApiFailures = 0;
 
+                // 退让条数只属于本轮：上一轮因故障中止时它可能已经退到 1，
+                // 留着它会让下一轮一上来就逐条发、逐条跳。
+                _retreatBatchSize = 0;
+
                 while (cursor < overflowedMessages.Count)
                 {
                     if (generation != _generation)
@@ -324,6 +328,18 @@ namespace VPetLLM.Core.Data.Managers
                     }
                     catch (SummarizeFailedException ex)
                     {
+                        // 切小只对「这一片太大」有用。连不上、超时、网关/CDN 自己回的错误页、
+                        // 限流、鉴权、5xx……切多小都一样失败，照旧对半退让会一路切到单条，
+                        // 再把消息逐条跳过，检查点越过从没总结过的消息。真实日志：EdgeOne
+                        // 15 秒回源超时把 175 条积压二分到单条，几轮下来连跳了 6 条。
+                        if (!MayBeCausedByInputSize(ex))
+                        {
+                            Logger.Log($"OverflowManager: [{batchStart}..{batchStart + batchSize}) 总结失败且与内容长度无关，" +
+                                       $"整轮放弃；检查点停在 {_lastSummarizedIndex}，" +
+                                       $"[{segmentStart + cursor}..{segmentEnd}) 留待下次重试: {ex.Message}");
+                            break;
+                        }
+
                         if (batchSize > 1)
                         {
                             // 还能再切：对半退让后重试，不推进游标。
@@ -334,9 +350,18 @@ namespace VPetLLM.Core.Data.Managers
                             continue;
                         }
 
-                        // 已经只剩一条还失败。按要求跳过这一条，但连续失败说明多半是
-                        // 服务不可用而不是消息太长——那样一条条跳下去会把整段积压静默吞掉，
-                        // 所以到阈值就整轮放弃，留给下次触发重试。
+                        // 已经只剩一条还被判太大。只有它自己确实占了预算的大头，跳过它才
+                        // 解决问题；一条小消息都发不出去，毛病在滚动总结/提示词或别的 4xx，
+                        // 跳过它只会白丢一条，下一条照样失败。
+                        if (TokenCounter.EstimateTokenCount(batch[0].Content ?? "") * 2 < budget)
+                        {
+                            Logger.Log($"OverflowManager: 第 {batchStart} 条单条总结失败，但它远小于预算 {budget}，" +
+                                       $"不是它太长；整轮放弃，检查点停在 {_lastSummarizedIndex}: {ex.Message}");
+                            break;
+                        }
+
+                        // 连续失败说明多半是服务不可用而不是消息太长——那样一条条跳下去
+                        // 会把整段积压静默吞掉，所以到阈值就整轮放弃，留给下次触发重试。
                         consecutiveApiFailures++;
                         if (consecutiveApiFailures >= MaxConsecutiveSingleFailures)
                         {
@@ -453,6 +478,26 @@ namespace VPetLLM.Core.Data.Managers
 
         private static bool ExceedsBudget(Message message, int budget)
             => TokenCounter.EstimateTokenCount(message.Content ?? "") > budget;
+
+        /// <summary>
+        /// 这次失败有没有可能是因为这一片太大。只有这种失败值得切小重试或跳过单条。
+        /// </summary>
+        private static bool MayBeCausedByInputSize(SummarizeFailedException ex)
+        {
+            // 底层是传输异常 = 根本没拿到模型的判定。加密通道把网关/CDN 自己回的
+            // 错误页也报成 HttpRequestException，归在这里。
+            for (var inner = ex.InnerException; inner is not null; inner = inner.InnerException)
+            {
+                if (inner is System.Net.Http.HttpRequestException or OperationCanceledException or TimeoutException or IOException)
+                    return false;
+            }
+
+            // 只有这几个码可能是在说「输入太长」。没有状态码的失败（无可用渠道、
+            // 配置未加载、响应解析失败）同样与长度无关。
+            return ex.StatusCode is System.Net.HttpStatusCode.BadRequest
+                or System.Net.HttpStatusCode.RequestEntityTooLarge
+                or System.Net.HttpStatusCode.UnprocessableEntity;
+        }
 
         /// <summary>
         /// 总结一片消息并提交。成功时替换滚动总结——下一片会拿它当

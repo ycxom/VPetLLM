@@ -41,10 +41,13 @@ internal sealed class RecordingCore : ChatCoreBase
 
     internal List<RecordedCall> Calls { get; } = new();
 
-    /// <summary>永远失败，用来模拟服务不可用。</summary>
-    internal bool FailAlways { get; set; }
+    /// <summary>永远以传输层异常失败：连不上、超时、网关/CDN 自己回的错误页。</summary>
+    internal bool FailAlwaysTransport { get; set; }
 
-    /// <summary>条数超过这个值就失败，用来模拟服务端比我们估得更严。</summary>
+    /// <summary>永远回 400：既可能是内容太长，也可能是别的请求错误，OverflowManager 分不清。</summary>
+    internal bool FailAlwaysBadRequest { get; set; }
+
+    /// <summary>条数超过这个值就回 400，用来模拟服务端比我们估得更严。</summary>
     internal int FailWhenMessagesExceed { get; set; } = int.MaxValue;
 
     /// <summary>第 N 次成功调用返回什么文本；默认返回一段可辨识的占位总结。</summary>
@@ -66,10 +69,18 @@ internal sealed class RecordingCore : ChatCoreBase
         };
         Calls.Add(call);
 
-        if (FailAlways || messageCount > FailWhenMessagesExceed)
+        if (FailAlwaysTransport)
+        {
+            // 与 FreeChatCore 一致：传输异常包成 InnerException
+            throw new SummarizeFailedException("fake transport failure",
+                new System.Net.Http.HttpRequestException("The authentication service returned an unauthenticated response."));
+        }
+
+        if (FailAlwaysBadRequest || messageCount > FailWhenMessagesExceed)
         {
             throw new SummarizeFailedException(
-                $"fake failure: {messageCount} messages exceed the fake limit");
+                $"fake failure: {messageCount} messages exceed the fake limit")
+            { StatusCode = System.Net.HttpStatusCode.BadRequest };
         }
 
         call.Succeeded = true;

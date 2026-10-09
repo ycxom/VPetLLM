@@ -830,12 +830,14 @@ namespace VPetLLM.Core.Providers.Chat
                         Logger.Log($"Free Summarize 服务器内部错误: {responseContent}");
                         throw new SummarizeFailedException(
                             ErrorMessageHelper.GetFreeApiError(Settings, "ServiceUnavailable")
-                            ?? "Free API 服务暂时不可用，总结功能无法使用。");
+                            ?? "Free API 服务暂时不可用，总结功能无法使用。")
+                        { StatusCode = response.StatusCode };
                     }
 
                     Logger.Log($"Free Summarize 错误: {response.StatusCode} - {responseContent}");
                     throw new SummarizeFailedException(
-                        ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败");
+                        ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败")
+                    { StatusCode = response.StatusCode };
                 }
             }
             catch (HttpRequestException httpEx)

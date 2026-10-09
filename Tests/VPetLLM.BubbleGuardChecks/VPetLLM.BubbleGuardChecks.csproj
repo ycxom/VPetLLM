@@ -5,6 +5,10 @@
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- 与宿主 VPet-Simulator.Windows.runtimeconfig.json 一致。Harmony 2.4 按这个开关选补丁信息的
+         序列化方式：不显式关掉时它走 BinaryFormatter，而 .NET 9+ 已移除，用
+         DOTNET_ROLL_FORWARD=LatestMajor 推到宿主的 .NET 10 上跑就会得到与生产不符的失败。 -->
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\VPetLLM.csproj" AdditionalProperties="SkipPluginCopy=true" />

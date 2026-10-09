@@ -119,6 +119,12 @@ namespace VPetLLM.Utils.UI
             // 结果"关掉气泡独占"只是让守卫不吞气泡，宿主该被动的还是被动了 —— 等于没有退路
             if (!IsEnabled) return;
 
+            HarmonyGate.Run("BubbleGuard", InstallCore);
+        }
+
+        /// <summary>碰 Harmony 的部分，只能经 <see cref="HarmonyGate.Run"/> 调用。</summary>
+        private static void InstallCore()
+        {
             lock (_lock)
             {
                 if (_harmony is not null) return;
@@ -172,22 +178,35 @@ namespace VPetLLM.Utils.UI
             {
                 try
                 {
-                    if (_harmony is not null)
-                    {
-                        _harmony.UnpatchAll(HarmonyId);
-                        Logger.Log("BubbleGuard: 气泡独占守卫已卸载");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"BubbleGuard: 卸载失败: {ex.Message}");
+                    HarmonyGate.Run("BubbleGuard", UninstallCore);
                 }
                 finally
                 {
-                    _harmony = null;
+                    // 回复状态与补丁装没装上无关，Harmony 不可用时也得清
                     _replyDepth = 0;
                     ClearPendingLocked();
                 }
+            }
+        }
+
+        /// <summary>碰 Harmony 的部分，只能经 <see cref="HarmonyGate.Run"/> 调用。调用方已持锁。</summary>
+        private static void UninstallCore()
+        {
+            try
+            {
+                if (_harmony is not null)
+                {
+                    _harmony.UnpatchAll(HarmonyId);
+                    Logger.Log("BubbleGuard: 气泡独占守卫已卸载");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"BubbleGuard: 卸载失败: {ex.Message}");
+            }
+            finally
+            {
+                _harmony = null;
             }
         }
 

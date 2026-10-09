@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0-windows</TargetFramework>
@@ -16,7 +16,7 @@
 
 	<ItemGroup>
 		<!-- 气泡独占守卫要改宿主 MessageBar 的行为但不能改它的身份，只能打补丁，理由见 BubbleGuard -->
-		<PackageReference Include="Lib.Harmony" Version="2.3.3" />
+		<PackageReference Include="Lib.Harmony" Version="2.4.2" />
 		<!-- 仅用于 net8 编译；运行时使用 VPet 宿主提供的 NAudio，不随 MOD 重复发布。 -->
 		<PackageReference Include="NAudio" Version="2.2.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

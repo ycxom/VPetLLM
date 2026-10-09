@@ -1665,32 +1665,6 @@ namespace VPetLLM.UI.Windows
             MarkUnsavedChanges();
         }
 
-        private Point _dragStartPoint;
-        private bool _isDragging;
-
-        private int GetDropIndex(ListBox listBox, Point point)
-        {
-            int index = 0;
-            for (int i = 0; i < listBox.Items.Count; i++)
-            {
-                ListBoxItem item = listBox.ItemContainerGenerator.ContainerFromIndex(i) as ListBoxItem;
-                if (item != null)
-                {
-                    Point itemTop = item.TranslatePoint(new Point(0, 0), listBox);
-                    Point itemBottom = item.TranslatePoint(new Point(item.ActualWidth, item.ActualHeight), listBox);
-
-                    double midY = itemTop.Y + item.ActualHeight / 2;
-
-                    if (point.Y < midY)
-                    {
-                        return i;
-                    }
-                    index = i + 1;
-                }
-            }
-            return index;
-        }
-
         private static T FindChild<T>(DependencyObject parent) where T : DependencyObject
         {
             for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)

@@ -34,7 +34,10 @@ namespace VPetLLM.Utils.UI
         private const string TargetMethod = "MenuItemCopy_Click";
 
         /// <summary>装上补丁。重复调用是安全的（幂等）。</summary>
-        public static void Install()
+        public static void Install() => HarmonyGate.Run("BubbleCopyGuard", InstallCore);
+
+        /// <summary>碰 Harmony 的部分，只能经 <see cref="HarmonyGate.Run"/> 调用。</summary>
+        private static void InstallCore()
         {
             lock (_lock)
             {
@@ -80,7 +83,10 @@ namespace VPetLLM.Utils.UI
         /// <summary>
         /// 摘掉补丁。插件卸载时必须调用 —— 补丁里的委托指向本程序集。
         /// </summary>
-        public static void Uninstall()
+        public static void Uninstall() => HarmonyGate.Run("BubbleCopyGuard", UninstallCore);
+
+        /// <summary>碰 Harmony 的部分，只能经 <see cref="HarmonyGate.Run"/> 调用。</summary>
+        private static void UninstallCore()
         {
             lock (_lock)
             {
