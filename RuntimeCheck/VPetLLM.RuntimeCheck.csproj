@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 旧版游戏本体检测，说明见 RuntimeCheckPlugin.cs。
+       刻意按 net8 编译、不引用主体：主体是 net10，旧宿主加载不了，这个必须能加载。
+       程序集名必须与其它 MOD 的副本不同 —— 宿主按 DLL 文件名全进程去重。 -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <UseWPF>true</UseWPF>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>VPetLLM.RuntimeCheck</AssemblyName>
+    <RootNamespace>Ycxom.VPetMods.RuntimeCheck</RootNamespace>
+    <!-- 只发布本程序集自己；接口程序集由宿主提供 -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 接口程序集版本号恒为 1.0.0.0，引用哪个包版本都能绑到任意宿主上 -->
+    <PackageReference Include="VPet-Simulator.Windows.Interface" Version="1.1.0.58">
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

@@ -450,12 +450,19 @@ static class Program
         // ---- 没有保护时的宿主原始行为 ----
         BubbleCopyGuard.Uninstall();
         var bare = Invoke();
-        if (!clipboardWritable)
+        if (!clipboardWritable && bare is null)
+        {
+            // 探的是这台机器真实的剪贴板，占着它的是别的程序，随时可能松手：
+            // 探测时被占、调用时已释放，宿主那一行自然不抛。这不是保护失效，
+            // 保护有没有用由下面"装上保护后"那条判定。
+            Console.WriteLine("  [跳过] 剪贴板占用是间歇的，探测之后已被释放，这次没复现出崩溃");
+        }
+        else if (!clipboardWritable)
         {
             // 复现成立：这一条正是用户贴的那个 COMException
             Check("★★ 复现：无保护时宿主复制确实抛 COMException",
                 bare is System.Runtime.InteropServices.COMException,
-                bare is null ? "居然没抛" : $"{bare.GetType().Name}");
+                $"{bare!.GetType().Name}");
         }
         else
         {

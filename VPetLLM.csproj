@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0-windows</TargetFramework>
+		<!-- 宿主 VPet 已是 .NET 10 自包含。旧宿主加载不了本体，由 RuntimeCheck 弹窗提示更新游戏。 -->
+		<TargetFramework>net10.0-windows</TargetFramework>
 		<OutputType>Library</OutputType>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
@@ -17,7 +18,7 @@
 	<ItemGroup>
 		<!-- 气泡独占守卫要改宿主 MessageBar 的行为但不能改它的身份，只能打补丁，理由见 BubbleGuard -->
 		<PackageReference Include="Lib.Harmony" Version="2.4.2" />
-		<!-- 仅用于 net8 编译；运行时使用 VPet 宿主提供的 NAudio，不随 MOD 重复发布。 -->
+		<!-- 仅用于编译；运行时使用 VPet 宿主提供的 NAudio，不随 MOD 重复发布。 -->
 		<PackageReference Include="NAudio" Version="2.2.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
@@ -30,6 +31,16 @@
 	<ItemGroup>
 		<!-- 独立回归检查项目不参与插件程序集编译 -->
 		<Compile Remove="Tests\**\*.cs" />
+		<!-- 旧版游戏本体检测是独立的 net8 程序集，同样不编进本体 -->
+		<Compile Remove="RuntimeCheck\**" />
+		<None Remove="RuntimeCheck\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- 只为让它随本体一起编译，不引用其输出（本体不能依赖它，它也不能依赖本体）；
+			 产物由 CopyResources 放进 plugin 目录 -->
+		<ProjectReference Include="RuntimeCheck\VPetLLM.RuntimeCheck.csproj"
+						  ReferenceOutputAssembly="false" Private="false" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -75,6 +86,14 @@
 				SourceFiles="@(FilesToCopy)"
 				DestinationFiles="@(FilesToCopy->'$(ProjectDir)3000_VPetLLM\plugin\%(RecursiveDir)%(Filename)%(Extension)')"
 				SkipUnchangedFiles="true" />
+
+		<!-- 旧版游戏本体检测（net8），见 RuntimeCheck/RuntimeCheckPlugin.cs。
+			 ProjectReference 在 DesignTimeBuild 等场景下只还原不编译，这里显式编一次（增量，已编过即跳过）。 -->
+		<MSBuild Projects="$(ProjectDir)RuntimeCheck\VPetLLM.RuntimeCheck.csproj" Targets="Build"
+				 Properties="Configuration=$(Configuration)" />
+		<Copy SourceFiles="$(ProjectDir)RuntimeCheck\bin\$(Configuration)\net8.0-windows\VPetLLM.RuntimeCheck.dll"
+			DestinationFolder="$(ProjectDir)3000_VPetLLM\plugin"
+			SkipUnchangedFiles="true" />
 
 		<!-- Architecture-specific private payloads must remain in their runtime folders. -->
 		<Copy SourceFiles="$(OutDir)runtimes\win-x64\native\VPetLLM.SecureCommunication.dll"
