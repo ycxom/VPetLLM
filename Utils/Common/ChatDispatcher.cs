@@ -90,6 +90,36 @@ namespace VPetLLM.Utils.Common
         private static Func<string, IReadOnlyList<byte[]>?, bool, Task<string>>? _sendStub;
 #pragma warning restore CS0649
 
+        /// <summary>
+        /// 宿主就绪闸门。宿主先构造插件、再读存档、建主界面，最后才调 LoadPlugin；
+        /// 构造函数里启动的子插件（前台窗口监视等）可能马上就回灌，那时 Core.Save 还是 null，
+        /// 拼系统提示词必然空引用，每个渠道都记一次失败，回执也随之丢掉。
+        /// 所以真正发出前先等 LoadPlugin 放行，排队的内容不丢。
+        /// </summary>
+        private static TaskCompletionSource _hostReady = NewHostGate();
+
+        private static TaskCompletionSource NewHostGate() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>插件构造时调用：之后的灌入先排队，等 <see cref="MarkHostReady"/>。</summary>
+        public static void MarkHostLoading()
+        {
+            lock (_lock)
+            {
+                // 宿主多开时会在同一进程里再构造一个插件实例，要重新关上闸门
+                if (_hostReady.Task.IsCompleted)
+                    _hostReady = NewHostGate();
+            }
+        }
+
+        /// <summary>LoadPlugin 结束时调用（成功失败都调），放行排队的灌入。</summary>
+        public static void MarkHostReady()
+        {
+            TaskCompletionSource gate;
+            lock (_lock) gate = _hostReady;
+            gate.TrySetResult();
+        }
+
         private static Setting? Settings => VPetLLM.Instance?.Settings;
 
         /// <summary>关掉即完全旁路（回到各入口直接调 ChatCore 的旧行为），用于排障。</summary>
@@ -390,6 +420,15 @@ namespace VPetLLM.Utils.Common
             var stub = _sendStub;
             if (stub is not null)
                 return await stub(text, images, isRetry).ConfigureAwait(false);
+
+            // 所有灌入（合并、旁路、排队超时绕行）最后都走到这里，闸门只需要这一道
+            Task gate;
+            lock (_lock) gate = _hostReady.Task;
+            if (!gate.IsCompleted)
+            {
+                Logger.Log("ChatDispatcher: 宿主尚未加载完毕（存档/主界面未就绪），灌入暂缓到 LoadPlugin 之后");
+                await gate.ConfigureAwait(false);
+            }
 
             var core = VPetLLM.Instance?.ChatCore;
             if (core is null)

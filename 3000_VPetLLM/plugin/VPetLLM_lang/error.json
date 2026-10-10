@@ -228,10 +228,10 @@
         "jp": "Ollama接続に失敗しました。以下を確認してください：\n1. Ollamaサービスが起動しているか\n2. URL設定が正しいか\n3. ファイアウォール設定"
     },
     "Free.Error.ConfigNotLoaded": {
-        "zh-hans": "Free Chat配置未加载，请等待配置下载完成后重启程序",
-        "zh-hant": "Free Chat配置未加載，請等待配置下載完成後重啟程序",
-        "en": "Free Chat configuration not loaded. Please wait for the configuration to download and restart the program",
-        "jp": "Free Chat設定が読み込まれていません。設定のダウンロードが完了するまで待ってからプログラムを再起動してください"
+        "zh-hans": "Free Chat配置下载失败，请检查网络连接后再试",
+        "zh-hant": "Free Chat配置下載失敗，請檢查網路連線後再試",
+        "en": "Failed to download the Free Chat configuration. Please check your network connection and try again",
+        "jp": "Free Chat設定のダウンロードに失敗しました。ネットワーク接続を確認してから再度お試しください"
     },
     "Free.Error.ServiceMaintenance": {
         "zh-hans": "Free API服务正在维护中，请稍后再试。如果问题持续存在，请联系开发者。",

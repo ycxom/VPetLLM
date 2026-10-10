@@ -159,6 +159,7 @@ namespace VPetLLM
         #region Private Fields
 
         private System.Timers.Timer _syncTimer;
+        private readonly Task _startupPluginLoad;
         private System.Timers.Timer _freeConfigTimer;
         private IntelligentConfigurationOptimizer? _configurationOptimizer;
         private Infrastructure.Services.ApplicationServices.VoiceInputService? _voiceInputService;
@@ -210,6 +211,9 @@ namespace VPetLLM
         {
             Instance = this;
 
+            // 下面 LoadPlugins 会启动子插件，它们可能立刻就回灌消息；在 LoadPlugin 之前一律先排队
+            ChatDispatcher.MarkHostLoading();
+
             // 初始化日志
 
             // **优先初始化 SQLite，避免后续数据库操作失败**
@@ -251,11 +255,8 @@ namespace VPetLLM
             // 初始化 ChatCore
             InitializeChatCore();
 
-            // 初始化名称同步定时器
-            InitializeSyncTimer();
-
-            // 初始化 TTS 服务（旧版）
-            InitializeLegacyTTSService();
+            // 名称同步定时器、TTS 服务都在 LoadPlugin 里初始化：构造时宿主还没读存档
+            // （Core.Save 为 null）、主界面也还没建（MW.Main 为 null）
 
             // 初始化配置优化器
             InitializeConfigurationOptimizer();
@@ -266,8 +267,13 @@ namespace VPetLLM
             // 注册服务到 DI 容器
             RegisterServices();
 
-            // 加载插件
-            LoadPlugins();
+            // 加载插件：放后台，不等。每个插件的 Initialize 最多给 10 秒，
+            // 以前在这里同步等，宿主加载界面就跟着停。聊天要等它加载完才放行（见 LoadPlugin 末尾）
+            _startupPluginLoad = Task.Run(() =>
+            {
+                try { LoadPlugins(); }
+                catch (Exception ex) { Logger.Log($"后台加载插件失败: {ex.Message}"); }
+            });
 
             // 初始化默认插件检查器
             _defaultPluginChecker = new DefaultPluginChecker(this);
@@ -324,23 +330,15 @@ namespace VPetLLM
                 Logger.Log("开始初始化Free配置...");
                 // 清理未加密的配置文件
                 FreeConfigCleaner.CleanUnencryptedConfigs();
-                // 同步等待配置初始化完成
-                var configTask = FreeConfigManager.InitializeConfigsAsync();
-                if (!configTask.Wait(TimeSpan.FromSeconds(8)))
+                // 只发起不等待：构造函数卡住就是宿主加载界面卡住。
+                // Free 渠道的工作 core 在第一次请求时才建，配置还没到时它会等这次下载（见 FreeChatCore）
+                _ = FreeConfigManager.BeginStartupDownload().ContinueWith(t =>
                 {
-                    Logger.Log("Free配置初始化超时，后台继续拉取");
-                    _ = configTask.ContinueWith(t =>
-                    {
-                        if (t.IsFaulted)
-                            Logger.Log($"Free配置后台初始化失败: {t.Exception?.GetBaseException().Message}");
-                        else
-                            Logger.Log($"Free配置后台初始化完成: {t.Result}");
-                    }, TaskScheduler.Default);
-                }
-                else
-                {
-                    Logger.Log($"Free配置初始化完成: {configTask.Result}");
-                }
+                    if (t.IsFaulted)
+                        Logger.Log($"Free配置后台初始化失败: {t.Exception?.GetBaseException().Message}");
+                    else
+                        Logger.Log($"Free配置初始化完成: {t.Result}");
+                }, TaskScheduler.Default);
 
                 Logger.Log("Free 通道私有通讯载荷将在请求时自行读取本机身份");
 
@@ -473,8 +471,12 @@ namespace VPetLLM
             if (!Settings.FollowVPetName)
                 return;
 
-            var aiName = MW.Core.Save.Name;
-            var userName = MW.Core.Save.HostName;
+            // 定时器在 LoadPlugin 里才启动，正常不会遇到没有存档；留着兜底，没有就等下一轮
+            if (MW.Core?.Save is not { } save)
+                return;
+
+            var aiName = save.Name;
+            var userName = save.HostName;
             if (Settings.AiName == aiName && Settings.UserName == userName)
                 return;
 
@@ -661,6 +663,11 @@ namespace VPetLLM
             {
                 Logger.Log("LoadPlugin started.");
 
+                // TTS 要在这里建：用户选了宿主播放器（或 mpv 缺失要降级到宿主播放器）时
+                // 需要 MW.Main，构造时它还是 null —— 以前选择被静默改成 mpv，mpv 也缺时 TTS 整局为 null。
+                // 必须早于 DetectAndHandleVPetTTSPlugin 和 TalkBox（SmartMessageProcessor 构造时取用它）
+                InitializeLegacyTTSService();
+
                 // 初始化气泡延迟控制（性能优化）
                 InitializeBubbleDelayControl();
 
@@ -686,6 +693,11 @@ namespace VPetLLM
 
                 // 加载聊天历史
                 ChatCore?.LoadHistory();
+
+                // 宿主先构造插件、再读存档、最后才调 LoadPlugin。以前定时器在构造函数里启动，
+                // 宿主加载 MOD（含工坊联网校验）超过 5 秒时，第一次触发就撞上 Core.Save == null：
+                // 发布版被 Timer 静默吞掉，挂调试器（Just My Code）时每 5 秒停一次
+                InitializeSyncTimer();
 
                 // 当前没有登记到 ServiceManager 的 IService，这里只是走空启动，不要堵 UI 线程
                 _ = _serviceManager.StartAsync();
@@ -758,6 +770,12 @@ namespace VPetLLM
             {
                 Logger.Log($"LoadPlugin failed: {ex.Message}");
                 _logger.LogError("Failed to load plugin", ex);
+            }
+            finally
+            {
+                // 放行构造以来排队的回灌。失败也要放行，否则队列永远卡住。
+                // 还要等后台的插件加载结束：否则第一句话的系统提示词里会缺插件
+                _ = _startupPluginLoad.ContinueWith(_ => ChatDispatcher.MarkHostReady(), TaskScheduler.Default);
             }
         }
 
@@ -1277,6 +1295,12 @@ namespace VPetLLM
 
             // 语音输入持有全局热键和自己的窗口
             Run(() => _voiceInputService?.Dispose(), "关停语音输入");
+
+            // 以下两项以前只在 Dispose 里做，而宿主从不调 Dispose：
+            // 触摸处理的 100ms 轮询定时器会一直转、宿主触摸事件不退订；
+            // 播放中的 mpv 视频进程会在 VPet 退出后继续留着
+            Run(() => TouchInteractionHandler?.Dispose(), "关停触摸交互");
+            Run(() => { if (_mediaPlaybackService?.IsPlaying == true) _mediaPlaybackService.StopPlayback(); }, "停止媒体播放");
 
             // 停止定时器
             Run(() => { _syncTimer?.Stop(); _syncTimer?.Dispose(); }, "停止同步定时器");

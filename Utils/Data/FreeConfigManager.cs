@@ -52,6 +52,21 @@ namespace VPetLLM.Utils.Data
             }
         }
 
+        private static Task<bool>? _startupDownload;
+
+        /// <summary>
+        /// 启动时那次配置拉取。没发起过时视为已完成（结果 false）。
+        /// 首次安装时 Free 渠道第一次发请求会等它，见 FreeChatCore.EnsureConfigLoadedAsync。
+        /// </summary>
+        public static Task<bool> StartupDownload => _startupDownload ?? Task.FromResult(false);
+
+        /// <summary>
+        /// 插件构造时调用：只发起、不等待。以前构造函数同步等最多 8 秒，
+        /// 宿主的 MOD 加载（加载界面）就跟着停 8 秒。
+        /// </summary>
+        public static Task<bool> BeginStartupDownload()
+            => _startupDownload = Task.Run(InitializeConfigsAsync);
+
         /// <summary>
         /// 初始化配置 - 检查并更新所有配置文件
         /// </summary>

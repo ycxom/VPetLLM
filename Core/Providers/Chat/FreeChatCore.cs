@@ -111,6 +111,47 @@ namespace VPetLLM.Core.Providers.Chat
             _freeSetting.ThinkingEffort = _node.ThinkingEffort;
         }
 
+        private bool HasConfig => !string.IsNullOrEmpty(_apiUrl) && !string.IsNullOrEmpty(_apiKey);
+
+        private readonly SemaphoreSlim _configReload = new(1, 1);
+
+        /// <summary>首次请求最多等启动那次配置下载这么久（两个地址各 10 秒超时，再加下配置文件）。</summary>
+        private static readonly TimeSpan StartupConfigWait = TimeSpan.FromSeconds(25);
+
+        /// <summary>
+        /// 配置还没加载时补一次：等启动那次下载结束，再重新读。
+        /// 首次安装时下载往往还没完成工作 core 就建好了，以前只能提示"下载完成后重启程序"。
+        /// </summary>
+        private async Task<bool> EnsureConfigLoadedAsync()
+        {
+            if (HasConfig) return true;
+
+            await _configReload.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                if (HasConfig) return true;
+
+                var download = FreeConfigManager.StartupDownload;
+                if (!download.IsCompleted)
+                {
+                    Logger.Log("FreeChatCore: 配置仍在下载，等待完成后再请求");
+                    await Task.WhenAny(download, Task.Delay(StartupConfigWait)).ConfigureAwait(false);
+                }
+
+                LoadConfig();
+                if (HasConfig)
+                {
+                    _httpClient.DefaultRequestHeaders.Authorization =
+                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+                }
+                return HasConfig;
+            }
+            finally
+            {
+                _configReload.Release();
+            }
+        }
+
         private void LoadConfig()
         {
             try
@@ -150,7 +191,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
                 else
                 {
-                    Logger.Log("FreeChatCore: 配置文件不存在，请等待配置下载完成后重启程序");
+                    Logger.Log("FreeChatCore: 配置文件不存在（可能仍在下载，发请求时会再读一次）");
                     _apiKey = "";
                     _apiUrl = "";
                     _model = "";
@@ -213,10 +254,10 @@ namespace VPetLLM.Core.Providers.Chat
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
 
-                if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
+                if (!await EnsureConfigLoadedAsync().ConfigureAwait(false))
                 {
                     var errorMessage = ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded")
-                        ?? "Free Chat 配置未加载，请等待配置下载完成后重启程序";
+                        ?? "Free Chat 配置下载失败，请检查网络连接后再试";
                     Logger.Log(errorMessage);
                     ReportFailure(errorMessage);
                     return "";
@@ -466,10 +507,10 @@ namespace VPetLLM.Core.Providers.Chat
                 // Handle conversation turn for record weight decrement
                 OnConversationTurn();
 
-                if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
+                if (!await EnsureConfigLoadedAsync().ConfigureAwait(false))
                 {
                     var errorMessage = ErrorMessageHelper.GetFreeApiError(Settings, "ConfigNotLoaded")
-                        ?? "Free Chat 配置未加载，请等待配置下载完成后重启程序";
+                        ?? "Free Chat 配置下载失败，请检查网络连接后再试";
                     Logger.Log(errorMessage);
                     ReportFailure(errorMessage);
                     return "";
@@ -788,7 +829,7 @@ namespace VPetLLM.Core.Providers.Chat
         {
             try
             {
-                if (string.IsNullOrEmpty(_apiUrl) || string.IsNullOrEmpty(_apiKey))
+                if (!await EnsureConfigLoadedAsync().ConfigureAwait(false))
                 {
                     Logger.Log("Free Chat 配置未加载，总结功能不可用");
                     throw new SummarizeFailedException(

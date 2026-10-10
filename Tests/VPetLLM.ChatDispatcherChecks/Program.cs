@@ -148,6 +148,30 @@ Reset();
 
 stubField.SetValue(null, null);
 
+// ── 6. 宿主就绪前灌入先排队，LoadPlugin 放行后才发 ─────────────────────────────
+// 不装替身：走真实 SendAsync，闸门之后因为没有 VPetLLM 实例而返回空串 —— 只验证时序
+{
+    ChatDispatcher.MarkHostLoading();
+    var pending = ChatDispatcher.SubmitAsync("early-plugin-result", ChatPriority.Plugin, source: "t6", isRetry: true);
+    var early = await Task.WhenAny(pending, Task.Delay(800));
+    Check(early != pending, "宿主就绪前的灌入不应被发出（应停在闸门前）。");
+
+    ChatDispatcher.MarkHostReady();
+    var released = await Task.WhenAny(pending, Task.Delay(3000));
+    Check(released == pending, "MarkHostReady 后排队的灌入应被放行。");
+
+    // 放行后再来的灌入直接通过
+    var later = ChatDispatcher.SubmitAsync("later", ChatPriority.Plugin, source: "t6b");
+    Check(await Task.WhenAny(later, Task.Delay(3000)) == later, "就绪之后的灌入不应再等待。");
+
+    // 同进程再构造一个插件实例（宿主多开）：闸门要重新关上
+    ChatDispatcher.MarkHostLoading();
+    var again = ChatDispatcher.SubmitAsync("second-instance", ChatPriority.Plugin, source: "t6c");
+    Check(await Task.WhenAny(again, Task.Delay(800)) != again, "重新 MarkHostLoading 后闸门应再次关上。");
+    ChatDispatcher.MarkHostReady();
+    Check(await Task.WhenAny(again, Task.Delay(3000)) == again, "第二个实例 LoadPlugin 后应放行。");
+}
+
 if (failures.Count > 0)
 {
     Console.Error.WriteLine("ChatDispatcher checks failed:");

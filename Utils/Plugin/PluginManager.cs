@@ -155,7 +155,18 @@ namespace VPetLLM.Utils.Plugin
             }
         }
 
+        // 启动时的加载跑在后台；设置里手动重载若赶上它还没完，排队等它结束而不是交叠着卸载/加载
+        private static readonly object _loadGate = new();
+
         public static void LoadPlugins(IChatCore chatCore)
+        {
+            lock (_loadGate)
+            {
+                LoadPluginsCore(chatCore);
+            }
+        }
+
+        private static void LoadPluginsCore(IChatCore chatCore)
         {
             SweepOrphanedShadowCopies();
             SweepLegacyTempShadowCopies();
