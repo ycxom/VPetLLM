@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using VPetLLM.Utils.Localization;
 
@@ -88,6 +89,8 @@ namespace VPetLLM.UI.Windows
                 var draft = ChannelPanel.BuildDraft();
                 if (draft is null)
                 {
+                    // 保存按钮在所有页共用，用户可能在别的页点的，不切回来就看不到错在哪
+                    Tabs.SelectedItem = Tab_Channel;
                     Host_Channel.Visibility = Visibility.Visible;
                     ShowStatus(T("QuickSetup.FixChannel", "AI 服务还没填好，请看上面的提示。"), false);
                     return false;
@@ -128,17 +131,13 @@ namespace VPetLLM.UI.Windows
                 : Visibility.Visible;
         }
 
-        private async void BrowsePlugins_Click(object sender, RoutedEventArgs e)
+        // 页内 ComboBox 的 SelectionChanged 也会冒泡到这里，所以只看插件页是否选中
+        private async void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var show = Host_Plugins.Visibility != Visibility.Visible;
-            Host_Plugins.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-
-            // 展开才加载：要算插件文件的哈希、还要联网，多数人打开设置并不是来看这个
-            if (show && !_pluginsLoaded)
-            {
-                _pluginsLoaded = true;
-                await PluginPanel.RefreshAsync();
-            }
+            // 切到插件页才加载：要算插件文件的哈希、还要联网，多数人打开设置并不是来看这个
+            if (!Tab_Plugins.IsSelected || _pluginsLoaded) return;
+            _pluginsLoaded = true;
+            await PluginPanel.RefreshAsync();
         }
 
         private void SetDefault_Click(object sender, RoutedEventArgs e)

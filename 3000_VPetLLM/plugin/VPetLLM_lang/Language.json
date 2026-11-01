@@ -5514,7 +5514,7 @@
       "en": "Features",
       "zh-hans": "功能开关",
       "zh-hant": "功能開關",
-      "jp": "機能のオン・オフ"
+      "jp": "機能"
     },
     "EnableAction": {
       "en": "Let the pet act and react based on the conversation",
@@ -5683,6 +5683,12 @@
       "zh-hans": "需要更新",
       "zh-hant": "需要更新",
       "jp": "更新が必要"
+    },
+    "TabHelp": {
+      "en": "Help",
+      "zh-hans": "帮助",
+      "zh-hant": "幫助",
+      "jp": "ヘルプ"
     }
   }
 }

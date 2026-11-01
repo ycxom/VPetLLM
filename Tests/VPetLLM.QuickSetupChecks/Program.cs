@@ -533,7 +533,8 @@ static class Program
         {
             try
             {
-                _ = new System.Windows.Application();   // pack:// 地址要等它注册
+                // pack:// 地址要等它注册。关掉最后一个窗口时不能让它退出，否则 Dispatcher 跟着停了，后面的窗口开不了
+                _ = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
                 var panel = new VPetLLM.UI.Controls.QuickPluginPanel();
                 var list = (System.Windows.Controls.ItemsControl)panel.FindName("List_Plugins");
                 list.ItemsSource = new List<UnifiedPluginItem>
@@ -555,6 +556,8 @@ static class Program
                 }
 
                 CheckSettingsButton(dir);
+                CheckSimpleSettingTabs(dir);
+                CheckGeekWindowLoads();
             }
             catch (Exception ex)
             {
@@ -712,6 +715,196 @@ static class Program
             window?.Close();
             plugins.Clear();
             plugins.AddRange(backup);
+        }
+    }
+
+    /// <summary>
+    /// 简易设置的分页，用真实窗口点一遍。保存只走校验失败的分支：那条路在写入任何设置之前就返回，
+    /// 所以按保存前要先确认草稿确实组不出来，否则就成了往真实 settings.db 里写。
+    /// </summary>
+    static void CheckSimpleSettingTabs(string dir)
+    {
+        Console.WriteLine("\n[简易设置分页]");
+
+        // 真实窗口的事件都跑在 Dispatcher 里，await 回得到 UI 线程；这里是测试直接调的，要自己装上
+        SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+
+        var settings = Fresh(dir);
+        settings.Ollama.OllamaNodes.Clear();
+        settings.Gemini.GeminiNodes.Add(new Setting.GeminiNodeSetting { Name = "主渠道", ApiKey = "k", Model = "gemini-x", Priority = 1000 });
+        // 插件页的联网部分走一个连不上的本地代理：很快失败，也不碰用真实库的代理池
+        settings.PluginStore.UseProxy = true;
+        settings.PluginStore.ProxyUrl = "127.0.0.1:1";
+
+        var host = (VPetLLM.VPetLLM)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(VPetLLM.VPetLLM));
+        host.Settings = settings;
+
+        var plugins = VPetLLM.Utils.Plugin.PluginManager.Plugins;
+        var backup = plugins.ToList();
+        plugins.Clear();
+
+        VPetLLM.UI.Windows.winSimpleSetting? window = null;
+        System.Windows.Window Open(Setting s)
+        {
+            host.Settings = s;
+            window?.Close();
+            window = new VPetLLM.UI.Windows.winSimpleSetting(host)
+            {
+                Left = -20000, Top = -20000,
+                WindowStartupLocation = System.Windows.WindowStartupLocation.Manual,
+                ShowInTaskbar = false, ShowActivated = false
+            };
+            window.Show();
+            window.UpdateLayout();
+            return window;
+        }
+
+        try
+        {
+            var win = Open(settings);
+            T Named<T>(string name) => (T)win.FindName(name);
+            var tabs = Named<System.Windows.Controls.TabControl>("Tabs");
+            var tabChannel = Named<System.Windows.Controls.TabItem>("Tab_Channel");
+            var channelHost = Named<System.Windows.Controls.Border>("Host_Channel");
+            var channel = (VPetLLM.UI.Controls.QuickChannelPanel)channelHost.Child;
+            var profile = (VPetLLM.UI.Controls.QuickProfilePanel)Named<System.Windows.Controls.Border>("Host_Profile").Child;
+            var pluginPanel = (VPetLLM.UI.Controls.QuickPluginPanel)Named<System.Windows.Controls.Border>("Host_Plugins").Child;
+            var pluginList = (System.Windows.Controls.ItemsControl)pluginPanel.FindName("List_Plugins");
+            var pluginState = (System.Windows.Controls.TextBlock)pluginPanel.FindName("Tb_State");
+            var pluginRefresh = (System.Windows.Controls.Button)pluginPanel.FindName("Btn_Refresh");
+            var change = Named<System.Windows.Controls.Button>("Btn_ChangeChannel");
+            var enableBuy = Named<System.Windows.Controls.CheckBox>("Cb_EnableBuy");
+            var aiName = (System.Windows.Controls.TextBox)profile.FindName("Tb_AiName");
+
+            void Select(string name)
+            {
+                tabs.SelectedItem = win.FindName(name);
+                win.UpdateLayout();
+            }
+            void Tour()
+            {
+                foreach (var name in new[] { "Tab_Profile", "Tab_Features", "Tab_Plugins", "Tab_Help", "Tab_Channel" })
+                    Select(name);
+            }
+            void Click(System.Windows.Controls.Button button)
+            {
+                button.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                win.UpdateLayout();
+            }
+
+            Check("分成五页，打开时在 AI 服务", tabs.Items.Count == 5 && ReferenceEquals(tabs.SelectedItem, tabChannel), $"{tabs.Items.Count} {tabs.SelectedIndex}");
+            Check("每页都有标题", tabs.Items.OfType<System.Windows.Controls.TabItem>().All(t => !string.IsNullOrEmpty(t.Header as string)));
+            Check("别的页不占地方", !enableBuy.IsVisible && !aiName.IsVisible && !pluginRefresh.IsVisible);
+            Check("主渠道能用时 AI 服务默认折叠", channelHost.Visibility == System.Windows.Visibility.Collapsed);
+            Check("打开窗口时不加载插件", pluginList.ItemsSource is null && string.IsNullOrEmpty(pluginState.Text));
+
+            Select("Tab_Profile");
+            Check("切页后内容显示出来", aiName.IsVisible);
+            var personality = (System.Windows.Controls.ComboBox)profile.FindName("Cb_Personality");
+            var bubbled = false;
+            tabs.SelectionChanged += (_, e) => bubbled |= ReferenceEquals(e.OriginalSource, personality);
+            personality.SelectedIndex = personality.SelectedIndex == 0 ? 1 : 0;
+            Check("页内下拉框的事件确实冒泡到 TabControl", bubbled);
+            Check("页内下拉框不触发插件加载", pluginList.ItemsSource is null);
+            Select("Tab_Features");
+            Select("Tab_Help");
+            Check("切到别的页不加载插件", pluginList.ItemsSource is null);
+
+            Select("Tab_Plugins");
+            Check("切到插件页才加载", pluginList.ItemsSource is not null && !pluginRefresh.IsEnabled);
+            Check("切到插件页直接看得到列表，不用再点一下", pluginRefresh.IsVisible && pluginList.IsVisible);
+            Pump(() => pluginRefresh.IsEnabled);
+            Check("连不上商店时显示原因，能重试", pluginRefresh.IsEnabled && !string.IsNullOrEmpty(pluginState.Text), pluginState.Text);
+
+            var loaded = new List<UnifiedPluginItem>();
+            pluginList.ItemsSource = loaded;
+            Select("Tab_Channel");
+            Select("Tab_Plugins");
+            Check("切走再切回不重复加载", ReferenceEquals(pluginList.ItemsSource, loaded));
+
+            // 用户最常见的动作：点开看一眼，逛一圈，什么都没改。面板表达不了 Gemini，这时不能算改过
+            Select("Tab_Channel");
+            Click(change);
+            Check("点更换能展开", channel.IsVisible);
+            Tour();
+            Check("只是逛一圈，Gemini 主渠道不会被写回", !channel.NeedsApply);
+
+            var useKey = (System.Windows.Controls.RadioButton)channel.FindName("Rb_ApiKey");
+            var keyBox = (System.Windows.Controls.PasswordBox)channel.FindName("Pb_ApiKey");
+            useKey.IsChecked = true;
+            keyBox.Password = "sk-typed";
+            aiName.Text = "刚填的名字";
+            var buy = enableBuy.IsChecked != true;
+            enableBuy.IsChecked = buy;
+            Tour();
+            Check("切页不丢没保存的输入", useKey.IsChecked == true && keyBox.Password == "sk-typed" && aiName.Text == "刚填的名字" && enableBuy.IsChecked == buy);
+
+            var useLocal = (System.Windows.Controls.RadioButton)channel.FindName("Rb_Local");
+            useLocal.IsChecked = true;
+            ((System.Windows.Controls.TextBox)channel.FindName("Tb_LocalUrl")).Text = "not-a-url";
+            Click(change);
+            Check("保存前 AI 服务已折叠", channelHost.Visibility == System.Windows.Visibility.Collapsed);
+            Select("Tab_Help");
+
+            var rejected = channel.NeedsApply && channel.BuildDraft() is null;
+            Check("草稿确实组不出来（否则保存会写真实库，下面不点）", rejected);
+            var save = VisibleButtons(win).FirstOrDefault(b => (b.Content as string) == "保存");
+            Check("保存按钮在别的页也看得到", save is not null);
+            if (rejected && save is not null)
+            {
+                var savedBuy = settings.EnableBuy;
+                Click(save);
+                Check("校验失败跳回 AI 服务页", ReferenceEquals(tabs.SelectedItem, tabChannel));
+                Check("校验失败展开表单", channel.IsVisible);
+                Check("校验失败给出提示", !string.IsNullOrEmpty(Named<System.Windows.Controls.TextBlock>("Tb_Status").Text));
+                Check("校验失败什么都不写", settings.EnableBuy == savedBuy && settings.Gemini.GeminiNodes.Count == 1);
+            }
+
+            win = Open(Fresh(dir));
+            var fresh = (VPetLLM.UI.Controls.QuickChannelPanel)((System.Windows.Controls.Border)win.FindName("Host_Channel")).Child;
+            Check("还没有服务时直接摊开表单", fresh.IsVisible && fresh.NeedsApply);
+        }
+        finally
+        {
+            window?.Close();
+            plugins.Clear();
+            plugins.AddRange(backup);
+        }
+    }
+
+    /// <summary>
+    /// Tab 样式放在公共样式里，两个窗口共用，键写错只有运行时才炸。极客界面的构造函数第一句就是
+    /// InitializeComponent，传 null 会在 XAML 全部加载之后、碰到设置之前抛异常，正好只验证 XAML。
+    /// </summary>
+    static void CheckGeekWindowLoads()
+    {
+        string? xamlError = null;
+        try
+        {
+            _ = new VPetLLM.UI.Windows.winSettingNew(null!);
+        }
+        catch (System.Windows.Markup.XamlParseException ex)
+        {
+            xamlError = ex.Message;
+        }
+        catch (NullReferenceException)
+        {
+            // 预期：XAML 已经加载完
+        }
+        Check("极客界面 XAML 能加载", xamlError is null, xamlError ?? "");
+    }
+
+    /// <summary>让 Dispatcher 转起来，直到条件成立或超时。</summary>
+    static void Pump(Func<bool> done)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (!done() && DateTime.UtcNow < deadline)
+        {
+            var frame = new System.Windows.Threading.DispatcherFrame();
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background, new Action(() => frame.Continue = false));
+            System.Windows.Threading.Dispatcher.PushFrame(frame);
+            Thread.Sleep(10);
         }
     }
 
