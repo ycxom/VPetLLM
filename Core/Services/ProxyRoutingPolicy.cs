@@ -52,6 +52,8 @@ namespace VPetLLM.Core.Services
 
             var host = uri.Host;
             var isRewriteService = host.Contains("ghfast", StringComparison.OrdinalIgnoreCase)
+                || host.Contains("gh-proxy", StringComparison.OrdinalIgnoreCase)
+                || host.Contains("ghproxy", StringComparison.OrdinalIgnoreCase)
                 || host.Contains("github", StringComparison.OrdinalIgnoreCase)
                 || host.Contains("raw.githubusercontent", StringComparison.OrdinalIgnoreCase);
 

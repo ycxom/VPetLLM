@@ -2575,10 +2575,10 @@
       "jp": "プロキシアドレス"
     },
     "ProxyUrlNote": {
-      "en": "Example: https://ghfast.top (for accelerating GitHub access in regions with connectivity issues)",
-      "zh-hans": "示例: https://ghfast.top (用于加速中国大陆等访问GitHub困难使用)",
-      "zh-hant": "示例: https://ghfast.top (用於加速中國大陸等訪問GitHub困難使用)",
-      "jp": "例: https://ghfast.top (中国本土などGitHubアクセスが困難な地域での高速化用)"
+      "en": "Example: https://ghfast.top. When on, the proxy list from the cloud and a direct connection are speed-tested and the fastest is used for downloads; this address is tested too. A local proxy such as 127.0.0.1:7890 is used as is, without testing.",
+      "zh-hans": "示例: https://ghfast.top。开启后会自动测速云端代理列表和直连，下载时用最快的线路，这里填的地址也一起测速。填本地代理（如 127.0.0.1:7890）时只走本地代理，不测速。",
+      "zh-hant": "示例: https://ghfast.top。開啟後會自動測速雲端代理列表和直連，下載時用最快的線路，這裡填的地址也一起測速。填本地代理（如 127.0.0.1:7890）時只走本地代理，不測速。",
+      "jp": "例: https://ghfast.top。有効にするとクラウドのプロキシ一覧と直接接続の速度を自動で測定し、最速の経路でダウンロードします。ここに入力した宛先も測定します。ローカルプロキシ（127.0.0.1:7890 など）はそのまま使用し、測定しません。"
     }
   },
   "Error": {

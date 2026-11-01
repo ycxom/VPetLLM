@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -48,6 +49,7 @@ static class Program
             Test_Persistence(dir);
             Test_PluginCatalog();
             Test_PluginHashFailure(dir).GetAwaiter().GetResult();
+            Test_PluginRoutes(dir).GetAwaiter().GetResult();
             Test_PluginPanelLoads(dir);
             Test_Localization();
         }
@@ -395,6 +397,131 @@ static class Program
         }
     }
 
+    /// <summary>
+    /// 代理池接进商店后的走向：哪条线路先试、坏线路换下一条、哈希校验一点不松。
+    /// 故意留一个所有线路都校验不过的附属文件，让流程停在加载插件之前，不去动真实的插件目录。
+    /// </summary>
+    static async Task Test_PluginRoutes(string dir)
+    {
+        Console.WriteLine("\n[插件下载线路]");
+
+        const string catalogUrl = "https://raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json";
+        const string catalogPath = "raw.githubusercontent.com/ycxom/VPetLLM_Plugin/refs/heads/main/PluginList.json";
+        const string dllPath = "github.com/o/r/raw/a.dll";
+        const string goodExtraPath = "github.com/o/r/raw/good.dat";
+        const string badExtraPath = "github.com/o/r/raw/bad.dat";
+
+        static string Hash(byte[] bytes) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+
+        var catalog = Encoding.UTF8.GetBytes("{\"A\":{\"Name\":\"a\",\"File\":\"https://github.com/o/r/raw/a.dll\"}}");
+        var goodDll = Encoding.UTF8.GetBytes("good dll");
+        var badDll = Encoding.UTF8.GetBytes("tampered dll");
+        var goodExtra = Encoding.UTF8.GetBytes("good extra");
+
+        var fetched = new List<string>();
+        Func<string, CancellationToken, Task<byte[]>> fetch = async (url, token) =>
+        {
+            lock (fetched) fetched.Add(url);
+            if (url.EndsWith("GitHub_Proxy.json"))
+            {
+                return Encoding.UTF8.GetBytes("{\"proxies\":[\"https://slow.test\",\"https://fast.test\"]}");
+            }
+            if (url == $"https://slow.test/{catalogPath}") { await Task.Delay(300, token); return catalog; }
+            if (url == $"https://fast.test/{catalogPath}") return catalog;
+            throw new HttpRequestException("unreachable");
+        };
+
+        var pool = new GitHubProxyPool(Path.Combine(dir, $"routes-{Guid.NewGuid():N}.db"), catalogUrl,
+            new[] { "https://list.test/GitHub_Proxy.json" }, fetch, () => DateTime.UtcNow);
+
+        var requested = new List<string>();
+        var downloads = new FakeDownloads(requested, new Dictionary<string, byte[]>
+        {
+            [$"https://fast.test/{dllPath}"] = badDll,
+            [$"https://slow.test/{dllPath}"] = goodDll,
+            [$"https://slow.test/{goodExtraPath}"] = goodExtra,
+            [$"https://fast.test/{badExtraPath}"] = badDll,
+            [$"https://slow.test/{badExtraPath}"] = badDll,
+            [$"https://ghfast.top/{badExtraPath}"] = badDll,
+            [$"https://{badExtraPath}"] = badDll
+        });
+
+        var plugin = (VPetLLM.VPetLLM)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(VPetLLM.VPetLLM));
+        var settings = Fresh(dir);
+        settings.PluginStore.UseProxy = true;
+        settings.PluginStore.ProxyUrl = "https://ghfast.top";
+        plugin.Settings = settings;
+        var store = new PluginStoreService(plugin, pool, () => downloads);
+
+        var pluginDir = Path.Combine(dir, $"routes-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(pluginDir);
+        var dllFile = Path.Combine(pluginDir, "a.dll");
+        var item = new UnifiedPluginItem
+        {
+            IsLocal = true,
+            LocalPlugin = new FakePlugin { FilePath = dllFile },
+            Id = "a",
+            Name = "a",
+            FileUrl = $"https://{dllPath}",
+            SHA256 = Hash(goodDll),
+            Extra = new List<PluginExtraFile>
+            {
+                new() { Name = "good.dat", FileUrl = $"https://{goodExtraPath}", SHA256 = Hash(goodExtra) },
+                new() { Name = "bad.dat", FileUrl = $"https://{badExtraPath}", SHA256 = Hash(goodExtra) }
+            }
+        };
+
+        var result = await store.InstallOrUpdateAsync(item);
+
+        var dllRequests = requested.Where(r => r.EndsWith("a.dll")).ToList();
+        Check("先试最快的线路", dllRequests.FirstOrDefault() == $"https://fast.test/{dllPath}", string.Join(", ", dllRequests));
+        Check("哈希对不上就换下一条线路", dllRequests.Count == 2 && dllRequests[1] == $"https://slow.test/{dllPath}", string.Join(", ", dllRequests));
+        Check("写进去的是校验通过的那份", File.Exists(dllFile) && File.ReadAllBytes(dllFile).SequenceEqual(goodDll));
+        Check("附属文件一条线路失败就换下一条", File.Exists(Path.Combine(pluginDir, "good.dat"))
+            && File.ReadAllBytes(Path.Combine(pluginDir, "good.dat")).SequenceEqual(goodExtra));
+        Check("附属文件所有线路都校验不过就判失败", !result.Success && result.Reason.Contains("bad.dat"), result.Reason);
+        Check("校验不过的附属文件不落盘", !File.Exists(Path.Combine(pluginDir, "bad.dat")));
+        Check("所有线路都试过才放弃", requested.Count(r => r.EndsWith("bad.dat")) == 4, string.Join(", ", requested));
+
+        var id = $"routes-check-{Guid.NewGuid():N}";
+        var target = Path.Combine(VPetLLM.Utils.Plugin.PluginManager.PluginPath, $"{id}.dll");
+        var refused = await store.InstallOrUpdateAsync(new UnifiedPluginItem
+        {
+            Id = id, Name = id, FileUrl = $"https://{dllPath}", SHA256 = "expected"
+        });
+        Check("多线路下校验不过仍然拒绝", !refused.Success && !refused.Silent);
+        Check("多线路下校验不过文件不落地", !File.Exists(target));
+
+        await pool.WaitForIdleAsync();
+
+        var fetchCount = fetched.Count;
+        requested.Clear();
+        downloads.Files[catalogUrl] = catalog;
+
+        settings.PluginStore.ProxyUrl = "127.0.0.1:7890";
+        Check("本地 HTTP 代理照常拉清单", (await store.FetchCatalogAsync()).ContainsKey("A"));
+        Check("本地 HTTP 代理不走代理池", fetched.Count == fetchCount && requested.SequenceEqual(new[] { catalogUrl }));
+
+        requested.Clear();
+        await store.InstallOrUpdateAsync(new UnifiedPluginItem
+        {
+            Id = id, Name = id, FileUrl = $"https://{badExtraPath}", SHA256 = "expected"
+        });
+        Check("本地 HTTP 代理下载不换线路", requested.Count == 3 && requested.All(r => r == $"https://{badExtraPath}"), string.Join(", ", requested));
+        requested.Clear();
+
+        settings.PluginStore.UseProxy = false;
+        settings.PluginStore.ProxyUrl = "https://ghfast.top";
+        Check("关掉代理照常拉清单", (await store.FetchCatalogAsync()).ContainsKey("A"));
+        Check("关掉代理不走代理池", fetched.Count == fetchCount && requested.SequenceEqual(new[] { catalogUrl }));
+
+        settings.PluginStore.UseProxy = true;
+        requested.Clear();
+        Check("镜像模式经代理池拉清单", (await store.FetchCatalogAsync()).ContainsKey("A"));
+        Check("镜像模式不绕过代理池直接请求", fetched.Count > fetchCount && requested.Count == 0);
+        await pool.WaitForIdleAsync();
+    }
+
     /// <summary>XAML 里的样式键写错只有运行时才炸，这里真的加载并排版一次，顺带核对每行露出的按钮。</summary>
     static void Test_PluginPanelLoads(string dir)
     {
@@ -661,6 +788,30 @@ static class Program
         Check("极客界面的设置按钮绑定 CanRunSettingAction", xaml.Contains($"{{Binding {nameof(UnifiedPluginItem.CanRunSettingAction)}}}"));
         Check("极客界面的点击处理等了插件", code.Contains($"await _pluginStore.{nameof(PluginStoreService.RunSettingActionAsync)}(plugin)"));
     }
+}
+
+class FakeDownloads : HttpMessageHandler
+{
+    private readonly List<string> _requested;
+
+    public FakeDownloads(List<string> requested, Dictionary<string, byte[]> files)
+    {
+        _requested = requested;
+        Files = files;
+    }
+
+    public Dictionary<string, byte[]> Files { get; }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var url = request.RequestUri!.ToString();
+        lock (_requested) _requested.Add(url);
+        return Task.FromResult(Files.TryGetValue(url, out var body)
+            ? new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(body) }
+            : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+    }
+
+    protected override void Dispose(bool disposing) { }
 }
 
 class FakePlugin : IVPetLLMPlugin

@@ -83,11 +83,21 @@ namespace VPetLLM.Core.Services
         // 列表只有几 KB，连不上就该尽快告诉用户。下载插件文件不用这个超时，大文件慢是正常的。
         private static readonly TimeSpan CatalogTimeout = TimeSpan.FromSeconds(20);
 
-        private readonly global::VPetLLM.VPetLLM _plugin;
+        // 完整设置和简易界面各有一个 PluginStoreService，测速结果要共用
+        private static readonly GitHubProxyPool SharedProxyPool = new GitHubProxyPool(CatalogUrl);
 
-        public PluginStoreService(global::VPetLLM.VPetLLM plugin)
+        private readonly global::VPetLLM.VPetLLM _plugin;
+        private readonly GitHubProxyPool _proxyPool;
+        private readonly Func<HttpMessageHandler>? _handlerFactory;
+
+        public PluginStoreService(
+            global::VPetLLM.VPetLLM plugin,
+            GitHubProxyPool? proxyPool = null,
+            Func<HttpMessageHandler>? handlerFactory = null)
         {
             _plugin = plugin;
+            _proxyPool = proxyPool ?? SharedProxyPool;
+            _handlerFactory = handlerFactory;
         }
 
         private PluginStoreProxyDecision ResolveProxy()
@@ -100,7 +110,27 @@ namespace VPetLLM.Core.Services
             => ProxyRoutingPolicy.BuildPluginStoreUrl(ResolveProxy(), originalUrl);
 
         private HttpClient CreateClient()
-            => new HttpClient(ProxyRoutingPolicy.CreatePluginStoreHandler(ResolveProxy()));
+            => new HttpClient(_handlerFactory?.Invoke() ?? ProxyRoutingPolicy.CreatePluginStoreHandler(ResolveProxy()));
+
+        /// <summary>
+        /// 这次下载依次要试的线路。只有用镜像改写地址时才进代理池：关了代理就是不走代理，
+        /// 填了本地 HTTP 代理说明用户有自己的线路，都不替他探测。
+        /// </summary>
+        private async Task<IReadOnlyList<PluginStoreProxyDecision>> ResolveDownloadRoutesAsync()
+        {
+            var decision = ResolveProxy();
+            if (decision.Mode != PluginStoreProxyMode.UrlRewrite)
+            {
+                return new[] { decision };
+            }
+
+            var routes = await _proxyPool.GetDownloadRoutesAsync(decision.ProxyUrl).ConfigureAwait(false);
+            return routes
+                .Select(route => route == GitHubProxyPool.DirectRoute
+                    ? new PluginStoreProxyDecision(PluginStoreProxyMode.Direct)
+                    : new PluginStoreProxyDecision(PluginStoreProxyMode.UrlRewrite, route))
+                .ToList();
+        }
 
         /// <summary>
         /// 跑插件的设置入口，打不开时返回给用户看的说明，打开了返回 null。
@@ -145,6 +175,12 @@ namespace VPetLLM.Core.Services
         /// <summary>拉取商店清单。连不上时抛异常，由调用方决定怎么退回离线显示。</summary>
         public async Task<Dictionary<string, JObject>> FetchCatalogAsync()
         {
+            var decision = ResolveProxy();
+            if (decision.Mode == PluginStoreProxyMode.UrlRewrite)
+            {
+                return await _proxyPool.FetchCatalogAsync(decision.ProxyUrl).ConfigureAwait(false);
+            }
+
             using var client = CreateClient();
             client.Timeout = CatalogTimeout;
             var json = await client.GetStringAsync(BuildUrl(CatalogUrl)).ConfigureAwait(false);
@@ -493,11 +529,12 @@ namespace VPetLLM.Core.Services
         /// <summary>
         /// 下载插件声明的附属数据文件，逐个校验哈希后写进插件目录。
         ///
-        /// 任何一个下载或校验失败都判整次安装失败。附属文件里装的是安全规则这类东西，
-        /// 带着一份来路不明的版本上线，比干脆装不上危险得多——所以这里不做"尽力而为"。
+        /// 任何一个文件所有线路都下载或校验失败，就判整次安装失败。附属文件里装的是安全规则
+        /// 这类东西，带着一份来路不明的版本上线，比干脆装不上危险得多——所以这里不做"尽力而为"。
         /// </summary>
         /// <returns>成功返回 null；失败返回给用户看的错误信息。</returns>
-        private async Task<string> DownloadExtraFilesAsync(HttpClient client, UnifiedPluginItem plugin, string targetDir)
+        private async Task<string> DownloadExtraFilesAsync(
+            HttpClient client, UnifiedPluginItem plugin, string targetDir, IReadOnlyList<PluginStoreProxyDecision> routes)
         {
             if (plugin.Extra is null || plugin.Extra.Count == 0) return null;
             if (string.IsNullOrEmpty(targetDir)) return "无法确定插件目录，附属文件安装失败";
@@ -523,32 +560,44 @@ namespace VPetLLM.Core.Services
                     return $"附属文件缺少 SHA256，拒绝安装: {safeName}";
                 }
 
-                try
+                string failure = null;
+                foreach (var route in routes)
                 {
-                    var url = BuildUrl(extra.FileUrl);
-                    Logger.Log($"Downloading extra file: {url}");
-                    var bytes = await client.GetByteArrayAsync(url);
-
-                    string actual;
-                    using (var sha256 = SHA256.Create())
+                    try
                     {
-                        actual = BitConverter.ToString(sha256.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
-                    }
+                        var url = ProxyRoutingPolicy.BuildPluginStoreUrl(route, extra.FileUrl);
+                        Logger.Log($"Downloading extra file: {url}");
+                        var bytes = await client.GetByteArrayAsync(url);
 
-                    if (actual != expected)
+                        string actual;
+                        using (var sha256 = SHA256.Create())
+                        {
+                            actual = BitConverter.ToString(sha256.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
+                        }
+
+                        if (actual != expected)
+                        {
+                            Logger.Log($"Extra file hash mismatch for {safeName}: expected {expected}, got {actual}");
+                            failure = $"附属文件校验失败: {safeName}（期望 {expected}，实际 {actual}）";
+                            continue;
+                        }
+
+                        var destination = Path.Combine(targetDir, safeName);
+                        File.WriteAllBytes(destination, bytes);
+                        Logger.Log($"Extra file written to: {destination}");
+                        failure = null;
+                        break;
+                    }
+                    catch (Exception ex)
                     {
-                        Logger.Log($"Extra file hash mismatch for {safeName}: expected {expected}, got {actual}");
-                        return $"附属文件校验失败: {safeName}（期望 {expected}，实际 {actual}）";
+                        Logger.Log($"Failed to install extra file {safeName}: {ex.Message}");
+                        failure = $"附属文件下载失败: {safeName} - {ex.Message}";
                     }
-
-                    var destination = Path.Combine(targetDir, safeName);
-                    File.WriteAllBytes(destination, bytes);
-                    Logger.Log($"Extra file written to: {destination}");
                 }
-                catch (Exception ex)
+
+                if (failure is not null)
                 {
-                    Logger.Log($"Failed to install extra file {safeName}: {ex.Message}");
-                    return $"附属文件下载失败: {safeName} - {ex.Message}";
+                    return failure;
                 }
             }
 
@@ -602,17 +651,19 @@ namespace VPetLLM.Core.Services
             {
                 using (var client = CreateClient())
                 {
-                    var downloadUrl = BuildUrl(plugin.FileUrl);
+                    var routes = await ResolveDownloadRoutesAsync();
                     byte[] data = null;
                     string downloadedFileHash = null;
                     bool downloadSuccess = false;
 
-                    // 重试下载机制
-                    for (int attempt = 1; attempt <= 3; attempt++)
+                    // 重试下载机制：线路够多时每次换一条，不够时在现有线路上重试
+                    var attempts = Math.Max(3, routes.Count);
+                    for (int attempt = 1; attempt <= attempts; attempt++)
                     {
                         try
                         {
-                            Logger.Log($"Downloading plugin (attempt {attempt}/3): {downloadUrl}");
+                            var downloadUrl = ProxyRoutingPolicy.BuildPluginStoreUrl(routes[(attempt - 1) % routes.Count], plugin.FileUrl);
+                            Logger.Log($"Downloading plugin (attempt {attempt}/{attempts}): {downloadUrl}");
                             data = await client.GetByteArrayAsync(downloadUrl);
                             Logger.Log($"Downloaded {data.Length} bytes");
 
@@ -636,7 +687,7 @@ namespace VPetLLM.Core.Services
                             else
                             {
                                 Logger.Log($"File validation failed on attempt {attempt}");
-                                if (attempt < 3)
+                                if (attempt < attempts)
                                 {
                                     Logger.Log("Retrying download...");
                                     await Task.Delay(1000); // 等待1秒后重试
@@ -646,7 +697,7 @@ namespace VPetLLM.Core.Services
                         catch (Exception ex)
                         {
                             Logger.Log($"Download attempt {attempt} failed: {ex.Message}");
-                            if (attempt < 3)
+                            if (attempt < attempts)
                             {
                                 await Task.Delay(1000);
                             }
@@ -770,7 +821,7 @@ namespace VPetLLM.Core.Services
 
                     // 附属数据文件必须赶在插件被加载之前就位：插件在 Initialize 里就要读它们，
                     // 晚一步 TerminalPlugin 这类就会直接进 fail-closed 保护模式。
-                    var extraError = await DownloadExtraFilesAsync(client, plugin, Path.GetDirectoryName(filePath));
+                    var extraError = await DownloadExtraFilesAsync(client, plugin, Path.GetDirectoryName(filePath), routes);
                     if (extraError is not null)
                     {
                         return PluginOperationResult.Fail(extraError);
