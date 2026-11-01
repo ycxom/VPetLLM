@@ -61,6 +61,8 @@ namespace VPetLLM
         /// 设置窗口（向后兼容）
         /// </summary>
         public winSettingNew? SettingWindow;
+        public UI.Windows.winSimpleSetting? SimpleSettingWindow;
+        public UI.Windows.winOnboarding? OnboardingWindow;
 
         /// <summary>
         /// 动作处理器
@@ -1204,16 +1206,98 @@ namespace VPetLLM
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                if (SettingWindow is null || !SettingWindow.IsVisible)
+                // 三个窗口互斥：完整窗口按控件整体写回设置，同时开着时别处的修改会被旧控件值盖掉
+                if (OnboardingWindow is not null)
+                {
+                    OnboardingWindow.Activate();
+                }
+                else if (SettingWindow?.IsVisible == true)
+                {
+                    SettingWindow.Activate();
+                }
+                else if (SimpleSettingWindow is not null)
+                {
+                    SimpleSettingWindow.Activate();
+                }
+                else if (Settings.UseSimpleSettings)
+                {
+                    SimpleSettingWindow = new UI.Windows.winSimpleSetting(this);
+                    SimpleSettingWindow.Show();
+                }
+                else
                 {
                     SettingWindow = new winSettingNew(this);
                     SettingWindow.Show();
                 }
-                else
-                {
-                    SettingWindow.Activate();
-                }
             });
+        }
+
+        /// <summary>
+        /// 记住设置模式并打开对应窗口。调用方负责先保存并关掉自己。
+        /// </summary>
+        public void SwitchSettingsMode(bool simple)
+        {
+            Settings.UseSimpleSettings = simple;
+            Settings.Save();
+            Setting();
+        }
+
+        /// <summary>
+        /// 打开新手引导。<paramref name="firstRun"/> 为首次自动弹出，设置界面默认选简易；
+        /// 从设置里手动重开时默认保持当前界面。
+        /// </summary>
+        public UI.Windows.winOnboarding ShowOnboarding(bool firstRun)
+        {
+            if (OnboardingWindow is not null)
+            {
+                OnboardingWindow.Activate();
+                return OnboardingWindow;
+            }
+
+            OnboardingWindow = new UI.Windows.winOnboarding(this, firstRun);
+            OnboardingWindow.Show();
+            OnboardingWindow.Activate();
+            return OnboardingWindow;
+        }
+
+        /// <summary>引导结束（完成或跳过都算），之后不再自动弹，并记住用户选的设置界面。</summary>
+        public void CompleteOnboarding(bool simple)
+        {
+            Settings.OnboardingCompleted = true;
+            Settings.UseSimpleSettings = simple;
+            Settings.Save();
+        }
+
+        /// <summary>
+        /// 让简易设置和新手引导写回的内容生效，副作用顺序和完整设置窗口保存时一致。
+        /// 渠道每次请求实时读取，所以聊天核心只在提供商变化或调用方要求时才重建。
+        /// </summary>
+        public void ApplyQuickSettings(Setting.LLMType oldProvider, bool rebuildChatCore = false)
+        {
+            Settings.SyncPrimaryProvider();
+            UpdateTTSService();
+            UpdateVoiceInputHotkey();
+            Settings.Save();
+
+            if (rebuildChatCore || oldProvider != Settings.Provider)
+            {
+                ChatCore?.SaveHistory();
+                UpdateChatCore(new RoutedChatCore(Settings, MW, ActionProcessor));
+            }
+            UpdateActionProcessor();
+        }
+
+        /// <summary>
+        /// 把宿主的聊天接口切到 VPetLLM。要放在 <see cref="ApplyQuickSettings"/> 之后：
+        /// 重建聊天核心会换掉 TalkBox，宿主这边是按名字取新下标。
+        /// </summary>
+        public bool SetAsDefaultChatPlugin()
+        {
+            if (!VPetHostAdapter.TrySelectTalkApi(MW, "VPetLLM"))
+                return false;
+
+            _defaultPluginChecker?.ForceRecheck();
+            return true;
         }
 
         /// <summary>宿主已经在走退出流程。<see cref="Save"/> 会据此改成同步等待落盘。</summary>
@@ -1883,8 +1967,46 @@ namespace VPetLLM
 
         private async Task RunStartupChecksAsync()
         {
+            await RunOnboardingIfNeededAsync();
+
+            // 引导也可能是被退出流程关掉的，窗口都清扫完了就别再弹更新提示
+            if (_isShuttingDown) return;
+
             await RunStartupVersionCheckAsync();
             await RunStartupProxyOptimizationAsync();
+        }
+
+        /// <summary>
+        /// 首次使用弹新手引导，等它关掉再往下走：更新提示和代理优化窗口都是给配好的用户看的，
+        /// 不该和引导抢焦点。
+        /// </summary>
+        private async Task RunOnboardingIfNeededAsync()
+        {
+            try
+            {
+                var firstRun = QuickSetupService.ShouldShowOnboarding(Settings);
+                if (!firstRun && !Settings.ShowOnboardingOnStartup) return;
+
+                // LoadPlugin 时桌宠还没露面，稍等一下，别让引导先于桌宠出现
+                await Task.Delay(TimeSpan.FromSeconds(2));
+
+                var closed = new TaskCompletionSource();
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    // 这两秒里用户已经自己打开了设置，就不再打断
+                    if (SettingWindow is not null || SimpleSettingWindow is not null)
+                    {
+                        closed.TrySetResult();
+                        return;
+                    }
+                    ShowOnboarding(firstRun).Closed += (_, _) => closed.TrySetResult();
+                });
+                await closed.Task;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to show onboarding", ex);
+            }
         }
 
         private async Task RunStartupVersionCheckAsync()
@@ -2148,6 +2270,14 @@ namespace VPetLLM
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
+                if (OnboardingWindow is not null)
+                {
+                    OnboardingWindow.Activate();
+                    return;
+                }
+
+                // 诊断建议要用户改的项简易窗口里可能没有，这里始终进完整窗口
+                SimpleSettingWindow?.Close();
                 if (SettingWindow is null || !SettingWindow.IsLoaded)
                 {
                     SettingWindow = new UI.Windows.winSettingNew(this);

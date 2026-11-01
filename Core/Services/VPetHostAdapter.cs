@@ -238,6 +238,45 @@ namespace VPetLLM.Core.Services
             return true;
         }
 
+        // ---- MainWindow 聊天接口选择（TalkAPIIndex / RemoveTalkBox / LoadTalkDIY，接口包未暴露）----
+
+        /// <summary>
+        /// 把宿主的聊天接口切到指定 API，效果等同于在宿主设置里选"DIY"并选中它。
+        /// 成员缺失或 API 未注册时返回 false，调用方提示用户去宿主设置手动选择。
+        /// </summary>
+        public static bool TrySelectTalkApi(IMainWindow mainWindow, string apiName)
+        {
+            if (mainWindow is null) return false;
+
+            var type = mainWindow.GetType();
+            var indexField = type.GetField("TalkAPIIndex");
+            var removeMethod = type.GetMethod("RemoveTalkBox");
+            var loadMethod = type.GetMethod("LoadTalkDIY");
+            if (indexField is null || removeMethod is null || loadMethod is null)
+            {
+                Logger.Log("VPetHostAdapter: 当前 VPet 版本缺少聊天接口切换成员，需手动在宿主设置里选择");
+                return false;
+            }
+
+            var index = mainWindow.TalkAPI.FindIndex(api => api.APIName == apiName);
+            if (index < 0)
+            {
+                Logger.Log($"VPetHostAdapter: 聊天接口 '{apiName}' 尚未注册");
+                return false;
+            }
+
+            // RemoveTalkBox 按当前下标摘聊天框，必须在改下标之前调，否则旧聊天框留在界面上
+            removeMethod.Invoke(mainWindow, null);
+            indexField.SetValue(mainWindow, index);
+
+            var config = mainWindow.Set["CGPT"];
+            config[(LinePutScript.gstr)"type"] = "DIY";
+            config[(LinePutScript.gstr)"DIY"] = apiName;
+
+            loadMethod.Invoke(mainWindow, null);
+            return true;
+        }
+
         // ---- Core.Controller 成员（移动区域，接口包未暴露）----
         private static volatile Type _controllerType;
         private static PropertyInfo _isPrimaryScreenProperty;

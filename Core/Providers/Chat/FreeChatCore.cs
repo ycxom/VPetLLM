@@ -860,7 +860,14 @@ namespace VPetLLM.Core.Providers.Chat
                 if (response.IsSuccessStatusCode)
                 {
                     var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
-                    return responseObj?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "总结失败";
+                    var summary = responseObj?["choices"]?[0]?["message"]?["content"]?.ToString();
+                    if (summary is not null) return summary;
+
+                    // 不能返回错误文字：调用方会把它当总结存进上下文，连接测试也会显示成功
+                    Logger.Log($"Free Summarize 响应没有内容: {responseContent}");
+                    throw new SummarizeFailedException(ShowDetailedErrors
+                        ? $"API调用失败: 响应没有内容 - {responseContent}"
+                        : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败"));
                 }
                 else
                 {
@@ -876,8 +883,9 @@ namespace VPetLLM.Core.Providers.Chat
                     }
 
                     Logger.Log($"Free Summarize 错误: {response.StatusCode} - {responseContent}");
-                    throw new SummarizeFailedException(
-                        ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败")
+                    throw new SummarizeFailedException(ShowDetailedErrors
+                        ? $"API调用失败: {response.StatusCode} - {responseContent}"
+                        : (ErrorMessageHelper.GetSummarizeError(Settings) ?? "总结失败"))
                     { StatusCode = response.StatusCode };
                 }
             }

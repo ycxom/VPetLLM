@@ -212,6 +212,17 @@ namespace VPetLLM.Core.Providers.Chat
         };
 
         /// <summary>
+        /// 连接测试用的系统提示词。
+        ///
+        /// Free 网关只放行 Prompt.json 里的提示词，其余一律伪装成随机 5xx 拒掉，测到的就是
+        /// 网关而不是后端，所以 Free 借真实总结用的那条。固定用 en：网关名单只有 en/zh，
+        /// 而测试并不关心模型回什么语言。
+        /// </summary>
+        public static string ProbePromptFor(Setting.ChannelNodeBase node) => node is Setting.FreeNodeSetting
+            ? Utils.Common.PromptHelper.Get("Context_Summary_Prefix", "en")
+            : "You are a connectivity probe. Reply with the single word OK.";
+
+        /// <summary>
         /// 测试一个渠道能不能用：发一次最小的请求，记下耗时和结果。
         ///
         /// 走的是各渠道真实的请求代码（协议、代理、鉴权、Free 的签名都一样），只是换成
@@ -235,9 +246,7 @@ namespace VPetLLM.Core.Providers.Chat
             ChannelTestResult result;
             try
             {
-                var request = worker.Summarize(
-                    "You are a connectivity probe. Reply with the single word OK.",
-                    "ping");
+                var request = worker.Summarize(ProbePromptFor(probe), "ping");
                 var finished = await Task.WhenAny(request, Task.Delay(TimeSpan.FromSeconds(timeout), cancellationToken));
                 sw.Stop();
 

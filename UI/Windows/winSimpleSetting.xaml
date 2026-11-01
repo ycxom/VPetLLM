@@ -1,0 +1,164 @@
+<Window x:Class="VPetLLM.UI.Windows.winSimpleSetting"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:utils="clr-namespace:VPetLLM.Utils.Localization"
+        xmlns:controls="clr-namespace:VPetLLM.UI.Controls"
+        Title="{utils:Localize KeyPath=QuickSetup.SimpleTitle, Default=VPetLLM 设置}"
+        Width="640"
+        Height="760"
+        MinWidth="520"
+        MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BackgroundBrush}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/QuickSetup.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Style="{StaticResource QuickTitle}" VerticalAlignment="Center" Margin="0"
+                       Text="{utils:Localize KeyPath=QuickSetup.SimpleTitle, Default=VPetLLM 设置}"/>
+            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Click="Advanced_Click"
+                    Content="{utils:Localize KeyPath=QuickSetup.GeekMode, Default=极客界面}"/>
+        </Grid>
+
+        <Border x:Name="Panel_NotDefault" Grid.Row="1" Margin="0,0,0,12" Padding="14,12" CornerRadius="8"
+                Background="{StaticResource QuickNoticeBackgroundBrush}"
+                BorderBrush="{StaticResource WarningBrush}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource QuickGuideLine}" Margin="0,0,12,0"
+                           VerticalAlignment="Center"
+                           Text="{utils:Localize KeyPath=QuickSetup.NotDefaultNotice, Default=桌宠现在用的不是 VPetLLM，聊天框不会经过 AI。}"/>
+                <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Click="SetDefault_Click"
+                        Content="{utils:Localize KeyPath=QuickSetup.SetDefaultNow, Default=一键设置}"/>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,0,8,0">
+                <Border Style="{StaticResource CardContainer}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource QuickCardTitle}"
+                                           Text="{utils:Localize KeyPath=QuickSetup.CardChannel, Default=AI 服务}"/>
+                                <TextBlock x:Name="Tb_ChannelSummary" Style="{StaticResource QuickHint}"/>
+                            </StackPanel>
+                            <Button x:Name="Btn_ChangeChannel" Grid.Column="1" Style="{StaticResource SecondaryButton}"
+                                    VerticalAlignment="Center" Click="ChangeChannel_Click"
+                                    Content="{utils:Localize KeyPath=QuickSetup.ChangeChannel, Default=更换}"/>
+                        </Grid>
+                        <Border x:Name="Host_Channel" Margin="0,12,0,0" Visibility="Collapsed">
+                            <controls:QuickChannelPanel/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardContainer}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource QuickCardTitle}" Margin="0,0,0,10"
+                                   Text="{utils:Localize KeyPath=QuickSetup.CardProfile, Default=桌宠设定}"/>
+                        <Border x:Name="Host_Profile">
+                            <controls:QuickProfilePanel/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardContainer}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource QuickCardTitle}" Margin="0,0,0,10"
+                                   Text="{utils:Localize KeyPath=QuickSetup.CardFeatures, Default=功能开关}"/>
+                        <CheckBox x:Name="Cb_EnableAction" Style="{StaticResource ModernCheckBox}"
+                                  Content="{utils:Localize KeyPath=QuickSetup.EnableAction, Default=让桌宠根据对话做动作和反应}"/>
+                        <CheckBox x:Name="Cb_EnableBuy" Style="{StaticResource ModernCheckBox}" Margin="0,10,0,0"
+                                  Content="{utils:Localize KeyPath=QuickSetup.EnableBuy, Default=允许桌宠购买物品}"/>
+                        <CheckBox x:Name="Cb_ReadAloud" Style="{StaticResource ModernCheckBox}" Margin="0,10,0,0"
+                                  Content="{utils:Localize KeyPath=QuickSetup.ReadAloud, Default=朗读桌宠的回复}"/>
+                        <TextBlock x:Name="Tb_ReadAloudHint" Style="{StaticResource QuickHint}" Margin="26,3,0,0"
+                                   Text="{utils:Localize KeyPath=QuickSetup.ReadAloudByPlugin, Default=检测到 VPetTTS 插件，朗读由它负责，请在它的设置里修改。}"/>
+                        <CheckBox x:Name="Cb_VoiceInput" Style="{StaticResource ModernCheckBox}" Margin="0,10,0,0"
+                                  Content="{utils:Localize KeyPath=QuickSetup.VoiceInput, Default=语音输入}"/>
+                        <TextBlock x:Name="Tb_VoiceInputHint" Style="{StaticResource QuickHint}" Margin="26,3,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardContainer}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource QuickCardTitle}"
+                                           Text="{utils:Localize KeyPath=QuickSetup.CardPlugins, Default=插件}"/>
+                                <TextBlock x:Name="Tb_PluginSummary" Style="{StaticResource QuickHint}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
+                                    Click="BrowsePlugins_Click"
+                                    Content="{utils:Localize KeyPath=QuickSetup.BrowsePlugins, Default=浏览插件}"/>
+                        </Grid>
+                        <Border x:Name="Host_Plugins" Margin="0,12,0,0" Visibility="Collapsed">
+                            <controls:QuickPluginPanel/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardContainer}" Margin="0,0,0,4">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource QuickCardTitle}"
+                                           Text="{utils:Localize KeyPath=QuickSetup.CardHelp, Default=需要帮助？}"/>
+                                <TextBlock Style="{StaticResource QuickHint}"
+                                           Text="{utils:Localize KeyPath=QuickSetup.HelpDesc, Default=重新走一遍新手引导，一步步检查设置。}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
+                                    Click="Onboarding_Click"
+                                    Content="{utils:Localize KeyPath=QuickSetup.RunOnboarding, Default=新手引导}"/>
+                        </Grid>
+                        <CheckBox x:Name="Cb_ShowOnboardingOnStartup" Style="{StaticResource ModernCheckBox}" Margin="0,10,0,0"
+                                  Content="{utils:Localize KeyPath=QuickSetup.ShowOnStartup, Default=启动时打开新手引导}"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="3" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="Tb_Status" Style="{StaticResource QuickHint}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+            <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" MinWidth="110" Click="Save_Click"
+                    Content="{utils:Localize KeyPath=QuickSetup.Save, Default=保存}"/>
+        </Grid>
+    </Grid>
+</Window>

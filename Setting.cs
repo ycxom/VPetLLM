@@ -203,6 +203,22 @@ namespace VPetLLM
         public List<string> HandledProxyRecommendations { get; set; } = new();
 
         /// <summary>
+        /// 新手引导走完或被跳过。之后不再自动弹，只能从设置里手动重开。
+        /// </summary>
+        public bool OnboardingCompleted { get; set; } = false;
+
+        /// <summary>
+        /// 打开设置时进简易模式。默认关：老用户升级后还是原来的完整窗口，
+        /// 只有首次引导带进来的新手才切过去。
+        /// </summary>
+        public bool UseSimpleSettings { get; set; } = false;
+
+        /// <summary>
+        /// 每次启动都打开新手引导，方便反复检查引导界面。不算首次引导，不会切换设置模式。
+        /// </summary>
+        public bool ShowOnboardingOnStartup { get; set; } = false;
+
+        /// <summary>
         /// 降级提供商配置列表
         /// </summary>
         public List<ProviderFallbackConfig> FallbackProviders { get; set; } = new();

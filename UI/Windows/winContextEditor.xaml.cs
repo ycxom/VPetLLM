@@ -1103,7 +1103,7 @@ namespace VPetLLM.UI.Windows
         {
             MessageBox.Show(
                 message,
-                LanguageHelper.Get("Error.Title", _langCode, "Error"),
+                LanguageHelper.Get("Error", _langCode, "Error"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }

@@ -228,10 +228,21 @@
     </Window.Resources>
     <Grid Margin="20">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0" Style="{StaticResource ModernTabControl}">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,8">
+            <CheckBox x:Name="Cb_ShowOnboardingOnStartup" Style="{StaticResource ModernCheckBox}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" Click="ShowOnboardingOnStartup_Click"
+                      Content="{utils:Localize KeyPath=QuickSetup.ShowOnStartup, Default=启动时打开新手引导}"/>
+            <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="OpenOnboarding_Click"
+                    Content="{utils:Localize KeyPath=QuickSetup.RunOnboarding, Default=新手引导}"/>
+            <Button Style="{StaticResource SecondaryButton}" Click="SwitchToSimple_Click"
+                    Content="{utils:Localize KeyPath=QuickSetup.SimpleMode, Default=简易界面}"/>
+        </StackPanel>
+
+        <TabControl Grid.Row="1" Style="{StaticResource ModernTabControl}">
             <TabItem Header="{utils:Localize KeyPath=LLM_Settings.Tab}"
                     x:Name="Tab_LLM"
                     Style="{StaticResource ModernTabItem}">
@@ -3071,7 +3082,7 @@
                                                             <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
                                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                                 <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding HasSettingAction}" Value="True">
+                                                                    <DataTrigger Binding="{Binding CanRunSettingAction}" Value="True">
                                                                         <Setter Property="Visibility" Value="Visible"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>

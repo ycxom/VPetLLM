@@ -1,0 +1,146 @@
+<Window x:Class="VPetLLM.UI.Windows.winOnboarding"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:utils="clr-namespace:VPetLLM.Utils.Localization"
+        xmlns:controls="clr-namespace:VPetLLM.UI.Controls"
+        Title="{utils:Localize KeyPath=QuickSetup.OnboardingTitle, Default=VPetLLM 新手引导}"
+        Width="620"
+        Height="680"
+        MinWidth="520"
+        MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BackgroundBrush}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/QuickSetup.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <UniformGrid x:Name="Panel_Progress" Rows="1" Margin="0,0,0,20"/>
+
+        <ScrollViewer x:Name="Scroll_Pages" Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="0,0,8,0">
+                <!-- 1. 欢迎 -->
+                <StackPanel x:Name="Page_Welcome">
+                    <TextBlock Style="{StaticResource QuickTitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.WelcomeTitle, Default=欢迎使用 VPetLLM}"/>
+                    <TextBlock Style="{StaticResource QuickSubtitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.WelcomeDesc, Default=VPetLLM 让桌宠接上 AI：它能和你聊天、听懂你的话，还能自己做动作。接下来几步帮你设置好，大约一分钟。}"/>
+                    <TextBlock Style="{StaticResource QuickFieldLabel}"
+                               Text="{utils:Localize KeyPath=QuickSetup.LanguageLabel, Default=界面语言}"/>
+                    <ComboBox x:Name="Cb_Language" Style="{StaticResource ModernComboBox}"
+                              DisplayMemberPath="Value" SelectedValuePath="Key" Width="220"
+                              HorizontalAlignment="Left" SelectionChanged="Language_SelectionChanged"/>
+                    <TextBlock Style="{StaticResource QuickFieldLabel}" Margin="0,18,0,6"
+                               Text="{utils:Localize KeyPath=QuickSetup.SettingsModeLabel, Default=设置界面}"/>
+                    <RadioButton x:Name="Rb_SimpleMode" Style="{StaticResource QuickCardRadio}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource QuickCardTitle}"
+                                       Text="{utils:Localize KeyPath=QuickSetup.SimpleMode, Default=简易界面}"/>
+                            <TextBlock Style="{StaticResource QuickHint}"
+                                       Text="{utils:Localize KeyPath=QuickSetup.SimpleModeDesc, Default=只显示常用设置，适合大多数人。}"/>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="Rb_GeekMode" Style="{StaticResource QuickCardRadio}" Margin="0">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource QuickCardTitle}"
+                                       Text="{utils:Localize KeyPath=QuickSetup.GeekMode, Default=极客界面}"/>
+                            <TextBlock Style="{StaticResource QuickHint}"
+                                       Text="{utils:Localize KeyPath=QuickSetup.GeekModeDesc, Default=显示全部设置：多渠道、代理、插件、技能等。}"/>
+                        </StackPanel>
+                    </RadioButton>
+                    <TextBlock Style="{StaticResource QuickHint}" Margin="0,8,0,0"
+                               Text="{utils:Localize KeyPath=QuickSetup.SettingsModeHint, Default=随时可以在设置窗口里切换。}"/>
+                    <TextBlock Style="{StaticResource QuickHint}" Margin="0,16,0,0"
+                               Text="{utils:Localize KeyPath=QuickSetup.WelcomeSkipHint, Default=每一步之后都能在设置里修改，点“跳过”也可以稍后再配。}"/>
+                </StackPanel>
+
+                <!-- 2. 选服务 -->
+                <StackPanel x:Name="Page_Channel" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource QuickTitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.ChannelTitle, Default=选择 AI 服务}"/>
+                    <TextBlock Style="{StaticResource QuickSubtitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.ChannelDesc, Default=桌宠的回复由 AI 服务生成。不知道怎么选就用第一项。}"/>
+                    <Border x:Name="Host_Channel">
+                        <controls:QuickChannelPanel/>
+                    </Border>
+                </StackPanel>
+
+                <!-- 3. 称呼和性格 -->
+                <StackPanel x:Name="Page_Profile" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource QuickTitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.ProfileTitle, Default=给桌宠一点个性}"/>
+                    <TextBlock Style="{StaticResource QuickSubtitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.ProfileDesc, Default=决定它叫什么、怎么称呼你，以及用什么语气说话。}"/>
+                    <Border x:Name="Host_Profile">
+                        <controls:QuickProfilePanel/>
+                    </Border>
+                </StackPanel>
+
+                <!-- 4. 语音 -->
+                <StackPanel x:Name="Page_Voice" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource QuickTitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.VoiceTitle, Default=语音（可选）}"/>
+                    <TextBlock Style="{StaticResource QuickSubtitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.VoiceDesc, Default=不需要的话直接下一步。没有配置过语音服务时会使用内置的免费服务。}"/>
+                    <CheckBox x:Name="Cb_ReadAloud" Style="{StaticResource ModernCheckBox}"
+                              Content="{utils:Localize KeyPath=QuickSetup.ReadAloud, Default=朗读桌宠的回复}"/>
+                    <TextBlock x:Name="Tb_ReadAloudHint" Style="{StaticResource QuickHint}" Margin="26,3,0,14"
+                               Text="{utils:Localize KeyPath=QuickSetup.ReadAloudHint, Default=回复会转成语音播放。}"/>
+                    <CheckBox x:Name="Cb_VoiceInput" Style="{StaticResource ModernCheckBox}"
+                              Content="{utils:Localize KeyPath=QuickSetup.VoiceInput, Default=语音输入}"/>
+                    <TextBlock x:Name="Tb_VoiceInputHint" Style="{StaticResource QuickHint}" Margin="26,3,0,0"/>
+                </StackPanel>
+
+                <!-- 5. 完成 -->
+                <StackPanel x:Name="Page_Done" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource QuickTitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.DoneTitle, Default=准备好了！}"/>
+                    <TextBlock Style="{StaticResource QuickSubtitle}"
+                               Text="{utils:Localize KeyPath=QuickSetup.DoneDesc, Default=点“开始使用”保存设置。以后可以这样用：}"/>
+                    <TextBlock Style="{StaticResource QuickGuideLine}"
+                               Text="{utils:Localize KeyPath=QuickSetup.GuideChat, Default=和桌宠聊天：鼠标右键点击桌宠打开菜单，在聊天框里输入文字。}"/>
+                    <TextBlock x:Name="Tb_GuideVoice" Style="{StaticResource QuickGuideLine}" Visibility="Collapsed"/>
+                    <TextBlock Style="{StaticResource QuickGuideLine}"
+                               Text="{utils:Localize KeyPath=QuickSetup.GuideSettings, Default=修改设置：在桌宠菜单的 MOD 设置里找到 VPetLLM。}"/>
+                    <Border x:Name="Panel_SetDefault" Margin="0,10,0,0" Padding="14,12" CornerRadius="8"
+                            Background="{StaticResource QuickNoticeBackgroundBrush}"
+                            BorderBrush="{StaticResource WarningBrush}" BorderThickness="1">
+                        <StackPanel>
+                            <CheckBox x:Name="Cb_SetDefault" Style="{StaticResource ModernCheckBox}" IsChecked="True"
+                                      Content="{utils:Localize KeyPath=QuickSetup.SetDefault, Default=把 VPetLLM 设为桌宠的聊天接口（推荐）}"/>
+                            <TextBlock Style="{StaticResource QuickHint}" Margin="26,3,0,0"
+                                       Text="{utils:Localize KeyPath=QuickSetup.SetDefaultHint, Default=桌宠现在用的不是 VPetLLM，不设置的话聊天框不会经过 AI。}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="Btn_Skip" Style="{StaticResource SecondaryButton}" Click="Skip_Click"
+                    Content="{utils:Localize KeyPath=QuickSetup.Skip, Default=跳过}"/>
+            <TextBlock x:Name="Tb_StepCounter" Grid.Column="1" Style="{StaticResource QuickHint}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0"/>
+            <Button x:Name="Btn_Back" Grid.Column="2" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                    Click="Back_Click" Content="{utils:Localize KeyPath=QuickSetup.Back, Default=上一步}"/>
+            <Button x:Name="Btn_Next" Grid.Column="3" Style="{StaticResource PrimaryButton}" MinWidth="110"
+                    Click="Next_Click"/>
+        </Grid>
+    </Grid>
+</Window>

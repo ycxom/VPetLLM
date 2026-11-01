@@ -1391,6 +1391,18 @@
       "zh-hans": "了解更多",
       "zh-hant": "了解更多",
       "jp": "詳細を確認"
+    },
+    "ResourceError": {
+      "en": "{0}'s resource files are missing or damaged. Try reinstalling the plugin, or contact its developer.",
+      "zh-hans": "{0} 的资源文件缺失或损坏，可以重新安装这个插件，或联系插件开发者。",
+      "zh-hant": "{0} 的資源檔案遺失或損壞，可以重新安裝這個插件，或聯絡插件開發者。",
+      "jp": "{0} のリソースファイルが見つからないか破損しています。プラグインを再インストールするか、開発者に連絡してください。"
+    },
+    "SettingError": {
+      "en": "Couldn't open the settings for {0}: {1}",
+      "zh-hans": "{0} 的设置打不开：{1}",
+      "zh-hant": "{0} 的設定打不開：{1}",
+      "jp": "{0} の設定を開けませんでした：{1}"
     }
   },
   "Proxy": {
@@ -2568,6 +2580,12 @@
       "zh-hant": "示例: https://ghfast.top (用於加速中國大陸等訪問GitHub困難使用)",
       "jp": "例: https://ghfast.top (中国本土などGitHubアクセスが困難な地域での高速化用)"
     }
+  },
+  "Error": {
+    "en": "Error",
+    "zh-hans": "错误",
+    "zh-hant": "錯誤",
+    "jp": "エラー"
   },
   "Success": {
     "en": "Success",
@@ -5045,6 +5063,626 @@
         "zh-hant": "免費服務設定尚未下載完成。",
         "jp": "無料サービスの設定はまだダウンロードされていません。"
       }
+    }
+  },
+  "QuickSetup": {
+    "FreeTitle": {
+      "en": "Free trial (recommended)",
+      "zh-hans": "免费体验（推荐）",
+      "zh-hant": "免費體驗（推薦）",
+      "jp": "無料で試す（おすすめ）"
+    },
+    "FreeDesc": {
+      "en": "No sign-up and nothing to fill in. Select it and start chatting.",
+      "zh-hans": "不用注册，也不用填写任何东西，选中就能开始聊天。",
+      "zh-hant": "不用註冊，也不用填寫任何東西，選中就能開始聊天。",
+      "jp": "登録も入力も不要です。選ぶだけでチャットを始められます。"
+    },
+    "ApiKeyTitle": {
+      "en": "I have an API key",
+      "zh-hans": "我有 API Key",
+      "zh-hant": "我有 API Key",
+      "jp": "API キーを持っている"
+    },
+    "ApiKeyDesc": {
+      "en": "Use an AI service you pay for. Reply quality and speed depend on the service.",
+      "zh-hans": "使用自己购买的 AI 服务，回复质量和速度由所选服务决定。",
+      "zh-hant": "使用自己購買的 AI 服務，回覆品質和速度由所選服務決定。",
+      "jp": "ご自身で契約した AI サービスを使います。返答の質と速度はサービスによって異なります。"
+    },
+    "ProviderLabel": {
+      "en": "Provider",
+      "zh-hans": "服务商",
+      "zh-hant": "服務商",
+      "jp": "プロバイダー"
+    },
+    "UrlLabel": {
+      "en": "API address",
+      "zh-hans": "接口地址",
+      "zh-hant": "介面位址",
+      "jp": "API アドレス"
+    },
+    "KeyLabel": {
+      "en": "API Key",
+      "zh-hans": "API Key",
+      "zh-hant": "API Key",
+      "jp": "API キー"
+    },
+    "KeySaved": {
+      "en": "An API key is already saved for this service. Leave this empty to keep using it.",
+      "zh-hans": "这个服务已经保存过 API Key，留空就继续使用它。",
+      "zh-hant": "這個服務已經儲存過 API Key，留空就繼續使用它。",
+      "jp": "このサービスの API キーは保存済みです。空欄のままにするとそのまま使います。"
+    },
+    "ModelLabel": {
+      "en": "Model",
+      "zh-hans": "模型",
+      "zh-hant": "模型",
+      "jp": "モデル"
+    },
+    "FetchModels": {
+      "en": "Get models",
+      "zh-hans": "获取模型",
+      "zh-hant": "取得模型",
+      "jp": "モデルを取得"
+    },
+    "ApiKeyMore": {
+      "en": "OpenAI-compatible services are supported here. For Gemini or backup channels, use the Geek view.",
+      "zh-hans": "这里支持 OpenAI 格式的服务。Gemini 或多个渠道备用，请到极客界面里配置。",
+      "zh-hant": "這裡支援 OpenAI 格式的服務。Gemini 或多個渠道備用，請到極客介面裡配置。",
+      "jp": "ここでは OpenAI 形式のサービスに対応しています。Gemini や予備チャンネルはギーク画面で設定してください。"
+    },
+    "LocalTitle": {
+      "en": "Local model",
+      "zh-hans": "本地模型",
+      "zh-hant": "本地模型",
+      "jp": "ローカルモデル"
+    },
+    "LocalDesc": {
+      "en": "Use Ollama or LM Studio already running on this computer. Conversations stay on this computer.",
+      "zh-hans": "使用电脑上已经运行的 Ollama 或 LM Studio，对话不离开这台电脑。",
+      "zh-hant": "使用電腦上已經執行的 Ollama 或 LM Studio，對話不離開這台電腦。",
+      "jp": "このパソコンで動作中の Ollama または LM Studio を使います。会話はこのパソコンの外に出ません。"
+    },
+    "InvalidUrl": {
+      "en": "The address must start with http:// or https://.",
+      "zh-hans": "接口地址要以 http:// 或 https:// 开头。",
+      "zh-hant": "介面位址要以 http:// 或 https:// 開頭。",
+      "jp": "アドレスは http:// または https:// で始めてください。"
+    },
+    "ModelRequired": {
+      "en": "Please choose or enter a model.",
+      "zh-hans": "请选择或填写模型。",
+      "zh-hant": "請選擇或填寫模型。",
+      "jp": "モデルを選択または入力してください。"
+    },
+    "KeyRequired": {
+      "en": "Please enter your API key.",
+      "zh-hans": "请填写 API Key。",
+      "zh-hant": "請填寫 API Key。",
+      "jp": "API キーを入力してください。"
+    },
+    "CoreNotReady": {
+      "en": "The chat service is still starting. Please try again shortly.",
+      "zh-hans": "聊天服务还在启动，请稍后再试。",
+      "zh-hant": "聊天服務還在啟動，請稍後再試。",
+      "jp": "チャットサービスを起動中です。少し待ってからもう一度お試しください。"
+    },
+    "Testing": {
+      "en": "Connecting, please wait…",
+      "zh-hans": "正在连接，请稍候…",
+      "zh-hant": "正在連線，請稍候…",
+      "jp": "接続しています。しばらくお待ちください…"
+    },
+    "TestOk": {
+      "en": "Connected!",
+      "zh-hans": "连接成功！",
+      "zh-hant": "連線成功！",
+      "jp": "接続しました！"
+    },
+    "TestFail": {
+      "en": "Connection failed: {0}",
+      "zh-hans": "连接失败：{0}",
+      "zh-hant": "連線失敗：{0}",
+      "jp": "接続に失敗しました：{0}"
+    },
+    "CustomProvider": {
+      "en": "Custom address",
+      "zh-hans": "自定义地址",
+      "zh-hant": "自訂位址",
+      "jp": "カスタムアドレス"
+    },
+    "Fetching": {
+      "en": "Getting the model list…",
+      "zh-hans": "正在获取模型列表…",
+      "zh-hant": "正在取得模型清單…",
+      "jp": "モデル一覧を取得しています…"
+    },
+    "Fetched": {
+      "en": "Found {0} models",
+      "zh-hans": "获取到 {0} 个模型",
+      "zh-hant": "取得到 {0} 個模型",
+      "jp": "{0} 個のモデルを取得しました"
+    },
+    "FetchFail": {
+      "en": "Couldn't get models: {0}",
+      "zh-hans": "获取模型失败：{0}",
+      "zh-hant": "取得模型失敗：{0}",
+      "jp": "モデルの取得に失敗しました：{0}"
+    },
+    "FollowName": {
+      "en": "Use the names from the pet's save",
+      "zh-hans": "使用桌宠存档里的名字和称呼",
+      "zh-hant": "使用桌寵存檔裡的名字和稱呼",
+      "jp": "ペットのセーブデータの名前と呼び方を使う"
+    },
+    "PetName": {
+      "en": "Pet's name",
+      "zh-hans": "桌宠的名字",
+      "zh-hant": "桌寵的名字",
+      "jp": "ペットの名前"
+    },
+    "UserName": {
+      "en": "What it calls you",
+      "zh-hans": "它怎么称呼你",
+      "zh-hant": "它怎麼稱呼你",
+      "jp": "あなたの呼び方"
+    },
+    "Personality": {
+      "en": "Personality",
+      "zh-hans": "性格",
+      "zh-hant": "性格",
+      "jp": "性格"
+    },
+    "PersonalityKeep": {
+      "en": "Keep current",
+      "zh-hans": "保持现在的设定",
+      "zh-hant": "保持現在的設定",
+      "jp": "今の設定のまま"
+    },
+    "PersonalityLively": {
+      "en": "Lively and cute",
+      "zh-hans": "活泼可爱",
+      "zh-hant": "活潑可愛",
+      "jp": "元気でかわいい"
+    },
+    "PersonalityGentle": {
+      "en": "Gentle and caring",
+      "zh-hans": "温柔体贴",
+      "zh-hant": "溫柔體貼",
+      "jp": "やさしく思いやりがある"
+    },
+    "PersonalityTsundere": {
+      "en": "Tsundere",
+      "zh-hans": "傲娇",
+      "zh-hant": "傲嬌",
+      "jp": "ツンデレ"
+    },
+    "RoleHint": {
+      "en": "This text tells the AI how to play your pet. Feel free to edit it.",
+      "zh-hans": "这段话告诉 AI 该怎么扮演桌宠，可以随意修改。",
+      "zh-hant": "這段話告訴 AI 該怎麼扮演桌寵，可以隨意修改。",
+      "jp": "この文章は AI にペットの演じ方を伝えます。自由に編集できます。"
+    },
+    "RoleLively": {
+      "en": "You are a lively, cute desktop pet. You speak cheerfully, are full of curiosity and love to make your owner happy.",
+      "zh-hans": "你是一只活泼可爱的桌宠，说话轻快，充满好奇心，喜欢逗主人开心。",
+      "zh-hant": "你是一隻活潑可愛的桌寵，說話輕快，充滿好奇心，喜歡逗主人開心。",
+      "jp": "あなたは元気でかわいいデスクトップペットです。軽やかに話し、好奇心いっぱいで、ご主人を楽しませるのが大好きです。"
+    },
+    "RoleGentle": {
+      "en": "You are a gentle, caring desktop pet. You speak softly and always look after your owner's mood and health.",
+      "zh-hans": "你是一只温柔体贴的桌宠，说话轻声细语，总是关心主人的心情和身体。",
+      "zh-hant": "你是一隻溫柔體貼的桌寵，說話輕聲細語，總是關心主人的心情和身體。",
+      "jp": "あなたはやさしく思いやりのあるデスクトップペットです。穏やかに話し、いつもご主人の気持ちや体調を気にかけています。"
+    },
+    "RoleTsundere": {
+      "en": "You are a tsundere desktop pet. You act sharp-tongued but secretly care about your owner, and sometimes let it slip.",
+      "zh-hans": "你是一只傲娇的桌宠，嘴上不饶人，心里却很在意主人，偶尔会不小心流露关心。",
+      "zh-hant": "你是一隻傲嬌的桌寵，嘴上不饒人，心裡卻很在意主人，偶爾會不小心流露關心。",
+      "jp": "あなたはツンデレなデスクトップペットです。口は悪いけれど本当はご主人を大切に思っていて、ときどきそれが表に出てしまいます。"
+    },
+    "OnboardingTitle": {
+      "en": "VPetLLM Setup Guide",
+      "zh-hans": "VPetLLM 新手引导",
+      "zh-hant": "VPetLLM 新手引導",
+      "jp": "VPetLLM はじめてガイド"
+    },
+    "WelcomeTitle": {
+      "en": "Welcome to VPetLLM",
+      "zh-hans": "欢迎使用 VPetLLM",
+      "zh-hant": "歡迎使用 VPetLLM",
+      "jp": "VPetLLM へようこそ"
+    },
+    "WelcomeDesc": {
+      "en": "VPetLLM connects your desktop pet to AI: it can chat with you, understand what you say and act on its own. The next few steps take about a minute.",
+      "zh-hans": "VPetLLM 让桌宠接上 AI：它能和你聊天、听懂你的话，还能自己做动作。接下来几步帮你设置好，大约一分钟。",
+      "zh-hant": "VPetLLM 讓桌寵接上 AI：它能和你聊天、聽懂你的話，還能自己做動作。接下來幾步幫你設定好，大約一分鐘。",
+      "jp": "VPetLLM はデスクトップペットを AI につなぎます。おしゃべりしたり、言葉を理解したり、自分で動いたりできるようになります。設定は数ステップ、1 分ほどで終わります。"
+    },
+    "LanguageLabel": {
+      "en": "Interface language",
+      "zh-hans": "界面语言",
+      "zh-hant": "介面語言",
+      "jp": "表示言語"
+    },
+    "WelcomeSkipHint": {
+      "en": "Everything can be changed later in the settings. You can also click “Skip” and set it up later.",
+      "zh-hans": "每一步之后都能在设置里修改，点“跳过”也可以稍后再配。",
+      "zh-hant": "每一步之後都能在設定裡修改，點「跳過」也可以稍後再配。",
+      "jp": "あとから設定で変更できます。「スキップ」を押して後で設定することもできます。"
+    },
+    "ChannelTitle": {
+      "en": "Choose an AI service",
+      "zh-hans": "选择 AI 服务",
+      "zh-hant": "選擇 AI 服務",
+      "jp": "AI サービスを選ぶ"
+    },
+    "ChannelDesc": {
+      "en": "Your pet's replies are generated by an AI service. If you're not sure, use the first option.",
+      "zh-hans": "桌宠的回复由 AI 服务生成。不知道怎么选就用第一项。",
+      "zh-hant": "桌寵的回覆由 AI 服務生成。不知道怎麼選就用第一項。",
+      "jp": "ペットの返答は AI サービスが生成します。迷ったら一番上を選んでください。"
+    },
+    "ProfileTitle": {
+      "en": "Give your pet some personality",
+      "zh-hans": "给桌宠一点个性",
+      "zh-hant": "給桌寵一點個性",
+      "jp": "ペットに個性をつける"
+    },
+    "ProfileDesc": {
+      "en": "Decide its name, what it calls you and how it talks.",
+      "zh-hans": "决定它叫什么、怎么称呼你，以及用什么语气说话。",
+      "zh-hant": "決定它叫什麼、怎麼稱呼你，以及用什麼語氣說話。",
+      "jp": "名前、あなたの呼び方、話し方を決めます。"
+    },
+    "VoiceTitle": {
+      "en": "Voice (optional)",
+      "zh-hans": "语音（可选）",
+      "zh-hant": "語音（可選）",
+      "jp": "音声（任意）"
+    },
+    "VoiceDesc": {
+      "en": "Skip ahead if you don't need this. If no voice service is set up, the built-in free service is used.",
+      "zh-hans": "不需要的话直接下一步。没有配置过语音服务时会使用内置的免费服务。",
+      "zh-hant": "不需要的話直接下一步。沒有配置過語音服務時會使用內建的免費服務。",
+      "jp": "不要なら次へ進んでください。音声サービスを設定していない場合は、内蔵の無料サービスを使います。"
+    },
+    "ReadAloud": {
+      "en": "Read the pet's replies aloud",
+      "zh-hans": "朗读桌宠的回复",
+      "zh-hant": "朗讀桌寵的回覆",
+      "jp": "ペットの返答を読み上げる"
+    },
+    "ReadAloudHint": {
+      "en": "Replies are turned into speech.",
+      "zh-hans": "回复会转成语音播放。",
+      "zh-hant": "回覆會轉成語音播放。",
+      "jp": "返答を音声にして再生します。"
+    },
+    "ReadAloudByPlugin": {
+      "en": "VPetTTS plugin detected. It handles reading aloud, so change this in its settings.",
+      "zh-hans": "检测到 VPetTTS 插件，朗读由它负责，请在它的设置里修改。",
+      "zh-hant": "偵測到 VPetTTS 外掛，朗讀由它負責，請在它的設定裡修改。",
+      "jp": "VPetTTS プラグインを検出しました。読み上げはこのプラグインが担当するため、そちらの設定で変更してください。"
+    },
+    "VoiceInput": {
+      "en": "Voice input",
+      "zh-hans": "语音输入",
+      "zh-hant": "語音輸入",
+      "jp": "音声入力"
+    },
+    "VoiceInputHint": {
+      "en": "Press {0} to start speaking, press it again to finish.",
+      "zh-hans": "按一下 {0} 开始说话，再按一下结束。",
+      "zh-hant": "按一下 {0} 開始說話，再按一下結束。",
+      "jp": "{0} を押すと話し始められます。もう一度押すと終了します。"
+    },
+    "DoneTitle": {
+      "en": "All set!",
+      "zh-hans": "准备好了！",
+      "zh-hant": "準備好了！",
+      "jp": "準備ができました！"
+    },
+    "DoneDesc": {
+      "en": "Click “Start” to save your settings. Here's how to use it:",
+      "zh-hans": "点“开始使用”保存设置。以后可以这样用：",
+      "zh-hant": "點「開始使用」儲存設定。以後可以這樣用：",
+      "jp": "「使い始める」を押すと設定を保存します。使い方は次のとおりです："
+    },
+    "GuideChat": {
+      "en": "Chat with your pet: right-click it to open the menu, then type in the chat box.",
+      "zh-hans": "和桌宠聊天：鼠标右键点击桌宠打开菜单，在聊天框里输入文字。",
+      "zh-hant": "和桌寵聊天：滑鼠右鍵點擊桌寵打開選單，在聊天框裡輸入文字。",
+      "jp": "ペットと話す：ペットを右クリックしてメニューを開き、チャット欄に入力します。"
+    },
+    "GuideVoice": {
+      "en": "Voice input: press {0} to start speaking, press it again to finish.",
+      "zh-hans": "语音输入：按一下 {0} 开始说话，再按一下结束。",
+      "zh-hant": "語音輸入：按一下 {0} 開始說話，再按一下結束。",
+      "jp": "音声入力：{0} を押すと話し始められます。もう一度押すと終了します。"
+    },
+    "GuideSettings": {
+      "en": "Change settings: find VPetLLM under MOD Setting in the pet's menu.",
+      "zh-hans": "修改设置：在桌宠菜单的 MOD 设置里找到 VPetLLM。",
+      "zh-hant": "修改設定：在桌寵選單的模組設定裡找到 VPetLLM。",
+      "jp": "設定の変更：ペットのメニューの MOD 設定から VPetLLM を選びます。"
+    },
+    "SetDefault": {
+      "en": "Set VPetLLM as the pet's chat interface (recommended)",
+      "zh-hans": "把 VPetLLM 设为桌宠的聊天接口（推荐）",
+      "zh-hant": "把 VPetLLM 設為桌寵的聊天介面（推薦）",
+      "jp": "VPetLLM をペットのチャットインターフェースにする（おすすめ）"
+    },
+    "SetDefaultHint": {
+      "en": "The pet isn't using VPetLLM right now. Without this, the chat box won't go through the AI.",
+      "zh-hans": "桌宠现在用的不是 VPetLLM，不设置的话聊天框不会经过 AI。",
+      "zh-hant": "桌寵現在用的不是 VPetLLM，不設定的話聊天框不會經過 AI。",
+      "jp": "ペットは現在 VPetLLM を使っていません。設定しないとチャット欄は AI につながりません。"
+    },
+    "SetDefaultFail": {
+      "en": "Couldn't set this automatically. Open the pet's settings, go to “Chat Settings”, choose the custom interface and select VPetLLM.",
+      "zh-hans": "没能自动设置。请打开桌宠的设置，在“聊天设置”里选择自定义接口并选中 VPetLLM。",
+      "zh-hant": "沒能自動設定。請打開桌寵的設定，在「聊天設定」裡選擇自訂介面並選中 VPetLLM。",
+      "jp": "自動で設定できませんでした。ペットの設定を開き、チャット設定でカスタムインターフェースを選んで VPetLLM を選択してください。"
+    },
+    "SetDefaultOk": {
+      "en": "Done. You can chat with your pet now.",
+      "zh-hans": "设置好了，现在可以和桌宠聊天了。",
+      "zh-hant": "設定好了，現在可以和桌寵聊天了。",
+      "jp": "設定しました。ペットとチャットできます。"
+    },
+    "Skip": {
+      "en": "Skip",
+      "zh-hans": "跳过",
+      "zh-hant": "跳過",
+      "jp": "スキップ"
+    },
+    "Back": {
+      "en": "Back",
+      "zh-hans": "上一步",
+      "zh-hant": "上一步",
+      "jp": "戻る"
+    },
+    "Next": {
+      "en": "Next",
+      "zh-hans": "下一步",
+      "zh-hant": "下一步",
+      "jp": "次へ"
+    },
+    "Finish": {
+      "en": "Start",
+      "zh-hans": "开始使用",
+      "zh-hant": "開始使用",
+      "jp": "使い始める"
+    },
+    "ContinueAnyway": {
+      "en": "Continue anyway",
+      "zh-hans": "仍然继续",
+      "zh-hant": "仍然繼續",
+      "jp": "このまま続ける"
+    },
+    "StepCounter": {
+      "en": "Step {0} of {1}",
+      "zh-hans": "第 {0} / {1} 步",
+      "zh-hant": "第 {0} / {1} 步",
+      "jp": "ステップ {0} / {1}"
+    },
+    "SimpleTitle": {
+      "en": "VPetLLM Settings",
+      "zh-hans": "VPetLLM 设置",
+      "zh-hant": "VPetLLM 設定",
+      "jp": "VPetLLM 設定"
+    },
+    "GeekMode": {
+      "en": "Geek view",
+      "zh-hans": "极客界面",
+      "zh-hant": "極客介面",
+      "jp": "ギーク画面"
+    },
+    "NotDefaultNotice": {
+      "en": "The pet isn't using VPetLLM right now, so the chat box won't go through the AI.",
+      "zh-hans": "桌宠现在用的不是 VPetLLM，聊天框不会经过 AI。",
+      "zh-hant": "桌寵現在用的不是 VPetLLM，聊天框不會經過 AI。",
+      "jp": "ペットは現在 VPetLLM を使っていないため、チャット欄は AI につながりません。"
+    },
+    "SetDefaultNow": {
+      "en": "Set it up",
+      "zh-hans": "一键设置",
+      "zh-hant": "一鍵設定",
+      "jp": "ワンクリック設定"
+    },
+    "CardChannel": {
+      "en": "AI service",
+      "zh-hans": "AI 服务",
+      "zh-hant": "AI 服務",
+      "jp": "AI サービス"
+    },
+    "ChangeChannel": {
+      "en": "Change",
+      "zh-hans": "更换",
+      "zh-hant": "更換",
+      "jp": "変更"
+    },
+    "CardProfile": {
+      "en": "Pet profile",
+      "zh-hans": "桌宠设定",
+      "zh-hant": "桌寵設定",
+      "jp": "ペットの設定"
+    },
+    "CardFeatures": {
+      "en": "Features",
+      "zh-hans": "功能开关",
+      "zh-hant": "功能開關",
+      "jp": "機能のオン・オフ"
+    },
+    "EnableAction": {
+      "en": "Let the pet act and react based on the conversation",
+      "zh-hans": "让桌宠根据对话做动作和反应",
+      "zh-hant": "讓桌寵根據對話做動作和反應",
+      "jp": "会話に合わせてペットが動いたり反応したりする"
+    },
+    "EnableBuy": {
+      "en": "Allow the pet to buy items",
+      "zh-hans": "允许桌宠购买物品",
+      "zh-hant": "允許桌寵購買物品",
+      "jp": "ペットのアイテム購入を許可する"
+    },
+    "CardHelp": {
+      "en": "Need help?",
+      "zh-hans": "需要帮助？",
+      "zh-hant": "需要幫助？",
+      "jp": "お困りですか？"
+    },
+    "HelpDesc": {
+      "en": "Go through the setup guide again and check your settings step by step.",
+      "zh-hans": "重新走一遍新手引导，一步步检查设置。",
+      "zh-hant": "重新走一遍新手引導，一步步檢查設定。",
+      "jp": "はじめてガイドをもう一度進めて、設定を順番に確認します。"
+    },
+    "RunOnboarding": {
+      "en": "Setup guide",
+      "zh-hans": "新手引导",
+      "zh-hant": "新手引導",
+      "jp": "はじめてガイド"
+    },
+    "Save": {
+      "en": "Save",
+      "zh-hans": "保存",
+      "zh-hant": "儲存",
+      "jp": "保存"
+    },
+    "SimpleMode": {
+      "en": "Simple view",
+      "zh-hans": "简易界面",
+      "zh-hant": "簡易介面",
+      "jp": "かんたん画面"
+    },
+    "NoChannel": {
+      "en": "No AI service selected yet",
+      "zh-hans": "还没有选择 AI 服务",
+      "zh-hant": "還沒有選擇 AI 服務",
+      "jp": "AI サービスが未選択です"
+    },
+    "FreeSummary": {
+      "en": "Free service",
+      "zh-hans": "免费服务",
+      "zh-hant": "免費服務",
+      "jp": "無料サービス"
+    },
+    "FixChannel": {
+      "en": "The AI service isn't filled in yet. See the message above.",
+      "zh-hans": "AI 服务还没填好，请看上面的提示。",
+      "zh-hant": "AI 服務還沒填好，請看上面的提示。",
+      "jp": "AI サービスの入力が完了していません。上の案内を確認してください。"
+    },
+    "Saved": {
+      "en": "Saved",
+      "zh-hans": "已保存",
+      "zh-hant": "已儲存",
+      "jp": "保存しました"
+    },
+    "ShowOnStartup": {
+      "en": "Open the setup guide on startup",
+      "zh-hans": "启动时打开新手引导",
+      "zh-hant": "啟動時打開新手引導",
+      "jp": "起動時にはじめてガイドを開く"
+    },
+    "SettingsModeLabel": {
+      "en": "Settings view",
+      "zh-hans": "设置界面",
+      "zh-hant": "設定介面",
+      "jp": "設定画面"
+    },
+    "SimpleModeDesc": {
+      "en": "Shows only the common settings. Right for most people.",
+      "zh-hans": "只显示常用设置，适合大多数人。",
+      "zh-hant": "只顯示常用設定，適合大多數人。",
+      "jp": "よく使う設定だけを表示します。ほとんどの方におすすめです。"
+    },
+    "GeekModeDesc": {
+      "en": "Shows everything: multiple channels, proxy, plugins, skills and more.",
+      "zh-hans": "显示全部设置：多渠道、代理、插件、技能等。",
+      "zh-hant": "顯示全部設定：多渠道、代理、插件、技能等。",
+      "jp": "すべての設定を表示します：複数チャンネル、プロキシ、プラグイン、スキルなど。"
+    },
+    "SettingsModeHint": {
+      "en": "You can switch any time from the settings window.",
+      "zh-hans": "随时可以在设置窗口里切换。",
+      "zh-hant": "隨時可以在設定視窗裡切換。",
+      "jp": "設定ウィンドウからいつでも切り替えられます。"
+    },
+    "CardPlugins": {
+      "en": "Plugins",
+      "zh-hans": "插件",
+      "zh-hant": "插件",
+      "jp": "プラグイン"
+    },
+    "PluginSummary": {
+      "en": "Installed plugins: {0}",
+      "zh-hans": "已安装 {0} 个插件",
+      "zh-hant": "已安裝 {0} 個插件",
+      "jp": "インストール済みのプラグイン：{0} 個"
+    },
+    "BrowsePlugins": {
+      "en": "Browse plugins",
+      "zh-hans": "浏览插件",
+      "zh-hant": "瀏覽插件",
+      "jp": "プラグインを見る"
+    },
+    "PluginRefresh": {
+      "en": "Refresh",
+      "zh-hans": "刷新",
+      "zh-hant": "重新整理",
+      "jp": "再読み込み"
+    },
+    "PluginLoading": {
+      "en": "Getting the plugin list…",
+      "zh-hans": "正在获取插件列表…",
+      "zh-hant": "正在取得插件列表…",
+      "jp": "プラグイン一覧を取得しています…"
+    },
+    "PluginOffline": {
+      "en": "Can't reach the plugin store, so only installed plugins are shown. You can change the proxy address on the plugin page of the Geek view.",
+      "zh-hans": "连不上插件商店，只显示已安装的插件。可以到极客界面的插件页换一个代理地址。",
+      "zh-hant": "連不上插件商店，只顯示已安裝的插件。可以到極客介面的插件頁換一個代理位址。",
+      "jp": "プラグインストアに接続できないため、インストール済みのプラグインのみ表示しています。ギーク画面のプラグインページでプロキシのアドレスを変更できます。"
+    },
+    "PluginWorking": {
+      "en": "Working on {0}…",
+      "zh-hans": "正在处理 {0}…",
+      "zh-hant": "正在處理 {0}…",
+      "jp": "{0} を処理しています…"
+    },
+    "PluginInstalled": {
+      "en": "{0} is ready",
+      "zh-hans": "{0} 已就绪",
+      "zh-hant": "{0} 已就緒",
+      "jp": "{0} の準備ができました"
+    },
+    "PluginUninstalled": {
+      "en": "{0} was uninstalled",
+      "zh-hans": "{0} 已卸载",
+      "zh-hant": "{0} 已解除安裝",
+      "jp": "{0} をアンインストールしました"
+    },
+    "PluginFailed": {
+      "en": "{0} didn't finish: {1}",
+      "zh-hans": "{0} 没有完成：{1}",
+      "zh-hant": "{0} 沒有完成：{1}",
+      "jp": "{0} を完了できませんでした：{1}"
+    },
+    "PluginHashFailed": {
+      "en": "The download failed or the file didn't pass verification, so nothing was installed for your safety. Check your network and try again.",
+      "zh-hans": "下载失败或文件校验没通过，为了安全没有安装。请检查网络后重试。",
+      "zh-hant": "下載失敗或檔案校驗沒通過，為了安全沒有安裝。請檢查網路後重試。",
+      "jp": "ダウンロードに失敗したか、ファイルの検証に通らなかったため、安全のためインストールしませんでした。ネットワークを確認してもう一度お試しください。"
+    },
+    "PluginNeedsUpdate": {
+      "en": "Needs update",
+      "zh-hans": "需要更新",
+      "zh-hant": "需要更新",
+      "jp": "更新が必要"
     }
   }
 }

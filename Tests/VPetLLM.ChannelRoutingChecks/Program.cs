@@ -42,6 +42,7 @@ static class Program
             Test_Migration(dir);
             Test_OpenAIProtocols();
             Test_EditorHelpers(dir);
+            Test_FreeProbePrompt();
             Test_EndToEndFailover(dir).GetAwaiter().GetResult();
         }
         finally
@@ -325,6 +326,38 @@ static class Program
 
         var models = await core.FetchModelsAsync(good);
         Check("拉模型：/models 与请求地址同一套规则", models.SequenceEqual(new[] { "m-a", "m-b" }), string.Join(",", models));
+    }
+
+    /// <summary>
+    /// Free 的连接测试：网关只放行 Prompt.json 里的提示词（freechat_prompt_not_allowed），
+    /// 否则伪装成随机 5xx 拒掉。Free 响应必须是原生密钥加密的，假服务走不到这里，
+    /// 所以直接比对网关仓库那份名单，两边改漂移了这里会红。
+    /// </summary>
+    static void Test_FreeProbePrompt()
+    {
+        Console.WriteLine("== Free 连接测试提示词 ==");
+
+        var root = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(root, "VPetLLM.csproj")))
+            root = Path.GetDirectoryName(root.TrimEnd(Path.DirectorySeparatorChar))!;
+        VPetLLM.Utils.Common.PromptHelper.LoadPrompts(
+            Path.Combine(root, "3000_VPetLLM", "plugin", "VPetLLM_lang", "Language.json"));
+
+        var free = RoutedChatCore.ProbePromptFor(new Setting.FreeNodeSetting());
+        var other = RoutedChatCore.ProbePromptFor(new Setting.OpenAINodeSetting());
+        Check("其它渠道仍用最短的探测词，不为测试跑一遍总结提示词", other.Contains("connectivity probe"), other);
+
+        var gateway = Path.Combine(root, "..", "VPetLLM-Services-Authentication",
+            "standalone", "config", "auth-FreeChat", "Prompt.json");
+        if (!File.Exists(gateway))
+        {
+            Console.WriteLine($"  [SKIP] 找不到网关的 Prompt.json: {gateway}");
+            return;
+        }
+
+        var allowed = JObject.Parse(File.ReadAllText(gateway)).Properties()
+            .SelectMany(p => ((JObject)p.Value).Properties().Select(l => l.Value.ToString()));
+        Check("Free 探测提示词在网关放行名单里，请求能到后端", allowed.Contains(free), free);
     }
 
     /// <summary>最小的 OpenAI 兼容假服务：/bad 一律 500，/good 走 Chat，/resp 走 Responses。</summary>
