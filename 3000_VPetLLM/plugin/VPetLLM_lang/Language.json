@@ -5360,12 +5360,6 @@
       "zh-hant": "大小未知",
       "jp": "サイズ不明"
     },
-    "LibrarySearch": {
-      "en": "Search",
-      "zh-hans": "搜索",
-      "zh-hant": "搜尋",
-      "jp": "検索"
-    },
     "LibraryRetry": {
       "en": "Retry",
       "zh-hans": "重试",
@@ -5402,11 +5396,167 @@
       "zh-hant": "暫時連不上 ollama.com，顯示的是上次儲存的清單。",
       "jp": "ollama.com に接続できないため、前回保存した一覧を表示しています。"
     },
-    "LibraryPulls": {
-      "en": "{0} pulls",
-      "zh-hans": "{0} 次下载",
-      "zh-hant": "{0} 次下載",
-      "jp": "{0} 回ダウンロード"
+    "LibrarySearchHint": {
+      "en": "Search model names or descriptions…",
+      "zh-hans": "搜索模型名称或说明…",
+      "zh-hant": "搜尋模型名稱或說明…",
+      "jp": "モデル名や説明を検索…"
+    },
+    "LibraryFilters": {
+      "en": "Filters",
+      "zh-hans": "筛选",
+      "zh-hant": "篩選",
+      "jp": "絞り込み"
+    },
+    "LibraryReset": {
+      "en": "Reset",
+      "zh-hans": "重置",
+      "zh-hant": "重置",
+      "jp": "リセット"
+    },
+    "LibraryStatus": {
+      "en": "Status",
+      "zh-hans": "状态",
+      "zh-hant": "狀態",
+      "jp": "状態"
+    },
+    "LibraryAllModels": {
+      "en": "All models",
+      "zh-hans": "所有模型",
+      "zh-hant": "所有模型",
+      "jp": "すべてのモデル"
+    },
+    "LibraryDownloaded": {
+      "en": "Downloaded",
+      "zh-hans": "已下载",
+      "zh-hant": "已下載",
+      "jp": "ダウンロード済み"
+    },
+    "CatalogFit": {
+      "en": "How it runs",
+      "zh-hans": "运行情况",
+      "zh-hant": "執行情況",
+      "jp": "動作状況"
+    },
+    "CatalogAllFits": {
+      "en": "All",
+      "zh-hans": "所有情况",
+      "zh-hant": "所有情況",
+      "jp": "すべて"
+    },
+    "CatalogNotDownloaded": {
+      "en": "Not downloaded",
+      "zh-hans": "未下载",
+      "zh-hant": "未下載",
+      "jp": "未ダウンロード"
+    },
+    "CatalogCount": {
+      "en": "{0} models",
+      "zh-hans": "共 {0} 个模型",
+      "zh-hant": "共 {0} 個模型",
+      "jp": "{0} 個のモデル"
+    },
+    "LocalSearchHint": {
+      "en": "Search model names…",
+      "zh-hans": "搜索模型名称…",
+      "zh-hant": "搜尋模型名稱…",
+      "jp": "モデル名を検索…"
+    },
+    "LocalPurpose": {
+      "en": "Purpose",
+      "zh-hans": "用途",
+      "zh-hant": "用途",
+      "jp": "用途"
+    },
+    "LocalChat": {
+      "en": "Can chat",
+      "zh-hans": "能聊天",
+      "zh-hant": "能聊天",
+      "jp": "チャット可能"
+    },
+    "LocalCount": {
+      "en": "{0} models, {1} used",
+      "zh-hans": "共 {0} 个模型，占用 {1}",
+      "zh-hant": "共 {0} 個模型，佔用 {1}",
+      "jp": "{0} 個のモデル、{1} 使用中"
+    },
+    "LibraryCapability": {
+      "en": "Capabilities",
+      "zh-hans": "能力",
+      "zh-hant": "能力",
+      "jp": "機能"
+    },
+    "LibraryAllCapabilities": {
+      "en": "All capabilities",
+      "zh-hans": "所有能力",
+      "zh-hant": "所有能力",
+      "jp": "すべての機能"
+    },
+    "LibrarySeries": {
+      "en": "Series",
+      "zh-hans": "系列",
+      "zh-hant": "系列",
+      "jp": "シリーズ"
+    },
+    "LibraryAllSeries": {
+      "en": "All series",
+      "zh-hans": "所有系列",
+      "zh-hant": "所有系列",
+      "jp": "すべてのシリーズ"
+    },
+    "LibraryOtherSeries": {
+      "en": "Other",
+      "zh-hans": "其他",
+      "zh-hant": "其他",
+      "jp": "その他"
+    },
+    "LibrarySortPopular": {
+      "en": "Popular",
+      "zh-hans": "热度",
+      "zh-hant": "熱度",
+      "jp": "人気順"
+    },
+    "LibrarySortName": {
+      "en": "Name",
+      "zh-hans": "名称",
+      "zh-hant": "名稱",
+      "jp": "名前順"
+    },
+    "LibraryPullsLabel": {
+      "en": "Pulls",
+      "zh-hans": "下载量",
+      "zh-hant": "下載量",
+      "jp": "ダウンロード数"
+    },
+    "LibrarySizeLabel": {
+      "en": "Size",
+      "zh-hans": "体积",
+      "zh-hant": "大小",
+      "jp": "サイズ"
+    },
+    "CapabilityTools": {
+      "en": "Tool calling",
+      "zh-hans": "工具调用",
+      "zh-hant": "工具呼叫",
+      "jp": "ツール呼び出し"
+    },
+    "CapabilityVision": {
+      "en": "Vision",
+      "zh-hans": "看图",
+      "zh-hant": "看圖",
+      "jp": "画像認識"
+    },
+    "CapabilityThinking": {
+      "en": "Thinking",
+      "zh-hans": "深度思考",
+      "zh-hant": "深度思考",
+      "jp": "思考"
+    },
+    "CapabilityAudio": {
+      "en": "Audio",
+      "zh-hans": "语音",
+      "zh-hant": "語音",
+      "jp": "音声"
     },
     "CustomLabel": {
       "en": "Other model (name from ollama.com)",

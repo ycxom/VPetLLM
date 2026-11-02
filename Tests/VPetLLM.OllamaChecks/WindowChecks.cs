@@ -66,9 +66,51 @@ internal static partial class Program
 
         public void Click(string name) => Press(Find<Button>(name));
 
+        public List<OllamaFilterChip> Chips(string list) => ((IEnumerable<OllamaFilterChip>)Find<ItemsControl>(list).ItemsSource).ToList();
+
+        public Button ChipButton(string list, string text)
+            => Descendants(Find<ItemsControl>(list)).OfType<Button>().Single(b => ((OllamaFilterChip)b.Tag).Text == text);
+
+        public void PressChip(string list, string text)
+        {
+            Press(ChipButton(list, text));
+            Pump(() => true);
+        }
+
+        public void SortLibrary(string name)
+        {
+            var button = Find<RadioButton>(name);
+            button.IsChecked = true;
+            button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Pump(() => true);
+        }
+
+        public List<OllamaLibraryBlock> Blocks => ((IEnumerable<OllamaLibraryBlock>)Find<ListBox>("Items_Library").ItemsSource).ToList();
+
+        public ScrollViewer LibraryViewer => Descendants(Find<ListBox>("Items_Library")).OfType<ScrollViewer>().First();
+
+        public ScrollViewer FilterViewer
+        {
+            get
+            {
+                DependencyObject element = Find<ItemsControl>("Items_SeriesChips");
+                while (element is not ScrollViewer) element = VisualTreeHelper.GetParent(element);
+                return (ScrollViewer)element;
+            }
+        }
+
+        /// <summary>卡片在列表里的位置，含卡片之间的间距。</summary>
+        public Rect CardBounds(string name)
+        {
+            var card = (FrameworkElement)LibraryRow(name);
+            return new Rect(card.TranslatePoint(new Point(0, 0), Find<ListBox>("Items_Library")), new Size(card.ActualWidth, card.ActualHeight));
+        }
+
+        public List<string> CardTexts(string name) => Descendants(LibraryRow(name)).OfType<TextBlock>().Select(t => t.Text).ToList();
+
         public IReadOnlyList<OllamaCatalogRow> Catalog => ((IEnumerable<OllamaCatalogRow>)Find<ItemsControl>("Items_Catalog").ItemsSource).ToList();
         public IReadOnlyList<OllamaLocalRow> Local => ((IEnumerable<OllamaLocalRow>)Find<ItemsControl>("Items_Local").ItemsSource).ToList();
-        public IReadOnlyList<OllamaLibraryRow> Library => (Find<ListBox>("Items_Library").ItemsSource as IEnumerable<OllamaLibraryRow>)?.ToList() ?? new List<OllamaLibraryRow>();
+        public IReadOnlyList<OllamaLibraryRow> Library => (Find<ListBox>("Items_Library").ItemsSource as IEnumerable<OllamaLibraryBlock>)?.SelectMany(b => b.Rows).ToList() ?? new List<OllamaLibraryRow>();
 
         public void OpenLibrary(Func<bool>? until = null)
         {
@@ -77,7 +119,10 @@ internal static partial class Program
             Pump(until ?? (() => Library.Count > 0 && RealizedRows() > 0));
         }
 
-        public int RealizedRows() => Descendants(Find<ListBox>("Items_Library")).OfType<ListBoxItem>().Count();
+        public int RealizedRows() => Cards().Count();
+
+        private IEnumerable<ContentPresenter> Cards()
+            => Descendants(Find<ListBox>("Items_Library")).OfType<ContentPresenter>().Where(p => p.Content is OllamaLibraryRow);
 
         public void Search(string keyword)
         {
@@ -100,8 +145,7 @@ internal static partial class Program
         private DependencyObject LibraryRow(string name)
         {
             DependencyObject? row = null;
-            Pump(() => (row = Descendants(Find<ListBox>("Items_Library")).OfType<ListBoxItem>()
-                .FirstOrDefault(item => (item.DataContext as OllamaLibraryRow)?.Name == name)) is not null);
+            Pump(() => (row = Cards().FirstOrDefault(card => ((OllamaLibraryRow)card.Content).Name == name)) is not null);
             return row!;
         }
 
@@ -229,6 +273,9 @@ internal static partial class Program
             CheckFailureMessages();
             CheckCloseDuringPull();
             CheckLibraryWindow();
+            CheckLibraryGrid();
+            CheckCatalogGrid();
+            CheckLocalGrid();
             CheckQuickPanel();
             CheckChannelView();
         }
@@ -336,6 +383,7 @@ internal static partial class Program
             Pump(() => DateTime.UtcNow >= settle);
             Save(window, prefix + "-library", 2);
             Save(window, prefix + "-catalog", 1);
+            Save(window, prefix + "-local", 3);
             window.Window.Width = window.Window.MinWidth;
             window.Window.Height = window.Window.MinHeight;
             Save(window, prefix + "-library-min", 2);
@@ -344,6 +392,32 @@ internal static partial class Program
 
         SaveLibrary("strong", StrongHardware);
         SaveLibrary("weak", new OllamaHardware(8 * GB, 0, "", 8, HasAvx2: false));
+
+        // 本机留着真实缓存时多出几张：假数据的说明太短，看不出截断和 20 多个系列按钮的样子。缓存拷一份用，不写回去
+        var realCache = Path.Combine(Path.GetTempPath(), "VPetLLM", "ollama");
+        if (File.Exists(Path.Combine(realCache, "library.json")))
+        {
+            var copy = NewLibraryCache();
+            Directory.CreateDirectory(copy);
+            foreach (var file in Directory.GetFiles(realCache)) File.Copy(file, Path.Combine(copy, Path.GetFileName(file)));
+
+            var realApi = new FakeApi { Running = true, Models = { new OllamaLocalModel("qwen3:8b", 5 * GB, "qwen") } };
+            var realInstaller = new FakeDeployInstaller(new OllamaInstallation(@"C:\Ollama", "0.40.13")) { Api = realApi, FreeSpace = 200 * GB };
+            var window = new ManagerWindow(realInstaller, realApi, "qwen3:8b", library: new OllamaLibrary(new FakeOllamaCom { Offline = true }, copy), hardware: StrongHardware);
+            Pump(() => window.Text("Tb_Hardware").Contains("模型盘"));
+            window.OpenLibrary();
+            var settle = DateTime.UtcNow.AddMilliseconds(600);
+            Pump(() => DateTime.UtcNow >= settle);
+            Save(window, "real-library", 2);
+            window.PressChip("Items_CapabilityChips", "看图");
+            window.PressChip("Items_SeriesChips", "qwen");
+            Save(window, "real-filtered", 2);
+            window.Click("Btn_LibraryReset");
+            window.Window.Width = window.Window.MinWidth;
+            window.Window.Height = window.Window.MinHeight;
+            Save(window, "real-library-min", 2);
+            window.Close();
+        }
 
         var panelHost = new Window { Width = 560, Height = 520, Left = -20000, Top = -20000, WindowStartupLocation = WindowStartupLocation.Manual, ShowActivated = false, ShowInTaskbar = false };
         var panel = new QuickChannelPanel();
@@ -451,7 +525,7 @@ internal static partial class Program
         Check("我的模型：在用的不能再选", local[0] is { UseText: "使用中", CanUse: false }, local[0].ToString());
         Check("我的模型：嵌入模型不能聊天", local[1] is { UseText: "不能聊天", CanUse: false }, local[1].ToString());
         Check("我的模型：其他模型可以选", local[2] is { UseText: "使用", CanUse: true }, local[2].ToString());
-        Check("我的模型：有内容时不显示空状态", !window.Shown("Tb_LocalEmpty"));
+        Check("我的模型：有内容时写数量和占用", window.Text("Tb_LocalState").StartsWith("共 3 个模型，占用 "), window.Text("Tb_LocalState"));
 
         var row = window.Catalog.Single(r => r.Name == Recommended.Name);
         Check("名单：已下载的显示使用", row is { ActionText: "使用", CanAct: true, Installed: true }, row.ToString());
@@ -714,9 +788,10 @@ internal static partial class Program
         string Status(FakeApi api, FakeDeployInstaller installer)
         {
             var window = new ManagerWindow(installer, api);
+            var before = window.Text("Tb_Status");
             window.Click("Btn_Deploy");
-            Pump(() => !window.Idle);
-            window.Finish();
+            // 失败得太快，等不到“忙”的状态，要等状态文字变
+            Pump(() => window.Idle && window.Text("Tb_Status") != before);
             var text = window.Text("Tb_Status");
             window.Close();
             return text;

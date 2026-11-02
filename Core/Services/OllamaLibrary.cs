@@ -32,6 +32,10 @@ namespace VPetLLM.Core.Services
         [JsonIgnore]
         public IReadOnlyList<string> Tags => Sizes.Count > 0 ? Sizes : new[] { "latest" };
 
+        /// <summary>名字开头的字母，qwen2.5、qwen3-coder 都算 qwen。页面上没写供应商，只能这样归类。</summary>
+        [JsonIgnore]
+        public string Series => string.Concat(Name.TakeWhile(char.IsAsciiLetter));
+
         public bool Matches(string keyword)
             => Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)
                || Description.Contains(keyword, StringComparison.OrdinalIgnoreCase);

@@ -4,10 +4,10 @@
         xmlns:utils="clr-namespace:VPetLLM.Utils.Localization"
         xmlns:controls="clr-namespace:VPetLLM.UI.Controls"
         Title="{utils:Localize KeyPath=OllamaManager.Title, Default=Ollama 管理器}"
-        Width="640"
-        Height="640"
-        MinWidth="520"
-        MinHeight="480"
+        Width="1120"
+        Height="720"
+        MinWidth="720"
+        MinHeight="600"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource BackgroundBrush}">
     <Window.Resources>
@@ -41,6 +41,167 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
+
+            <Style x:Key="OllamaPanel" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="10"/>
+                <Setter Property="Padding" Value="12"/>
+            </Style>
+
+            <!-- 卡片排成网格时 CardContainer 的阴影太重，只留边框 -->
+            <Style x:Key="OllamaModelCard" TargetType="Border" BasedOn="{StaticResource OllamaPanel}">
+                <Setter Property="Padding" Value="14,14,14,12"/>
+                <Setter Property="Margin" Value="0,0,12,12"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="BorderBrush" Value="{StaticResource HoverBorderBrush}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- 推荐的、正在用的那张卡 -->
+            <Style x:Key="OllamaHighlightCard" TargetType="Border" BasedOn="{StaticResource OllamaModelCard}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Highlighted}" Value="True">
+                        <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="OllamaStatLabel" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+            </Style>
+
+            <Style x:Key="OllamaStatValue" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Consolas"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Margin" Value="0,2,0,0"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+            </Style>
+
+            <DataTemplate x:Key="OllamaCardHeader">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Width="40" Height="40" CornerRadius="8" Background="{StaticResource BackgroundBrush}">
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" FontWeight="Bold"
+                                   Foreground="{StaticResource SecondaryTextBrush}" Text="{Binding Initial}"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource OllamaStatValue}" Margin="0" TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Name}" Text="{Binding Name}"/>
+                        <TextBlock Style="{StaticResource OllamaFitBadge}" Margin="0,3,0,0" MinHeight="16" Text="{Binding Badge}"/>
+                    </StackPanel>
+                </Grid>
+            </DataTemplate>
+
+            <ItemsPanelTemplate x:Key="OllamaCardPanel">
+                <UniformGrid VerticalAlignment="Top" Columns="{Binding CardGridColumns, RelativeSource={RelativeSource AncestorType=Window}}"/>
+            </ItemsPanelTemplate>
+
+            <!-- 盖在输入框上，Tag 指向那个输入框 -->
+            <Style x:Key="OllamaPlaceholder" TargetType="TextBlock">
+                <Setter Property="IsHitTestVisible" Value="False"/>
+                <Setter Property="Margin" Value="16,0"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Tag.Text, RelativeSource={RelativeSource Self}}" Value="">
+                        <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="OllamaFilterTitle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Margin" Value="0,12,0,8"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+            </Style>
+
+            <Style x:Key="OllamaChip" TargetType="Button">
+                <Setter Property="Padding" Value="8,4"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="BorderBrush" Value="{StaticResource HoverBorderBrush}"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Opacity" Value="0.5"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="OllamaFilterChip" TargetType="Button" BasedOn="{StaticResource OllamaChip}">
+                <Setter Property="Margin" Value="0,0,6,6"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Selected}" Value="True">
+                        <Setter Property="Background" Value="{StaticResource QuickSelectedBackgroundBrush}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="OllamaSegment" TargetType="RadioButton">
+                <Setter Property="Padding" Value="10,4"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="IsChecked" Value="True">
+                        <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}"/>
+                        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <DataTemplate x:Key="OllamaChipTemplate">
+                <Button Style="{StaticResource OllamaFilterChip}" IsEnabled="{Binding CanPick}" Tag="{Binding}" Click="FilterChip_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding Text}"/>
+                        <Border Margin="6,0,0,0" Padding="5,0" CornerRadius="4" Background="{StaticResource BackgroundBrush}">
+                            <TextBlock FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" Text="{Binding Count}"/>
+                        </Border>
+                    </StackPanel>
+                </Button>
+            </DataTemplate>
+
+            <ItemsPanelTemplate x:Key="OllamaChipPanel">
+                <WrapPanel/>
+            </ItemsPanelTemplate>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -87,157 +248,387 @@
             </TabItem>
 
             <TabItem x:Name="Tab_Catalog" Header="{utils:Localize KeyPath=OllamaManager.TabCatalog, Default=推荐模型}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
-                    <StackPanel Margin="0,12,8,4">
-                        <ItemsControl x:Name="Items_Catalog">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Style="{StaticResource CardContainer}" Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Style="{StaticResource QuickCardTitle}" Text="{Binding Name}"/>
-                                                    <TextBlock Style="{StaticResource QuickHint}" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding Size}"/>
-                                                    <TextBlock Style="{StaticResource OllamaFitBadge}" Text="{Binding Badge}"/>
-                                                </StackPanel>
-                                                <TextBlock Style="{StaticResource QuickHint}" Text="{Binding Description}"/>
-                                            </StackPanel>
-                                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="12,0,0,0" VerticalAlignment="Center"
-                                                    Content="{Binding ActionText}" IsEnabled="{Binding CanAct}" Tag="{Binding}" Click="CatalogAction_Click"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                <Grid Margin="0,12,0,4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                        <TextBlock Style="{StaticResource QuickFieldLabel}"
+                    <Grid x:Name="Panel_Custom" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="Tb_CustomModel" Style="{StaticResource OllamaTextBox}"/>
+                        <TextBlock Style="{StaticResource OllamaPlaceholder}" Tag="{Binding ElementName=Tb_CustomModel}"
                                    Text="{utils:Localize KeyPath=OllamaManager.CustomLabel, Default=其他模型（填 ollama.com 上的名字）}"/>
-                        <Grid x:Name="Panel_Custom">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="Tb_CustomModel" Style="{StaticResource OllamaTextBox}"/>
-                            <Button x:Name="Btn_PullCustom" Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="PullCustom_Click"
-                                    Content="{utils:Localize KeyPath=OllamaManager.Download, Default=下载}"/>
+                        <Button x:Name="Btn_PullCustom" Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="PullCustom_Click"
+                                Content="{utils:Localize KeyPath=OllamaManager.Download, Default=下载}"/>
+                    </Grid>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource OllamaPanel}" Margin="0,0,12,12" Padding="12,12,4,12">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
+                                <StackPanel Margin="0,0,6,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock FontSize="14" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource PrimaryTextBrush}"
+                                                   Text="{utils:Localize KeyPath=OllamaManager.LibraryFilters, Default=筛选}"/>
+                                        <Button x:Name="Btn_CatalogReset" Grid.Column="1" Style="{StaticResource OllamaChip}" Click="CatalogReset_Click"
+                                                Content="{utils:Localize KeyPath=OllamaManager.LibraryReset, Default=重置}"/>
+                                    </Grid>
+
+                                    <StackPanel x:Name="Panel_CatalogFit">
+                                        <TextBlock Style="{StaticResource OllamaFilterTitle}"
+                                                   Text="{utils:Localize KeyPath=OllamaManager.CatalogFit, Default=运行情况}"/>
+                                        <ItemsControl x:Name="Items_CatalogFitChips" ItemsPanel="{StaticResource OllamaChipPanel}" ItemTemplate="{StaticResource OllamaChipTemplate}"/>
+                                    </StackPanel>
+
+                                    <TextBlock Style="{StaticResource OllamaFilterTitle}"
+                                               Text="{utils:Localize KeyPath=OllamaManager.LibraryStatus, Default=状态}"/>
+                                    <ItemsControl x:Name="Items_CatalogStateChips" ItemsPanel="{StaticResource OllamaChipPanel}" ItemTemplate="{StaticResource OllamaChipTemplate}"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
+                        <Grid Grid.Column="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Style="{StaticResource OllamaPanel}" Padding="12,8" Margin="0,0,0,12">
+                                <TextBlock x:Name="Tb_CatalogState" Style="{StaticResource QuickHint}" Margin="0" VerticalAlignment="Center"/>
+                            </Border>
+
+                            <ScrollViewer x:Name="Scroll_Catalog" Grid.Row="1" VerticalScrollBarVisibility="Auto" SizeChanged="CardScroll_SizeChanged"
+                                          controls:SmoothWheelScroll.Enabled="True">
+                                <ItemsControl x:Name="Items_Catalog" ItemsPanel="{StaticResource OllamaCardPanel}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource OllamaHighlightCard}">
+                                                <StackPanel>
+                                                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource OllamaCardHeader}"/>
+
+                                                    <TextBlock Style="{StaticResource QuickHint}" Margin="0,10,0,0" Height="36" LineHeight="18" LineStackingStrategy="BlockLineHeight"
+                                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Description}" Text="{Binding Description}"/>
+
+                                                    <Grid Margin="0,8,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Style="{StaticResource OllamaStatLabel}"
+                                                                       Text="{utils:Localize KeyPath=OllamaManager.LibrarySizeLabel, Default=体积}"/>
+                                                            <TextBlock Style="{StaticResource OllamaStatValue}" Text="{Binding Size}"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1">
+                                                            <TextBlock Style="{StaticResource OllamaStatLabel}"
+                                                                       Text="{utils:Localize KeyPath=OllamaManager.LibraryStatus, Default=状态}"/>
+                                                            <TextBlock Style="{StaticResource OllamaStatValue}" Text="{Binding StateText}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <Border Margin="0,10" Height="1" Background="{StaticResource BorderBrush}"/>
+
+                                                    <Button Style="{StaticResource SecondaryButton}" Margin="0"
+                                                            Content="{Binding ActionText}" IsEnabled="{Binding CanAct}" Tag="{Binding}" Click="CatalogAction_Click"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </Grid>
-                    </StackPanel>
-                </ScrollViewer>
+                    </Grid>
+                </Grid>
             </TabItem>
 
             <TabItem x:Name="Tab_Library" Header="{utils:Localize KeyPath=OllamaManager.TabLibrary, Default=模型库}">
                 <Grid Margin="0,12,0,4">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <Grid Margin="0,0,8,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Style="{StaticResource QuickFieldLabel}" Margin="0,0,8,0" VerticalAlignment="Center"
-                                   Text="{utils:Localize KeyPath=OllamaManager.LibrarySearch, Default=搜索}"/>
-                        <TextBox x:Name="Tb_LibrarySearch" Grid.Column="1" Style="{StaticResource OllamaTextBox}" TextChanged="LibrarySearch_TextChanged"/>
+                    <Grid Margin="0,0,0,12">
+                        <TextBox x:Name="Tb_LibrarySearch" Style="{StaticResource OllamaTextBox}" TextChanged="LibrarySearch_TextChanged"/>
+                        <TextBlock Style="{StaticResource OllamaPlaceholder}" Tag="{Binding ElementName=Tb_LibrarySearch}"
+                                   Text="{utils:Localize KeyPath=OllamaManager.LibrarySearchHint, Default=搜索模型名称或说明…}"/>
                     </Grid>
 
-                    <Grid Grid.Row="1" Margin="0,8,8,0">
+                    <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="Tb_LibraryState" Style="{StaticResource QuickHint}" VerticalAlignment="Center"/>
-                        <Button x:Name="Btn_LibraryRetry" Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                                Visibility="Collapsed" Click="LibraryRetry_Click"
-                                Content="{utils:Localize KeyPath=OllamaManager.LibraryRetry, Default=重试}"/>
-                    </Grid>
 
-                    <!-- 两百多行，只生成看得见的。放在 * 行里才有高度，不能再套 ScrollViewer -->
-                    <ListBox x:Name="Items_Library" Grid.Row="2" Margin="0,8,0,0" Background="Transparent" BorderThickness="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             ScrollViewer.CanContentScroll="True"
-                             VirtualizingPanel.IsVirtualizing="True"
-                             VirtualizingPanel.VirtualizationMode="Standard"
-                             VirtualizingPanel.ScrollUnit="Pixel"
-                             controls:SmoothWheelScroll.Enabled="True">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Focusable" Value="False"/>
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <ContentPresenter/>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border Style="{StaticResource CardContainer}" Margin="0,0,8,8"
-                                        Loaded="LibraryRow_Loaded">
-                                    <StackPanel>
+                        <Border Style="{StaticResource OllamaPanel}" Margin="0,0,12,12" Padding="12,12,4,12">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
+                                <StackPanel Margin="0,0,6,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock FontSize="14" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource PrimaryTextBrush}"
+                                                   Text="{utils:Localize KeyPath=OllamaManager.LibraryFilters, Default=筛选}"/>
+                                        <Button x:Name="Btn_LibraryReset" Grid.Column="1" Style="{StaticResource OllamaChip}" Click="LibraryReset_Click"
+                                                Content="{utils:Localize KeyPath=OllamaManager.LibraryReset, Default=重置}"/>
+                                    </Grid>
+
+                                    <TextBlock Style="{StaticResource OllamaFilterTitle}"
+                                               Text="{utils:Localize KeyPath=OllamaManager.LibraryStatus, Default=状态}"/>
+                                    <ItemsControl x:Name="Items_StateChips" ItemsPanel="{StaticResource OllamaChipPanel}" ItemTemplate="{StaticResource OllamaChipTemplate}"/>
+
+                                    <TextBlock Style="{StaticResource OllamaFilterTitle}"
+                                               Text="{utils:Localize KeyPath=OllamaManager.LibraryCapability, Default=能力}"/>
+                                    <ItemsControl x:Name="Items_CapabilityChips" ItemsPanel="{StaticResource OllamaChipPanel}" ItemTemplate="{StaticResource OllamaChipTemplate}"/>
+
+                                    <TextBlock Style="{StaticResource OllamaFilterTitle}"
+                                               Text="{utils:Localize KeyPath=OllamaManager.LibrarySeries, Default=系列}"/>
+                                    <ItemsControl x:Name="Items_SeriesChips" ItemsPanel="{StaticResource OllamaChipPanel}" ItemTemplate="{StaticResource OllamaChipTemplate}"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
+                        <Grid Grid.Column="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Style="{StaticResource OllamaPanel}" Padding="12,8" Margin="0,0,0,12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="Tb_LibraryState" Style="{StaticResource QuickHint}" Margin="0" VerticalAlignment="Center"/>
+                                    <Button x:Name="Btn_LibraryRetry" Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                            Visibility="Collapsed" Click="LibraryRetry_Click"
+                                            Content="{utils:Localize KeyPath=OllamaManager.LibraryRetry, Default=重试}"/>
+                                    <Border Grid.Column="2" Margin="12,0,0,0" Padding="2" CornerRadius="7" VerticalAlignment="Center" Background="{StaticResource BackgroundBrush}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Style="{StaticResource QuickCardTitle}" Text="{Binding Name}"/>
-                                            <TextBlock Style="{StaticResource OllamaFitBadge}" Text="{Binding FitText}"/>
+                                            <RadioButton x:Name="Rb_SortPopular" Style="{StaticResource OllamaSegment}" IsChecked="True" Click="LibrarySort_Click"
+                                                         Content="{utils:Localize KeyPath=OllamaManager.LibrarySortPopular, Default=热度}"/>
+                                            <RadioButton x:Name="Rb_SortName" Style="{StaticResource OllamaSegment}" Click="LibrarySort_Click"
+                                                         Content="{utils:Localize KeyPath=OllamaManager.LibrarySortName, Default=名称}"/>
                                         </StackPanel>
-                                        <TextBlock Style="{StaticResource QuickHint}" MaxHeight="36" TextTrimming="CharacterEllipsis" Text="{Binding Description}"/>
-                                        <Grid Margin="0,8,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Style="{StaticResource QuickHint}" Margin="0" VerticalAlignment="Center" Text="{Binding Details}"/>
-                                            <ComboBox Grid.Column="1" Style="{StaticResource OllamaComboBox}" Width="170" Margin="8,0,0,0"
-                                                      ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" DisplayMemberPath="Text"/>
-                                            <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" VerticalAlignment="Center"
-                                                    Content="{Binding Action.Text}" IsEnabled="{Binding Action.Enabled}" Tag="{Binding}" Click="LibraryAction_Click"/>
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- 两百多张卡，按排虚拟化，只生成看得见的。放在 * 行里才有高度，不能再套 ScrollViewer -->
+                            <ListBox x:Name="Items_Library" Grid.Row="1" Background="Transparent" BorderThickness="0" SizeChanged="Library_SizeChanged"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.CanContentScroll="True"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     VirtualizingPanel.VirtualizationMode="Standard"
+                                     VirtualizingPanel.ScrollUnit="Pixel"
+                                     controls:SmoothWheelScroll.Enabled="True">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Focusable" Value="False"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <ContentPresenter/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <ItemsControl ItemsSource="{Binding Rows}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <!-- 列数固定，最后一排不满也和上面对齐 -->
+                                                    <UniformGrid Rows="1" Columns="{Binding Columns}"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Style="{StaticResource OllamaModelCard}" Loaded="LibraryRow_Loaded">
+                                                        <StackPanel>
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <Border Width="40" Height="40" CornerRadius="8" Background="{StaticResource BackgroundBrush}">
+                                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" FontWeight="Bold"
+                                                                               Foreground="{StaticResource SecondaryTextBrush}" Text="{Binding Initial}"/>
+                                                                </Border>
+                                                                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                                    <TextBlock Style="{StaticResource OllamaStatValue}" Margin="0" TextTrimming="CharacterEllipsis"
+                                                                               ToolTip="{Binding Name}" Text="{Binding Name}"/>
+                                                                    <TextBlock Style="{StaticResource OllamaStatLabel}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
+                                                                               Text="{Binding CapabilityText}"/>
+                                                                </StackPanel>
+                                                            </Grid>
+
+                                                            <TextBlock Style="{StaticResource QuickHint}" Margin="0,10,0,0" Height="36" LineHeight="18" LineStackingStrategy="BlockLineHeight"
+                                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Description}" Text="{Binding Description}"/>
+
+                                                            <TextBlock Style="{StaticResource OllamaFitBadge}" Margin="0,8,0,0" MinHeight="16" Text="{Binding FitText}"/>
+
+                                                            <Grid Margin="0,6,0,0">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel>
+                                                                    <TextBlock Style="{StaticResource OllamaStatLabel}"
+                                                                               Text="{utils:Localize KeyPath=OllamaManager.LibraryPullsLabel, Default=下载量}"/>
+                                                                    <TextBlock Style="{StaticResource OllamaStatValue}" Text="{Binding Pulls}"/>
+                                                                </StackPanel>
+                                                                <StackPanel Grid.Column="1">
+                                                                    <TextBlock Style="{StaticResource OllamaStatLabel}"
+                                                                               Text="{utils:Localize KeyPath=OllamaManager.LibrarySizeLabel, Default=体积}"/>
+                                                                    <TextBlock Style="{StaticResource OllamaStatValue}" Text="{Binding SizeText}"/>
+                                                                </StackPanel>
+                                                            </Grid>
+
+                                                            <Border Margin="0,10" Height="1" Background="{StaticResource BorderBrush}"/>
+
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <ComboBox Style="{StaticResource OllamaComboBox}" ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" DisplayMemberPath="Text"/>
+                                                                <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                                        Content="{Binding Action.Text}" IsEnabled="{Binding Action.Enabled}" Tag="{Binding}" Click="LibraryAction_Click"/>
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Grid>
                 </Grid>
             </TabItem>
 
             <TabItem Header="{utils:Localize KeyPath=OllamaManager.TabLocal, Default=我的模型}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
-                    <StackPanel Margin="0,12,8,4">
-                        <TextBlock x:Name="Tb_LocalEmpty" Style="{StaticResource QuickHint}" Margin="0,0,0,8"/>
-                        <ItemsControl x:Name="Items_Local">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Style="{StaticResource CardContainer}" Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel VerticalAlignment="Center">
-                                                <TextBlock Style="{StaticResource QuickCardTitle}" TextTrimming="CharacterEllipsis" Text="{Binding Name}"/>
-                                                <TextBlock Style="{StaticResource QuickHint}" Text="{Binding Size}"/>
-                                            </StackPanel>
-                                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="12,0,0,0" VerticalAlignment="Center"
-                                                    Content="{Binding UseText}" IsEnabled="{Binding CanUse}" Tag="{Binding}" Click="UseModel_Click"/>
-                                            <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" VerticalAlignment="Center"
-                                                    Content="{utils:Localize KeyPath=OllamaManager.Delete, Default=删除}" Tag="{Binding}" Click="DeleteModel_Click"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
+                <Grid Margin="0,12,0,4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Margin="0,0,0,12">
+                        <TextBox x:Name="Tb_LocalSearch" Style="{StaticResource OllamaTextBox}" TextChanged="LocalSearch_TextChanged"/>
+                        <TextBlock Style="{StaticResource OllamaPlaceholder}" Tag="{Binding ElementName=Tb_LocalSearch}"
+                                   Text="{utils:Localize KeyPath=OllamaManager.LocalSearchHint, Default=搜索模型名称…}"/>
+                    </Grid>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource OllamaPanel}" Margin="0,0,12,12" Padding="12,12,4,12">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
+                                <StackPanel Margin="0,0,6,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock FontSize="14" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource PrimaryTextBrush}"
+                                                   Text="{utils:Localize KeyPath=OllamaManager.LibraryFilters, Default=筛选}"/>
+                                        <Button x:Name="Btn_LocalReset" Grid.Column="1" Style="{StaticResource OllamaChip}" Click="LocalReset_Click"
+                                                Content="{utils:Localize KeyPath=OllamaManager.LibraryReset, Default=重置}"/>
+                                    </Grid>
+
+                                    <StackPanel x:Name="Panel_LocalFit">
+                                        <TextBlock Style="{StaticResource OllamaFilterTitle}"
+                                                   Text="{utils:Localize KeyPath=OllamaManager.CatalogFit, Default=运行情况}"/>
+                                        <ItemsControl x:Name="Items_LocalFitChips" ItemsPanel="{StaticResource OllamaChipPanel}" ItemTemplate="{StaticResource OllamaChipTemplate}"/>
+                                    </StackPanel>
+
+                                    <TextBlock Style="{StaticResource OllamaFilterTitle}"
+                                               Text="{utils:Localize KeyPath=OllamaManager.LocalPurpose, Default=用途}"/>
+                                    <ItemsControl x:Name="Items_LocalPurposeChips" ItemsPanel="{StaticResource OllamaChipPanel}" ItemTemplate="{StaticResource OllamaChipTemplate}"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
+                        <Grid Grid.Column="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Style="{StaticResource OllamaPanel}" Padding="12,8" Margin="0,0,0,12">
+                                <TextBlock x:Name="Tb_LocalState" Style="{StaticResource QuickHint}" Margin="0" VerticalAlignment="Center"/>
+                            </Border>
+
+                            <ScrollViewer x:Name="Scroll_Local" Grid.Row="1" VerticalScrollBarVisibility="Auto" SizeChanged="CardScroll_SizeChanged"
+                                          controls:SmoothWheelScroll.Enabled="True">
+                                <ItemsControl x:Name="Items_Local" ItemsPanel="{StaticResource OllamaCardPanel}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource OllamaHighlightCard}">
+                                                <StackPanel>
+                                                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource OllamaCardHeader}"/>
+
+                                                    <Grid Margin="0,10,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Style="{StaticResource OllamaStatLabel}"
+                                                                       Text="{utils:Localize KeyPath=OllamaManager.LibrarySizeLabel, Default=体积}"/>
+                                                            <TextBlock Style="{StaticResource OllamaStatValue}" Text="{Binding Size}"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1">
+                                                            <TextBlock Style="{StaticResource OllamaStatLabel}"
+                                                                       Text="{utils:Localize KeyPath=OllamaManager.LibrarySeries, Default=系列}"/>
+                                                            <TextBlock Style="{StaticResource OllamaStatValue}" TextTrimming="CharacterEllipsis" Text="{Binding Series}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <Border Margin="0,10" Height="1" Background="{StaticResource BorderBrush}"/>
+
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Button Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                                                                Content="{Binding UseText}" IsEnabled="{Binding CanUse}" Tag="{Binding}" Click="UseModel_Click"/>
+                                                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="4,0,0,0"
+                                                                Content="{utils:Localize KeyPath=OllamaManager.Delete, Default=删除}" Tag="{Binding}" Click="DeleteModel_Click"/>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
+                </Grid>
             </TabItem>
         </TabControl>
 

@@ -395,6 +395,9 @@ internal static partial class Program
         Check("体积：取消不占着并发名额", await shared.GetSizeAsync("ok", default).WaitAsync(TimeSpan.FromSeconds(5)) == 1000);
     }
 
+    /// <summary>机器忙时一拍能卡到大半秒，“还没到时间就划走了”的场景要留够余量。</summary>
+    private static readonly TimeSpan RelaxedLookupDelay = TimeSpan.FromMilliseconds(1500);
+
     private static string LibraryPage() => Page(
         Card("alpha", "First family.", "tools 4b 8b 70b", "3.5M"),
         Card("bravo", "Second family, quite heavy.", "tools 20b"),
@@ -456,7 +459,7 @@ internal static partial class Program
         Check("模型库：只生成看得见的行", realized > 0 && realized < names.Count / 2, $"{realized}/{names.Count}");
 
         var alpha = window.Library[0];
-        Check("模型库：显示能力和下载量", alpha.Details == "tools · 3.5M 次下载", alpha.Details);
+        Check("模型库：显示能力和下载量", alpha.CapabilityText == "工具调用" && alpha.Pulls == "3.5M", $"{alpha.CapabilityText} {alpha.Pulls}");
         Pump(() => Sized(alpha));
         Check("模型库：默认选能流畅运行的最大规格", alpha.Selected.Tag == "8b" && alpha.Selected.Model == "alpha:8b", alpha.Selected.ToString());
         Check("模型库：徽章说得动不动得动", alpha is { Fit: OllamaFit.Smooth, FitText: "能流畅运行" }, alpha.FitText);
@@ -572,11 +575,12 @@ internal static partial class Program
         var fast = LibraryNet();
         fast.Html = Page();
         var scrolling = new ManagerWindow(new FakeDeployInstaller(installed) { Api = api }, api, library: Library(fast), hardware: StrongHardware);
+        scrolling.Window.SizeLookupDelay = RelaxedLookupDelay;
         scrolling.OpenLibrary(until: () => scrolling.RealizedRows() > 0);
         Pump(() => true);
         scrolling.ScrollLibraryToEnd();
         // 要等过虚拟化卸载旧行的那 500 毫秒，卸载之后也不能再去查
-        var settle = DateTime.UtcNow.AddMilliseconds(800);
+        var settle = DateTime.UtcNow.AddMilliseconds(2000);
         Pump(() => DateTime.UtcNow >= settle);
         var looked = fast.Looked.ToList();
         Check("滚动：划走的行不查体积", !looked.Contains("filler00:8b"), string.Join(",", looked));
@@ -587,6 +591,7 @@ internal static partial class Program
         var bounced = LibraryNet();
         bounced.Html = Page();
         var bounce = new ManagerWindow(new FakeDeployInstaller(installed) { Api = api }, api, library: Library(bounced), hardware: StrongHardware);
+        bounce.Window.SizeLookupDelay = RelaxedLookupDelay;
         bounce.OpenLibrary(until: () => bounce.RealizedRows() > 0);
         Pump(() => true);
         bounce.ScrollLibraryToEnd();
@@ -594,7 +599,7 @@ internal static partial class Program
         bounce.ScrollLibraryToStart();
         Pump(() => bounced.Looked.Contains("filler00:8b"));
         Check("划回来：还没卸载的行也要查", bounced.Looked.Contains("filler00:8b"), string.Join(",", bounced.Looked));
-        var bounceSettle = DateTime.UtcNow.AddMilliseconds(800);
+        var bounceSettle = DateTime.UtcNow.AddMilliseconds(2000);
         Pump(() => DateTime.UtcNow >= bounceSettle);
         Check("划回来：这次划走的行不查", !bounced.Looked.Contains("filler29:8b"), string.Join(",", bounced.Looked));
         bounce.Close();
@@ -604,14 +609,17 @@ internal static partial class Program
         flipped.Html = Page();
         flipped.ManifestGate = new TaskCompletionSource();
         var flip = new ManagerWindow(new FakeDeployInstaller(installed) { Api = api }, api, library: Library(flipped), hardware: StrongHardware);
+        // 只留一张卡：同时只查 4 个，卡片一多，重复的查询排在闸门后面就看不见了
+        flip.Find<TextBox>("Tb_LibrarySearch").Text = "filler00";
+        flip.Window.SizeLookupDelay = RelaxedLookupDelay;
         flip.OpenLibrary(until: () => flip.RealizedRows() > 0);
         flip.Find<TabControl>("Tabs").SelectedIndex = 0;
         Pump(() => true);
-        var flipSettle = DateTime.UtcNow.AddMilliseconds(400);
+        var flipSettle = DateTime.UtcNow.AddMilliseconds(1800);
         Pump(() => DateTime.UtcNow >= flipSettle);
         Check("切走：卸载的行不查体积", !flipped.Looked.Contains("filler00:8b"), string.Join(",", flipped.Looked));
         flip.OpenLibrary(until: () => flipped.Looked.Contains("filler00:8b"));
-        var flipBack = DateTime.UtcNow.AddMilliseconds(400);
+        var flipBack = DateTime.UtcNow.AddMilliseconds(1800);
         Pump(() => DateTime.UtcNow >= flipBack);
         Check("切回来：只查一遍", flipped.Looked.Count(k => k == "filler00:8b") == 1, string.Join(",", flipped.Looked));
 
@@ -624,8 +632,8 @@ internal static partial class Program
         flip.Close();
 
         // 换下拉项时 WPF 会把同一项写回来，这不算用户选了规格
-        OllamaTagOption Option(string tag, long size) => new(tag, $"plain:{tag}", size, OllamaFit.Unknown, "", tag);
-        var plain = new OllamaLibraryRow(new OllamaLibraryModel("plain", "", Array.Empty<string>(), new[] { "4b", "8b" }, ""), "",
+        OllamaTagOption Option(string tag, long size) => new(tag, $"plain:{tag}", size, "", OllamaFit.Unknown, "", tag);
+        var plain = new OllamaLibraryRow(new OllamaLibraryModel("plain", "", Array.Empty<string>(), new[] { "4b", "8b" }, ""), "", "",
             new[] { Option("4b", 0), Option("8b", 0) }, _ => new OllamaRowAction("下载", true, false));
         plain.Selected = plain.Selected;
         plain.SetOptions(new[] { Option("4b", GB), Option("8b", 2 * GB) }, "8b");
@@ -813,8 +821,8 @@ internal static partial class Program
         detailed.OpenLibrary();
         var mixedRow = detailed.Library.Single(r => r.Name == "mixed");
         var brandNewRow = detailed.Library.Single(r => r.Name == "brandnew");
-        Check("模型库：不显示 cloud 徽章", mixedRow.Details == "tools · 1.2K 次下载", mixedRow.Details);
-        Check("模型库：没有下载量就不写", brandNewRow.Details == "vision", brandNewRow.Details);
+        Check("模型库：不显示 cloud 徽章", mixedRow.CapabilityText == "工具调用", mixedRow.CapabilityText);
+        Check("模型库：没有下载量就写破折号", brandNewRow.Pulls == "—", brandNewRow.Pulls);
         detailed.Close();
 
         // 列表还没回来时在两页之间切换，不能再发一次请求

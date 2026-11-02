@@ -8,13 +8,29 @@ using VPetLLM.Utils.Localization;
 
 namespace VPetLLM.UI.Windows
 {
-    public sealed record OllamaCatalogRow(OllamaModelInfo Model, string Name, string Size, OllamaFit Fit, string Badge, string Description, string ActionText, bool CanAct, bool Installed, int Rank);
+    public sealed record OllamaCatalogRow(OllamaModelInfo Model, string Name, string Size, OllamaFit Fit, string Badge, string Description, string ActionText, bool CanAct, bool Installed, string StateText, int Rank)
+    {
+        public string Initial => Name[..1].ToUpperInvariant();
+        public bool Highlighted => Rank < 0;
+    }
 
-    public sealed record OllamaLocalRow(string Name, string Size, string UseText, bool CanUse);
+    public sealed record OllamaLocalRow(string Name, long SizeBytes, string Size, OllamaFit Fit, string Badge, string Series, string UseText, bool CanUse, bool IsChat, bool Highlighted)
+    {
+        public string Initial => Name[..1].ToUpperInvariant();
+    }
 
     public sealed record OllamaRowAction(string Text, bool Enabled, bool Installed);
 
-    public sealed record OllamaTagOption(string Tag, string Model, long SizeBytes, OllamaFit Fit, string FitText, string Text);
+    public sealed record OllamaTagOption(string Tag, string Model, long SizeBytes, string SizeText, OllamaFit Fit, string FitText, string Text);
+
+    /// <summary>模型库的一排卡片。列表按排虚拟化，WPF 没有现成的虚拟化网格。</summary>
+    public sealed record OllamaLibraryBlock(IReadOnlyList<OllamaLibraryRow> Rows, int Columns);
+
+    /// <summary>选中的项数到 0 也要能点，不然退不回去。</summary>
+    public sealed record OllamaFilterChip(string Text, int Count, bool Selected, Action Apply)
+    {
+        public bool CanPick => Count > 0 || Selected;
+    }
 
     /// <summary>模型库里的一行。体积是滚到这行才查的，查到之后下拉项和默认规格都会变。</summary>
     public sealed class OllamaLibraryRow : INotifyPropertyChanged
@@ -23,10 +39,11 @@ namespace VPetLLM.UI.Windows
         private OllamaTagOption _selected;
         private bool _chosenByUser;
 
-        public OllamaLibraryRow(OllamaLibraryModel model, string details, IReadOnlyList<OllamaTagOption> options, Func<string, OllamaRowAction> describeAction)
+        public OllamaLibraryRow(OllamaLibraryModel model, string series, string capabilityText, IReadOnlyList<OllamaTagOption> options, Func<string, OllamaRowAction> describeAction)
         {
             Model = model;
-            Details = details;
+            Series = series;
+            CapabilityText = capabilityText;
             Options = options;
             _selected = options[0];
             _describeAction = describeAction;
@@ -38,7 +55,11 @@ namespace VPetLLM.UI.Windows
         public OllamaLibraryModel Model { get; }
         public string Name => Model.Name;
         public string Description => Model.Description;
-        public string Details { get; }
+        public string Initial => Name[..1].ToUpperInvariant();
+        public string Series { get; }
+        public string CapabilityText { get; }
+        public string Pulls => Model.Pulls.Length > 0 ? Model.Pulls : "—";
+        public string SizeText => _selected.SizeText;
         public IReadOnlyList<OllamaTagOption> Options { get; private set; }
         public OllamaFit Fit => _selected.Fit;
         public string FitText => _selected.FitText;
@@ -80,6 +101,7 @@ namespace VPetLLM.UI.Windows
         {
             _selected = option;
             Raise(nameof(Selected));
+            Raise(nameof(SizeText));
             Raise(nameof(Fit));
             Raise(nameof(FitText));
             RefreshAction();
@@ -98,8 +120,10 @@ namespace VPetLLM.UI.Windows
         private const double GiB = 1024 * 1024 * 1024;
         private const int MaxPopularModels = 4;
 
-        // 快速滚动时划过去的行不发请求
-        private static readonly TimeSpan SizeLookupDelay = TimeSpan.FromMilliseconds(200);
+        // 同系列不到这么多个就归到“其他”，不然筛选栏全是只有一两个模型的按钮
+        private const int MinSeriesModels = 3;
+        private const double MinCardWidth = 240;
+        private const double CardGap = 12;
 
         private static winOllamaManager? _instance;
 
@@ -123,6 +147,18 @@ namespace VPetLLM.UI.Windows
         private long? _freeSpace;
         private IReadOnlyList<OllamaLibraryModel>? _libraryModels;
         private List<OllamaLibraryRow> _libraryRows = new();
+        private List<OllamaLibraryRow> _shownRows = new();
+        private List<string> _librarySeries = new();
+        private List<string> _libraryCapabilities = new();
+        private HashSet<string> _downloaded = new();
+        private string? _filterSeries;
+        private string? _filterCapability;
+        private bool _filterDownloaded;
+        private int _libraryColumns;
+        private OllamaFit? _catalogFit;
+        private bool _catalogDownloaded;
+        private OllamaFit? _localFit;
+        private bool? _localChat;
         private List<OllamaModelInfo> _popular = new();
         private CancellationTokenSource? _popularLookup;
         private bool _libraryLoading;
@@ -150,11 +186,27 @@ namespace VPetLLM.UI.Windows
             _instance.Show();
         }
 
+        /// <summary>快速滚动时划过去的行不发请求，停够这么久才查体积。</summary>
+        public TimeSpan SizeLookupDelay { get; set; } = TimeSpan.FromMilliseconds(200);
+
+        public static readonly DependencyProperty CardGridColumnsProperty =
+            DependencyProperty.Register(nameof(CardGridColumns), typeof(int), typeof(winOllamaManager), new PropertyMetadata(1));
+
+        /// <summary>推荐页和我的模型的列数，两页一样宽，共用一个值。</summary>
+        public int CardGridColumns
+        {
+            get => (int)GetValue(CardGridColumnsProperty);
+            set => SetValue(CardGridColumnsProperty, value);
+        }
+
         /// <param name="confirm">升级、删除前的确认，返回 true 才继续。不传时弹系统确认框。</param>
         public winOllamaManager(Setting settings, OllamaManagerService service, string? currentModel, Func<string, string, bool> onChosen,
             Func<string, MessageBoxImage, bool>? confirm = null, OllamaLibrary? library = null, OllamaHardware? hardware = null)
         {
             InitializeComponent();
+            // 小屏幕上窗口不能比屏幕还大
+            Width = Math.Min(Width, SystemParameters.WorkArea.Width);
+            Height = Math.Min(Height, SystemParameters.WorkArea.Height);
             _settings = settings;
             _library = library ?? OllamaLibrary.Shared;
             _hardware = hardware ?? OllamaHardware.Detect();
@@ -288,13 +340,15 @@ namespace VPetLLM.UI.Windows
             Items_Local.IsEnabled = !busy;
             Panel_Custom.IsEnabled = !busy;
 
-            Items_Catalog.ItemsSource = OllamaModelCatalog.Models.Concat(_popular).Select(BuildCatalogRow).OrderBy(r => r.Rank).ToList();
+            ShowCatalog();
             foreach (var row in _libraryRows) row.RefreshAction();
-            Items_Local.ItemsSource = _models.Select(BuildLocalRow).ToList();
-            Tb_LocalEmpty.Text = running
-                ? T("NoModels", "还没有下载模型。")
-                : T("NotRunningModels", "Ollama 没有运行，看不到模型。可以到“部署”页启动。");
-            Tb_LocalEmpty.Visibility = _models.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            var downloaded = _models.Select(m => m.Name.Split(':')[0]).ToHashSet();
+            if (!downloaded.SetEquals(_downloaded))
+            {
+                _downloaded = downloaded;
+                ApplyLibraryFilter();
+            }
+            ShowLocal();
         }
 
         private OllamaCatalogRow BuildCatalogRow(OllamaModelInfo model)
@@ -306,7 +360,108 @@ namespace VPetLLM.UI.Windows
             return new OllamaCatalogRow(model, model.Name, FormatSize(model.SizeBytes), fit,
                 recommended ? T("Recommended", "推荐") : DescribeFit(fit),
                 LanguageHelper.Get(model.DescriptionKey, Lang, model.DefaultDescription), action.Text, action.Enabled, action.Installed,
+                action.Installed ? T("LibraryDownloaded", "已下载") : T("CatalogNotDownloaded", "未下载"),
                 recommended ? -1 : (int)fit);
+        }
+
+        private void ShowCatalog()
+        {
+            var rows = OllamaModelCatalog.Models.Concat(_popular).Select(BuildCatalogRow).OrderBy(r => r.Rank).ToList();
+            // 别的电脑判断不了跑不跑得动，这组筛选不显示，之前选的也不算
+            var fit = Hardware is null ? null : _catalogFit;
+
+            OllamaFilterChip Chip(string text, int count, bool selected, Action apply) => new(text, count, selected, () =>
+            {
+                apply();
+                ShowCatalog();
+                Scroll_Catalog.ScrollToTop();
+            });
+
+            // 每组的数字不算本组的条件
+            var byFit = rows.Where(r => !_catalogDownloaded || r.Installed).ToList();
+            var byState = rows.Where(r => fit is null || r.Fit == fit).ToList();
+
+            Panel_CatalogFit.Visibility = Hardware is null ? Visibility.Collapsed : Visibility.Visible;
+            Items_CatalogFitChips.ItemsSource = FitChips(byFit.Select(r => r.Fit).ToList(), fit, Chip, f => _catalogFit = f);
+            Items_CatalogStateChips.ItemsSource = new[]
+            {
+                Chip(T("LibraryAllModels", "所有模型"), byState.Count, !_catalogDownloaded, () => _catalogDownloaded = false),
+                Chip(T("LibraryDownloaded", "已下载"), byState.Count(r => r.Installed), _catalogDownloaded, () => _catalogDownloaded = true)
+            };
+
+            var shown = byState.Where(r => !_catalogDownloaded || r.Installed).ToList();
+            Items_Catalog.ItemsSource = shown;
+            Btn_CatalogReset.IsEnabled = fit is not null || _catalogDownloaded;
+            Tb_CatalogState.Text = shown.Count == 0
+                ? T("LibraryNoMatch", "没有找到匹配的模型。")
+                : string.Format(T("CatalogCount", "共 {0} 个模型"), shown.Count);
+        }
+
+        private List<OllamaFilterChip> FitChips(List<OllamaFit> fits, OllamaFit? selected, Func<string, int, bool, Action, OllamaFilterChip> chip, Action<OllamaFit?> pick)
+            => new[] { OllamaFit.Smooth, OllamaFit.Slow, OllamaFit.TooLarge }
+                .Select(f => chip(DescribeFit(f), fits.Count(x => x == f), selected == f, () => pick(f)))
+                .Prepend(chip(T("CatalogAllFits", "所有情况"), fits.Count, selected is null, () => pick(null)))
+                .ToList();
+
+        private void ShowLocal()
+        {
+            var rows = _models.Select(BuildLocalRow).OrderByDescending(r => r.Highlighted).ToList();
+            var fit = Hardware is null ? null : _localFit;
+            var keyword = Tb_LocalSearch.Text.Trim();
+
+            OllamaFilterChip Chip(string text, int count, bool selected, Action apply) => new(text, count, selected, () =>
+            {
+                apply();
+                ShowLocal();
+                Scroll_Local.ScrollToTop();
+            });
+
+            // 每组的数字不算本组的条件
+            var searched = rows.Where(r => r.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase) || r.Series.Contains(keyword, StringComparison.OrdinalIgnoreCase)).ToList();
+            var byFit = searched.Where(r => _localChat is null || r.IsChat == _localChat).ToList();
+            var byPurpose = searched.Where(r => fit is null || r.Fit == fit).ToList();
+
+            Panel_LocalFit.Visibility = Hardware is null ? Visibility.Collapsed : Visibility.Visible;
+            Items_LocalFitChips.ItemsSource = FitChips(byFit.Select(r => r.Fit).ToList(), fit, Chip, f => _localFit = f);
+            Items_LocalPurposeChips.ItemsSource = new[]
+            {
+                Chip(T("LibraryAllModels", "所有模型"), byPurpose.Count, _localChat is null, () => _localChat = null),
+                Chip(T("LocalChat", "能聊天"), byPurpose.Count(r => r.IsChat), _localChat == true, () => _localChat = true),
+                Chip(T("NotChat", "不能聊天"), byPurpose.Count(r => !r.IsChat), _localChat == false, () => _localChat = false)
+            };
+
+            var shown = byPurpose.Where(r => _localChat is null || r.IsChat == _localChat).ToList();
+            Items_Local.ItemsSource = shown;
+            Btn_LocalReset.IsEnabled = keyword.Length > 0 || fit is not null || _localChat is not null;
+            Tb_LocalState.Text = _models.Count == 0
+                ? _status is { IsRunning: true } ? T("NoModels", "还没有下载模型。") : T("NotRunningModels", "Ollama 没有运行，看不到模型。可以到“部署”页启动。")
+                : shown.Count == 0 ? T("LibraryNoMatch", "没有找到匹配的模型。")
+                : string.Format(T("LocalCount", "共 {0} 个模型，占用 {1}"), shown.Count, FormatSize(shown.Sum(r => r.SizeBytes)));
+        }
+
+        private void LocalSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ShowLocal();
+            Scroll_Local.ScrollToTop();
+        }
+
+        private void LocalReset_Click(object sender, RoutedEventArgs e)
+        {
+            _localFit = null;
+            _localChat = null;
+            Tb_LocalSearch.Clear();
+            ShowLocal();
+            Scroll_Local.ScrollToTop();
+        }
+
+        private void CardScroll_SizeChanged(object sender, SizeChangedEventArgs e) => CardGridColumns = CardColumns(e.NewSize.Width);
+
+        private void CatalogReset_Click(object sender, RoutedEventArgs e)
+        {
+            _catalogFit = null;
+            _catalogDownloaded = false;
+            ShowCatalog();
+            Scroll_Catalog.ScrollToTop();
         }
 
         private OllamaRowAction DescribeAction(string model)
@@ -329,7 +484,10 @@ namespace VPetLLM.UI.Windows
         {
             var inUse = model.Name == _currentModel;
             var text = !model.IsChatModel ? T("NotChat", "不能聊天") : inUse ? T("InUse", "使用中") : T("Use", "使用");
-            return new OllamaLocalRow(model.Name, FormatSize(model.SizeBytes), text, model.IsChatModel && !inUse);
+            // 嵌入模型不聊天，跑得快慢无所谓
+            var fit = model.IsChatModel ? OllamaModelCatalog.Assess(model.SizeBytes, Hardware) : OllamaFit.Unknown;
+            return new OllamaLocalRow(model.Name, model.SizeBytes, FormatSize(model.SizeBytes), fit, DescribeFit(fit),
+                model.Family.Length > 0 ? model.Family : "—", text, model.IsChatModel && !inUse, model.IsChatModel, inUse);
         }
 
         private string DescribeState(OllamaStatus status)
@@ -637,33 +795,101 @@ namespace VPetLLM.UI.Windows
         private void ShowLibrary(IReadOnlyList<OllamaLibraryModel> models)
         {
             _libraryModels = models;
-            _libraryRows = models.Where(m => m.IsChatModel && !m.IsCloudOnly).Select(BuildLibraryRow).ToList();
+            var chatModels = models.Where(m => m.IsChatModel && !m.IsCloudOnly).ToList();
+            _librarySeries = chatModels.Where(m => m.Series.Length > 0).GroupBy(m => m.Series)
+                .Where(g => g.Count() >= MinSeriesModels).OrderByDescending(g => g.Count()).Select(g => g.Key).ToList();
+            _libraryCapabilities = chatModels.SelectMany(m => m.Capabilities).Where(c => c != "cloud")
+                .GroupBy(c => c).OrderByDescending(g => g.Count()).Select(g => g.Key).ToList();
+            _libraryRows = chatModels.Select(BuildLibraryRow).ToList();
             ApplyLibraryFilter();
             _ = LoadPopularAsync(models);
         }
 
         private OllamaLibraryRow BuildLibraryRow(OllamaLibraryModel model)
         {
-            var details = model.Capabilities.Where(c => c != "cloud").ToList();
-            if (model.Pulls.Length > 0) details.Add(string.Format(T("LibraryPulls", "{0} 次下载"), model.Pulls));
-
-            return new OllamaLibraryRow(model, string.Join(" · ", details),
+            return new OllamaLibraryRow(model, _librarySeries.Contains(model.Series) ? model.Series : "",
+                string.Join(" · ", model.Capabilities.Where(c => c != "cloud").Select(DescribeCapability)),
                 model.Tags.Select(tag => BuildTagOption(model, tag, 0)).ToList(), DescribeAction);
         }
+
+        private string DescribeCapability(string capability) => capability switch
+        {
+            "tools" => T("CapabilityTools", "工具调用"),
+            "vision" => T("CapabilityVision", "看图"),
+            "thinking" => T("CapabilityThinking", "深度思考"),
+            "audio" => T("CapabilityAudio", "语音"),
+            // 页面以后多出来的能力照原文显示，筛选不受影响
+            _ => capability
+        };
 
         private OllamaTagOption BuildTagOption(OllamaLibraryModel model, string tag, long size)
         {
             var fit = OllamaModelCatalog.Assess(size, Hardware);
             var text = $"{tag} · {(size > 0 ? FormatSize(size) : T("SizeUnknown", "大小未知"))}";
-            return new OllamaTagOption(tag, $"{model.Name}:{tag}", size, fit, DescribeFit(fit), text);
+            return new OllamaTagOption(tag, $"{model.Name}:{tag}", size, size > 0 ? FormatSize(size) : "—", fit, DescribeFit(fit), text);
         }
 
         private void ApplyLibraryFilter()
         {
             var keyword = Tb_LibrarySearch.Text.Trim();
-            var rows = _libraryRows.Where(r => r.Model.Matches(keyword)).ToList();
-            Items_Library.ItemsSource = rows;
-            ShowLibraryState(rows.Count);
+            var searched = _libraryRows.Where(r => r.Model.Matches(keyword)).ToList();
+
+            bool InState(OllamaLibraryRow r) => !_filterDownloaded || _downloaded.Contains(r.Name);
+            bool HasCapability(OllamaLibraryRow r) => _filterCapability is null || r.Model.Capabilities.Contains(_filterCapability);
+            bool InSeries(OllamaLibraryRow r) => _filterSeries is null || r.Series == _filterSeries;
+
+            OllamaFilterChip Chip(string text, int count, bool selected, Action apply) => new(text, count, selected, () =>
+            {
+                apply();
+                FilterLibrary();
+            });
+
+            // 每组的数字不算本组的条件，不然选中一项后同组其他按钮全变成 0
+            var byState = searched.Where(r => HasCapability(r) && InSeries(r)).ToList();
+            var byCapability = searched.Where(r => InState(r) && InSeries(r)).ToList();
+            var bySeries = searched.Where(r => InState(r) && HasCapability(r)).ToList();
+
+            Items_StateChips.ItemsSource = new[]
+            {
+                Chip(T("LibraryAllModels", "所有模型"), byState.Count, !_filterDownloaded, () => _filterDownloaded = false),
+                Chip(T("LibraryDownloaded", "已下载"), byState.Count(r => _downloaded.Contains(r.Name)), _filterDownloaded, () => _filterDownloaded = true)
+            };
+            Items_CapabilityChips.ItemsSource = _libraryCapabilities
+                .Select(c => Chip(DescribeCapability(c), byCapability.Count(r => r.Model.Capabilities.Contains(c)), _filterCapability == c, () => _filterCapability = c))
+                .Prepend(Chip(T("LibraryAllCapabilities", "所有能力"), byCapability.Count, _filterCapability is null, () => _filterCapability = null))
+                .ToList();
+            Items_SeriesChips.ItemsSource = _librarySeries.Append("")
+                .Select(s => Chip(s.Length > 0 ? s : T("LibraryOtherSeries", "其他"), bySeries.Count(r => r.Series == s), _filterSeries == s, () => _filterSeries = s))
+                .Prepend(Chip(T("LibraryAllSeries", "所有系列"), bySeries.Count, _filterSeries is null, () => _filterSeries = null))
+                .ToList();
+
+            var rows = byState.Where(InState);
+            _shownRows = (Rb_SortName.IsChecked == true ? rows.OrderBy(r => r.Name, StringComparer.Ordinal) : rows).ToList();
+            ShowLibraryCards();
+            Btn_LibraryReset.IsEnabled = keyword.Length > 0 || _filterDownloaded || _filterCapability is not null || _filterSeries is not null;
+            ShowLibraryState(_shownRows.Count);
+        }
+
+        private static int CardColumns(double width) => Math.Max(1, (int)((width - SystemParameters.VerticalScrollBarWidth) / (MinCardWidth + CardGap)));
+
+        private int LibraryColumns() => CardColumns(Items_Library.ActualWidth);
+
+        private void ShowLibraryCards()
+        {
+            _libraryColumns = LibraryColumns();
+            Items_Library.ItemsSource = _shownRows.Chunk(_libraryColumns).Select(rows => new OllamaLibraryBlock(rows, _libraryColumns)).ToList();
+        }
+
+        private void Library_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (LibraryColumns() != _libraryColumns) ShowLibraryCards();
+        }
+
+        /// <summary>换了条件要回到开头。下载完刷新不走这里，不能把用户看到的位置弄丢。</summary>
+        private void FilterLibrary()
+        {
+            ApplyLibraryFilter();
+            if (Items_Library.Items.Count > 0) Items_Library.ScrollIntoView(Items_Library.Items[0]);
         }
 
         private void ShowLibraryState(int shown)
@@ -679,7 +905,20 @@ namespace VPetLLM.UI.Windows
             Btn_LibraryRetry.Visibility = _libraryOffline ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void LibrarySearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyLibraryFilter();
+        private void LibrarySearch_TextChanged(object sender, TextChangedEventArgs e) => FilterLibrary();
+
+        private void LibrarySort_Click(object sender, RoutedEventArgs e) => FilterLibrary();
+
+        private void FilterChip_Click(object sender, RoutedEventArgs e) => ((OllamaFilterChip)((Button)sender).Tag).Apply();
+
+        private void LibraryReset_Click(object sender, RoutedEventArgs e)
+        {
+            _filterDownloaded = false;
+            _filterCapability = null;
+            _filterSeries = null;
+            Tb_LibrarySearch.Clear();
+            FilterLibrary();
+        }
 
         private async void LibraryRetry_Click(object sender, RoutedEventArgs e) => await LoadLibraryAsync();
 
