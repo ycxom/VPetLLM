@@ -116,19 +116,36 @@ namespace VPetLLM.Core.Services
         /// 这次下载依次要试的线路。只有用镜像改写地址时才进代理池：关了代理就是不走代理，
         /// 填了本地 HTTP 代理说明用户有自己的线路，都不替他探测。
         /// </summary>
-        private async Task<IReadOnlyList<PluginStoreProxyDecision>> ResolveDownloadRoutesAsync()
+        private Task<IReadOnlyList<PluginStoreProxyDecision>> ResolveDownloadRoutesAsync()
+            => ResolveRoutesAsync(ResolveProxy(), _proxyPool);
+
+        private static async Task<IReadOnlyList<PluginStoreProxyDecision>> ResolveRoutesAsync(PluginStoreProxyDecision decision, GitHubProxyPool pool)
         {
-            var decision = ResolveProxy();
             if (decision.Mode != PluginStoreProxyMode.UrlRewrite)
             {
                 return new[] { decision };
             }
 
-            var routes = await _proxyPool.GetDownloadRoutesAsync(decision.ProxyUrl).ConfigureAwait(false);
+            var routes = await pool.GetDownloadRoutesAsync(decision.ProxyUrl).ConfigureAwait(false);
             return routes
                 .Select(route => route == GitHubProxyPool.DirectRoute
                     ? new PluginStoreProxyDecision(PluginStoreProxyMode.Direct)
                     : new PluginStoreProxyDecision(PluginStoreProxyMode.UrlRewrite, route))
+                .ToList();
+        }
+
+        /// <summary>
+        /// 下载商店以外的 GitHub 文件（Ollama 安装包）要试的线路，和插件下载共用代理设置和测速结果。
+        /// 这些文件都有自己的校验，线路本身不需要被信任。
+        /// </summary>
+        public static async Task<IReadOnlyList<DownloadRoute>> ResolveFileRoutesAsync(Setting.PluginStoreSetting? settings, string url)
+        {
+            var decision = ProxyRoutingPolicy.ResolvePluginStore(settings?.UseProxy == true, settings?.ProxyUrl);
+            var routes = await ResolveRoutesAsync(decision, SharedProxyPool).ConfigureAwait(false);
+            return routes
+                .Select(route => new DownloadRoute(
+                    ProxyRoutingPolicy.BuildPluginStoreUrl(route, url),
+                    () => ProxyRoutingPolicy.CreatePluginStoreHandler(route)))
                 .ToList();
         }
 

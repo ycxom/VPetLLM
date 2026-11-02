@@ -27,7 +27,7 @@
 
         <UniformGrid x:Name="Panel_Progress" Rows="1" Margin="0,0,0,20"/>
 
-        <ScrollViewer x:Name="Scroll_Pages" Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="Scroll_Pages" Grid.Row="1" VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
             <Grid Margin="0,0,8,0">
                 <!-- 1. 欢迎 -->
                 <StackPanel x:Name="Page_Welcome">

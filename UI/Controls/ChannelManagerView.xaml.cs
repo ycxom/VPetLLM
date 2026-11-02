@@ -7,6 +7,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using VPetLLM.UI.Windows;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 
@@ -494,6 +495,7 @@ namespace VPetLLM.UI.Controls
                 Ed_Model.ItemsSource = isFree ? new List<string> { "auto" } : (CachedModels(UrlOf(d)) ?? new List<string>());
                 Ed_Model.Text = isFree ? "auto" : d.Model ?? "";
                 Ed_ModelStatus.Visibility = Visibility.Collapsed;
+                Ed_OllamaManager.Visibility = d is Setting.OllamaNodeSetting ? Visibility.Visible : Visibility.Collapsed;
 
                 Ed_GeminiOpenAIAuth.Visibility = d is Setting.GeminiNodeSetting ? Visibility.Visible : Visibility.Collapsed;
                 Ed_GeminiOpenAIAuth.IsChecked = (d as Setting.GeminiNodeSetting)?.UseOpenAIAuth == true;
@@ -775,6 +777,32 @@ namespace VPetLLM.UI.Controls
             {
                 Ed_RefreshModels.IsEnabled = true;
             }
+        }
+
+        private void Ed_OllamaManager_Click(object sender, RoutedEventArgs e)
+        {
+            if (_settings is null || _draft is not { } draft) return;
+
+            var url = Ed_Url.Text.Trim();
+            if (url.Length > 0 && !(Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"))
+            {
+                ShowModelStatus(T("OllamaInvalidUrl", "接口地址不对，改好后再打开管理器。"), error: true);
+                return;
+            }
+
+            winOllamaManager.Open(Window.GetWindow(this), _settings, url, Ed_Model.Text,
+                (model, chosenUrl) => ApplyOllamaChoice(draft, model, chosenUrl));
+        }
+
+        private bool ApplyOllamaChoice(Setting.ChannelNodeBase draft, string model, string url)
+        {
+            // 管理器不挡设置页，用户可能已经切到别的渠道
+            if (!ReferenceEquals(draft, _draft)) return false;
+
+            Ed_Url.Text = url;
+            Ed_Model.Text = model;
+            ShowModelStatus(string.Format(T("OllamaChosen", "已选用 {0}，保存后生效。"), model), error: false);
+            return true;
         }
 
         private void ShowModelStatus(string text, bool error)

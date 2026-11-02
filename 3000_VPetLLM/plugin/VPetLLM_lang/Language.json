@@ -4408,6 +4408,24 @@
     }
   },
   "Channels": {
+    "OllamaManager": {
+      "en": "Ollama Manager (install, upgrade, get models)",
+      "zh-hans": "Ollama 管理器（安装、升级、下载模型）",
+      "zh-hant": "Ollama 管理器（安裝、升級、下載模型）",
+      "jp": "Ollama マネージャー（インストール、アップグレード、モデル入手）"
+    },
+    "OllamaInvalidUrl": {
+      "en": "The address isn't valid. Fix it, then open the manager.",
+      "zh-hans": "接口地址不对，改好后再打开管理器。",
+      "zh-hant": "介面位址不對，改好後再開啟管理器。",
+      "jp": "アドレスが正しくありません。修正してからマネージャーを開いてください。"
+    },
+    "OllamaChosen": {
+      "en": "Selected {0}. Save to apply.",
+      "zh-hans": "已选用 {0}，保存后生效。",
+      "zh-hant": "已選用 {0}，儲存後生效。",
+      "jp": "{0} を選択しました。保存すると反映されます。"
+    },
     "Title": {
       "en": "Channels",
       "zh-hans": "渠道管理",
@@ -5065,7 +5083,593 @@
       }
     }
   },
+  "OllamaManager": {
+    "Title": {
+      "en": "Ollama Manager",
+      "zh-hans": "Ollama 管理器",
+      "zh-hant": "Ollama 管理器",
+      "jp": "Ollama マネージャー"
+    },
+    "TabDeploy": {
+      "en": "Setup",
+      "zh-hans": "部署",
+      "zh-hant": "部署",
+      "jp": "セットアップ"
+    },
+    "TabCatalog": {
+      "en": "Recommended",
+      "zh-hans": "推荐模型",
+      "zh-hant": "推薦模型",
+      "jp": "おすすめモデル"
+    },
+    "TabLibrary": {
+      "en": "Model library",
+      "zh-hans": "模型库",
+      "zh-hant": "模型庫",
+      "jp": "モデルライブラリ"
+    },
+    "TabLocal": {
+      "en": "My models",
+      "zh-hans": "我的模型",
+      "zh-hant": "我的模型",
+      "jp": "マイモデル"
+    },
+    "Deploy": {
+      "en": "One-click setup",
+      "zh-hans": "一键部署",
+      "zh-hant": "一鍵部署",
+      "jp": "ワンクリックセットアップ"
+    },
+    "Start": {
+      "en": "Start service",
+      "zh-hans": "启动服务",
+      "zh-hant": "啟動服務",
+      "jp": "サービスを起動"
+    },
+    "Refresh": {
+      "en": "Refresh",
+      "zh-hans": "刷新",
+      "zh-hant": "重新整理",
+      "jp": "更新"
+    },
+    "Cancel": {
+      "en": "Cancel",
+      "zh-hans": "取消",
+      "zh-hant": "取消",
+      "jp": "キャンセル"
+    },
+    "Download": {
+      "en": "Download",
+      "zh-hans": "下载",
+      "zh-hant": "下載",
+      "jp": "ダウンロード"
+    },
+    "Delete": {
+      "en": "Delete",
+      "zh-hans": "删除",
+      "zh-hant": "刪除",
+      "jp": "削除"
+    },
+    "Use": {
+      "en": "Use",
+      "zh-hans": "使用",
+      "zh-hant": "使用",
+      "jp": "使用"
+    },
+    "InUse": {
+      "en": "In use",
+      "zh-hans": "使用中",
+      "zh-hant": "使用中",
+      "jp": "使用中"
+    },
+    "NotChat": {
+      "en": "Not for chat",
+      "zh-hans": "不能聊天",
+      "zh-hant": "不能聊天",
+      "jp": "チャット不可"
+    },
+    "Install": {
+      "en": "Install Ollama only ({0})",
+      "zh-hans": "只安装 Ollama（{0}）",
+      "zh-hant": "只安裝 Ollama（{0}）",
+      "jp": "Ollama のみインストール（{0}）"
+    },
+    "Upgrade": {
+      "en": "Upgrade to {0}",
+      "zh-hans": "升级到 {0}",
+      "zh-hant": "升級到 {0}",
+      "jp": "{0} にアップグレード"
+    },
+    "Checking": {
+      "en": "Checking…",
+      "zh-hans": "正在检查…",
+      "zh-hant": "正在檢查…",
+      "jp": "確認中…"
+    },
+    "StateRunning": {
+      "en": "Ollama is running",
+      "zh-hans": "Ollama 正在运行",
+      "zh-hant": "Ollama 正在執行",
+      "jp": "Ollama は動作中です"
+    },
+    "StateRemoteDown": {
+      "en": "Can't reach {0}. This address is on another computer, so installing and starting must be done there.",
+      "zh-hans": "连不上 {0}。这个地址不在本机，安装和启动要到那台电脑上操作。",
+      "zh-hant": "連不上 {0}。這個位址不在本機，安裝和啟動要到那台電腦上操作。",
+      "jp": "{0} に接続できません。このアドレスは別のパソコンのものなので、インストールと起動はそちらで行ってください。"
+    },
+    "StateMissing": {
+      "en": "Ollama isn't installed on this computer yet",
+      "zh-hans": "这台电脑还没有安装 Ollama",
+      "zh-hant": "這台電腦還沒有安裝 Ollama",
+      "jp": "このパソコンには Ollama がインストールされていません"
+    },
+    "StateStopped": {
+      "en": "Ollama is installed but not running",
+      "zh-hans": "Ollama 已安装，但没有运行",
+      "zh-hant": "Ollama 已安裝，但沒有執行",
+      "jp": "Ollama はインストール済みですが、動作していません"
+    },
+    "CurrentVersion": {
+      "en": "Current version {0}",
+      "zh-hans": "当前版本 {0}",
+      "zh-hant": "目前版本 {0}",
+      "jp": "現在のバージョン {0}"
+    },
+    "LatestVersion": {
+      "en": "Latest version {0}",
+      "zh-hans": "最新版本 {0}",
+      "zh-hant": "最新版本 {0}",
+      "jp": "最新バージョン {0}"
+    },
+    "Ready": {
+      "en": "All set. Using {0}.",
+      "zh-hans": "已经部署好了，正在使用 {0}。",
+      "zh-hant": "已經部署好了，正在使用 {0}。",
+      "jp": "セットアップ済みです。{0} を使用しています。"
+    },
+    "Plan": {
+      "en": "One-click setup will: {0}",
+      "zh-hans": "一键部署会：{0}",
+      "zh-hant": "一鍵部署會：{0}",
+      "jp": "ワンクリックセットアップの内容：{0}"
+    },
+    "PlanInstall": {
+      "en": "install Ollama (about {0} download)",
+      "zh-hans": "安装 Ollama（下载约 {0}）",
+      "zh-hant": "安裝 Ollama（下載約 {0}）",
+      "jp": "Ollama をインストール（約 {0} のダウンロード）"
+    },
+    "PlanStart": {
+      "en": "start Ollama",
+      "zh-hans": "启动 Ollama",
+      "zh-hant": "啟動 Ollama",
+      "jp": "Ollama を起動"
+    },
+    "PlanModel": {
+      "en": "download model {0} ({1})",
+      "zh-hans": "下载模型 {0}（{1}）",
+      "zh-hant": "下載模型 {0}（{1}）",
+      "jp": "モデル {0} をダウンロード（{1}）"
+    },
+    "PlanFill": {
+      "en": "fill the model into your settings",
+      "zh-hans": "把模型填回设置",
+      "zh-hant": "把模型填回設定",
+      "jp": "モデルを設定に入力"
+    },
+    "SlowWarning": {
+      "en": "This computer has modest specs, so local models may reply slowly. For a smoother experience, use the free channel or an API key.",
+      "zh-hans": "这台电脑配置偏低，本地模型回复可能比较慢。想要流畅体验可以改用免费渠道或 API Key。",
+      "zh-hant": "這台電腦配置偏低，本機模型回覆可能比較慢。想要流暢體驗可以改用免費渠道或 API Key。",
+      "jp": "このパソコンは性能が控えめなため、ローカルモデルの応答が遅くなることがあります。快適に使うには無料チャンネルか API Key をお勧めします。"
+    },
+    "TooWeakWarning": {
+      "en": "This computer doesn't have enough memory for local models, so a download may not even run. Use the free channel or an API key instead.",
+      "zh-hans": "这台电脑的内存不够运行本地模型，下载了也可能跑不起来。建议改用免费渠道或 API Key。",
+      "zh-hant": "這台電腦的記憶體不夠執行本機模型，下載了也可能跑不起來。建議改用免費渠道或 API Key。",
+      "jp": "このパソコンはメモリが足りないため、ローカルモデルをダウンロードしても動かない可能性があります。無料チャンネルか API Key をお勧めします。"
+    },
+    "Hardware": {
+      "en": "This computer: {0}, {1}",
+      "zh-hans": "这台电脑：{0}，{1}",
+      "zh-hant": "這台電腦：{0}，{1}",
+      "jp": "このパソコン：{0}、{1}"
+    },
+    "HardwareMemory": {
+      "en": "{0} memory",
+      "zh-hans": "内存 {0}",
+      "zh-hant": "記憶體 {0}",
+      "jp": "メモリ {0}"
+    },
+    "HardwareVideo": {
+      "en": "graphics card {0} with {1} video memory",
+      "zh-hans": "显卡 {0}，显存 {1}",
+      "zh-hant": "顯示卡 {0}，顯示記憶體 {1}",
+      "jp": "グラフィックスカード {0}、ビデオメモリ {1}"
+    },
+    "HardwareNoVideo": {
+      "en": "no dedicated graphics card detected",
+      "zh-hans": "没有检测到独立显卡",
+      "zh-hant": "沒有偵測到獨立顯示卡",
+      "jp": "専用グラフィックスカードは検出されませんでした"
+    },
+    "HardwareDisk": {
+      "en": "{0} free on the model drive",
+      "zh-hans": "模型盘剩余 {0}",
+      "zh-hant": "模型磁碟剩餘 {0}",
+      "jp": "モデル用ドライブの空き {0}"
+    },
+    "HardwareRemote": {
+      "en": "Models live on {0}. This window can't see that computer's specs, so it won't judge what will run.",
+      "zh-hans": "模型装在 {0} 上，这里看不到那台电脑的配置，不判断跑不跑得动。",
+      "zh-hant": "模型裝在 {0} 上，這裡看不到那台電腦的配置，不判斷跑不跑得動。",
+      "jp": "モデルは {0} にあります。そのパソコンの性能はここから確認できないため、動作の判定は行いません。"
+    },
+    "CapacityFull": {
+      "en": "Runs models up to about {0} smoothly, and up to about {1} slowly.",
+      "zh-hans": "能流畅运行约 {0} 以内的模型，约 {1} 以内能跑但比较慢。",
+      "zh-hant": "能流暢執行約 {0} 以內的模型，約 {1} 以內能跑但比較慢。",
+      "jp": "約 {0} までのモデルは快適に動作し、約 {1} までは動作しますが遅くなります。"
+    },
+    "CapacitySlow": {
+      "en": "Local models will run slowly here. Up to about {0} is just about usable.",
+      "zh-hans": "本地模型只能慢慢跑，约 {0} 以内勉强可用。",
+      "zh-hant": "本機模型只能慢慢跑，約 {0} 以內勉強可用。",
+      "jp": "ローカルモデルの動作は遅くなります。約 {0} までならなんとか使えます。"
+    },
+    "CapacityNone": {
+      "en": "This computer's specs are too low to recommend local models.",
+      "zh-hans": "这台电脑配置偏低，不建议运行本地模型。",
+      "zh-hant": "這台電腦配置偏低，不建議執行本機模型。",
+      "jp": "このパソコンの性能では、ローカルモデルの利用はお勧めできません。"
+    },
+    "Recommended": {
+      "en": "Recommended",
+      "zh-hans": "推荐",
+      "zh-hant": "推薦",
+      "jp": "おすすめ"
+    },
+    "FitSmooth": {
+      "en": "Runs smoothly",
+      "zh-hans": "能流畅运行",
+      "zh-hant": "能流暢執行",
+      "jp": "快適に動作"
+    },
+    "FitSlow": {
+      "en": "Runs, but slowly",
+      "zh-hans": "能跑，但比较慢",
+      "zh-hant": "能跑，但比較慢",
+      "jp": "動作しますが遅め"
+    },
+    "FitTooLarge": {
+      "en": "Too large for this computer",
+      "zh-hans": "这台电脑带不动",
+      "zh-hant": "這台電腦帶不動",
+      "jp": "このパソコンでは動きません"
+    },
+    "TooLargeConfirm": {
+      "en": "{0} is about {1}, which won't fit in this computer's memory and video memory, so it may not run even after downloading. Continue anyway?",
+      "zh-hans": "{0} 大约 {1}，这台电脑的内存和显存放不下，下载了也可能跑不起来。还要继续吗？",
+      "zh-hant": "{0} 大約 {1}，這台電腦的記憶體和顯示記憶體放不下，下載了也可能跑不起來。還要繼續嗎？",
+      "jp": "{0} は約 {1} あり、このパソコンのメモリとビデオメモリに収まらないため、ダウンロードしても動かない可能性があります。続行しますか？"
+    },
+    "SizeUnknown": {
+      "en": "size unknown",
+      "zh-hans": "大小未知",
+      "zh-hant": "大小未知",
+      "jp": "サイズ不明"
+    },
+    "LibrarySearch": {
+      "en": "Search",
+      "zh-hans": "搜索",
+      "zh-hant": "搜尋",
+      "jp": "検索"
+    },
+    "LibraryRetry": {
+      "en": "Retry",
+      "zh-hans": "重试",
+      "zh-hant": "重試",
+      "jp": "再試行"
+    },
+    "LibraryLoading": {
+      "en": "Fetching the model list…",
+      "zh-hans": "正在获取模型列表…",
+      "zh-hant": "正在取得模型清單…",
+      "jp": "モデル一覧を取得しています…"
+    },
+    "LibraryCount": {
+      "en": "{0} models from ollama.com. Descriptions are in English only.",
+      "zh-hans": "共 {0} 个模型，数据来自 ollama.com，说明只有英文。",
+      "zh-hant": "共 {0} 個模型，資料來自 ollama.com，說明只有英文。",
+      "jp": "全 {0} 個のモデル。データは ollama.com から取得しており、説明は英語のみです。"
+    },
+    "LibraryNoMatch": {
+      "en": "No matching models.",
+      "zh-hans": "没有找到匹配的模型。",
+      "zh-hant": "沒有找到符合的模型。",
+      "jp": "一致するモデルはありません。"
+    },
+    "LibraryFailed": {
+      "en": "Couldn't get the model list from ollama.com. The Recommended tab still works.",
+      "zh-hans": "暂时获取不到 ollama.com 的模型列表。“推荐模型”页不受影响。",
+      "zh-hant": "暫時取得不到 ollama.com 的模型清單。「推薦模型」頁不受影響。",
+      "jp": "ollama.com からモデル一覧を取得できませんでした。「おすすめモデル」タブは引き続き使えます。"
+    },
+    "LibraryStale": {
+      "en": "Can't reach ollama.com right now, so this is the last saved list.",
+      "zh-hans": "暂时连不上 ollama.com，显示的是上次保存的列表。",
+      "zh-hant": "暫時連不上 ollama.com，顯示的是上次儲存的清單。",
+      "jp": "ollama.com に接続できないため、前回保存した一覧を表示しています。"
+    },
+    "LibraryPulls": {
+      "en": "{0} pulls",
+      "zh-hans": "{0} 次下载",
+      "zh-hant": "{0} 次下載",
+      "jp": "{0} 回ダウンロード"
+    },
+    "CustomLabel": {
+      "en": "Other model (name from ollama.com)",
+      "zh-hans": "其他模型（填 ollama.com 上的名字）",
+      "zh-hant": "其他模型（填 ollama.com 上的名字）",
+      "jp": "その他のモデル（ollama.com の名前を入力）"
+    },
+    "InvalidName": {
+      "en": "That model name isn't valid. Use the name from ollama.com, such as qwen3:4b.",
+      "zh-hans": "模型名不对。要填 ollama.com 上的名字，比如 qwen3:4b。",
+      "zh-hant": "模型名不對。要填 ollama.com 上的名字，比如 qwen3:4b。",
+      "jp": "モデル名が正しくありません。qwen3:4b のように ollama.com の名前を入力してください。"
+    },
+    "NoModels": {
+      "en": "No models downloaded yet.",
+      "zh-hans": "还没有下载模型。",
+      "zh-hant": "還沒有下載模型。",
+      "jp": "ダウンロード済みのモデルはありません。"
+    },
+    "NotRunningModels": {
+      "en": "Ollama isn't running, so models can't be listed. You can start it on the Setup tab.",
+      "zh-hans": "Ollama 没有运行，看不到模型。可以到“部署”页启动。",
+      "zh-hant": "Ollama 沒有執行，看不到模型。可以到「部署」頁啟動。",
+      "jp": "Ollama が動作していないため、モデルを表示できません。「セットアップ」タブから起動できます。"
+    },
+    "Preparing": {
+      "en": "Preparing…",
+      "zh-hans": "正在准备…",
+      "zh-hant": "正在準備…",
+      "jp": "準備中…"
+    },
+    "PhaseDownloadSetup": {
+      "en": "Downloading the Ollama installer…",
+      "zh-hans": "正在下载 Ollama 安装包…",
+      "zh-hant": "正在下載 Ollama 安裝檔…",
+      "jp": "Ollama インストーラーをダウンロード中…"
+    },
+    "PhaseVerifySetup": {
+      "en": "Verifying the installer…",
+      "zh-hans": "正在校验安装包…",
+      "zh-hant": "正在校驗安裝檔…",
+      "jp": "インストーラーを検証中…"
+    },
+    "PhaseInstall": {
+      "en": "Installing Ollama, please wait…",
+      "zh-hans": "正在安装 Ollama，请稍候…",
+      "zh-hant": "正在安裝 Ollama，請稍候…",
+      "jp": "Ollama をインストール中です。しばらくお待ちください…"
+    },
+    "PhaseStart": {
+      "en": "Starting Ollama…",
+      "zh-hans": "正在启动 Ollama…",
+      "zh-hant": "正在啟動 Ollama…",
+      "jp": "Ollama を起動中…"
+    },
+    "PhaseManifest": {
+      "en": "Connecting to the model registry…",
+      "zh-hans": "正在连接模型仓库…",
+      "zh-hant": "正在連線模型倉庫…",
+      "jp": "モデルリポジトリに接続中…"
+    },
+    "PhasePull": {
+      "en": "Downloading the model…",
+      "zh-hans": "正在下载模型…",
+      "zh-hant": "正在下載模型…",
+      "jp": "モデルをダウンロード中…"
+    },
+    "PhaseVerifyModel": {
+      "en": "Verifying the model…",
+      "zh-hans": "正在校验模型…",
+      "zh-hant": "正在校驗模型…",
+      "jp": "モデルを検証中…"
+    },
+    "PhaseWrite": {
+      "en": "Writing the model…",
+      "zh-hans": "正在写入模型…",
+      "zh-hant": "正在寫入模型…",
+      "jp": "モデルを書き込み中…"
+    },
+    "Cancelled": {
+      "en": "Cancelled. Downloading continues from where it stopped next time.",
+      "zh-hans": "已取消。再次开始时会接着下载。",
+      "zh-hant": "已取消。再次開始時會接著下載。",
+      "jp": "キャンセルしました。次回は続きからダウンロードします。"
+    },
+    "Chosen": {
+      "en": "Selected {0}. Go back to the settings page and save to apply.",
+      "zh-hans": "已选用 {0}，回到设置页保存后生效。",
+      "zh-hant": "已選用 {0}，回到設定頁儲存後生效。",
+      "jp": "{0} を選択しました。設定画面に戻って保存すると反映されます。"
+    },
+    "ChooseLost": {
+      "en": "The settings page has switched to another channel, so the model wasn't filled in. Go back and open the manager again.",
+      "zh-hans": "设置页已经切到别的渠道，模型没有填进去。请回到设置页重新打开管理器。",
+      "zh-hant": "設定頁已經切到別的渠道，模型沒有填進去。請回到設定頁重新開啟管理器。",
+      "jp": "設定画面が別のチャンネルに切り替わったため、モデルは入力されていません。設定画面からマネージャーを開き直してください。"
+    },
+    "Pulled": {
+      "en": "{0} has finished downloading.",
+      "zh-hans": "{0} 下载完成。",
+      "zh-hant": "{0} 下載完成。",
+      "jp": "{0} のダウンロードが完了しました。"
+    },
+    "Installed": {
+      "en": "Ollama is installed.",
+      "zh-hans": "Ollama 已安装好。",
+      "zh-hant": "Ollama 已安裝好。",
+      "jp": "Ollama をインストールしました。"
+    },
+    "UpgradeConfirm": {
+      "en": "Ollama closes during the upgrade, which interrupts any chat in progress. Upgrade now?",
+      "zh-hans": "升级时 Ollama 会先关闭，正在进行的聊天会中断。现在升级吗？",
+      "zh-hant": "升級時 Ollama 會先關閉，正在進行的聊天會中斷。現在升級嗎？",
+      "jp": "アップグレード中は Ollama が終了するため、進行中のチャットは中断されます。今すぐアップグレードしますか？"
+    },
+    "DeleteConfirm": {
+      "en": "Delete {0}? You'll need to download it again to use it.",
+      "zh-hans": "确定删除 {0} 吗？之后要用还得重新下载。",
+      "zh-hant": "確定刪除 {0} 嗎？之後要用還得重新下載。",
+      "jp": "{0} を削除しますか？再び使うにはダウンロードし直す必要があります。"
+    },
+    "DeleteInUseConfirm": {
+      "en": "{0} is in use. Deleting it will make chat fail until you choose another model. Delete it?",
+      "zh-hans": "{0} 正在使用，删除后聊天会报错，需要重新选模型。确定删除吗？",
+      "zh-hant": "{0} 正在使用，刪除後聊天會報錯，需要重新選模型。確定刪除嗎？",
+      "jp": "{0} は使用中です。削除すると別のモデルを選ぶまでチャットでエラーになります。削除しますか？"
+    },
+    "Deleting": {
+      "en": "Deleting {0}…",
+      "zh-hans": "正在删除 {0}…",
+      "zh-hant": "正在刪除 {0}…",
+      "jp": "{0} を削除中…"
+    },
+    "Deleted": {
+      "en": "Deleted {0}.",
+      "zh-hans": "已删除 {0}。",
+      "zh-hant": "已刪除 {0}。",
+      "jp": "{0} を削除しました。"
+    },
+    "ErrorGeneric": {
+      "en": "The operation failed: {0}",
+      "zh-hans": "操作失败：{0}",
+      "zh-hant": "操作失敗：{0}",
+      "jp": "操作に失敗しました：{0}"
+    },
+    "ErrorVersion": {
+      "en": "Couldn't look up the latest Ollama version. Check your network and try again.",
+      "zh-hans": "查不到 Ollama 最新版本，请检查网络后重试。",
+      "zh-hant": "查不到 Ollama 最新版本，請檢查網路後重試。",
+      "jp": "Ollama の最新バージョンを確認できませんでした。ネットワークを確認してやり直してください。"
+    },
+    "ErrorDownload": {
+      "en": "The installer failed to download. Check your network and try again. What was already downloaded is kept.",
+      "zh-hans": "安装包下载失败，请检查网络后重试。已下载的部分会保留。",
+      "zh-hant": "安裝檔下載失敗，請檢查網路後重試。已下載的部分會保留。",
+      "jp": "インストーラーをダウンロードできませんでした。ネットワークを確認してやり直してください。ダウンロード済みの分は保持されます。"
+    },
+    "ErrorDisk": {
+      "en": "Not enough disk space: {0} needed, {1} free.",
+      "zh-hans": "磁盘空间不足：需要 {0}，只剩 {1}。",
+      "zh-hant": "磁碟空間不足：需要 {0}，只剩 {1}。",
+      "jp": "ディスク容量が足りません：{0} 必要ですが、空きは {1} です。"
+    },
+    "ErrorSignature": {
+      "en": "The installer failed verification: it isn't signed by Ollama, so it was deleted. Try again, or download it yourself from ollama.com.",
+      "zh-hans": "安装包没有通过校验，不是 Ollama 官方签名的文件，已经删除。请重试，或到 ollama.com 手动下载。",
+      "zh-hant": "安裝檔沒有通過校驗，不是 Ollama 官方簽署的檔案，已經刪除。請重試，或到 ollama.com 手動下載。",
+      "jp": "インストーラーは検証に失敗しました。Ollama の公式署名がないため削除しました。やり直すか、ollama.com から手動でダウンロードしてください。"
+    },
+    "ErrorSetup": {
+      "en": "Installation failed ({0}). You can try again, or install it yourself from ollama.com.",
+      "zh-hans": "安装失败（{0}）。可以重试，或到 ollama.com 手动下载安装。",
+      "zh-hant": "安裝失敗（{0}）。可以重試，或到 ollama.com 手動下載安裝。",
+      "jp": "インストールに失敗しました（{0}）。やり直すか、ollama.com から手動でインストールしてください。"
+    },
+    "ErrorNotInstalled": {
+      "en": "Ollama isn't installed yet. Use One-click setup on the Setup tab first.",
+      "zh-hans": "还没有安装 Ollama，请先到“部署”页点一键部署。",
+      "zh-hant": "還沒有安裝 Ollama，請先到「部署」頁點一鍵部署。",
+      "jp": "Ollama がまだインストールされていません。先に「セットアップ」タブでワンクリックセットアップを行ってください。"
+    },
+    "ErrorStart": {
+      "en": "Ollama failed to start. You can open it from the Start menu, then click Refresh.",
+      "zh-hans": "Ollama 启动失败。可以从开始菜单手动打开 Ollama，再点刷新。",
+      "zh-hant": "Ollama 啟動失敗。可以從開始功能表手動開啟 Ollama，再點重新整理。",
+      "jp": "Ollama を起動できませんでした。スタートメニューから開いて、「更新」を押してください。"
+    },
+    "ErrorOutdated": {
+      "en": "This model needs a newer version of Ollama. Upgrade on the Setup tab.",
+      "zh-hans": "这个模型需要更新版本的 Ollama，请到“部署”页升级。",
+      "zh-hant": "這個模型需要更新版本的 Ollama，請到「部署」頁升級。",
+      "jp": "このモデルには新しいバージョンの Ollama が必要です。「セットアップ」タブでアップグレードしてください。"
+    },
+    "ErrorApi": {
+      "en": "Ollama returned an error: {0}",
+      "zh-hans": "Ollama 返回错误：{0}",
+      "zh-hant": "Ollama 回傳錯誤：{0}",
+      "jp": "Ollama がエラーを返しました：{0}"
+    },
+    "Model": {
+      "Entry": {
+        "en": "A good starting point. Replies quickly and runs on ordinary computers.",
+        "zh-hans": "入门之选，回复快，普通电脑也能跑。",
+        "zh-hant": "入門之選，回覆快，普通電腦也能跑。",
+        "jp": "入門に最適です。応答が速く、一般的なパソコンでも動きます。"
+      },
+      "Balanced": {
+        "en": "A little smarter than the entry model. Needs 4 GB of video memory or 16 GB of memory.",
+        "zh-hans": "比入门款聪明一些，需要 4 GB 显存或 16 GB 内存。",
+        "zh-hant": "比入門款聰明一些，需要 4 GB 顯示記憶體或 16 GB 記憶體。",
+        "jp": "入門モデルより少し賢いモデルです。ビデオメモリ 4 GB またはメモリ 16 GB が必要です。"
+      },
+      "Quality": {
+        "en": "Better answers. 8 GB of video memory recommended.",
+        "zh-hans": "回答质量更好，建议 8 GB 显存。",
+        "zh-hant": "回答品質更好，建議 8 GB 顯示記憶體。",
+        "jp": "回答の質が高くなります。ビデオメモリ 8 GB を推奨します。"
+      },
+      "Best": {
+        "en": "The strongest on this list, and it can read images. 10 GB of video memory recommended.",
+        "zh-hans": "这份名单里最强，还能看图，建议 10 GB 显存。",
+        "zh-hant": "這份名單裡最強，還能看圖，建議 10 GB 顯示記憶體。",
+        "jp": "この一覧で最も高性能で、画像も読み取れます。ビデオメモリ 10 GB を推奨します。"
+      },
+      "Gemma": {
+        "en": "From Google. Strong in English and other languages.",
+        "zh-hans": "Google 出品，英文和多语言表现好。",
+        "zh-hant": "Google 出品，英文和多語言表現好。",
+        "jp": "Google 製で、英語や多言語に強いモデルです。"
+      },
+      "DeepSeek": {
+        "en": "Good at reasoning. Thinks before answering, so replies are slower.",
+        "zh-hans": "擅长推理，会先思考再回答，回复较慢。",
+        "zh-hant": "擅長推理，會先思考再回答，回覆較慢。",
+        "jp": "推論が得意です。考えてから答えるため、応答は遅めです。"
+      },
+      "Llama": {
+        "en": "A lightweight model from Meta, better suited to English chat.",
+        "zh-hans": "Meta 出品的轻量模型，更适合英文对话。",
+        "zh-hant": "Meta 出品的輕量模型，更適合英文對話。",
+        "jp": "Meta 製の軽量モデルで、英語の会話に向いています。"
+      }
+    }
+  },
   "QuickSetup": {
+    "OllamaManager": {
+      "en": "Open Ollama Manager",
+      "zh-hans": "打开 Ollama 管理器",
+      "zh-hant": "開啟 Ollama 管理器",
+      "jp": "Ollama マネージャーを開く"
+    },
+    "OllamaManagerHint": {
+      "en": "Don't have Ollama yet? The manager installs it and downloads a model in one click, and can upgrade or remove models too.",
+      "zh-hans": "还没装 Ollama？管理器可以一键装好并下载模型，也能升级和删除模型。",
+      "zh-hant": "還沒裝 Ollama？管理器可以一鍵裝好並下載模型，也能升級和刪除模型。",
+      "jp": "Ollama をお持ちでない場合は、マネージャーがワンクリックでインストールとモデルのダウンロードを行います。アップグレードやモデルの削除もできます。"
+    },
+    "OllamaChosen": {
+      "en": "Selected {0}. Save to apply.",
+      "zh-hans": "已选用 {0}，保存后生效。",
+      "zh-hant": "已選用 {0}，儲存後生效。",
+      "jp": "{0} を選択しました。保存すると反映されます。"
+    },
     "FreeTitle": {
       "en": "Free trial (recommended)",
       "zh-hans": "免费体验（推荐）",
@@ -5139,10 +5743,10 @@
       "jp": "ローカルモデル"
     },
     "LocalDesc": {
-      "en": "Use Ollama or LM Studio already running on this computer. Conversations stay on this computer.",
-      "zh-hans": "使用电脑上已经运行的 Ollama 或 LM Studio，对话不离开这台电脑。",
-      "zh-hant": "使用電腦上已經執行的 Ollama 或 LM Studio，對話不離開這台電腦。",
-      "jp": "このパソコンで動作中の Ollama または LM Studio を使います。会話はこのパソコンの外に出ません。"
+      "en": "Use Ollama or LM Studio on this computer. Conversations stay here. Don't have one yet? Ollama can be set up in one click.",
+      "zh-hans": "使用电脑上的 Ollama 或 LM Studio，对话不离开这台电脑。没有装也行，Ollama 可以一键部署。",
+      "zh-hant": "使用電腦上的 Ollama 或 LM Studio，對話不離開這台電腦。沒有裝也行，Ollama 可以一鍵部署。",
+      "jp": "このパソコンの Ollama または LM Studio を使います。会話はこのパソコンの外に出ません。未導入でも Ollama はワンクリックでセットアップできます。"
     },
     "InvalidUrl": {
       "en": "The address must start with http:// or https://.",

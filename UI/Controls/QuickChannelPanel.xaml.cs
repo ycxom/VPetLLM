@@ -2,6 +2,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using VPetLLM.UI.Windows;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
 
@@ -283,6 +284,7 @@ namespace VPetLLM.UI.Controls
         {
             Panel_ApiKey.Visibility = Rb_ApiKey.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
             Panel_Local.Visibility = Rb_Local.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            Panel_OllamaManager.Visibility = Rb_Ollama.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
             Panel_CustomUrl.Visibility = ReferenceEquals(Cb_Preset.SelectedItem, _customPreset)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -324,7 +326,31 @@ namespace VPetLLM.UI.Controls
         {
             if (_settings is null) return;
             LoadLocal(LocalKind);
+            UpdateVisibility();
             NotifyChanged();
+        }
+
+        private void OllamaManager_Click(object sender, RoutedEventArgs e)
+        {
+            var url = Tb_LocalUrl.Text.Trim();
+            if (url.Length > 0 && !IsHttpUrl(url))
+            {
+                ShowStatus(T("QuickSetup.InvalidUrl", "接口地址要以 http:// 或 https:// 开头。"), false);
+                return;
+            }
+            winOllamaManager.Open(Window.GetWindow(this), _settings!, url, Cb_LocalModel.Text, ApplyOllamaChoice);
+        }
+
+        private bool ApplyOllamaChoice(string model, string url)
+        {
+            Rb_Local.IsChecked = true;
+            Rb_Ollama.IsChecked = true;
+            Tb_LocalUrl.Text = url;
+            Cb_LocalModel.Text = model;
+            // 模型框只把键盘输入算作改动，回填要自己标记。NotifyChanged 会清状态，所以提示放在后面
+            NotifyChanged();
+            ShowStatus(string.Format(T("QuickSetup.OllamaChosen", "已选用 {0}，保存后生效。"), model), true);
+            return true;
         }
 
         private void Preset_SelectionChanged(object sender, SelectionChangedEventArgs e)

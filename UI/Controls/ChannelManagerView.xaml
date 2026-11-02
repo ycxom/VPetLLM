@@ -526,6 +526,9 @@
                                     <ComboBox x:Name="Ed_Model" Style="{StaticResource ModelComboBox}" IsEditable="True"/>
                                 </DockPanel>
                                 <TextBlock x:Name="Ed_ModelStatus" Style="{StaticResource FormHint}" Visibility="Collapsed"/>
+                                <Button x:Name="Ed_OllamaManager" Style="{StaticResource SecondaryButton}" Margin="112,8,0,0" Padding="12,6"
+                                        HorizontalAlignment="Left" Visibility="Collapsed" Click="Ed_OllamaManager_Click"
+                                        Content="{utils:Localize KeyPath=Channels.OllamaManager, Default=Ollama 管理器（安装、升级、下载模型）}"/>
                             </StackPanel>
 
                             <CheckBox x:Name="Ed_GeminiOpenAIAuth" Style="{StaticResource ModernCheckBox}" Margin="112,0,0,12" FontSize="13"

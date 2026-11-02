@@ -57,7 +57,7 @@
                     ItemContainerStyle="{StaticResource ModernTabItem}"
                     SelectionChanged="Tabs_SelectionChanged">
             <TabItem x:Name="Tab_Channel" Header="{utils:Localize KeyPath=QuickSetup.CardChannel, Default=AI 服务}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
                     <Border Style="{StaticResource CardContainer}" Margin="0,12,8,4" VerticalAlignment="Top">
                         <StackPanel>
                             <Grid>
@@ -83,7 +83,7 @@
             </TabItem>
 
             <TabItem x:Name="Tab_Profile" Header="{utils:Localize KeyPath=QuickSetup.CardProfile, Default=桌宠设定}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
                     <Border Style="{StaticResource CardContainer}" Margin="0,12,8,4" VerticalAlignment="Top">
                         <Border x:Name="Host_Profile">
                             <controls:QuickProfilePanel/>
@@ -93,7 +93,7 @@
             </TabItem>
 
             <TabItem x:Name="Tab_Features" Header="{utils:Localize KeyPath=QuickSetup.CardFeatures, Default=功能开关}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
                     <Border Style="{StaticResource CardContainer}" Margin="0,12,8,4" VerticalAlignment="Top">
                         <StackPanel>
                             <CheckBox x:Name="Cb_EnableAction" Style="{StaticResource ModernCheckBox}"
@@ -113,7 +113,7 @@
             </TabItem>
 
             <TabItem x:Name="Tab_Plugins" Header="{utils:Localize KeyPath=QuickSetup.CardPlugins, Default=插件}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
                     <Border Style="{StaticResource CardContainer}" Margin="0,12,8,4" VerticalAlignment="Top">
                         <StackPanel>
                             <TextBlock x:Name="Tb_PluginSummary" Style="{StaticResource QuickHint}"/>
@@ -126,7 +126,7 @@
             </TabItem>
 
             <TabItem x:Name="Tab_Help" Header="{utils:Localize KeyPath=QuickSetup.TabHelp, Default=帮助}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
                     <Border Style="{StaticResource CardContainer}" Margin="0,12,8,4" VerticalAlignment="Top">
                         <StackPanel>
                             <Grid>

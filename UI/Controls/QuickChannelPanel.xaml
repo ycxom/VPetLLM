@@ -70,7 +70,7 @@
                 <TextBlock Style="{StaticResource QuickCardTitle}"
                            Text="{utils:Localize KeyPath=QuickSetup.LocalTitle, Default=本地模型}"/>
                 <TextBlock Style="{StaticResource QuickHint}"
-                           Text="{utils:Localize KeyPath=QuickSetup.LocalDesc, Default=使用电脑上已经运行的 Ollama 或 LM Studio，对话不离开这台电脑。}"/>
+                           Text="{utils:Localize KeyPath=QuickSetup.LocalDesc, Default=使用电脑上的 Ollama 或 LM Studio，对话不离开这台电脑。没有装也行，Ollama 可以一键部署。}"/>
             </StackPanel>
         </RadioButton>
 
@@ -80,6 +80,14 @@
                              Content="Ollama" Checked="LocalKind_Checked"/>
                 <RadioButton x:Name="Rb_LMStudio" Style="{StaticResource ModernRadioButton}"
                              Content="LM Studio" Checked="LocalKind_Checked"/>
+            </StackPanel>
+
+            <StackPanel x:Name="Panel_OllamaManager" Margin="0,10,0,0" Visibility="Collapsed">
+                <TextBlock Style="{StaticResource QuickHint}"
+                           Text="{utils:Localize KeyPath=QuickSetup.OllamaManagerHint, Default=还没装 Ollama？管理器可以一键装好并下载模型，也能升级和删除模型。}"/>
+                <Button x:Name="Btn_OllamaManager" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left"
+                        Margin="0,6,0,0" Click="OllamaManager_Click"
+                        Content="{utils:Localize KeyPath=QuickSetup.OllamaManager, Default=打开 Ollama 管理器}"/>
             </StackPanel>
 
             <TextBlock Style="{StaticResource QuickFieldLabel}"
