@@ -634,7 +634,7 @@ namespace VPetLLM.UI.Windows
             }
             catch (Exception ex)
             {
-                Logger.Log($"Ollama 管理器操作失败: {ex}");
+                Logger.Log($"一键化本地部署操作失败: {ex}");
                 ShowStatus(Describe(ex), false);
             }
             finally
@@ -677,7 +677,7 @@ namespace VPetLLM.UI.Windows
         {
             if (_onChosen?.Invoke(model, _service.Url) != true)
             {
-                ShowStatus(T("ChooseLost", "设置页已经切到别的渠道，模型没有填进去。请回到设置页重新打开管理器。"), false);
+                ShowStatus(T("ChooseLost", "设置页已经切到别的渠道，模型没有填进去。请回到设置页重新打开一键化本地部署。"), false);
                 return;
             }
             _currentModel = model;

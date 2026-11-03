@@ -58,27 +58,38 @@
                     SelectionChanged="Tabs_SelectionChanged">
             <TabItem x:Name="Tab_Channel" Header="{utils:Localize KeyPath=QuickSetup.CardChannel, Default=AI 服务}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
-                    <Border Style="{StaticResource CardContainer}" Margin="0,12,8,4" VerticalAlignment="Top">
-                        <StackPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource QuickCardTitle}"
-                                               Text="{utils:Localize KeyPath=QuickSetup.CardChannel, Default=AI 服务}"/>
-                                    <TextBlock x:Name="Tb_ChannelSummary" Style="{StaticResource QuickHint}"/>
-                                </StackPanel>
-                                <Button x:Name="Btn_ChangeChannel" Grid.Column="1" Style="{StaticResource SecondaryButton}"
-                                        VerticalAlignment="Center" Click="ChangeChannel_Click"
-                                        Content="{utils:Localize KeyPath=QuickSetup.ChangeChannel, Default=更换}"/>
-                            </Grid>
-                            <Border x:Name="Host_Channel" Margin="0,12,0,0" Visibility="Collapsed">
-                                <controls:QuickChannelPanel/>
-                            </Border>
-                        </StackPanel>
-                    </Border>
+                    <StackPanel>
+                        <Button x:Name="Btn_LocalDeploy" Style="{StaticResource QuickActionCard}" Margin="0,12,8,10"
+                                Click="LocalDeploy_Click">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource QuickCardTitle}"
+                                           Text="{utils:Localize KeyPath=OllamaManager.Title, Default=一键化本地部署}"/>
+                                <TextBlock Style="{StaticResource QuickHint}"
+                                           Text="{utils:Localize KeyPath=QuickSetup.OllamaDeployDesc, Default=不用 API Key，帮你装好 Ollama 和适合这台电脑的模型，对话不离开这台电脑。}"/>
+                            </StackPanel>
+                        </Button>
+                        <Border Style="{StaticResource CardContainer}" Margin="0,0,8,4" VerticalAlignment="Top">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource QuickCardTitle}"
+                                                   Text="{utils:Localize KeyPath=QuickSetup.CardChannel, Default=AI 服务}"/>
+                                        <TextBlock x:Name="Tb_ChannelSummary" Style="{StaticResource QuickHint}"/>
+                                    </StackPanel>
+                                    <Button x:Name="Btn_ChangeChannel" Grid.Column="1" Style="{StaticResource SecondaryButton}"
+                                            VerticalAlignment="Center" Click="ChangeChannel_Click"
+                                            Content="{utils:Localize KeyPath=QuickSetup.ChangeChannel, Default=更换}"/>
+                                </Grid>
+                                <Border x:Name="Host_Channel" Margin="0,12,0,0" Visibility="Collapsed">
+                                    <controls:QuickChannelPanel/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </ScrollViewer>
             </TabItem>
 

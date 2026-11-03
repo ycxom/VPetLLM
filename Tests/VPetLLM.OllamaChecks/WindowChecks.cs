@@ -277,7 +277,9 @@ internal static partial class Program
             CheckCatalogGrid();
             CheckLocalGrid();
             CheckQuickPanel();
+            CheckQuickDeploy();
             CheckChannelView();
+            CheckChannelDeploy();
         }
         finally
         {
@@ -311,18 +313,23 @@ internal static partial class Program
         void Save(ManagerWindow window, string name, int tab)
         {
             window.Find<TabControl>("Tabs").SelectedIndex = tab;
+            Snapshot(window.Window, name);
+        }
+
+        void Snapshot(Window window, string name)
+        {
             Pump(() => true);
-            window.Window.UpdateLayout();
+            window.UpdateLayout();
             Pump(() => true);
 
             // 内容带外边距，按它算尺寸会切掉右边和下边，改用窗口客户区
-            var content = (FrameworkElement)window.Window.Content;
+            var content = (FrameworkElement)window.Content;
             var width = content.ActualWidth + content.Margin.Left + content.Margin.Right;
             var height = content.ActualHeight + content.Margin.Top + content.Margin.Bottom;
             var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)width, (int)height, 96, 96, PixelFormats.Pbgra32);
             var background = new DrawingVisual();
             using (var drawing = background.RenderOpen())
-                drawing.DrawRectangle(window.Window.Background, null, new Rect(0, 0, width, height));
+                drawing.DrawRectangle(window.Background ?? Brushes.White, null, new Rect(0, 0, width, height));
             bitmap.Render(background);
             bitmap.Render(content);
 
@@ -438,6 +445,50 @@ internal static partial class Program
         using (var file = File.Create(Path.Combine(outputDirectory, "quick-panel.png")))
             png.Save(file);
         panelHost.Close();
+
+        // 三处部署入口。宿主只要 Settings；标成退出中，关引导窗口时才不写“看过引导”
+        var host = (global::VPetLLM.VPetLLM)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(global::VPetLLM.VPetLLM));
+        typeof(global::VPetLLM.VPetLLM).GetField("_isShuttingDown", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(host, true);
+        T Offscreen<T>(T window) where T : Window
+        {
+            window.Left = -20000;
+            window.Top = -20000;
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+            window.ShowActivated = false;
+            window.ShowInTaskbar = false;
+            window.Show();
+            return window;
+        }
+
+        var ready2 = FreshSettings(dir);
+        ready2.Ollama.OllamaNodes[0].Url = "http://192.0.2.1:11434";
+        ready2.Ollama.OllamaNodes[0].Model = "qwen3:4b";
+        ready2.Gemini.GeminiNodes.Add(new Setting.GeminiNodeSetting { Name = "主渠道", ApiKey = "k", Model = "gemini-x", Priority = 1000 });
+        host.Settings = ready2;
+        var simple = Offscreen(new winSimpleSetting(host));
+        Snapshot(simple, "entry-simple-collapsed");
+        simple.Close();
+
+        var unset = FreshSettings(dir);
+        unset.Free.FreeNodes[0].Enabled = false;
+        host.Settings = unset;
+        simple = Offscreen(new winSimpleSetting(host));
+        Snapshot(simple, "entry-simple-expanded");
+        simple.Close();
+
+        var onboarding = Offscreen(new winOnboarding(host, firstRun: true));
+        Call(onboarding, "ShowStep", 1);
+        Snapshot(onboarding, "entry-onboarding");
+        ((ScrollViewer)onboarding.FindName("Scroll_Pages")).ScrollToEnd();
+        Snapshot(onboarding, "entry-onboarding-end");
+        onboarding.Close();
+
+        var viewHost = Offscreen(new Window { Width = 900, Height = 560, Background = Brushes.White });
+        var view = new ChannelManagerView();
+        view.Attach(ready2, () => null, () => { });
+        viewHost.Content = view;
+        Snapshot(viewHost, "entry-channels");
+        viewHost.Close();
 
         Directory.Delete(dir, recursive: true);
     }
@@ -916,6 +967,59 @@ internal static partial class Program
         CheckEntryOpens("简易界面", Get<TextBox>("Tb_LocalUrl"), Get<Button>("Btn_OllamaManager"));
     }
 
+    /// <summary>确认部署窗口开着，且带的是这个地址和模型，然后关掉。</summary>
+    private static void CheckDeployOpened(string name, string url, string model)
+    {
+        var window = ManagerInstance();
+        Check($"{name}：打开部署窗口", window is not null);
+        if (window is null) return;
+
+        var (openedUrl, openedModel) = (Field<OllamaManagerService>(window, "_service").Url, Field<string>(window, "_currentModel"));
+        Check($"{name}：带的地址和模型对", openedUrl == url && openedModel == model, $"{openedUrl} {openedModel}");
+        window.Close();
+        Pump(() => true);
+    }
+
+    /// <summary>外层窗口的入口常驻，面板可能选着别的服务，这时表单里的地址不是 Ollama 的。</summary>
+    private static void CheckQuickDeploy()
+    {
+        const string ollamaUrl = "http://192.0.2.1:11434";
+        var settings = FreshSettings(Path.GetTempPath());
+        var node = settings.Ollama.OllamaNodes[0];
+        node.Url = ollamaUrl;
+        node.Model = "qwen3:4b";
+        settings.LMStudio.LMStudioNodes.Add(new Setting.LMStudioNodeSetting { Url = "http://192.0.2.2:1234", Model = "lm-model", Priority = 50 });
+
+        var panel = new QuickChannelPanel();
+        panel.Attach(settings, () => null);
+        T Get<T>(string name) where T : class => (T)panel.FindName(name);
+
+        Get<RadioButton>("Rb_Local").IsChecked = true;
+        Get<RadioButton>("Rb_LMStudio").IsChecked = true;
+        Check("常驻入口：表单里确实是 LM Studio 的地址", Get<TextBox>("Tb_LocalUrl").Text == "http://192.0.2.2:1234", Get<TextBox>("Tb_LocalUrl").Text);
+        Check("常驻入口：选着 LM Studio 也开得了", panel.OpenLocalDeploy());
+        CheckDeployOpened("常驻入口(LM Studio)", ollamaUrl, "qwen3:4b");
+
+        Get<RadioButton>("Rb_Free").IsChecked = true;
+        panel.OpenLocalDeploy();
+        CheckDeployOpened("常驻入口(免费服务)", ollamaUrl, "qwen3:4b");
+
+        Check("回填前选着 LM Studio", Get<RadioButton>("Rb_LMStudio").IsChecked == true);
+        Call(panel, "ApplyOllamaChoice", "qwen3:8b", ollamaUrl);
+        Check("常驻入口：选用后换成 Ollama", panel.BuildDraft() is Setting.OllamaNodeSetting { Model: "qwen3:8b", Url: ollamaUrl }, panel.BuildDraft()?.ToString() ?? "null");
+
+        // 选着 Ollama 时要用表单里刚改的，还没保存的节点是旧的
+        Get<TextBox>("Tb_LocalUrl").Text = "http://192.0.2.3:11434";
+        Get<ComboBox>("Cb_LocalModel").Text = "typed";
+        panel.OpenLocalDeploy();
+        CheckDeployOpened("常驻入口(Ollama 表单)", "http://192.0.2.3:11434", "typed");
+
+        node.Url = "localhost:11434";
+        Get<RadioButton>("Rb_LMStudio").IsChecked = true;
+        Check("常驻入口：节点地址不对时不开", !panel.OpenLocalDeploy() && ManagerInstance() is null);
+        Check("常驻入口：节点地址不对时说明原因", Get<TextBlock>("Tb_Status").Text.Contains("http://"), Get<TextBlock>("Tb_Status").Text);
+    }
+
     private static void CheckChannelView()
     {
         var settings = FreshSettings(Path.GetTempPath());
@@ -955,6 +1059,61 @@ internal static partial class Program
         CheckEntryOpens("极客界面", Get<TextBox>("Ed_Url"), entry);
     }
 
+    /// <summary>列表页的入口：这时没有打开的渠道，选好模型才进编辑页，保存前什么都不写。</summary>
+    private static void CheckChannelDeploy()
+    {
+        const string ollamaUrl = "http://192.0.2.1:11434";
+        var settings = FreshSettings(Path.GetTempPath());
+        var node = settings.Ollama.OllamaNodes[0];
+        node.Url = ollamaUrl;
+        node.Model = "qwen3:4b";
+
+        var view = new ChannelManagerView();
+        view.Attach(settings, () => null, () => { });
+        T Get<T>(string name) where T : class => (T)view.FindName(name);
+        Setting.ChannelNodeBase? Draft() => Field<Setting.ChannelNodeBase?>(view, "_draft");
+        var entry = Get<Button>("Button_LocalDeploy");
+        var editor = Get<FrameworkElement>("Page_Editor");
+        var url = Get<TextBox>("Ed_Url");
+        var model = Get<ComboBox>("Ed_Model");
+
+        Press(entry);
+        Check("列表入口：打开时还在列表页", editor.Visibility != Visibility.Visible && Draft() is null);
+        CheckDeployOpened("列表入口", ollamaUrl, "qwen3:4b");
+
+        var applied = Call(view, "ApplyDeployChoice", "qwen3:8b", "http://localhost:11500");
+        Check("列表入口：选用后进这条渠道的编辑页", applied is true && editor.Visibility == Visibility.Visible
+                                                   && ReferenceEquals(Field<Setting.ChannelNodeBase?>(view, "_original"), node));
+        Check("列表入口：表单填好", url.Text == "http://localhost:11500" && model.Text == "qwen3:8b", $"{url.Text} {model.Text}");
+        Check("列表入口：没保存前节点不变", node.Url == ollamaUrl && node.Model == "qwen3:4b");
+
+        var first = Draft();
+        var again = Call(view, "ApplyDeployChoice", "qwen3:14b", "http://localhost:11600");
+        Check("列表入口：再选一次继续填同一张表", again is true && ReferenceEquals(Draft(), first) && model.Text == "qwen3:14b" && url.Text == "http://localhost:11600");
+
+        Call(view, "ShowList");
+        Call(view, "OpenEditor", null!, Setting.ChannelKind.OpenAIChat);
+        url.Text = "https://example.com/typed";
+        var lost = Call(view, "ApplyDeployChoice", "qwen3:4b", ollamaUrl);
+        Check("列表入口：正在编辑别的类型时不换掉表单", lost is false && Draft() is Setting.OpenAINodeSetting && url.Text == "https://example.com/typed");
+
+        Call(view, "ShowList");
+        settings.Ollama.OllamaNodes.Clear();
+        var created = Call(view, "ApplyDeployChoice", "qwen3:4b", ollamaUrl);
+        Check("列表入口：没有渠道时开新草稿", created is true && Draft() is Setting.OllamaNodeSetting && Field<Setting.ChannelNodeBase?>(view, "_original") is null && model.Text == "qwen3:4b");
+        Check("列表入口：新草稿保存前不进设置", settings.Ollama.OllamaNodes.Count == 0);
+
+        Call(view, "ShowList");
+        settings.Ollama.OllamaNodes.Add(new Setting.OllamaNodeSetting { Url = "localhost:11434", Model = "" });
+        Press(entry);
+        Check("列表入口：地址不对时不开窗口", ManagerInstance() is null);
+        Check("列表入口：地址不对时进编辑页说明原因", editor.Visibility == Visibility.Visible && Get<TextBlock>("Ed_ModelStatus").Text.Contains("接口地址不对"), Get<TextBlock>("Ed_ModelStatus").Text);
+
+        // 留空是走默认地址，真打开会连本机，这里只看判断本身
+        var isDeployUrl = typeof(ChannelManagerView).GetMethod("IsDeployUrl", BindingFlags.Static | BindingFlags.NonPublic)!;
+        Check("列表入口：地址留空算合法", isDeployUrl.Invoke(null, new object[] { "" }) is true);
+    }
+
     private static void CheckLocalization()
     {
         var root = AppContext.BaseDirectory;
@@ -973,6 +1132,8 @@ internal static partial class Program
         var quickCode = File.ReadAllText(Path.Combine(root, "UI", "Controls", "QuickChannelPanel.xaml.cs"));
         var channelXaml = File.ReadAllText(Path.Combine(root, "UI", "Controls", "ChannelManagerView.xaml"));
         var channelCode = File.ReadAllText(Path.Combine(root, "UI", "Controls", "ChannelManagerView.xaml.cs"));
+        var simpleXaml = File.ReadAllText(Path.Combine(root, "UI", "Windows", "winSimpleSetting.xaml"));
+        var onboardingXaml = File.ReadAllText(Path.Combine(root, "UI", "Windows", "winOnboarding.xaml"));
 
         // 取键和中文兜底，兜底要和 zh-hans 一致，不然语言文件没换时看到的是另一句话
         var used = new Dictionary<string, string>();
@@ -985,9 +1146,9 @@ internal static partial class Program
         const string keyPath = @"KeyPath=([\w.]+), Default=([^}]*)\}";
         Scan(code, @"\bT\(""(\w+)"",\s*""([^""]*)""\)", "OllamaManager.");
         Scan(xaml, keyPath, "");
-        Scan(quickXaml, keyPath.Replace(@"[\w.]+", @"QuickSetup\.(?:Ollama|LocalDesc)\w*"), "");
+        foreach (var source in new[] { quickXaml, channelXaml, simpleXaml, onboardingXaml })
+            Scan(source, keyPath.Replace(@"[\w.]+", @"(?:Channels\.Ollama|QuickSetup\.(?:Ollama|LocalDesc)|OllamaManager\.)\w*"), "");
         Scan(quickCode, @"\bT\(""(QuickSetup\.Ollama\w*)"",\s*""([^""]*)""\)", "");
-        Scan(channelXaml, keyPath.Replace(@"[\w.]+", @"Channels\.Ollama\w*"), "");
         Scan(channelCode, @"\bT\(""(Ollama\w*)"",\s*""([^""]*)""\)", "Channels.");
         foreach (var model in OllamaModelCatalog.Models)
             used[model.DescriptionKey] = model.DefaultDescription;

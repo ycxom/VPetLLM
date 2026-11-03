@@ -18,7 +18,7 @@ namespace VPetLLM.Core.Services
     }
 
     /// <summary>
-    /// Ollama 管理器的全部操作，窗口只管显示。设置地址指向本机才能装和启动，
+    /// 一键化本地部署的全部操作，窗口只管显示。设置地址指向本机才能装和启动，
     /// 指向别的电脑时只能管那边的模型。这里不碰设置，选定的模型由窗口回传给打开它的面板。
     /// </summary>
     public sealed class OllamaManagerService

@@ -4409,16 +4409,16 @@
   },
   "Channels": {
     "OllamaManager": {
-      "en": "Ollama Manager (install, upgrade, get models)",
-      "zh-hans": "Ollama 管理器（安装、升级、下载模型）",
-      "zh-hant": "Ollama 管理器（安裝、升級、下載模型）",
-      "jp": "Ollama マネージャー（インストール、アップグレード、モデル入手）"
+      "en": "One-Click Local Deployment (install, upgrade, get models)",
+      "zh-hans": "一键化本地部署（安装、升级、下载模型）",
+      "zh-hant": "一鍵化本地部署（安裝、升級、下載模型）",
+      "jp": "ワンクリックローカル導入（インストール、アップグレード、モデル入手）"
     },
     "OllamaInvalidUrl": {
-      "en": "The address isn't valid. Fix it, then open the manager.",
-      "zh-hans": "接口地址不对，改好后再打开管理器。",
-      "zh-hant": "介面位址不對，改好後再開啟管理器。",
-      "jp": "アドレスが正しくありません。修正してからマネージャーを開いてください。"
+      "en": "The address isn't valid. Fix it, then open One-Click Local Deployment.",
+      "zh-hans": "接口地址不对，改好后再打开一键化本地部署。",
+      "zh-hant": "介面位址不對，改好後再開啟一鍵化本地部署。",
+      "jp": "アドレスが正しくありません。修正してからワンクリックローカル導入を開いてください。"
     },
     "OllamaChosen": {
       "en": "Selected {0}. Save to apply.",
@@ -5085,10 +5085,10 @@
   },
   "OllamaManager": {
     "Title": {
-      "en": "Ollama Manager",
-      "zh-hans": "Ollama 管理器",
-      "zh-hant": "Ollama 管理器",
-      "jp": "Ollama マネージャー"
+      "en": "One-Click Local Deployment",
+      "zh-hans": "一键化本地部署",
+      "zh-hant": "一鍵化本地部署",
+      "jp": "ワンクリックローカル導入"
     },
     "TabDeploy": {
       "en": "Setup",
@@ -5649,10 +5649,10 @@
       "jp": "{0} を選択しました。設定画面に戻って保存すると反映されます。"
     },
     "ChooseLost": {
-      "en": "The settings page has switched to another channel, so the model wasn't filled in. Go back and open the manager again.",
-      "zh-hans": "设置页已经切到别的渠道，模型没有填进去。请回到设置页重新打开管理器。",
-      "zh-hant": "設定頁已經切到別的渠道，模型沒有填進去。請回到設定頁重新開啟管理器。",
-      "jp": "設定画面が別のチャンネルに切り替わったため、モデルは入力されていません。設定画面からマネージャーを開き直してください。"
+      "en": "The settings page has switched to another channel, so the model wasn't filled in. Go back and open One-Click Local Deployment again.",
+      "zh-hans": "设置页已经切到别的渠道，模型没有填进去。请回到设置页重新打开一键化本地部署。",
+      "zh-hant": "設定頁已經切到別的渠道，模型沒有填進去。請回到設定頁重新開啟一鍵化本地部署。",
+      "jp": "設定画面が別のチャンネルに切り替わったため、モデルは入力されていません。設定画面からワンクリックローカル導入を開き直してください。"
     },
     "Pulled": {
       "en": "{0} has finished downloading.",
@@ -5803,16 +5803,22 @@
   },
   "QuickSetup": {
     "OllamaManager": {
-      "en": "Open Ollama Manager",
-      "zh-hans": "打开 Ollama 管理器",
-      "zh-hant": "開啟 Ollama 管理器",
-      "jp": "Ollama マネージャーを開く"
+      "en": "Open One-Click Local Deployment",
+      "zh-hans": "打开一键化本地部署",
+      "zh-hant": "開啟一鍵化本地部署",
+      "jp": "ワンクリックローカル導入を開く"
     },
     "OllamaManagerHint": {
-      "en": "Don't have Ollama yet? The manager installs it and downloads a model in one click, and can upgrade or remove models too.",
-      "zh-hans": "还没装 Ollama？管理器可以一键装好并下载模型，也能升级和删除模型。",
-      "zh-hant": "還沒裝 Ollama？管理器可以一鍵裝好並下載模型，也能升級和刪除模型。",
-      "jp": "Ollama をお持ちでない場合は、マネージャーがワンクリックでインストールとモデルのダウンロードを行います。アップグレードやモデルの削除もできます。"
+      "en": "Don't have Ollama yet? One-Click Local Deployment installs it, downloads a model, and can upgrade or remove models too.",
+      "zh-hans": "还没装 Ollama？一键化本地部署可以装好它并下载模型，也能升级和删除模型。",
+      "zh-hant": "還沒裝 Ollama？一鍵化本地部署可以裝好它並下載模型，也能升級和刪除模型。",
+      "jp": "Ollama をお持ちでない場合は、ワンクリックローカル導入でインストールとモデルのダウンロードができます。アップグレードやモデルの削除もできます。"
+    },
+    "OllamaDeployDesc": {
+      "en": "No API key needed. Sets up Ollama and a model that suits this PC, and your chats stay on this computer.",
+      "zh-hans": "不用 API Key，帮你装好 Ollama 和适合这台电脑的模型，对话不离开这台电脑。",
+      "zh-hant": "不用 API Key，幫你裝好 Ollama 和適合這台電腦的模型，對話不離開這台電腦。",
+      "jp": "API キーは不要です。Ollama とこの PC に合うモデルをセットアップし、会話はこの PC の外に出ません。"
     },
     "OllamaChosen": {
       "en": "Selected {0}. Save to apply.",

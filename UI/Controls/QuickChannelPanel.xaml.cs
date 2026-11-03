@@ -2,6 +2,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using VPetLLM.UI.Windows;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
@@ -164,6 +165,26 @@ namespace VPetLLM.UI.Controls
             }
         }
 
+        /// <summary>
+        /// 打开一键化本地部署。外层窗口的入口常驻，这时可能选着 LM Studio，地址和模型都要取 Ollama 的。
+        /// 地址不对时在面板里说明原因并返回 false。
+        /// </summary>
+        public bool OpenLocalDeploy()
+        {
+            var ollama = LocalNode(Setting.ChannelKind.Ollama);
+            var (url, model) = Rb_Ollama.IsChecked == true
+                ? (Tb_LocalUrl.Text.Trim(), Cb_LocalModel.Text)
+                : (ollama.Endpoint ?? "", ollama.Model);
+
+            if (url.Length > 0 && !IsHttpUrl(url))
+            {
+                ShowStatus(T("QuickSetup.InvalidUrl", "接口地址要以 http:// 或 https:// 开头。"), false);
+                return false;
+            }
+            winOllamaManager.Open(Window.GetWindow(this), _settings!, url, model, ApplyOllamaChoice);
+            return true;
+        }
+
         public void RefreshLanguage()
         {
             _customPreset.Content = T("QuickSetup.CustomProvider", "自定义地址");
@@ -271,10 +292,12 @@ namespace VPetLLM.UI.Controls
             Cb_Model.Text = preset.DefaultModel ?? preset.Models.FirstOrDefault() ?? "";
         }
 
+        private Setting.ChannelNodeBase LocalNode(Setting.ChannelKind kind)
+            => _settings!.EnumerateChannels().FirstOrDefault(c => c.Kind == kind) ?? Setting.CreateChannel(kind);
+
         private void LoadLocal(Setting.ChannelKind kind)
         {
-            var node = _settings!.EnumerateChannels().FirstOrDefault(c => c.Kind == kind)
-                       ?? Setting.CreateChannel(kind);
+            var node = LocalNode(kind);
             Tb_LocalUrl.Text = node.Endpoint ?? "";
             Cb_LocalModel.ItemsSource = null;
             Cb_LocalModel.Text = node.Model ?? "";
@@ -330,16 +353,7 @@ namespace VPetLLM.UI.Controls
             NotifyChanged();
         }
 
-        private void OllamaManager_Click(object sender, RoutedEventArgs e)
-        {
-            var url = Tb_LocalUrl.Text.Trim();
-            if (url.Length > 0 && !IsHttpUrl(url))
-            {
-                ShowStatus(T("QuickSetup.InvalidUrl", "接口地址要以 http:// 或 https:// 开头。"), false);
-                return;
-            }
-            winOllamaManager.Open(Window.GetWindow(this), _settings!, url, Cb_LocalModel.Text, ApplyOllamaChoice);
-        }
+        private void OllamaManager_Click(object sender, RoutedEventArgs e) => OpenLocalDeploy();
 
         private bool ApplyOllamaChoice(string model, string url)
         {
@@ -350,6 +364,8 @@ namespace VPetLLM.UI.Controls
             // 模型框只把键盘输入算作改动，回填要自己标记。NotifyChanged 会清状态，所以提示放在后面
             NotifyChanged();
             ShowStatus(string.Format(T("QuickSetup.OllamaChosen", "已选用 {0}，保存后生效。"), model), true);
+            // 提示在表单最下面，这一步可能刚摊开，要等布局完才滚得过去
+            Dispatcher.InvokeAsync(Tb_Status.BringIntoView, DispatcherPriority.Loaded);
             return true;
         }
 

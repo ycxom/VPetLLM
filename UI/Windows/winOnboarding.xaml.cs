@@ -117,6 +117,8 @@ namespace VPetLLM.UI.Windows
 
         private void Back_Click(object sender, RoutedEventArgs e) => ShowStep(_step - 1);
 
+        private void LocalDeploy_Click(object sender, RoutedEventArgs e) => ChannelPanel.OpenLocalDeploy();
+
         private void Skip_Click(object sender, RoutedEventArgs e) => Close();
 
         private async void Next_Click(object sender, RoutedEventArgs e)

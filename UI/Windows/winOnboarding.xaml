@@ -73,6 +73,14 @@
                     <Border x:Name="Host_Channel">
                         <controls:QuickChannelPanel/>
                     </Border>
+                    <Button x:Name="Btn_LocalDeploy" Style="{StaticResource QuickActionCard}" Margin="0,6,0,0" Click="LocalDeploy_Click">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource QuickCardTitle}"
+                                       Text="{utils:Localize KeyPath=OllamaManager.Title, Default=一键化本地部署}"/>
+                            <TextBlock Style="{StaticResource QuickHint}"
+                                       Text="{utils:Localize KeyPath=QuickSetup.OllamaDeployDesc, Default=不用 API Key，帮你装好 Ollama 和适合这台电脑的模型，对话不离开这台电脑。}"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
 
                 <!-- 3. 称呼和性格 -->

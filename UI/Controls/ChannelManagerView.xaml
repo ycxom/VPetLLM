@@ -215,12 +215,22 @@
             </Grid.RowDefinitions>
 
             <!-- 标题 + 概要 -->
-            <StackPanel Grid.Row="0" Margin="0,0,0,12">
-                <TextBlock Text="{utils:Localize KeyPath=Channels.Title, Default=渠道管理}"
-                           FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}"/>
-                <TextBlock x:Name="Text_Summary" Margin="0,4,0,0" FontSize="12"
-                           Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap"/>
-            </StackPanel>
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="{utils:Localize KeyPath=Channels.Title, Default=渠道管理}"
+                               FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}"/>
+                    <TextBlock x:Name="Text_Summary" Margin="0,4,0,0" FontSize="12"
+                               Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Button x:Name="Button_LocalDeploy" Grid.Column="1" Style="{StaticResource PrimaryButton}"
+                        Padding="14,6" Margin="12,0,0,0" VerticalAlignment="Center" Click="Button_LocalDeploy_Click"
+                        Content="{utils:Localize KeyPath=OllamaManager.Title, Default=一键化本地部署}"
+                        ToolTip="{utils:Localize KeyPath=QuickSetup.OllamaDeployDesc, Default=不用 API Key，帮你装好 Ollama 和适合这台电脑的模型，对话不离开这台电脑。}"/>
+            </Grid>
 
             <!-- 工具栏 -->
             <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="False">
@@ -528,7 +538,7 @@
                                 <TextBlock x:Name="Ed_ModelStatus" Style="{StaticResource FormHint}" Visibility="Collapsed"/>
                                 <Button x:Name="Ed_OllamaManager" Style="{StaticResource SecondaryButton}" Margin="112,8,0,0" Padding="12,6"
                                         HorizontalAlignment="Left" Visibility="Collapsed" Click="Ed_OllamaManager_Click"
-                                        Content="{utils:Localize KeyPath=Channels.OllamaManager, Default=Ollama 管理器（安装、升级、下载模型）}"/>
+                                        Content="{utils:Localize KeyPath=Channels.OllamaManager, Default=一键化本地部署（安装、升级、下载模型）}"/>
                             </StackPanel>
 
                             <CheckBox x:Name="Ed_GeminiOpenAIAuth" Style="{StaticResource ModernCheckBox}" Margin="112,0,0,12" FontSize="13"

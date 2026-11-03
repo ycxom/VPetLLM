@@ -34,6 +34,7 @@ namespace VPetLLM.UI.Windows
 
             var settings = _plugin.Settings;
             ChannelPanel.Attach(settings, () => _plugin.ChatCore as RoutedChatCore);
+            ChannelPanel.SelectionChanged += ShowChannelForm;
             ProfilePanel.Load(settings);
             PluginPanel.Attach(_plugin);
             PluginPanel.Changed += RefreshPluginSummary;
@@ -90,8 +91,7 @@ namespace VPetLLM.UI.Windows
                 if (draft is null)
                 {
                     // 保存按钮在所有页共用，用户可能在别的页点的，不切回来就看不到错在哪
-                    Tabs.SelectedItem = Tab_Channel;
-                    Host_Channel.Visibility = Visibility.Visible;
+                    ShowChannelForm();
                     ShowStatus(T("QuickSetup.FixChannel", "AI 服务还没填好，请看上面的提示。"), false);
                     return false;
                 }
@@ -122,6 +122,19 @@ namespace VPetLLM.UI.Windows
         {
             if (SaveAll())
                 ShowStatus(T("QuickSetup.Saved", "已保存"), true);
+        }
+
+        private void ShowChannelForm()
+        {
+            Tabs.SelectedItem = Tab_Channel;
+            Host_Channel.Visibility = Visibility.Visible;
+        }
+
+        // 部署窗口不挡这里：选用模型时面板可能还折叠着，也可能已切到别的页，由 SelectionChanged 摊开
+        private void LocalDeploy_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ChannelPanel.OpenLocalDeploy())
+                ShowChannelForm();
         }
 
         private void ChangeChannel_Click(object sender, RoutedEventArgs e)

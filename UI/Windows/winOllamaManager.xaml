@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:utils="clr-namespace:VPetLLM.Utils.Localization"
         xmlns:controls="clr-namespace:VPetLLM.UI.Controls"
-        Title="{utils:Localize KeyPath=OllamaManager.Title, Default=Ollama 管理器}"
+        Title="{utils:Localize KeyPath=OllamaManager.Title, Default=一键化本地部署}"
         Width="1120"
         Height="720"
         MinWidth="720"
@@ -215,7 +215,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock Style="{StaticResource QuickTitle}" Margin="0,0,0,8"
-                   Text="{utils:Localize KeyPath=OllamaManager.Title, Default=Ollama 管理器}"/>
+                   Text="{utils:Localize KeyPath=OllamaManager.Title, Default=一键化本地部署}"/>
 
         <StackPanel Grid.Row="1" Margin="0,0,0,8">
             <TextBlock x:Name="Tb_Hardware" Style="{StaticResource QuickHint}"/>

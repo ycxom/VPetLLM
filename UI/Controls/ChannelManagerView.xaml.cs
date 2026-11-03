@@ -784,9 +784,9 @@ namespace VPetLLM.UI.Controls
             if (_settings is null || _draft is not { } draft) return;
 
             var url = Ed_Url.Text.Trim();
-            if (url.Length > 0 && !(Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"))
+            if (!IsDeployUrl(url))
             {
-                ShowModelStatus(T("OllamaInvalidUrl", "接口地址不对，改好后再打开管理器。"), error: true);
+                ShowDeployUrlError();
                 return;
             }
 
@@ -794,9 +794,46 @@ namespace VPetLLM.UI.Controls
                 (model, chosenUrl) => ApplyOllamaChoice(draft, model, chosenUrl));
         }
 
+        private void Button_LocalDeploy_Click(object sender, RoutedEventArgs e)
+        {
+            if (_settings is null) return;
+
+            var node = FirstOllamaChannel();
+            var url = node?.Endpoint?.Trim() ?? "";
+            if (!IsDeployUrl(url))
+            {
+                OpenEditor(node, null);
+                ShowDeployUrlError();
+                return;
+            }
+
+            winOllamaManager.Open(Window.GetWindow(this), _settings, url, node?.Model, ApplyDeployChoice);
+        }
+
+        /// <summary>列表页的入口没有打开的渠道：选好模型才进 Ollama 渠道的编辑页，保存前什么都不写。</summary>
+        private bool ApplyDeployChoice(string model, string url)
+        {
+            if (_draft is null)
+            {
+                var node = FirstOllamaChannel();
+                OpenEditor(node, node is null ? Setting.ChannelKind.Ollama : null);
+            }
+            // 窗口不挡设置页，这时可能正在编辑别的类型的渠道，没保存的内容不能换掉
+            return _draft is { Kind: Setting.ChannelKind.Ollama } draft && ApplyOllamaChoice(draft, model, url);
+        }
+
+        private Setting.ChannelNodeBase? FirstOllamaChannel()
+            => _settings?.EnumerateChannels().FirstOrDefault(c => c.Kind == Setting.ChannelKind.Ollama);
+
+        private static bool IsDeployUrl(string url)
+            => url.Length == 0 || (Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https");
+
+        private void ShowDeployUrlError()
+            => ShowModelStatus(T("OllamaInvalidUrl", "接口地址不对，改好后再打开一键化本地部署。"), error: true);
+
         private bool ApplyOllamaChoice(Setting.ChannelNodeBase draft, string model, string url)
         {
-            // 管理器不挡设置页，用户可能已经切到别的渠道
+            // 部署窗口不挡设置页，用户可能已经切到别的渠道
             if (!ReferenceEquals(draft, _draft)) return false;
 
             Ed_Url.Text = url;

@@ -863,12 +863,110 @@ static class Program
             win = Open(Fresh(dir));
             var fresh = (VPetLLM.UI.Controls.QuickChannelPanel)((System.Windows.Controls.Border)win.FindName("Host_Channel")).Child;
             Check("还没有服务时直接摊开表单", fresh.IsVisible && fresh.NeedsApply);
+
+            // 一键化本地部署的入口常驻：主渠道是 Gemini，表单折叠着，选模型时人可能已经在别的页
+            System.Windows.Window? DeployWindow() => (System.Windows.Window?)typeof(VPetLLM.UI.Windows.winOllamaManager)
+                .GetField("_instance", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null);
+            void Rebind()
+            {
+                tabs = Named<System.Windows.Controls.TabControl>("Tabs");
+                tabChannel = Named<System.Windows.Controls.TabItem>("Tab_Channel");
+                channelHost = Named<System.Windows.Controls.Border>("Host_Channel");
+                channel = (VPetLLM.UI.Controls.QuickChannelPanel)channelHost.Child;
+            }
+            Setting GeminiPrimary(string ollamaUrl)
+            {
+                var s = Fresh(dir);
+                s.Ollama.OllamaNodes[0].Url = ollamaUrl;
+                s.Gemini.GeminiNodes.Add(new Setting.GeminiNodeSetting { Name = "主渠道", ApiKey = "k", Model = "gemini-x", Priority = 1000 });
+                return s;
+            }
+
+            win = Open(GeminiPrimary("http://192.0.2.1:11434"));
+            Rebind();
+            var deploy = Named<System.Windows.Controls.Button>("Btn_LocalDeploy");
+            Check("部署入口：表单折叠时也看得到", channelHost.Visibility == System.Windows.Visibility.Collapsed && deploy.IsVisible);
+
+            Click(deploy);
+            var manager = DeployWindow();
+            Check("部署入口：点了打开部署窗口", manager is not null);
+            Check("部署入口：只是打开不算改动，表单也不摊开", !channel.NeedsApply && channelHost.Visibility == System.Windows.Visibility.Collapsed);
+
+            if (manager is not null)
+            {
+                Select("Tab_Help");
+                var chosen = (Func<string, string, bool>)manager.GetType().GetField("_onChosen", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(manager)!;
+                chosen("qwen3:4b", "http://192.0.2.1:11434");
+                manager.Close();
+                Pump(() => DeployWindow() is null);
+                win.UpdateLayout();
+                Check("部署入口：选用后回到 AI 服务页并摊开", ReferenceEquals(tabs.SelectedItem, tabChannel) && channel.IsVisible);
+                Check("部署入口：选用后保存才写得进去", channel.NeedsApply && channel.BuildDraft() is Setting.OllamaNodeSetting { Model: "qwen3:4b" });
+
+                var status = (System.Windows.FrameworkElement)channel.FindName("Tb_Status");
+                System.Windows.DependencyObject up = channelHost;
+                while (up is not System.Windows.Controls.ScrollViewer)
+                    up = System.Windows.Media.VisualTreeHelper.GetParent(up);
+                var viewer = (System.Windows.Controls.ScrollViewer)up;
+                var inView = () =>
+                {
+                    var top = status.TransformToAncestor(viewer).Transform(new System.Windows.Point()).Y;
+                    return top >= 0 && top + status.ActualHeight <= viewer.ViewportHeight;
+                };
+                Pump(inView);
+                Check("部署入口：表单够长才算验证了滚动", viewer.ScrollableHeight > 0, viewer.ScrollableHeight.ToString());
+                Check("部署入口：提示滚进可视区", inView(), $"{viewer.VerticalOffset}/{viewer.ScrollableHeight}");
+            }
+
+            win = Open(GeminiPrimary("localhost:11434"));
+            Rebind();
+            Click(Named<System.Windows.Controls.Button>("Btn_LocalDeploy"));
+            Check("部署入口：地址不对时不开窗口", DeployWindow() is null);
+            Check("部署入口：地址不对时摊开表单看得到原因", channel.IsVisible && ((System.Windows.UIElement)channel.FindName("Tb_Status")).IsVisible);
+
+            CheckOnboardingDeploy(host, GeminiPrimary("http://192.0.2.1:11434"), DeployWindow);
         }
         finally
         {
             window?.Close();
             plugins.Clear();
             plugins.AddRange(backup);
+        }
+    }
+
+    /// <summary>
+    /// 新手引导第 2 步的入口。关窗时默认会写“看过引导”落盘，这里把宿主标成退出中走不写的那条路。
+    /// </summary>
+    static void CheckOnboardingDeploy(VPetLLM.VPetLLM host, Setting settings, Func<System.Windows.Window?> deployWindow)
+    {
+        host.Settings = settings;
+        typeof(VPetLLM.VPetLLM).GetField("_isShuttingDown", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(host, true);
+
+        var onboarding = new VPetLLM.UI.Windows.winOnboarding(host, firstRun: true)
+        {
+            Left = -20000, Top = -20000,
+            WindowStartupLocation = System.Windows.WindowStartupLocation.Manual,
+            ShowInTaskbar = false, ShowActivated = false
+        };
+        host.OnboardingWindow = onboarding;
+        try
+        {
+            onboarding.Show();
+            var entry = (System.Windows.Controls.Button)onboarding.FindName("Btn_LocalDeploy");
+            Check("引导：第一步看不到部署入口", !entry.IsVisible);
+
+            typeof(VPetLLM.UI.Windows.winOnboarding).GetMethod("ShowStep", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(onboarding, new object[] { 1 });
+            onboarding.UpdateLayout();
+            Check("引导：选服务这步有部署入口", entry.IsVisible);
+
+            entry.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Check("引导：点了打开部署窗口", deployWindow() is not null);
+            deployWindow()?.Close();
+            Pump(() => deployWindow() is null);
+        }
+        finally
+        {
+            onboarding.Close();
         }
     }
 
