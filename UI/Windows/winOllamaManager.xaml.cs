@@ -4,6 +4,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using VPetLLM.Utils.Localization;
 
 namespace VPetLLM.UI.Windows
@@ -127,6 +128,9 @@ namespace VPetLLM.UI.Windows
 
         private static winOllamaManager? _instance;
 
+        // 关掉窗口再开还记得，桌宠退出就忘：这里不写设置，代理只给安装包用
+        private static Uri? _downloadProxy;
+
         private readonly Setting _settings;
         private readonly OllamaHardware _hardware;
         private readonly OllamaLibrary _library;
@@ -134,6 +138,7 @@ namespace VPetLLM.UI.Windows
         private readonly CancellationTokenSource _lifetime = new();
         private readonly Stopwatch _speedClock = new();
         private readonly Func<string, MessageBoxImage, bool> _confirm;
+        private readonly LocalProxyDetector _proxyDetector;
 
         private OllamaManagerService _service;
         private Func<string, string, bool>? _onChosen;
@@ -144,6 +149,12 @@ namespace VPetLLM.UI.Windows
         private CancellationTokenSource? _running;
         private long _speedBytes;
         private string _speedText = "";
+        private readonly Stopwatch _slowClock = new();
+        private OllamaTaskProgress? _lastProgress;
+        private OllamaTaskPhase? _slowPhase;
+        private long _slowStartBytes;
+        private bool _slowDismissed;
+        private CancellationTokenSource? _proxyScan;
         private long? _freeSpace;
         private IReadOnlyList<OllamaLibraryModel>? _libraryModels;
         private List<OllamaLibraryRow> _libraryRows = new();
@@ -189,6 +200,12 @@ namespace VPetLLM.UI.Windows
         /// <summary>快速滚动时划过去的行不发请求，停够这么久才查体积。</summary>
         public TimeSpan SizeLookupDelay { get; set; } = TimeSpan.FromMilliseconds(200);
 
+        /// <summary>按这么长的一段时间算平均速度，太短会被一时的波动误报。</summary>
+        public TimeSpan SlowPeriod { get; set; } = TimeSpan.FromSeconds(30);
+
+        /// <summary>平均速度低于它就提示，剩下的量一段时间内就能下完时不提示。</summary>
+        public long SlowBytesPerSecond { get; set; } = 512 * 1024;
+
         public static readonly DependencyProperty CardGridColumnsProperty =
             DependencyProperty.Register(nameof(CardGridColumns), typeof(int), typeof(winOllamaManager), new PropertyMetadata(1));
 
@@ -201,7 +218,8 @@ namespace VPetLLM.UI.Windows
 
         /// <param name="confirm">升级、删除前的确认，返回 true 才继续。不传时弹系统确认框。</param>
         public winOllamaManager(Setting settings, OllamaManagerService service, string? currentModel, Func<string, string, bool> onChosen,
-            Func<string, MessageBoxImage, bool>? confirm = null, OllamaLibrary? library = null, OllamaHardware? hardware = null)
+            Func<string, MessageBoxImage, bool>? confirm = null, OllamaLibrary? library = null, OllamaHardware? hardware = null,
+            LocalProxyDetector? proxyDetector = null)
         {
             InitializeComponent();
             // 小屏幕上窗口不能比屏幕还大
@@ -215,6 +233,8 @@ namespace VPetLLM.UI.Windows
             _onChosen = onChosen;
             _confirm = confirm ?? ((text, image) => MessageBox.Show(this, text, Title, MessageBoxButton.YesNo, image) == MessageBoxResult.Yes);
             _recommended = OllamaModelCatalog.Recommend(_hardware);
+            _proxyDetector = proxyDetector ?? new LocalProxyDetector();
+            _service.UseDownloadProxy(_downloadProxy);
             Loaded += Window_Loaded;
         }
 
@@ -227,6 +247,7 @@ namespace VPetLLM.UI.Windows
             var next = OllamaManagerService.Create(_settings, url);
             if (_running is null && next.Url != _service.Url)
             {
+                next.UseDownloadProxy(_downloadProxy);
                 _service = next;
                 _status = null;
                 _models = Array.Empty<OllamaLocalModel>();
@@ -593,6 +614,10 @@ namespace VPetLLM.UI.Windows
         private static string FormatSize(long bytes)
             => bytes >= GiB ? $"{bytes / GiB:0.0} GB" : $"{bytes / (1024.0 * 1024):0} MB";
 
+        // 慢的时候正要看清多慢，按 MB 取整会显示成 0 MB/s
+        private static string FormatSpeed(double bytesPerSecond)
+            => bytesPerSecond >= 1024 * 1024 ? $"{bytesPerSecond / (1024 * 1024):0.0} MB/s" : $"{bytesPerSecond / 1024:0} KB/s";
+
         private void ShowStatus(string? text, bool? ok)
         {
             Tb_Status.Text = text ?? "";
@@ -624,6 +649,17 @@ namespace VPetLLM.UI.Windows
             Panel_Progress.Visibility = Visibility.Visible;
             ApplyState();
 
+            _lastProgress = null;
+            _slowDismissed = false;
+            ResetSlowWindow(null, 0);
+            // 进度只在收到数据时才报，完全卡住时靠它发现
+            var slowTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+            {
+                Interval = TimeSpan.FromTicks(Math.Min(TimeSpan.FromSeconds(1).Ticks, Math.Max(SlowPeriod.Ticks / 4, 1)))
+            };
+            slowTimer.Tick += (_, _) => CheckSlow();
+            slowTimer.Start();
+
             try
             {
                 await work(new Progress<OllamaTaskProgress>(OnProgress), running.Token);
@@ -640,6 +676,9 @@ namespace VPetLLM.UI.Windows
             finally
             {
                 _running = null;
+                slowTimer.Stop();
+                _proxyScan?.Cancel();
+                Panel_Slow.Visibility = Visibility.Collapsed;
                 Panel_Progress.Visibility = Visibility.Collapsed;
             }
 
@@ -649,6 +688,14 @@ namespace VPetLLM.UI.Windows
         private void OnProgress(OllamaTaskProgress progress)
         {
             if (_running is null) return;
+
+            _lastProgress = progress;
+            // 换了阶段或进度倒退（重连后各层重新上报）就重新计时
+            if (progress.Phase != _slowPhase || progress.Completed < _slowStartBytes)
+            {
+                ResetSlowWindow(progress.Phase, progress.Completed);
+                if (!IsSlowWatched(progress.Phase)) Panel_Slow.Visibility = Visibility.Collapsed;
+            }
 
             Tb_TaskTitle.Text = DescribePhase(progress.Phase);
             // 安装程序不能中途打断，取消了它也会继续跑完
@@ -666,7 +713,7 @@ namespace VPetLLM.UI.Windows
             if (_speedClock.Elapsed >= TimeSpan.FromSeconds(1))
             {
                 var perSecond = (progress.Completed - _speedBytes) / _speedClock.Elapsed.TotalSeconds;
-                _speedText = _speedBytes > 0 && perSecond > 0 ? $" · {FormatSize((long)perSecond)}/s" : "";
+                _speedText = _speedBytes > 0 && perSecond > 0 ? $" · {FormatSpeed(perSecond)}" : "";
                 _speedBytes = progress.Completed;
                 _speedClock.Restart();
             }
@@ -739,6 +786,152 @@ namespace VPetLLM.UI.Windows
         {
             Btn_Cancel.IsEnabled = false;
             _running?.Cancel();
+        }
+
+        private static bool IsSlowWatched(OllamaTaskPhase? phase)
+            => phase is OllamaTaskPhase.DownloadingSetup or OllamaTaskPhase.PullingModel;
+
+        private void ResetSlowWindow(OllamaTaskPhase? phase, long completed)
+        {
+            _slowPhase = phase;
+            _slowStartBytes = completed;
+            _slowClock.Restart();
+        }
+
+        /// <summary>
+        /// 每满一段 <see cref="SlowPeriod"/> 算一次平均速度。慢就提示，恢复了就收起；
+        /// 用户点了“不用了”，这次任务就不再提示。
+        /// </summary>
+        private void CheckSlow()
+        {
+            if (_running is null || _slowDismissed || _lastProgress is not { } progress) return;
+            if (!IsSlowWatched(progress.Phase) || progress.Total <= 0 || _slowClock.Elapsed < SlowPeriod) return;
+
+            var perSecond = (progress.Completed - _slowStartBytes) / _slowClock.Elapsed.TotalSeconds;
+            var remaining = progress.Total - progress.Completed;
+            ResetSlowWindow(progress.Phase, progress.Completed);
+
+            if (perSecond >= SlowBytesPerSecond || remaining <= SlowBytesPerSecond * SlowPeriod.TotalSeconds)
+            {
+                // 正在填代理时不收，免得字打到一半框没了
+                if (!Panel_Slow.IsKeyboardFocusWithin) Panel_Slow.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var setup = progress.Phase == OllamaTaskPhase.DownloadingSetup;
+            Tb_SlowHint.Text = setup
+                ? string.Format(T("SlowSetup", "安装包下载很慢（{0}）。有代理的话可以填在这里，改经代理从 GitHub 下载，已下载的部分不会丢。"), FormatSpeed(perSecond))
+                : string.Format(T("SlowPull", "模型下载很慢（{0}）。可以断开重连：Ollama 会留着已下载的部分，重新建立下载连接，速度通常能恢复。"), FormatSpeed(perSecond));
+            if (Panel_Slow.Visibility == Visibility.Visible) return;
+
+            Panel_Proxy.Visibility = setup ? Visibility.Visible : Visibility.Collapsed;
+            Btn_UseProxy.Visibility = setup ? Visibility.Visible : Visibility.Collapsed;
+            Btn_Reconnect.Visibility = setup ? Visibility.Collapsed : Visibility.Visible;
+            Tb_ProxyFound.Visibility = Visibility.Collapsed;
+            if (setup && string.IsNullOrWhiteSpace(Tb_Proxy.Text)) Tb_Proxy.Text = DefaultProxyText();
+            Panel_Slow.Visibility = Visibility.Visible;
+            // 不会填代理的用户也能点一下就用上
+            if (setup && string.IsNullOrWhiteSpace(Tb_Proxy.Text)) _ = DetectProxyAsync(false);
+        }
+
+        /// <summary>找本机代理软件的端口，找到就填进框里。<paramref name="replace"/> 为 false 时不覆盖用户已经填的。</summary>
+        private async Task DetectProxyAsync(bool replace)
+        {
+            _proxyScan?.Cancel();
+            using var scan = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            _proxyScan = scan;
+            Btn_DetectProxy.IsEnabled = false;
+            ShowProxyFound(T("ProxyDetecting", "正在查找本机的代理软件…"));
+            try
+            {
+                var result = await _proxyDetector.DetectAsync(scan.Token);
+                if (result.Found is { } found)
+                {
+                    if (replace || string.IsNullOrWhiteSpace(Tb_Proxy.Text)) Tb_Proxy.Text = found.ToString().TrimEnd('/');
+                    ShowProxyFound(string.Format(T("ProxyDetected", "找到本机代理 {0}（{1} 常用的端口），点“使用代理”就行。"),
+                        found.Authority, result.Software));
+                }
+                else if (result.SystemProxy is { } system)
+                {
+                    ShowProxyFound(string.Format(T("ProxyIsSystem", "系统代理已经开着（{0}），下载本来就经过它。还是慢的话，可以在代理软件里换个节点。"),
+                        system.Authority));
+                }
+                else
+                {
+                    ShowProxyFound(T("ProxyNotFound", "没找到本机代理。开着代理软件的话，把它设置里的端口填进来，例如 http://127.0.0.1:7890。"));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // 下载结束、窗口关了或又点了一次检测
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"查找本机代理失败: {ex.Message}");
+                Tb_ProxyFound.Visibility = Visibility.Collapsed;
+            }
+            finally
+            {
+                if (ReferenceEquals(_proxyScan, scan))
+                {
+                    _proxyScan = null;
+                    Btn_DetectProxy.IsEnabled = true;
+                }
+            }
+        }
+
+        private void ShowProxyFound(string text)
+        {
+            Tb_ProxyFound.Text = text;
+            Tb_ProxyFound.Visibility = Visibility.Visible;
+        }
+
+        private void DetectProxy_Click(object sender, RoutedEventArgs e) => _ = DetectProxyAsync(true);
+
+        /// <summary>先填这次运行里用过的，其次是设置里开着的网络代理。</summary>
+        private string DefaultProxyText()
+        {
+            if (_downloadProxy is { } used) return used.ToString().TrimEnd('/');
+
+            var proxy = _settings.Proxy;
+            if (proxy is null || !proxy.IsEnabled || proxy.FollowSystemProxy || string.IsNullOrWhiteSpace(proxy.Address)) return "";
+
+            var address = proxy.Address.Trim();
+            if (address.Contains("://", StringComparison.Ordinal)) return address;
+            // 和聊天请求拼代理的写法一致
+            var scheme = string.Equals(proxy.Protocol, "socks", StringComparison.OrdinalIgnoreCase) ? "socks5" : proxy.Protocol?.Trim();
+            return $"{(string.IsNullOrEmpty(scheme) ? "http" : scheme)}://{address}";
+        }
+
+        private void UseProxy_Click(object sender, RoutedEventArgs e)
+        {
+            var proxy = OllamaInstaller.ParseProxy(Tb_Proxy.Text);
+            if (proxy is null)
+            {
+                Tb_SlowHint.Text = T("ProxyInvalid", "代理地址不对。例如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080。");
+                return;
+            }
+
+            _downloadProxy = proxy;
+            _service.UseDownloadProxy(proxy);
+            Panel_Slow.Visibility = Visibility.Collapsed;
+            ResetSlowWindow(_lastProgress?.Phase, _lastProgress?.Completed ?? 0);
+            // Authority 不带用户名密码
+            ShowStatus(string.Format(T("ProxyApplied", "已改用代理 {0} 下载，接着已下载的部分继续。"), proxy.Authority), null);
+        }
+
+        private void Reconnect_Click(object sender, RoutedEventArgs e)
+        {
+            _service.ReconnectPull();
+            Panel_Slow.Visibility = Visibility.Collapsed;
+            ResetSlowWindow(_lastProgress?.Phase, _lastProgress?.Completed ?? 0);
+            ShowStatus(T("Reconnected", "已断开重连，接着已下载的部分继续。"), null);
+        }
+
+        private void SlowDismiss_Click(object sender, RoutedEventArgs e)
+        {
+            _slowDismissed = true;
+            Panel_Slow.Visibility = Visibility.Collapsed;
         }
 
         private async void CatalogAction_Click(object sender, RoutedEventArgs e)

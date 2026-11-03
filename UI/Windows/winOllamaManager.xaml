@@ -637,6 +637,10 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             <StackPanel VerticalAlignment="Center">
                 <TextBlock x:Name="Tb_TaskTitle" Style="{StaticResource QuickGuideLine}"/>
                 <ProgressBar x:Name="Bar_Task" Height="6" Margin="0,6,0,4" Maximum="100"
@@ -646,6 +650,39 @@
             <Button x:Name="Btn_Cancel" Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="12,0,0,0"
                     VerticalAlignment="Center" Click="Cancel_Click"
                     Content="{utils:Localize KeyPath=OllamaManager.Cancel, Default=取消}"/>
+
+            <!-- 下载慢时才出现：安装包问要不要走代理，模型给断开重连 -->
+            <Border x:Name="Panel_Slow" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" Padding="12,10"
+                    CornerRadius="6" BorderThickness="1" BorderBrush="{StaticResource WarningBrush}"
+                    Background="{StaticResource SecondaryBackgroundBrush}" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock x:Name="Tb_SlowHint" Style="{StaticResource QuickGuideLine}" TextWrapping="Wrap"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid x:Name="Panel_Proxy">
+                            <TextBox x:Name="Tb_Proxy" Style="{StaticResource OllamaTextBox}"/>
+                            <TextBlock Style="{StaticResource OllamaPlaceholder}" Tag="{Binding ElementName=Tb_Proxy}"
+                                       Text="{utils:Localize KeyPath=OllamaManager.ProxyPlaceholder, Default=代理地址，例如 http://127.0.0.1:7890}"/>
+                        </Grid>
+                        <Button x:Name="Btn_DetectProxy" Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                Click="DetectProxy_Click" Content="{utils:Localize KeyPath=OllamaManager.DetectProxy, Default=自动检测}"/>
+                        <Button x:Name="Btn_UseProxy" Grid.Column="2" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"
+                                Click="UseProxy_Click" Content="{utils:Localize KeyPath=OllamaManager.UseProxy, Default=使用代理}"/>
+                        <Button x:Name="Btn_Reconnect" Style="{StaticResource PrimaryButton}" Margin="0"
+                                HorizontalAlignment="Left" Click="Reconnect_Click"
+                                Content="{utils:Localize KeyPath=OllamaManager.Reconnect, Default=断开重连}"/>
+                        <Button x:Name="Btn_SlowDismiss" Grid.Column="3" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                Click="SlowDismiss_Click" Content="{utils:Localize KeyPath=OllamaManager.SlowDismiss, Default=不用了}"/>
+                    </Grid>
+                    <TextBlock x:Name="Tb_ProxyFound" Style="{StaticResource QuickGuideLine}" TextWrapping="Wrap"
+                               Margin="0,6,0,0" Visibility="Collapsed"/>
+                </StackPanel>
+            </Border>
         </Grid>
 
         <TextBlock x:Name="Tb_Status" Grid.Row="4" Style="{StaticResource QuickGuideLine}" Margin="0,10,0,0" Visibility="Collapsed"/>

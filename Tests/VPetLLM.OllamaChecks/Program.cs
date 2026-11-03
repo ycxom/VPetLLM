@@ -55,10 +55,13 @@ internal static partial class Program
             Task.Run(CheckLibrarySizesAsync).GetAwaiter().GetResult();
             Task.Run(CheckClientAsync).GetAwaiter().GetResult();
             Task.Run(CheckDownloadAsync).GetAwaiter().GetResult();
+            Task.Run(CheckDownloadProxyAsync).GetAwaiter().GetResult();
+            Task.Run(CheckLocalProxyDetectAsync).GetAwaiter().GetResult();
             Task.Run(CheckLatestVersionAsync).GetAwaiter().GetResult();
             CheckPublisherIdentity();
             Task.Run(CheckInstallAsync).GetAwaiter().GetResult();
             Task.Run(CheckManagerAsync).GetAwaiter().GetResult();
+            Task.Run(CheckReconnectAsync).GetAwaiter().GetResult();
             CheckServerStartInfo();
             CheckWindows();
             CheckLocalization();
@@ -1080,7 +1083,12 @@ internal static partial class Program
         public List<long?> Ranges { get; } = new();
         public List<string> Urls { get; } = new();
 
-        public DownloadRoute Route() => new($"https://github.com/ollama/ollama/releases/download/v{Version}/OllamaSetup.exe", () => new FakeHandler(HandleAsync));
+        public DownloadRoute Route() => new($"https://github.com/ollama/ollama/releases/download/v{Version}/OllamaSetup.exe", Handler);
+
+        /// <summary>镜像线路的地址是改写过的，和经代理请求的官方地址区分得开。</summary>
+        public DownloadRoute MirrorRoute() => new($"https://mirror.example/github.com/ollama/ollama/releases/download/v{Version}/OllamaSetup.exe", Handler);
+
+        public HttpMessageHandler Handler() => new FakeHandler(HandleAsync);
 
         private async Task<HttpResponseMessage> HandleAsync(HttpRequestMessage request, CancellationToken token)
         {
@@ -1181,6 +1189,18 @@ internal static partial class Program
                 ConnectTimeout = TimeSpan.FromMilliseconds(200)
             };
 
+        /// <summary>代理连接换成假的，记下每次要连的代理地址。</summary>
+        public OllamaInstaller ProxyInstaller(SetupServer proxy, List<Uri> used, TimeSpan stall, params DownloadRoute[] routes)
+            => new LimitedDiskInstaller(long.MaxValue, routes, Directory, address =>
+            {
+                lock (used) used.Add(address);
+                return proxy.Handler();
+            })
+            {
+                StallTimeout = stall,
+                ConnectTimeout = TimeSpan.FromMilliseconds(200)
+            };
+
         public void Dispose()
         {
             try { System.IO.Directory.Delete(Directory, recursive: true); }
@@ -1188,8 +1208,9 @@ internal static partial class Program
         }
     }
 
-    private sealed class LimitedDiskInstaller(long freeSpace, IReadOnlyList<DownloadRoute> routes, string directory)
-        : OllamaInstaller(_ => Task.FromResult(routes), cacheDirectory: directory)
+    private sealed class LimitedDiskInstaller(long freeSpace, IReadOnlyList<DownloadRoute> routes, string directory,
+        Func<Uri, HttpMessageHandler>? proxyHandler = null)
+        : OllamaInstaller(_ => Task.FromResult(routes), cacheDirectory: directory, proxyHandler: proxyHandler)
     {
         public override long GetFreeSpace(string path) => freeSpace;
     }
@@ -1248,11 +1269,20 @@ internal static partial class Program
             return Task.FromResult(Latest);
         }
 
-        public override Task<string> DownloadAsync(string version, IProgress<OllamaTaskProgress>? progress, CancellationToken token)
+        /// <summary>报一次进度后卡住，直到有人给它设了代理。</summary>
+        public bool SlowUntilProxy { get; init; }
+
+        public override async Task<string> DownloadAsync(string version, IProgress<OllamaTaskProgress>? progress, CancellationToken token)
         {
             if (DownloadThrows is not null) throw DownloadThrows;
             Log.Add("download " + version);
-            return Task.FromResult("setup.exe");
+            if (SlowUntilProxy)
+            {
+                progress?.Report(new OllamaTaskProgress(OllamaTaskPhase.DownloadingSetup, 100, GB));
+                while (DownloadProxy is null) await Task.Delay(10, token);
+                Log.Add("proxy " + DownloadProxy);
+            }
+            return "setup.exe";
         }
 
         public override async Task InstallAsync(string setupPath, IProgress<OllamaTaskProgress>? progress, CancellationToken token)
@@ -1293,6 +1323,25 @@ internal static partial class Program
         public TaskCompletionSource? PullGate { get; set; }
         public bool PullCancelled { get; private set; }
 
+        /// <summary>按第几次拉取（从 1 起）给出响应，返回 null 时走默认行为。</summary>
+        public Func<int, HttpResponseMessage?>? PullScript { get; set; }
+
+        /// <summary>吐一行进度后挂住，直到请求被取消：慢到不动的下载。</summary>
+        public static HttpResponseMessage StuckPull(long completed, long total)
+        {
+            var line = new Newtonsoft.Json.Linq.JObject
+            {
+                ["status"] = "pulling 0123456789ab",
+                ["digest"] = "sha256:0123456789ab",
+                ["total"] = total,
+                ["completed"] = completed
+            }.ToString(Newtonsoft.Json.Formatting.None) + "\n";
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new ScriptedStream(Encoding.UTF8.GetBytes(line))) };
+        }
+
+        public static HttpResponseMessage PullFails(string error)
+            => Text(HttpStatusCode.OK, new Newtonsoft.Json.Linq.JObject { ["error"] = error }.ToString(Newtonsoft.Json.Formatting.None));
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             if (!Running) throw new HttpRequestException("refused");
@@ -1320,6 +1369,7 @@ internal static partial class Program
                     var body = await request.Content!.ReadAsStringAsync(token);
                     var model = Newtonsoft.Json.Linq.JObject.Parse(body)["model"]!.ToString();
                     Pulled.Add(model);
+                    if (PullScript?.Invoke(Pulled.Count) is { } scripted) return scripted;
                     if (PullGate is { } gate)
                     {
                         try

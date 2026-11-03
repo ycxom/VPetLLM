@@ -70,19 +70,59 @@ namespace VPetLLM.Core.Services
         private static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(20);
         private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(250);
 
+        private static readonly string[] ProxySchemes = { "http", "https", "socks4", "socks4a", "socks5" };
+
         private readonly Func<string, Task<IReadOnlyList<DownloadRoute>>> _routes;
         private readonly Func<HttpMessageHandler> _directHandler;
+        private readonly Func<Uri, HttpMessageHandler> _proxyHandler;
         private readonly string _cacheDirectory;
+
+        private Uri? _downloadProxy;
+        private CancellationTokenSource? _attempt;
 
         public OllamaInstaller(
             Func<string, Task<IReadOnlyList<DownloadRoute>>> routes,
             Func<HttpMessageHandler>? directHandler = null,
-            string? cacheDirectory = null)
+            string? cacheDirectory = null,
+            Func<Uri, HttpMessageHandler>? proxyHandler = null)
         {
             _routes = routes;
             _directHandler = directHandler ?? (() => new SocketsHttpHandler());
+            _proxyHandler = proxyHandler ?? (proxy => new SocketsHttpHandler { Proxy = new WebProxy(proxy), UseProxy = true });
             // 放临时目录：卸载 VPetLLM 不留残余，也不放进会被宿主清理的 VPet\cache
             _cacheDirectory = cacheDirectory ?? Path.Combine(Path.GetTempPath(), "VPetLLM", "ollama");
+        }
+
+        /// <summary>用户指定的下载代理，null 表示不用。</summary>
+        public Uri? DownloadProxy => Volatile.Read(ref _downloadProxy);
+
+        /// <summary>
+        /// 改用（或停用）下载代理。正在下的那条线路立刻断开，从 .part 已有的位置经代理接着下，
+        /// 这次断开不算线路失败。代理只是多一条去 GitHub 原地址的线路，安装前照样验签。
+        /// </summary>
+        public void UseDownloadProxy(Uri? proxy)
+        {
+            Interlocked.Exchange(ref _downloadProxy, proxy);
+            try
+            {
+                Volatile.Read(ref _attempt)?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // 这条线路刚好结束，下一条会读到新代理
+            }
+        }
+
+        /// <summary>解析用户填的代理地址，没写协议当 http。填得不对返回 null。</summary>
+        public static Uri? ParseProxy(string? text)
+        {
+            var value = text?.Trim();
+            if (string.IsNullOrEmpty(value)) return null;
+            if (!value.Contains("://", StringComparison.Ordinal)) value = "http://" + value;
+
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)) return null;
+            if (!ProxySchemes.Contains(uri.Scheme, StringComparer.OrdinalIgnoreCase)) return null;
+            return string.IsNullOrEmpty(uri.Host) ? null : uri;
         }
 
         /// <summary>连接和收到响应头的上限。</summary>
@@ -123,11 +163,15 @@ namespace VPetLLM.Core.Services
         /// </summary>
         public virtual async Task<string?> GetLatestVersionAsync(CancellationToken token)
         {
-            var sources = new List<DownloadRoute>
+            var direct = new[]
             {
-                new("https://ollama.com/api/update?os=windows&arch=amd64&version=0.0.0&ts=1", _directHandler),
-                new("https://api.github.com/repos/ollama/ollama/releases/latest", _directHandler)
+                "https://ollama.com/api/update?os=windows&arch=amd64&version=0.0.0&ts=1",
+                "https://api.github.com/repos/ollama/ollama/releases/latest"
             };
+            var sources = new List<DownloadRoute>();
+            if (DownloadProxy is { } proxy)
+                sources.AddRange(direct.Select(url => new DownloadRoute(url, () => _proxyHandler(proxy))));
+            sources.AddRange(direct.Select(url => new DownloadRoute(url, _directHandler)));
             sources.AddRange(await TryGetRoutesAsync(LatestReleasePage).ConfigureAwait(false));
 
             foreach (var source in sources)
@@ -214,13 +258,19 @@ namespace VPetLLM.Core.Services
             {
                 var before = LengthOf(part);
                 var rangeIgnored = false;
+                var proxy = DownloadProxy;
+                var round = proxy is null ? routes : routes.Prepend(new DownloadRoute(url, () => _proxyHandler(proxy))).ToList();
 
-                foreach (var route in routes)
+                foreach (var route in round)
                 {
                     token.ThrowIfCancellationRequested();
+                    using var attempt = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    Interlocked.Exchange(ref _attempt, attempt);
                     try
                     {
-                        await DownloadFromRouteAsync(route, part, restartAllowed, progress, token).ConfigureAwait(false);
+                        // 先登记再看：代理恰好在登记前换掉时，这里能看到
+                        if (!ReferenceEquals(DownloadProxy, proxy)) break;
+                        await DownloadFromRouteAsync(route, part, restartAllowed, progress, attempt.Token).ConfigureAwait(false);
                         File.Move(part, target, overwrite: true);
                         return target;
                     }
@@ -234,9 +284,21 @@ namespace VPetLLM.Core.Services
                     }
                     catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
                     {
+                        // 用户换了代理才断的，不算这条线路的错
+                        if (!ReferenceEquals(DownloadProxy, proxy)) break;
                         lastError = ex;
                         Logger.Log($"Ollama 安装包下载中断，换线路: {ex.Message}");
                     }
+                    finally
+                    {
+                        Interlocked.CompareExchange(ref _attempt, null, attempt);
+                    }
+                }
+
+                if (!ReferenceEquals(DownloadProxy, proxy))
+                {
+                    Logger.Log(DownloadProxy is null ? "Ollama 安装包停用代理，接着下载" : "Ollama 安装包改用代理，接着下载");
+                    continue;
                 }
 
                 // 变长了是有进展，变没了是坏文件被丢弃，都值得再来一轮

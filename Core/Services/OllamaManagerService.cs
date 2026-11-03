@@ -28,8 +28,11 @@ namespace VPetLLM.Core.Services
         // 模型解压合并时临时文件和成品同时存在
         private const double PullSpaceFactor = 1.1;
 
+        private const int MaxReconnectLeftovers = 5;
+
         private readonly OllamaInstaller _installer;
         private readonly OllamaClient _client;
+        private CancellationTokenSource? _pullAttempt;
 
         public OllamaManagerService(string url, OllamaInstaller installer, HttpMessageHandler? apiHandler = null)
         {
@@ -91,8 +94,63 @@ namespace VPetLLM.Core.Services
                 }
             }
 
-            await _client.PullAsync(model, expectedSize, progress, token).ConfigureAwait(false);
+            var leftovers = 0;
+            var reconnected = false;
+            while (true)
+            {
+                using var attempt = CancellationTokenSource.CreateLinkedTokenSource(token);
+                Interlocked.Exchange(ref _pullAttempt, attempt);
+                try
+                {
+                    await _client.PullAsync(model, expectedSize, progress, attempt.Token).ConfigureAwait(false);
+                    return;
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    // 只有 ReconnectPull 会单独取消这一次：Ollama 留着已下的部分，重新请求会重新建立连接
+                    Logger.Log($"Ollama 模型 {model} 断开重连");
+                    reconnected = true;
+                    leftovers = 0;
+                }
+                catch (OllamaOperationException ex) when (reconnected && ex.Failure == OllamaFailure.Api
+                                                          && ex.Message.Contains("cancel", StringComparison.OrdinalIgnoreCase)
+                                                          && ++leftovers <= MaxReconnectLeftovers)
+                {
+                    // 刚断开时上一轮的下载还没收完，新请求挂上去会跟着报 context canceled，等一下再来
+                    Logger.Log($"Ollama 模型 {model} 上一轮下载尚未结束，稍后重试");
+                }
+                finally
+                {
+                    Interlocked.CompareExchange(ref _pullAttempt, null, attempt);
+                }
+
+                await Task.Delay(ReconnectDelay, token).ConfigureAwait(false);
+            }
         }
+
+        /// <summary>
+        /// 断开正在下的模型再接着下。Ollama 单条连接变慢后不会自己换，重新请求能换一批连接，已下的部分不丢。
+        /// 没在下载时什么也不做。
+        /// </summary>
+        public void ReconnectPull()
+        {
+            try
+            {
+                Volatile.Read(ref _pullAttempt)?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // 这次下载刚好结束
+            }
+        }
+
+        /// <summary>断开后等多久再重新请求，给 Ollama 收拾上一轮的时间。</summary>
+        public TimeSpan ReconnectDelay { get; init; } = TimeSpan.FromSeconds(1);
+
+        /// <summary>安装包下载代理，只管安装包：模型由 Ollama 自己下载，代理要设在它的环境变量里。</summary>
+        public Uri? DownloadProxy => _installer.DownloadProxy;
+
+        public void UseDownloadProxy(Uri? proxy) => _installer.UseDownloadProxy(proxy);
 
         /// <summary>下载并安装最新版。也用于升级：官方安装包会沿用原来的安装目录。</summary>
         public async Task InstallLatestAsync(IProgress<OllamaTaskProgress>? progress, CancellationToken token)

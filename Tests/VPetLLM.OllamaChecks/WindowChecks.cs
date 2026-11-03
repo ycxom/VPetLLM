@@ -26,12 +26,14 @@ internal static partial class Program
     private sealed class ManagerWindow
     {
         public ManagerWindow(FakeDeployInstaller installer, FakeApi api, string? model = null, string url = Url,
-            Func<string, string, bool>? chosen = null, OllamaLibrary? library = null, OllamaHardware? hardware = null)
+            Func<string, string, bool>? chosen = null, OllamaLibrary? library = null, OllamaHardware? hardware = null,
+            LocalProxyDetector? proxies = null)
         {
             var service = new OllamaManagerService(url, installer, api)
             {
                 StartTimeout = TimeSpan.FromSeconds(2),
-                PostInstallGrace = TimeSpan.FromMilliseconds(100)
+                PostInstallGrace = TimeSpan.FromMilliseconds(100),
+                ReconnectDelay = TimeSpan.FromMilliseconds(10)
             };
             Window = new winOllamaManager(_settings!, service, model, (name, target) =>
             {
@@ -41,7 +43,9 @@ internal static partial class Program
             {
                 Confirms.Add(text);
                 return Answer;
-            }, library ?? new OllamaLibrary(new FakeOllamaCom { Offline = true }, NewLibraryCache()), hardware ?? StrongHardware)
+            }, library ?? new OllamaLibrary(new FakeOllamaCom { Offline = true }, NewLibraryCache()), hardware ?? StrongHardware,
+                // 不能去碰跑测试这台电脑上真开着的代理软件
+                proxies ?? new LocalProxyDetector { Candidates = Array.Empty<LocalProxyCandidate>(), SystemProxy = _ => null })
             {
                 ShowActivated = false,
                 ShowInTaskbar = false,
@@ -272,6 +276,7 @@ internal static partial class Program
             CheckChooseLost();
             CheckFailureMessages();
             CheckCloseDuringPull();
+            CheckSlowBanner();
             CheckLibraryWindow();
             CheckLibraryGrid();
             CheckCatalogGrid();

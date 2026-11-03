@@ -5642,6 +5642,90 @@
       "zh-hant": "已取消。再次開始時會接著下載。",
       "jp": "キャンセルしました。次回は続きからダウンロードします。"
     },
+    "SlowSetup": {
+      "en": "The installer is downloading slowly ({0}). If you have a proxy, enter it here to download from GitHub through it. What's already downloaded is kept.",
+      "zh-hans": "安装包下载很慢（{0}）。有代理的话可以填在这里，改经代理从 GitHub 下载，已下载的部分不会丢。",
+      "zh-hant": "安裝包下載很慢（{0}）。有代理的話可以填在這裡，改經代理從 GitHub 下載，已下載的部分不會遺失。",
+      "jp": "インストーラーのダウンロードが遅いです（{0}）。プロキシがあればここに入力すると、プロキシ経由で GitHub からダウンロードします。ダウンロード済みの部分は失われません。"
+    },
+    "SlowPull": {
+      "en": "The model is downloading slowly ({0}). You can reconnect: Ollama keeps what's already downloaded and opens new connections, which usually brings the speed back.",
+      "zh-hans": "模型下载很慢（{0}）。可以断开重连：Ollama 会留着已下载的部分，重新建立下载连接，速度通常能恢复。",
+      "zh-hant": "模型下載很慢（{0}）。可以斷開重連：Ollama 會留著已下載的部分，重新建立下載連線，速度通常能恢復。",
+      "jp": "モデルのダウンロードが遅いです（{0}）。再接続できます。Ollama はダウンロード済みの部分を残したまま接続を張り直すので、たいてい速度が戻ります。"
+    },
+    "ProxyPlaceholder": {
+      "en": "Proxy address, e.g. http://127.0.0.1:7890",
+      "zh-hans": "代理地址，例如 http://127.0.0.1:7890",
+      "zh-hant": "代理地址，例如 http://127.0.0.1:7890",
+      "jp": "プロキシのアドレス（例：http://127.0.0.1:7890）"
+    },
+    "UseProxy": {
+      "en": "Use proxy",
+      "zh-hans": "使用代理",
+      "zh-hant": "使用代理",
+      "jp": "プロキシを使う"
+    },
+    "Reconnect": {
+      "en": "Reconnect",
+      "zh-hans": "断开重连",
+      "zh-hant": "斷開重連",
+      "jp": "再接続"
+    },
+    "SlowDismiss": {
+      "en": "No thanks",
+      "zh-hans": "不用了",
+      "zh-hant": "不用了",
+      "jp": "使わない"
+    },
+    "ProxyInvalid": {
+      "en": "That proxy address isn't valid. For example: http://127.0.0.1:7890 or socks5://127.0.0.1:1080.",
+      "zh-hans": "代理地址不对。例如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080。",
+      "zh-hant": "代理地址不對。例如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080。",
+      "jp": "プロキシのアドレスが正しくありません。例：http://127.0.0.1:7890 または socks5://127.0.0.1:1080。"
+    },
+    "ProxyApplied": {
+      "en": "Now downloading through proxy {0}, continuing from what's already downloaded.",
+      "zh-hans": "已改用代理 {0} 下载，接着已下载的部分继续。",
+      "zh-hant": "已改用代理 {0} 下載，接著已下載的部分繼續。",
+      "jp": "プロキシ {0} 経由でのダウンロードに切り替えました。ダウンロード済みの続きから再開します。"
+    },
+    "Reconnected": {
+      "en": "Reconnected, continuing from what's already downloaded.",
+      "zh-hans": "已断开重连，接着已下载的部分继续。",
+      "zh-hant": "已斷開重連，接著已下載的部分繼續。",
+      "jp": "再接続しました。ダウンロード済みの続きから再開します。"
+    },
+    "DetectProxy": {
+      "en": "Detect",
+      "zh-hans": "自动检测",
+      "zh-hant": "自動偵測",
+      "jp": "自動検出"
+    },
+    "ProxyDetecting": {
+      "en": "Looking for proxy software on this computer…",
+      "zh-hans": "正在查找本机的代理软件…",
+      "zh-hant": "正在尋找本機的代理軟體…",
+      "jp": "このパソコンのプロキシソフトを探しています…"
+    },
+    "ProxyDetected": {
+      "en": "Found a local proxy at {0} (the usual port of {1}). Just click \"Use proxy\".",
+      "zh-hans": "找到本机代理 {0}（{1} 常用的端口），点“使用代理”就行。",
+      "zh-hant": "找到本機代理 {0}（{1} 常用的連接埠），點「使用代理」就行。",
+      "jp": "ローカルプロキシ {0} が見つかりました（{1} がよく使うポート）。「プロキシを使う」を押すだけです。"
+    },
+    "ProxyIsSystem": {
+      "en": "The system proxy is already on ({0}), so the download already goes through it. If it's still slow, try switching servers in your proxy software.",
+      "zh-hans": "系统代理已经开着（{0}），下载本来就经过它。还是慢的话，可以在代理软件里换个节点。",
+      "zh-hant": "系統代理已經開著（{0}），下載本來就經過它。還是慢的話，可以在代理軟體裡換個節點。",
+      "jp": "システムプロキシがすでに有効です（{0}）。ダウンロードはもう経由しています。まだ遅い場合は、プロキシソフトでサーバーを切り替えてみてください。"
+    },
+    "ProxyNotFound": {
+      "en": "No local proxy found. If your proxy software is running, enter the port from its settings, e.g. http://127.0.0.1:7890.",
+      "zh-hans": "没找到本机代理。开着代理软件的话，把它设置里的端口填进来，例如 http://127.0.0.1:7890。",
+      "zh-hant": "沒找到本機代理。開著代理軟體的話，把它設定裡的連接埠填進來，例如 http://127.0.0.1:7890。",
+      "jp": "ローカルプロキシが見つかりません。プロキシソフトを起動している場合は、その設定にあるポートを入力してください（例：http://127.0.0.1:7890）。"
+    },
     "Chosen": {
       "en": "Selected {0}. Go back to the settings page and save to apply.",
       "zh-hans": "已选用 {0}，回到设置页保存后生效。",
