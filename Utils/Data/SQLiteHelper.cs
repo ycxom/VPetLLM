@@ -137,9 +137,19 @@ namespace VPetLLM.Utils.Data
         public static SqliteConnection OpenConnection(string dbPath)
         {
             var connection = new SqliteConnection(BuildConnectionString(dbPath));
-            connection.Open();
-            ConfigureConnection(connection);
-            return connection;
+            try
+            {
+                connection.Open();
+                // 文件头坏了 Open 不报错，第一条语句才报 SQLITE_NOTADB；
+                // 这时不释放的话句柄一直占着文件，后面从备份恢复覆盖不了它
+                ConfigureConnection(connection);
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
         }
 
         /// <summary>

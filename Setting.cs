@@ -264,8 +264,8 @@ namespace VPetLLM
         /// 加载时读到了明文 API Key（来自已发布版本写下的 settings.db / 旧 JSON）：
         /// 整体 Save 一遍（密钥字段经 ProtectedStringConverter 变成密文），
         /// 再清掉各处残留的明文副本——不清的话加密就形同虚设：
-        /// 迁移旧 JSON 时留下的 .backup、BackupManager 在每次保存前复制的整库备份（最多 5 份），
-        /// 以及 SQLite 改写行之后留在空闲页/WAL 里的旧明文。
+        /// 迁移旧 JSON 时留下的 .backup、BackupManager 在保存前写的整库备份（最多 5 份）、
+        /// 从备份恢复前留下的应急副本，以及 SQLite 改写行之后留在空闲页/WAL 里的旧明文。
         /// 任何一步失败只记日志：密钥此时要么已是密文，要么还是原样，不会丢。
         /// </summary>
         private void ProtectStoredSecretsIfNeeded()
@@ -343,20 +343,11 @@ namespace VPetLLM
                                 Logger.Log($"Read {json.Length} characters from JSON file");
                                 
                                 // Populate this instance with JSON data
-                                JsonConvert.PopulateObject(json, this);
+                                JsonConvert.PopulateObject(json, this, PopulateSettings);
                                 Logger.Log("Successfully loaded settings from JSON");
-                                
-                                // 迁移时去重 EnabledButtons 列表，修复重复添加的问题
-                                if (FloatingSidebar?.EnabledButtons != null && FloatingSidebar.EnabledButtons.Count > 0)
-                                {
-                                    var uniqueButtons = FloatingSidebar.EnabledButtons.Distinct().ToList();
-                                    if (uniqueButtons.Count != FloatingSidebar.EnabledButtons.Count)
-                                    {
-                                        Logger.Log($"Migration: Deduplicating FloatingSidebar.EnabledButtons: {FloatingSidebar.EnabledButtons.Count} -> {uniqueButtons.Count}");
-                                        FloatingSidebar.EnabledButtons = uniqueButtons;
-                                    }
-                                }
-                                
+
+                                DeduplicateSidebarButtons();
+
                                 // Save to SQLite
                                 _storage.Save(this);
                                 Logger.Log("Successfully saved settings to SQLite");
@@ -405,6 +396,44 @@ namespace VPetLLM
             _storage.Initialize(instanceId);
         }
 
+        /// <summary>
+        /// 读设置用。Newtonsoft 往已有对象里填充时默认往已有 List 里追加：构造时带默认项的列表
+        /// （FloatingSidebar.EnabledButtons）每启动一次就多一份默认项，实机上已经叠到上百项，
+        /// 重启后第一次保存也就永远"有改动"。列表改成整体替换，对象和字典照旧就地填充
+        /// </summary>
+        private static readonly JsonSerializerSettings PopulateSettings = new()
+        {
+            ContractResolver = new ReplaceListsContractResolver()
+        };
+
+        private sealed class ReplaceListsContractResolver : Newtonsoft.Json.Serialization.DefaultContractResolver
+        {
+            protected override Newtonsoft.Json.Serialization.JsonProperty CreateProperty(
+                System.Reflection.MemberInfo member, MemberSerialization memberSerialization)
+            {
+                var property = base.CreateProperty(member, memberSerialization);
+                if (property.PropertyType is { IsArray: false } type && typeof(System.Collections.IList).IsAssignableFrom(type))
+                    property.ObjectCreationHandling = ObjectCreationHandling.Replace;
+                return property;
+            }
+        }
+
+        /// <summary>
+        /// 以前每次启动都往 EnabledButtons 里追加一份默认按钮，已经叠出来的重复项在这里去掉
+        /// </summary>
+        private void DeduplicateSidebarButtons()
+        {
+            if (FloatingSidebar?.EnabledButtons is not { Count: > 0 } buttons)
+                return;
+
+            var uniqueButtons = buttons.Distinct().ToList();
+            if (uniqueButtons.Count != buttons.Count)
+            {
+                Logger.Log($"Deduplicating FloatingSidebar.EnabledButtons: {buttons.Count} -> {uniqueButtons.Count}");
+                FloatingSidebar.EnabledButtons = uniqueButtons;
+            }
+        }
+
         private void LoadSettings()
         {
             try
@@ -422,8 +451,9 @@ namespace VPetLLM
                     var json = sqliteStorage.LoadAsJson();
                     if (!string.IsNullOrWhiteSpace(json))
                     {
-                        JsonConvert.PopulateObject(json, this);
-                        
+                        JsonConvert.PopulateObject(json, this, PopulateSettings);
+                        DeduplicateSidebarButtons();
+
                         // Load provider nodes from provider_nodes table
                         LoadProviderNodes(sqliteStorage);
                         LoadModelCache(sqliteStorage);
@@ -774,8 +804,8 @@ namespace VPetLLM
             {
                 if (_storage != null)
                 {
+                    // 宿主约 2 分钟调一次；各部分都是先和库里比，没改动就不写
                     _storage.Save(this);
-                    Logger.Log("Settings saved successfully to storage");
 
                     // Save provider nodes to provider_nodes table
                     if (_storage is SQLiteSettingStorage sqliteStorage)
@@ -812,6 +842,12 @@ namespace VPetLLM
                     Logger.Log("Cannot save model cache: database connection is null");
                     return;
                 }
+
+                // 以前每次保存都把两张表清空再整表插回去；和库里一模一样就不动
+                if (ModelCacheMatchesStored(connection))
+                    return;
+
+                sqliteStorage.BackupBeforeWrite();
 
                 // Use SQL directly since we don't have a service for this
                 using var transaction = connection.BeginTransaction();
@@ -878,6 +914,49 @@ namespace VPetLLM
             {
                 Logger.Log($"Failed to save model cache: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 库里的模型缓存和内存里是否完全一致：按写入时的同一套序列化方式逐行比
+        /// </summary>
+        private bool ModelCacheMatchesStored(SqliteConnection connection)
+        {
+            var cache = ModelCache?.Cache ?? new Dictionary<string, ModelCacheEntry>();
+            var links = ModelCache?.ChannelCacheLinks ?? new Dictionary<string, string>();
+
+            var storedCache = new Dictionary<string, string>();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT cache_key, models_json, linked_channels_json, created_at, updated_at FROM model_cache";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    storedCache[reader.GetString(0)] = string.Join("\n", reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4));
+            }
+
+            if (storedCache.Count != cache.Count)
+                return false;
+            foreach (var kvp in cache)
+            {
+                var row = string.Join("\n",
+                    JsonConvert.SerializeObject(kvp.Value.Models),
+                    JsonConvert.SerializeObject(kvp.Value.LinkedChannels),
+                    kvp.Value.CreatedAt.ToString("o"),
+                    kvp.Value.UpdatedAt.ToString("o"));
+                if (!storedCache.TryGetValue(kvp.Key, out var stored) || stored != row)
+                    return false;
+            }
+
+            var storedLinks = new Dictionary<string, string>();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT channel_id, cache_key FROM channel_cache_links";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    storedLinks[reader.GetString(0)] = reader.GetString(1);
+            }
+
+            return storedLinks.Count == links.Count
+                && links.All(kvp => storedLinks.TryGetValue(kvp.Key, out var stored) && stored == kvp.Value);
         }
 
         /// <summary>
@@ -962,69 +1041,17 @@ namespace VPetLLM
                 // 读失败时内存里的空列表不代表用户意图，拿它去覆盖会把表里的渠道全删掉。
                 if (OpenAI?.OpenAINodes != null && (OpenAI.OpenAINodes.Count > 0 || _providerNodesLoaded))
                 {
-                    // Get existing nodes
-                    var existingNodes = nodeService.GetNodes("OpenAI", enabledOnly: false);
-                    
-                    // Update or add nodes
-                    for (int i = 0; i < OpenAI.OpenAINodes.Count; i++)
-                    {
-                        var node = OpenAI.OpenAINodes[i];
-                        
-                        if (i < existingNodes.Count)
-                        {
-                            // Update existing node
-                            nodeService.UpdateNode(existingNodes[i].Id, node);
-                        }
-                        else
-                        {
-                            // Add new node
-                            nodeService.AddNode("OpenAI", node, node.Enabled);
-                        }
-                    }
-                    
-                    // Delete extra nodes if list was shortened
-                    for (int i = OpenAI.OpenAINodes.Count; i < existingNodes.Count; i++)
-                    {
-                        nodeService.DeleteNode(existingNodes[i].Id);
-                    }
-                    
-                    Logger.Log($"Saved {OpenAI.OpenAINodes.Count} OpenAI nodes to provider_nodes table");
+                    SyncNodes(nodeService, sqliteStorage, "OpenAI", OpenAI.OpenAINodes);
                 }
 
                 // Save Gemini nodes
                 if (Gemini?.GeminiNodes != null && (Gemini.GeminiNodes.Count > 0 || _providerNodesLoaded))
                 {
-                    // Get existing nodes
-                    var existingNodes = nodeService.GetNodes("Gemini", enabledOnly: false);
-                    
-                    // Update or add nodes
-                    for (int i = 0; i < Gemini.GeminiNodes.Count; i++)
-                    {
-                        var node = Gemini.GeminiNodes[i];
-                        
-                        if (i < existingNodes.Count)
-                        {
-                            // Update existing node
-                            nodeService.UpdateNode(existingNodes[i].Id, node);
-                        }
-                        else
-                        {
-                            // Add new node
-                            nodeService.AddNode("Gemini", node, node.Enabled);
-                        }
-                    }
-                    
-                    // Delete extra nodes if list was shortened
-                    for (int i = Gemini.GeminiNodes.Count; i < existingNodes.Count; i++)
-                    {
-                        nodeService.DeleteNode(existingNodes[i].Id);
-                    }
-                    
-                    Logger.Log($"Saved {Gemini.GeminiNodes.Count} Gemini nodes to provider_nodes table");
+                    SyncNodes(nodeService, sqliteStorage, "Gemini", Gemini.GeminiNodes);
                 }
 
                 // Save plugin/tool data
-                SavePluginData(connection);
+                SavePluginData(sqliteStorage, connection);
             }
             catch (Exception ex)
             {
@@ -1037,7 +1064,50 @@ namespace VPetLLM
         /// <summary>
         /// Save plugin/tool data to plugin_data table
         /// </summary>
-        private void SavePluginData(SqliteConnection connection)
+        /// <summary>
+        /// 按位置和表里现有的节点逐个比：序列化结果一样就跳过，变了才写，写之前按间隔备份一次
+        /// </summary>
+        private static void SyncNodes<T>(ProviderNodeService nodeService, SQLiteSettingStorage sqliteStorage, string providerType, List<T> nodes)
+            where T : ChannelNodeBase
+        {
+            // Get existing nodes
+            var existingNodes = nodeService.GetNodes(providerType, enabledOnly: false);
+            var changed = 0;
+
+            // Update or add nodes
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                var node = nodes[i];
+                var nodeData = JsonConvert.SerializeObject(node);
+
+                if (i < existingNodes.Count)
+                {
+                    if (existingNodes[i].NodeData == nodeData)
+                        continue;
+                    sqliteStorage.BackupBeforeWrite();
+                    nodeService.UpdateNode(existingNodes[i].Id, nodeData);
+                }
+                else
+                {
+                    sqliteStorage.BackupBeforeWrite();
+                    nodeService.AddNode(providerType, nodeData, node.Enabled);
+                }
+                changed++;
+            }
+
+            // Delete extra nodes if list was shortened
+            for (int i = nodes.Count; i < existingNodes.Count; i++)
+            {
+                sqliteStorage.BackupBeforeWrite();
+                nodeService.DeleteNode(existingNodes[i].Id);
+                changed++;
+            }
+
+            if (changed > 0)
+                Logger.Log($"Saved {nodes.Count} {providerType} nodes to provider_nodes table ({changed} changed)");
+        }
+
+        private void SavePluginData(SQLiteSettingStorage sqliteStorage, SqliteConnection connection)
         {
             try
             {
@@ -1048,31 +1118,39 @@ namespace VPetLLM
                 {
                     // Get existing plugins
                     var existingPlugins = pluginService.GetPlugins("Tool", enabledOnly: false);
-                    
-                    // Update or add tools
+                    var changed = 0;
+
+                    // Update or add tools；和节点一样，没变的不重写
                     for (int i = 0; i < Tools.Count; i++)
                     {
                         var tool = Tools[i];
-                        
+                        var configData = JsonConvert.SerializeObject(tool);
+
                         if (i < existingPlugins.Count)
                         {
-                            // Update existing tool
-                            pluginService.UpdatePlugin(existingPlugins[i].Id, tool);
+                            if (existingPlugins[i].ConfigData == configData)
+                                continue;
+                            sqliteStorage.BackupBeforeWrite();
+                            pluginService.UpdatePlugin(existingPlugins[i].Id, configData);
                         }
                         else
                         {
-                            // Add new tool
-                            pluginService.AddPlugin(tool.Name, "Tool", tool, tool.IsEnabled, i);
+                            sqliteStorage.BackupBeforeWrite();
+                            pluginService.AddPlugin(tool.Name, "Tool", configData, tool.IsEnabled, i);
                         }
+                        changed++;
                     }
-                    
+
                     // Delete extra tools if list was shortened
                     for (int i = Tools.Count; i < existingPlugins.Count; i++)
                     {
+                        sqliteStorage.BackupBeforeWrite();
                         pluginService.DeletePlugin(existingPlugins[i].Id);
+                        changed++;
                     }
-                    
-                    Logger.Log($"Saved {Tools.Count} tools to plugin_data table");
+
+                    if (changed > 0)
+                        Logger.Log($"Saved {Tools.Count} tools to plugin_data table ({changed} changed)");
                 }
             }
             catch (Exception ex)

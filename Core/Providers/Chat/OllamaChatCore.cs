@@ -342,7 +342,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 // API调用成功后，才将用户消息和助手回复保存到历史记录
-                if (Settings?.KeepContext ?? true)
+                if (KeepContextEnabled)
                 {
                     // 先保存用户消息（包含图像数据）
                     if (tempUserMessage is not null)
@@ -566,7 +566,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 // API调用成功后，才将用户消息和助手回复保存到历史记录
-                if (Settings?.KeepContext ?? true)
+                if (KeepContextEnabled)
                 {
                     // 先保存用户消息
                     if (tempUserMessage is not null)

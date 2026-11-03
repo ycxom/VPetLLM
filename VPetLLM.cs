@@ -2219,19 +2219,14 @@ namespace VPetLLM
             UI.Windows.winDiagnosticReport diagWindow,
             string lang)
         {
-            foreach (var cr in result.ChannelResults)
+            await diagService.TestChannelLLMsAsync(result.ChannelResults, cr =>
             {
-                if (cr.ApiAvailable && !cr.LlmTested)
-                {
-                    var statusMsg = lang.StartsWith("zh")
-                        ? $"正在测试 {cr.ChannelType}: {cr.ChannelName}..."
-                        : $"Testing {cr.ChannelType}: {cr.ChannelName}...";
-                    Application.Current.Dispatcher.Invoke(() =>
-                        diagWindow.ShowProgress(statusMsg));
-
-                    await diagService.CheckChannelLLMAsync(cr);
-                }
-            }
+                var statusMsg = lang.StartsWith("zh")
+                    ? $"正在测试 {cr.ChannelType}: {cr.ChannelName}..."
+                    : $"Testing {cr.ChannelType}: {cr.ChannelName}...";
+                Application.Current.Dispatcher.Invoke(() =>
+                    diagWindow.ShowProgress(statusMsg));
+            });
 
             var finalReport = diagService.FormatDiagnosticReport(result);
 

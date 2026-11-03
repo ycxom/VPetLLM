@@ -218,103 +218,21 @@ namespace VPetLLM.Services
             // StreamingChunkHandler 是逐 delta 的原始回调，两种分支都能兜住。
             var streamedText = new System.Text.StringBuilder();
 
-            IChatCore? chatCore = null;
-
-            // 保存原始的 KeepContext 设置
-            var originalKeepContext = _settings.KeepContext;
+            Core.Abstractions.Base.ChatCoreBase? chatCore = null;
 
             try
             {
-                // 临时禁用上下文保存，防止前置多模态的 prompt 被写入主上下文
-                _settings.KeepContext = false;
-
-                // 获取 MainWindow 引用
-                var mainWindow = _plugin.MW;
-
-                // 已经选定了具体渠道（原生多模态）：直接用它，不再按类型另挑节点
-                if (channel is not null)
-                {
-                    chatCore = channel switch
-                    {
-                        Setting.OpenAINodeSetting n => new OpenAIChatCore(n, _settings, mainWindow, null!),
-                        Setting.GeminiNodeSetting n => new GeminiChatCore(n, _settings, mainWindow, null!),
-                        Setting.OllamaNodeSetting n => new OllamaChatCore(n, _settings, mainWindow, null!),
-                        Setting.LMStudioNodeSetting n => new LMStudioChatCore(n, _settings, mainWindow, null!),
-                        _ => new FreeChatCore(_settings.Free, _settings, mainWindow, null!)
-                    };
-                }
-                else switch (providerType)
-                {
-                    case "Free":
-                        if (_settings.Free is not null)
-                        {
-                            chatCore = new FreeChatCore(_settings.Free, _settings, mainWindow, null!);
-                        }
-                        break;
-
-                    // 下面几个渠道：node 为 null 表示「不指定节点」（原生多模态走主渠道时就是这样），
-                    // 此时退回该渠道当前生效的节点，而不是直接失败
-                    case "OpenAI":
-                        if (_settings.OpenAI?.OpenAINodes is not null)
-                        {
-                            var openAINode = node is not null
-                                ? _settings.OpenAI.OpenAINodes.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
-                                : _settings.OpenAI.GetCurrentOpenAISetting();
-
-                            if (openAINode is not null && openAINode.EnableVision)
-                            {
-                                chatCore = new OpenAIChatCore(openAINode, _settings, mainWindow, null!);
-                            }
-                        }
-                        break;
-
-                    case "Gemini":
-                        if (_settings.Gemini?.GeminiNodes is not null)
-                        {
-                            var geminiNode = node is not null
-                                ? _settings.Gemini.GeminiNodes.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
-                                : _settings.Gemini.GetCurrentGeminiSetting();
-
-                            if (geminiNode is not null && geminiNode.EnableVision)
-                            {
-                                // 必须传 geminiNode 本身：传整份 _settings.Gemini 的话，
-                                // GeminiChatCore 会用 GetCurrentGeminiSetting() 另选主聊天当前的节点，
-                                // 上面挑出来的视觉节点就只剩「校验」作用，请求实际打去了别处
-                                chatCore = new GeminiChatCore(geminiNode, _settings, mainWindow, null!);
-                            }
-                        }
-                        break;
-
-                    case "Ollama":
-                        var ollamaVisionNode = node is not null
-                            ? _settings.Ollama?.OllamaNodes?.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
-                            : _settings.Ollama?.GetCurrentOllamaSetting();
-                        if (ollamaVisionNode != null && ollamaVisionNode.EnableVision)
-                        {
-                            chatCore = new OllamaChatCore(ollamaVisionNode, _settings, mainWindow, null!);
-                        }
-                        break;
-
-                    case "LMStudio":
-                        var lmNode = node is not null
-                            ? _settings.LMStudio?.LMStudioNodes?.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
-                            : _settings.LMStudio?.GetCurrentLMStudioSetting();
-
-                        if (lmNode is not null && lmNode.EnableVision)
-                        {
-                            chatCore = new LMStudioChatCore(lmNode, _settings, mainWindow, null!);
-                        }
-                        break;
-                }
+                chatCore = CreateCore(providerType, node, channel);
 
                 if (chatCore is null)
                 {
                     throw new InvalidOperationException($"无法创建 {providerType} 的 ChatCore 实例");
                 }
 
-                // 不使用主上下文的历史：靠上面的 KeepContext = false 即可 ——
-                // GetCoreHistoryCommonAsync 在 KeepContext 为假时只发系统消息，压根不读历史。
-                //
+                // 不使用主上下文的历史：GetCoreHistoryCommonAsync 此时只发系统消息，压根不读历史，
+                // 前置多模态的 prompt 也不会写进主上下文。
+                chatCore.IgnoreContext = true;
+
                 // 这里绝不能调 chatCore.ClearContext()：HistoryManager / OverflowManager 是按
                 // provider 名共享同一个 SQLite 库的，临时 core 和主 core 指向同一份数据，
                 // 那一下会把用户真实的聊天历史和溢出总结全部删掉（日志里表现为每次识图都跟着
@@ -324,19 +242,16 @@ namespace VPetLLM.Services
                 // 只有用户显式打开「识图强制流式」时才覆盖：非流式请求在整段生成完之前不返回
                 // 任何字节，途中按"等响应头"设超时的网关会把它掐掉（发出十几秒后收到空 body 的
                 // 5xx）。该开关是给撞上这种网关的用户的出路，不必为此改动主对话的流式偏好。
-                if (chatCore is Core.Abstractions.Base.ChatCoreBase coreBase)
+                var forceStreaming = _settings.Screenshot?.MultimodalProvider?.ForceStreamingForVision ?? false;
+                if (forceStreaming)
                 {
-                    var forceStreaming = _settings.Screenshot?.MultimodalProvider?.ForceStreamingForVision ?? false;
-                    if (forceStreaming)
-                    {
-                        coreBase.ForceStreaming = true;
-                        Logger.Log("PreprocessingMultimodal: 识图强制流式（用户已开启该选项）");
-                    }
-
-                    // 无论走哪条分支都挂上：流式时它是唯一能拿到完整描述的通道，
-                    // 非流式时它不会被调用、缓冲为空，取值处自然退回 ResponseHandler。
-                    coreBase.SetStreamingChunkHandler(chunk => streamedText.Append(chunk));
+                    chatCore.ForceStreaming = true;
+                    Logger.Log("PreprocessingMultimodal: 识图强制流式（用户已开启该选项）");
                 }
+
+                // 无论走哪条分支都挂上：流式时它是唯一能拿到完整描述的通道，
+                // 非流式时它不会被调用、缓冲为空，取值处自然退回 ResponseHandler。
+                chatCore.SetStreamingChunkHandler(chunk => streamedText.Append(chunk));
 
                 // 设置响应处理器
                 chatCore.SetResponseHandler(responseHandler);
@@ -357,15 +272,101 @@ namespace VPetLLM.Services
             }
             finally
             {
-                // 恢复原始的 KeepContext 设置
-                _settings.KeepContext = originalKeepContext;
-
                 // 清理资源
                 if (chatCore is IDisposable disposable)
                 {
                     disposable.Dispose();
                 }
             }
+        }
+
+        /// <summary>
+        /// 按渠道造一个临时 core；选不出可用的视觉节点时返回 null。
+        /// </summary>
+        protected virtual Core.Abstractions.Base.ChatCoreBase? CreateCore(
+            string providerType, VisionNodeIdentifier? node, Setting.ChannelNodeBase? channel)
+        {
+            // 获取 MainWindow 引用
+            var mainWindow = _plugin.MW;
+
+            // 已经选定了具体渠道（原生多模态）：直接用它，不再按类型另挑节点
+            if (channel is not null)
+            {
+                return channel switch
+                {
+                    Setting.OpenAINodeSetting n => new OpenAIChatCore(n, _settings, mainWindow, null!),
+                    Setting.GeminiNodeSetting n => new GeminiChatCore(n, _settings, mainWindow, null!),
+                    Setting.OllamaNodeSetting n => new OllamaChatCore(n, _settings, mainWindow, null!),
+                    Setting.LMStudioNodeSetting n => new LMStudioChatCore(n, _settings, mainWindow, null!),
+                    _ => new FreeChatCore(_settings.Free, _settings, mainWindow, null!)
+                };
+            }
+
+            switch (providerType)
+            {
+                case "Free":
+                    if (_settings.Free is not null)
+                    {
+                        return new FreeChatCore(_settings.Free, _settings, mainWindow, null!);
+                    }
+                    break;
+
+                // 下面几个渠道：node 为 null 表示「不指定节点」（原生多模态走主渠道时就是这样），
+                // 此时退回该渠道当前生效的节点，而不是直接失败
+                case "OpenAI":
+                    if (_settings.OpenAI?.OpenAINodes is not null)
+                    {
+                        var openAINode = node is not null
+                            ? _settings.OpenAI.OpenAINodes.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
+                            : _settings.OpenAI.GetCurrentOpenAISetting();
+
+                        if (openAINode is not null && openAINode.EnableVision)
+                        {
+                            return new OpenAIChatCore(openAINode, _settings, mainWindow, null!);
+                        }
+                    }
+                    break;
+
+                case "Gemini":
+                    if (_settings.Gemini?.GeminiNodes is not null)
+                    {
+                        var geminiNode = node is not null
+                            ? _settings.Gemini.GeminiNodes.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
+                            : _settings.Gemini.GetCurrentGeminiSetting();
+
+                        if (geminiNode is not null && geminiNode.EnableVision)
+                        {
+                            // 必须传 geminiNode 本身：传整份 _settings.Gemini 的话，
+                            // GeminiChatCore 会用 GetCurrentGeminiSetting() 另选主聊天当前的节点，
+                            // 上面挑出来的视觉节点就只剩「校验」作用，请求实际打去了别处
+                            return new GeminiChatCore(geminiNode, _settings, mainWindow, null!);
+                        }
+                    }
+                    break;
+
+                case "Ollama":
+                    var ollamaVisionNode = node is not null
+                        ? _settings.Ollama?.OllamaNodes?.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
+                        : _settings.Ollama?.GetCurrentOllamaSetting();
+                    if (ollamaVisionNode != null && ollamaVisionNode.EnableVision)
+                    {
+                        return new OllamaChatCore(ollamaVisionNode, _settings, mainWindow, null!);
+                    }
+                    break;
+
+                case "LMStudio":
+                    var lmNode = node is not null
+                        ? _settings.LMStudio?.LMStudioNodes?.FirstOrDefault(n => n.Name == node.NodeName && n.Enabled && n.EnableVision)
+                        : _settings.LMStudio?.GetCurrentLMStudioSetting();
+
+                    if (lmNode is not null && lmNode.EnableVision)
+                    {
+                        return new LMStudioChatCore(lmNode, _settings, mainWindow, null!);
+                    }
+                    break;
+            }
+
+            return null;
         }
 
         /// <inheritdoc/>

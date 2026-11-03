@@ -297,7 +297,7 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                 }
 
-                if (Settings?.KeepContext ?? true)
+                if (KeepContextEnabled)
                 {
                     if (tempUserMessage is not null)
                     {
@@ -534,7 +534,7 @@ namespace VPetLLM.Core.Providers.Chat
                     }
                 }
 
-                if (Settings?.KeepContext ?? true)
+                if (KeepContextEnabled)
                 {
                     if (tempUserMessage is not null)
                     {

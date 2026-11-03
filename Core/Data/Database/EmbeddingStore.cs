@@ -50,8 +50,7 @@ namespace VPetLLM.Core.Data.Database
         /// </summary>
         public static string ComputeHash(string content)
         {
-            using var sha = SHA256.Create();
-            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(content ?? ""));
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content ?? ""));
             return Convert.ToHexString(bytes, 0, 16);   // 128 bit 足够
         }
 
@@ -66,32 +65,28 @@ namespace VPetLLM.Core.Data.Database
             {
                 using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
-                // SQLite 参数上限 999，分批查询
-                foreach (var chunk in Chunk(hashes, 400))
+                // 要的基本是全部向量，顺着表扫一遍比按主键逐条查快
+                var wanted = hashes.ToHashSet(StringComparer.Ordinal);
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT content_hash, dim, vector FROM embeddings WHERE model_key = @mk";
+                cmd.Parameters.AddWithValue("@mk", modelKey);
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
                 {
-                    var cmd = connection.CreateCommand();
-                    var placeholders = string.Join(",", chunk.Select((_, i) => $"@h{i}"));
-                    cmd.CommandText =
-                        $"SELECT content_hash, dim, vector FROM embeddings " +
-                        $"WHERE model_key = @mk AND content_hash IN ({placeholders})";
-                    cmd.Parameters.AddWithValue("@mk", modelKey);
-                    for (int i = 0; i < chunk.Count; i++)
-                        cmd.Parameters.AddWithValue($"@h{i}", chunk[i]);
+                    var hash = reader.GetString(0);
+                    if (!wanted.Contains(hash))
+                        continue;
 
-                    using var reader = cmd.ExecuteReader();
-                    while (reader.Read())
-                    {
-                        var hash = reader.GetString(0);
-                        var dim = reader.GetInt32(1);
-                        var blob = (byte[])reader[2];
+                    var dim = reader.GetInt32(1);
+                    var blob = (byte[])reader[2];
 
-                        if (blob.Length != dim * sizeof(float))
-                            continue;   // 脏数据，当作未命中
+                    if (blob.Length != dim * sizeof(float))
+                        continue;   // 脏数据，当作未命中
 
-                        var vector = new float[dim];
-                        Buffer.BlockCopy(blob, 0, vector, 0, blob.Length);
-                        result[hash] = vector;
-                    }
+                    var vector = new float[dim];
+                    Buffer.BlockCopy(blob, 0, vector, 0, blob.Length);
+                    result[hash] = vector;
                 }
             }
             catch (Exception ex)
@@ -113,6 +108,20 @@ namespace VPetLLM.Core.Data.Database
                 using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 using var transaction = connection.BeginTransaction();
 
+                // 整批共用一条预编译语句，免得每条向量都重新解析一遍 SQL
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO embeddings(content_hash, model_key, dim, vector, updated_at)
+                    VALUES(@h, @mk, @d, @v, @t)
+                    ON CONFLICT(content_hash, model_key) DO UPDATE SET
+                        dim = excluded.dim, vector = excluded.vector, updated_at = excluded.updated_at
+                ";
+                var hashParam = cmd.Parameters.Add("@h", SqliteType.Text);
+                cmd.Parameters.AddWithValue("@mk", modelKey);
+                var dimParam = cmd.Parameters.Add("@d", SqliteType.Integer);
+                var vectorParam = cmd.Parameters.Add("@v", SqliteType.Blob);
+                var timeParam = cmd.Parameters.Add("@t", SqliteType.Text);
+
                 foreach (var (hash, vector) in items)
                 {
                     NormalizeInPlace(vector);
@@ -120,18 +129,10 @@ namespace VPetLLM.Core.Data.Database
                     var blob = new byte[vector.Length * sizeof(float)];
                     Buffer.BlockCopy(vector, 0, blob, 0, blob.Length);
 
-                    var cmd = connection.CreateCommand();
-                    cmd.CommandText = @"
-                        INSERT INTO embeddings(content_hash, model_key, dim, vector, updated_at)
-                        VALUES(@h, @mk, @d, @v, @t)
-                        ON CONFLICT(content_hash, model_key) DO UPDATE SET
-                            dim = excluded.dim, vector = excluded.vector, updated_at = excluded.updated_at
-                    ";
-                    cmd.Parameters.AddWithValue("@h", hash);
-                    cmd.Parameters.AddWithValue("@mk", modelKey);
-                    cmd.Parameters.AddWithValue("@d", vector.Length);
-                    cmd.Parameters.AddWithValue("@v", blob);
-                    cmd.Parameters.AddWithValue("@t", DateTime.UtcNow);
+                    hashParam.Value = hash;
+                    dimParam.Value = vector.Length;
+                    vectorParam.Value = blob;
+                    timeParam.Value = DateTime.UtcNow;
                     cmd.ExecuteNonQuery();
                 }
 
@@ -184,22 +185,6 @@ namespace VPetLLM.Core.Data.Database
             var inverseNorm = 1.0 / Math.Sqrt(sumSquares);
             for (int i = 0; i < vector.Length; i++)
                 vector[i] = (float)(vector[i] * inverseNorm);
-        }
-
-        private static IEnumerable<List<T>> Chunk<T>(IEnumerable<T> source, int size)
-        {
-            var batch = new List<T>(size);
-            foreach (var item in source)
-            {
-                batch.Add(item);
-                if (batch.Count == size)
-                {
-                    yield return batch;
-                    batch = new List<T>(size);
-                }
-            }
-            if (batch.Count > 0)
-                yield return batch;
         }
     }
 }

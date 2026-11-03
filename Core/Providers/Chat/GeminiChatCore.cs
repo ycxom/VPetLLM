@@ -319,7 +319,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            if (Settings?.KeepContext ?? true)
+            if (KeepContextEnabled)
             {
                 var userMessage = CreateUserMessage($"[图像] {prompt}");
                 if (userMessage is not null)
@@ -498,7 +498,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            if (Settings?.KeepContext ?? true)
+            if (KeepContextEnabled)
             {
                 var userMessage = CreateUserMessage($"[图像] {prompt}");
                 if (userMessage is not null)
@@ -731,7 +731,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            if (Settings?.KeepContext ?? true)
+            if (KeepContextEnabled)
             {
                 if (tempUserMessage is not null)
                 {
@@ -897,7 +897,7 @@ namespace VPetLLM.Core.Providers.Chat
                 return "";
             }
 
-            if (Settings?.KeepContext ?? true)
+            if (KeepContextEnabled)
             {
                 if (tempUserMessage is not null)
                 {

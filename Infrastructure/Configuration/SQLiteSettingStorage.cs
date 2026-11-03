@@ -19,6 +19,7 @@ public class SQLiteSettingStorage : ISettingStorage
     private readonly object _lock = new object();
     private readonly ConcurrentQueue<Action> _pendingWrites = new ConcurrentQueue<Action>();
     private readonly System.Threading.Timer? _flushTimer;
+    private bool _recovering;
 
     // Instance-specific setting keys
     private static readonly HashSet<string> InstanceSpecificKeys = new HashSet<string>
@@ -204,7 +205,17 @@ public class SQLiteSettingStorage : ISettingStorage
             // Clean up connection if initialization failed
             _connection?.Dispose();
             _connection = null;
-            
+
+            // 文件头坏了，打开连接那一步就报 SQLITE_NOTADB，走不到读设置时的那处恢复，得在这里接住
+            for (var inner = ex; inner is not null; inner = inner.InnerException)
+            {
+                if (inner is SqliteException sqlite && IsDatabaseCorrupted(sqlite))
+                {
+                    Logger.Log("设置库已损坏，尝试从备份恢复");
+                    return TryRecoverFromBackup();
+                }
+            }
+
             return false;
         }
     }
@@ -425,6 +436,11 @@ public class SQLiteSettingStorage : ISettingStorage
 
     private bool TryRecoverFromBackup()
     {
+        // 恢复完会重新 Initialize；备份本身也坏的话那次初始化又会判成损坏，不拦住就无限套娃
+        if (_recovering)
+            return false;
+
+        _recovering = true;
         try
         {
             // Close current connection
@@ -453,6 +469,40 @@ public class SQLiteSettingStorage : ISettingStorage
             Logger.Log($"Failed to recover from backup: {ex.Message}");
             return false;
         }
+        finally
+        {
+            _recovering = false;
+        }
+    }
+
+    /// <summary>
+    /// 真要往库里写之前调：到了间隔就先备份一次。没改动的保存不调，也就不会每次都复制一遍整库。
+    /// 要在开事务之前调；刚备份过的话直接返回，重复调很便宜。
+    /// </summary>
+    public void BackupBeforeWrite()
+    {
+        try
+        {
+            _backupManager.BackupIfDue();
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Warning: Failed to create backup before save: {ex.Message}");
+            // Continue with save even if backup fails
+        }
+    }
+
+    private static Dictionary<string, (string Value, string Type)> ReadRows(SqliteConnection connection, string tableName)
+    {
+        var rows = new Dictionary<string, (string Value, string Type)>();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"SELECT key, value, type FROM `{tableName}`";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            rows[reader.GetString(0)] = (reader.IsDBNull(1) ? "" : reader.GetString(1), reader.IsDBNull(2) ? "" : reader.GetString(2));
+        }
+        return rows;
     }
 
     public void Save<T>(T settings) where T : class
@@ -466,93 +516,92 @@ public class SQLiteSettingStorage : ISettingStorage
                     throw new StorageException("Database connection is not initialized");
                 }
 
-                // Create backup before saving
-                try
-                {
-                    _backupManager.CreateBackup();
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Warning: Failed to create backup before save: {ex.Message}");
-                    // Continue with save even if backup fails
-                }
-
                 // Ensure instance table exists
                 var instanceTableName = GetInstanceTableName();
                 EnsureInstanceTableExists(instanceTableName);
 
                 var connection = _connection; // 使用局部变量避免可空类型问题
+
+                // 宿主约 2 分钟调一次保存，绝大多数时候什么都没改：先和库里比，只写变了的行，一行没变就不碰库
+                var rows = new List<(string Table, string Key, string Value, string Type)>();
+                var properties = typeof(T).GetProperties();
+
+                foreach (var property in properties)
+                {
+                    if (!property.CanRead)
+                        continue;
+
+                    var key = property.Name;
+                    var value = property.GetValue(settings);
+                    
+                    if (value == null)
+                        continue;
+
+                    var type = property.PropertyType.FullName ?? property.PropertyType.Name;
+                    string serializedValue;
+
+                    // Serialize based on type
+                    if (property.PropertyType.IsPrimitive || 
+                        property.PropertyType == typeof(string) ||
+                        property.PropertyType == typeof(decimal) ||
+                        property.PropertyType == typeof(DateTime))
+                    {
+                        serializedValue = value.ToString() ?? "";
+                    }
+                    else
+                    {
+                        // Complex type - serialize to JSON
+                        // For OpenAI and Gemini settings, exclude node lists (managed in provider_nodes table)
+                        // For Tools, exclude the list (managed in plugin_data table)
+                        if (key == "OpenAI" || key == "Gemini")
+                        {
+                            serializedValue = SerializeProviderSettingWithoutNodes(value, key);
+                        }
+                        else if (key == "Tools")
+                        {
+                            // Skip Tools list - managed in plugin_data table
+                            continue;
+                        }
+                        else
+                        {
+                            serializedValue = JsonConvert.SerializeObject(value);
+                        }
+                    }
+
+                    // Determine which table to save to
+                    var tableName = IsInstanceSpecificSetting(key) ? instanceTableName : "settings";
+                    rows.Add((tableName, key, serializedValue, type));
+                }
+
+                var shared = ReadRows(connection, "settings");
+                var instance = ReadRows(connection, instanceTableName);
+                var changed = rows.Where(row =>
+                    !(row.Table == "settings" ? shared : instance).TryGetValue(row.Key, out var stored)
+                    || stored.Value != row.Value
+                    || stored.Type != row.Type).ToList();
+                if (changed.Count == 0)
+                    return;
+
+                BackupBeforeWrite();
+
                 using var transaction = connection.BeginTransaction();
                 try
                 {
-                    var properties = typeof(T).GetProperties();
-                    var savedCount = 0;
-                    var sharedCount = 0;
-                    var instanceCount = 0;
-
-                    foreach (var property in properties)
+                    foreach (var row in changed)
                     {
-                        if (!property.CanRead)
-                            continue;
-
-                        var key = property.Name;
-                        var value = property.GetValue(settings);
-                        
-                        if (value == null)
-                            continue;
-
-                        var type = property.PropertyType.FullName ?? property.PropertyType.Name;
-                        string serializedValue;
-
-                        // Serialize based on type
-                        if (property.PropertyType.IsPrimitive || 
-                            property.PropertyType == typeof(string) ||
-                            property.PropertyType == typeof(decimal) ||
-                            property.PropertyType == typeof(DateTime))
-                        {
-                            serializedValue = value.ToString() ?? "";
-                        }
-                        else
-                        {
-                            // Complex type - serialize to JSON
-                            // For OpenAI and Gemini settings, exclude node lists (managed in provider_nodes table)
-                            // For Tools, exclude the list (managed in plugin_data table)
-                            if (key == "OpenAI" || key == "Gemini")
-                            {
-                                serializedValue = SerializeProviderSettingWithoutNodes(value, key);
-                            }
-                            else if (key == "Tools")
-                            {
-                                // Skip Tools list - managed in plugin_data table
-                                continue;
-                            }
-                            else
-                            {
-                                serializedValue = JsonConvert.SerializeObject(value);
-                            }
-                        }
-
-                        // Determine which table to save to
-                        var tableName = IsInstanceSpecificSetting(key) ? instanceTableName : "settings";
-
                         using var cmd = connection.CreateCommand();
                         cmd.CommandText = $@"
-                            INSERT OR REPLACE INTO `{tableName}` (key, value, type, updated_at)
+                            INSERT OR REPLACE INTO `{row.Table}` (key, value, type, updated_at)
                             VALUES (@key, @value, @type, CURRENT_TIMESTAMP)
                         ";
-                        cmd.Parameters.AddWithValue("@key", key);
-                        cmd.Parameters.AddWithValue("@value", serializedValue);
-                        cmd.Parameters.AddWithValue("@type", type);
+                        cmd.Parameters.AddWithValue("@key", row.Key);
+                        cmd.Parameters.AddWithValue("@value", row.Value);
+                        cmd.Parameters.AddWithValue("@type", row.Type);
                         cmd.ExecuteNonQuery();
-                        
-                        savedCount++;
-                        if (IsInstanceSpecificSetting(key))
-                            instanceCount++;
-                        else
-                            sharedCount++;
                     }
 
                     transaction.Commit();
+                    Logger.Log($"设置已保存（{changed.Count} 项有改动）");
                 }
                 catch (Exception ex)
                 {

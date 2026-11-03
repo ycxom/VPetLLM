@@ -115,9 +115,15 @@ namespace VPetLLM.Services
                 return result;
             }
 
+            // 后面几项互不依赖，同时开跑，总耗时只取决于最慢的那项；进度仍按原顺序报
+            var proxyTask = CheckProxyAvailabilityAsync();
+            var channelsTask = CheckAllChannelsAsync();
+            var pluginStoreTask = CheckPluginStoreAsync();
+            var ttsTask = CheckTTSAsync();
+
             statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingProxy"));
 
-            var proxyOk = await CheckProxyAvailabilityAsync();
+            var proxyOk = await proxyTask;
             result.ProxyOk = proxyOk;
             result.ProxyEnabled = _settings.Proxy?.IsEnabled ?? false;
             result.GlobalApiProxyEnabled = _settings.Proxy?.ForAllAPI ?? false;
@@ -129,7 +135,7 @@ namespace VPetLLM.Services
 
             statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingChannels"));
 
-            var channelResults = await CheckAllChannelsAsync(statusCallback);
+            var channelResults = await channelsTask;
             result.ChannelResults = channelResults;
 
             if (!proxyOk && channelResults.Any(cr => cr.ProxyTried && cr.ProxyConnectionOk))
@@ -142,10 +148,10 @@ namespace VPetLLM.Services
             sb.AppendLine(result.ProxyDetails);
 
             statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingPluginStore"));
-            result.PluginStoreResult = await CheckPluginStoreAsync();
+            result.PluginStoreResult = await pluginStoreTask;
 
             statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingTTS"));
-            result.TTSResult = await CheckTTSAsync();
+            result.TTSResult = await ttsTask;
 
             bool allChannelsOk = true;
             foreach (var cr in channelResults)
@@ -169,48 +175,102 @@ namespace VPetLLM.Services
         {
             string[] pingTargets = { "8.8.8.8", "1.1.1.1", "114.114.114.114" };
 
-            foreach (var target in pingTargets)
-            {
-                try
-                {
-                    using var ping = new Ping();
-                    var reply = await ping.SendPingAsync(target, 3000);
-                    if (reply.Status == IPStatus.Success)
-                    {
-                        Logger.Log($"Diagnostic: Ping to {target} succeeded ({reply.RoundtripTime}ms)");
-                        return true;
-                    }
-                    Logger.Log($"Diagnostic: Ping to {target} failed: {reply.Status}");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Diagnostic: Ping to {target} exception: {ex.Message}");
-                }
-            }
+            if (await AnySucceededAsync(pingTargets.Select(PingAsync)))
+                return true;
 
+            string[] httpTargets = { "https://www.google.com/generate_204", "https://www.baidu.com" };
+            return await AnySucceededAsync(httpTargets.Select(ProbeHttpAsync));
+        }
+
+        private static async Task<bool> PingAsync(string target)
+        {
+            try
+            {
+                using var ping = new Ping();
+                var reply = await ping.SendPingAsync(target, 3000);
+                if (reply.Status == IPStatus.Success)
+                {
+                    Logger.Log($"Diagnostic: Ping to {target} succeeded ({reply.RoundtripTime}ms)");
+                    return true;
+                }
+                Logger.Log($"Diagnostic: Ping to {target} failed: {reply.Status}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Diagnostic: Ping to {target} exception: {ex.Message}");
+            }
+            return false;
+        }
+
+        private static async Task<bool> ProbeHttpAsync(string url)
+        {
             try
             {
                 using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                var response = await client.GetAsync("https://www.google.com/generate_204");
-                Logger.Log($"Diagnostic: HTTP connectivity check: {response.StatusCode}");
+                var response = await client.GetAsync(url);
+                Logger.Log($"Diagnostic: HTTP connectivity check {url}: {response.StatusCode}");
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
-                try
-                {
-                    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                    var response = await client.GetAsync("https://www.baidu.com");
-                    Logger.Log($"Diagnostic: HTTP fallback check: {response.StatusCode}");
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Diagnostic: HTTP connectivity failed: {ex.Message}");
-                }
+                Logger.Log($"Diagnostic: HTTP connectivity check {url} failed: {ex.Message}");
+                return false;
             }
+        }
 
+        /// <summary>同时探测，任一成功立刻返回，不等其余的超时。全部失败才返回 false。</summary>
+        public static async Task<bool> AnySucceededAsync(IEnumerable<Task<bool>> probes)
+        {
+            var pending = probes.ToList();
+            while (pending.Count > 0)
+            {
+                var finished = await Task.WhenAny(pending);
+                if (await finished)
+                    return true;
+                pending.Remove(finished);
+            }
             return false;
+        }
+
+        /// <summary>
+        /// 不同 host 同时跑，同一 host 排队，结果与 <paramref name="items"/> 同序。
+        /// 同一上游并发打过去可能被限流，诊断会把限流误报成故障；
+        /// 本机的 Ollama / LM Studio 端口不同，但同时加载模型会抢显存，所以也算同一个 host。
+        /// </summary>
+        public static async Task<TResult[]> RunPerHostAsync<T, TResult>(
+            IReadOnlyList<T> items, Func<T, string?> urlOf, Func<T, Task<TResult>> check)
+        {
+            var results = new TResult[items.Count];
+            var hosts = Enumerable.Range(0, items.Count)
+                .GroupBy(i => HostOf(urlOf(items[i])));
+
+            await Task.WhenAll(hosts.Select(async host =>
+            {
+                foreach (var i in host)
+                    results[i] = await check(items[i]);
+            }));
+
+            return results;
+        }
+
+        private static string HostOf(string? url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                return url ?? "";
+
+            return uri.IsLoopback ? "localhost" : uri.Host;
+        }
+
+        /// <summary>对 API 可达的渠道各做一次真实 LLM 调用。<paramref name="onStart"/> 在每个渠道开测时调用。</summary>
+        public async Task TestChannelLLMsAsync(
+            IEnumerable<ChannelDiagnosticResult> channels, Action<ChannelDiagnosticResult> onStart)
+        {
+            var pending = channels.Where(cr => cr.ApiAvailable && !cr.LlmTested).ToList();
+            await RunPerHostAsync(pending, cr => cr.ApiUrl, cr =>
+            {
+                onStart(cr);
+                return CheckChannelLLMAsync(cr);
+            });
         }
 
         private async Task<bool> CheckProxyAvailabilityAsync()
@@ -253,16 +313,12 @@ namespace VPetLLM.Services
             }
         }
 
-        private async Task<List<ChannelDiagnosticResult>> CheckAllChannelsAsync(Action<string>? statusCallback = null)
+        private async Task<List<ChannelDiagnosticResult>> CheckAllChannelsAsync()
         {
-            var results = new List<ChannelDiagnosticResult>();
+            var checks = new List<(string? Url, Func<Task<ChannelDiagnosticResult>> Run)>();
 
-            statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingOpenAI"));
             foreach (var node in _settings.OpenAI.OpenAINodes.Where(n => n.Enabled))
-            {
-                var r = await CheckOpenAIChannelAsync(node);
-                results.Add(r);
-            }
+                checks.Add((node.Url, () => CheckOpenAIChannelAsync(node)));
             if (!_settings.ChannelsUnified && !_settings.OpenAI.OpenAINodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.OpenAI.ApiKey))
             {
                 var legacyNode = new Setting.OpenAINodeSetting
@@ -274,16 +330,11 @@ namespace VPetLLM.Services
                     Enabled = _settings.OpenAI.Enabled,
                     ProxyMode = Setting.ChannelProxyMode.FollowDefault
                 };
-                var r = await CheckOpenAIChannelAsync(legacyNode);
-                results.Add(r);
+                checks.Add((legacyNode.Url, () => CheckOpenAIChannelAsync(legacyNode)));
             }
 
-            statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingGemini"));
             foreach (var node in _settings.Gemini.GeminiNodes.Where(n => n.Enabled))
-            {
-                var r = await CheckGeminiChannelAsync(node);
-                results.Add(r);
-            }
+                checks.Add((node.Url, () => CheckGeminiChannelAsync(node)));
             if (!_settings.ChannelsUnified && !_settings.Gemini.GeminiNodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.Gemini.ApiKey))
             {
                 var legacyNode = new Setting.GeminiNodeSetting
@@ -295,16 +346,11 @@ namespace VPetLLM.Services
                     Enabled = true,
                     ProxyMode = Setting.ChannelProxyMode.FollowDefault
                 };
-                var r = await CheckGeminiChannelAsync(legacyNode);
-                results.Add(r);
+                checks.Add((legacyNode.Url, () => CheckGeminiChannelAsync(legacyNode)));
             }
 
-            statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingOllama"));
             foreach (var node in _settings.Ollama.OllamaNodes.Where(n => n.Enabled))
-            {
-                var r = await CheckOllamaChannelAsync(node);
-                results.Add(r);
-            }
+                checks.Add((node.Url, () => CheckOllamaChannelAsync(node)));
             if (!_settings.ChannelsUnified && !_settings.Ollama.OllamaNodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.Ollama.Url))
             {
                 var legacyNode = new Setting.OllamaNodeSetting
@@ -314,16 +360,11 @@ namespace VPetLLM.Services
                     Model = _settings.Ollama.Model ?? "",
                     Enabled = true
                 };
-                var r = await CheckOllamaChannelAsync(legacyNode);
-                results.Add(r);
+                checks.Add((legacyNode.Url, () => CheckOllamaChannelAsync(legacyNode)));
             }
 
-            statusCallback?.Invoke(GetLocalizedText("Diagnostic.CheckingLMStudio"));
             foreach (var node in _settings.LMStudio.LMStudioNodes.Where(n => n.Enabled))
-            {
-                var r = await CheckLMStudioChannelAsync(node);
-                results.Add(r);
-            }
+                checks.Add((node.Url, () => CheckLMStudioChannelAsync(node)));
             if (!_settings.ChannelsUnified && !_settings.LMStudio.LMStudioNodes.Any(n => n.Enabled) && !string.IsNullOrEmpty(_settings.LMStudio.Url))
             {
                 var legacyNode = new Setting.LMStudioNodeSetting
@@ -333,11 +374,11 @@ namespace VPetLLM.Services
                     Model = _settings.LMStudio.Model ?? "",
                     Enabled = true
                 };
-                var r = await CheckLMStudioChannelAsync(legacyNode);
-                results.Add(r);
+                checks.Add((legacyNode.Url, () => CheckLMStudioChannelAsync(legacyNode)));
             }
 
-            return results;
+            var results = await RunPerHostAsync(checks, c => c.Url, c => c.Run());
+            return results.ToList();
         }
 
         private bool ShouldUseProxyForChannel(Setting.ChannelProxyMode proxyMode, string channelType)
@@ -401,44 +442,43 @@ namespace VPetLLM.Services
         private async Task<(bool directOk, string directMsg, bool proxyOk, string proxyMsg)> TryBothModesAsync(
             string channelType, Func<HttpClientHandler, Task<(bool success, string message, List<string> models)>> requestFunc)
         {
-            bool directOk = false;
-            string directMsg = "";
-            bool proxyOk = false;
-            string proxyMsg = "";
-
-            try
+            async Task<(bool ok, string msg)> TryDirectAsync()
             {
-                var directHandler = new HttpClientHandler { UseProxy = false, Proxy = null };
-                var (dOk, dMsg, dModels) = await requestFunc(directHandler);
-                directOk = dOk;
-                directMsg = dMsg;
-            }
-            catch (Exception ex)
-            {
-                directOk = false;
-                directMsg = ex.Message;
-            }
-
-            try
-            {
-                var proxyHandler = CreateProxyHandler();
-                if (proxyHandler.Proxy != null || proxyHandler.UseProxy)
+                try
                 {
-                    var (pOk, pMsg, pModels) = await requestFunc(proxyHandler);
-                    proxyOk = pOk;
-                    proxyMsg = pMsg;
+                    var directHandler = new HttpClientHandler { UseProxy = false, Proxy = null };
+                    var (dOk, dMsg, dModels) = await requestFunc(directHandler);
+                    return (dOk, dMsg);
                 }
-                else
+                catch (Exception ex)
                 {
-                    proxyOk = false;
-                    proxyMsg = GetLocalizedText("Diagnostic.ProxyNotConfigured");
+                    return (false, ex.Message);
                 }
             }
-            catch (Exception ex)
+
+            async Task<(bool ok, string msg)> TryProxyAsync()
             {
-                proxyOk = false;
-                proxyMsg = ex.Message;
+                try
+                {
+                    var proxyHandler = CreateProxyHandler();
+                    if (proxyHandler.Proxy != null || proxyHandler.UseProxy)
+                    {
+                        var (pOk, pMsg, pModels) = await requestFunc(proxyHandler);
+                        return (pOk, pMsg);
+                    }
+                    return (false, GetLocalizedText("Diagnostic.ProxyNotConfigured"));
+                }
+                catch (Exception ex)
+                {
+                    return (false, ex.Message);
+                }
             }
+
+            // 一路连不上要等满超时，两路同时测就不用再排在它后面等
+            var direct = TryDirectAsync();
+            var proxy = TryProxyAsync();
+            var (directOk, directMsg) = await direct;
+            var (proxyOk, proxyMsg) = await proxy;
 
             return (directOk, directMsg, proxyOk, proxyMsg);
         }
@@ -814,59 +854,67 @@ namespace VPetLLM.Services
                 storeUrl);
             result.StoreUrl = BuildPluginStoreUrl(activeDecision, githubUrl);
 
-            try
+            async Task CheckDirectAsync()
             {
-                using var directClient = new HttpClient(new HttpClientHandler { UseProxy = false, Proxy = null })
-                    { Timeout = TimeSpan.FromSeconds(10) };
-                var directResponse = await directClient.GetAsync(githubUrl);
-                result.DirectOk = directResponse.IsSuccessStatusCode;
-                result.DirectMessage = directResponse.IsSuccessStatusCode
-                    ? GetLocalizedText("Diagnostic.StoreDirectOk")
-                    : $"HTTP {(int)directResponse.StatusCode}";
-            }
-            catch (Exception ex)
-            {
-                result.DirectOk = false;
-                result.DirectMessage = ex.Message;
+                try
+                {
+                    using var directClient = new HttpClient(new HttpClientHandler { UseProxy = false, Proxy = null })
+                        { Timeout = TimeSpan.FromSeconds(10) };
+                    var directResponse = await directClient.GetAsync(githubUrl);
+                    result.DirectOk = directResponse.IsSuccessStatusCode;
+                    result.DirectMessage = directResponse.IsSuccessStatusCode
+                        ? GetLocalizedText("Diagnostic.StoreDirectOk")
+                        : $"HTTP {(int)directResponse.StatusCode}";
+                }
+                catch (Exception ex)
+                {
+                    result.DirectOk = false;
+                    result.DirectMessage = ex.Message;
+                }
             }
 
-            try
+            async Task CheckProxyAsync()
             {
-                var proxyDecision = ProxyRoutingPolicy.ResolvePluginStore(true, storeUrl);
-                if (proxyDecision.Mode == PluginStoreProxyMode.UrlRewrite)
+                try
                 {
-                    using var proxyClient = new HttpClient(new HttpClientHandler { UseProxy = false, Proxy = null })
-                        { Timeout = TimeSpan.FromSeconds(10) };
-                    var proxyResponse = await proxyClient.GetAsync(BuildPluginStoreUrl(proxyDecision, githubUrl));
-                    result.ProxyOk = proxyResponse.IsSuccessStatusCode;
-                    result.ProxyMessage = proxyResponse.IsSuccessStatusCode
-                        ? GetLocalizedText("Diagnostic.StoreMirrorOk")
-                        : $"HTTP {(int)proxyResponse.StatusCode}";
-                }
-                else if (proxyDecision.Mode == PluginStoreProxyMode.HttpProxy)
-                {
-                    using var proxyClient = new HttpClient(new HttpClientHandler
+                    var proxyDecision = ProxyRoutingPolicy.ResolvePluginStore(true, storeUrl);
+                    if (proxyDecision.Mode == PluginStoreProxyMode.UrlRewrite)
                     {
-                        Proxy = new WebProxy(proxyDecision.ProxyUrl!),
-                        UseProxy = true
-                    }) { Timeout = TimeSpan.FromSeconds(10) };
-                    var proxyResponse = await proxyClient.GetAsync(githubUrl);
-                    result.ProxyOk = proxyResponse.IsSuccessStatusCode;
-                    result.ProxyMessage = proxyResponse.IsSuccessStatusCode
-                        ? GetLocalizedText("Diagnostic.StoreProxyOk")
-                        : $"HTTP {(int)proxyResponse.StatusCode}";
+                        using var proxyClient = new HttpClient(new HttpClientHandler { UseProxy = false, Proxy = null })
+                            { Timeout = TimeSpan.FromSeconds(10) };
+                        var proxyResponse = await proxyClient.GetAsync(BuildPluginStoreUrl(proxyDecision, githubUrl));
+                        result.ProxyOk = proxyResponse.IsSuccessStatusCode;
+                        result.ProxyMessage = proxyResponse.IsSuccessStatusCode
+                            ? GetLocalizedText("Diagnostic.StoreMirrorOk")
+                            : $"HTTP {(int)proxyResponse.StatusCode}";
+                    }
+                    else if (proxyDecision.Mode == PluginStoreProxyMode.HttpProxy)
+                    {
+                        using var proxyClient = new HttpClient(new HttpClientHandler
+                        {
+                            Proxy = new WebProxy(proxyDecision.ProxyUrl!),
+                            UseProxy = true
+                        }) { Timeout = TimeSpan.FromSeconds(10) };
+                        var proxyResponse = await proxyClient.GetAsync(githubUrl);
+                        result.ProxyOk = proxyResponse.IsSuccessStatusCode;
+                        result.ProxyMessage = proxyResponse.IsSuccessStatusCode
+                            ? GetLocalizedText("Diagnostic.StoreProxyOk")
+                            : $"HTTP {(int)proxyResponse.StatusCode}";
+                    }
+                    else
+                    {
+                        result.ProxyOk = false;
+                        result.ProxyMessage = GetLocalizedText("Diagnostic.StoreNoProxy");
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
                     result.ProxyOk = false;
-                    result.ProxyMessage = GetLocalizedText("Diagnostic.StoreNoProxy");
+                    result.ProxyMessage = ex.Message;
                 }
             }
-            catch (Exception ex)
-            {
-                result.ProxyOk = false;
-                result.ProxyMessage = ex.Message;
-            }
+
+            await Task.WhenAll(CheckDirectAsync(), CheckProxyAsync());
 
             if (result.DirectOk)
             {
@@ -1240,45 +1288,53 @@ namespace VPetLLM.Services
                 return result;
             }
 
-            try
+            async Task CheckDirectAsync()
             {
-                using var directHandler = new HttpClientHandler { UseProxy = false, Proxy = null };
-                using var directClient = new HttpClient(directHandler) { Timeout = TimeSpan.FromSeconds(10) };
-                var directResponse = await directClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, endpoint));
-                result.DirectOk = directResponse.IsSuccessStatusCode;
-                result.DirectMessage = directResponse.IsSuccessStatusCode
-                    ? GetLocalizedText("Diagnostic.TTSReachable")
-                    : $"HTTP {(int)directResponse.StatusCode}";
-            }
-            catch (Exception ex)
-            {
-                result.DirectOk = false;
-                result.DirectMessage = ex.Message;
+                try
+                {
+                    using var directHandler = new HttpClientHandler { UseProxy = false, Proxy = null };
+                    using var directClient = new HttpClient(directHandler) { Timeout = TimeSpan.FromSeconds(10) };
+                    var directResponse = await directClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, endpoint));
+                    result.DirectOk = directResponse.IsSuccessStatusCode;
+                    result.DirectMessage = directResponse.IsSuccessStatusCode
+                        ? GetLocalizedText("Diagnostic.TTSReachable")
+                        : $"HTTP {(int)directResponse.StatusCode}";
+                }
+                catch (Exception ex)
+                {
+                    result.DirectOk = false;
+                    result.DirectMessage = ex.Message;
+                }
             }
 
-            try
+            async Task CheckProxyAsync()
             {
-                var proxyHandler = CreateProxyHandler();
-                if (proxyHandler.Proxy != null || proxyHandler.UseProxy)
+                try
                 {
-                    using var proxyClient = new HttpClient(proxyHandler) { Timeout = TimeSpan.FromSeconds(10) };
-                    var proxyResponse = await proxyClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, endpoint));
-                    result.ProxyOk = proxyResponse.IsSuccessStatusCode;
-                    result.ProxyMessage = proxyResponse.IsSuccessStatusCode
-                        ? GetLocalizedText("Diagnostic.TTSReachable")
-                        : $"HTTP {(int)proxyResponse.StatusCode}";
+                    var proxyHandler = CreateProxyHandler();
+                    if (proxyHandler.Proxy != null || proxyHandler.UseProxy)
+                    {
+                        using var proxyClient = new HttpClient(proxyHandler) { Timeout = TimeSpan.FromSeconds(10) };
+                        var proxyResponse = await proxyClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, endpoint));
+                        result.ProxyOk = proxyResponse.IsSuccessStatusCode;
+                        result.ProxyMessage = proxyResponse.IsSuccessStatusCode
+                            ? GetLocalizedText("Diagnostic.TTSReachable")
+                            : $"HTTP {(int)proxyResponse.StatusCode}";
+                    }
+                    else
+                    {
+                        result.ProxyOk = false;
+                        result.ProxyMessage = GetLocalizedText("Diagnostic.ProxyNotConfigured");
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
                     result.ProxyOk = false;
-                    result.ProxyMessage = GetLocalizedText("Diagnostic.ProxyNotConfigured");
+                    result.ProxyMessage = ex.Message;
                 }
             }
-            catch (Exception ex)
-            {
-                result.ProxyOk = false;
-                result.ProxyMessage = ex.Message;
-            }
+
+            await Task.WhenAll(CheckDirectAsync(), CheckProxyAsync());
 
             result.Reachable = result.DirectOk || result.ProxyOk;
             result.Summary = result.Reachable

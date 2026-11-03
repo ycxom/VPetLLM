@@ -1,14 +1,20 @@
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using VPetLLM;
 using VPetLLM.Core.Abstractions.Base;
+using VPetLLM.Core.Data.Database;
+using VPetLLM.Core.Data.Managers;
 using VPetLLM.Core.Providers.Chat;
 using VPetLLM.Core.Routing;
 using VPetLLM.Infrastructure.Exceptions;
+using VPetLLM.Services;
+using VPetLLM.Configuration;
 
 // 统一渠道路由的回归检查。
 //
@@ -17,7 +23,8 @@ using VPetLLM.Infrastructure.Exceptions;
 //   1. 选路：停用/用途/视觉过滤、优先级分层、权重分配、关掉失败转移时只给一个；
 //   2. 迁移：旧的"当前提供商 + 负载均衡 + 降级列表"折算成优先级后，运行时行为不变；
 //   3. OpenAI 两种协议：地址拼接、Responses 多段文本、图片部件格式；
-//   4. 端到端：本地起两个假服务，第一个 500、第二个正常 —— 总结和测试走的是真实请求代码。
+//   4. 端到端：本地起两个假服务，第一个 500、第二个正常 —— 总结和测试走的是真实请求代码；
+//   5. 识图的临时 core：不读不写主上下文，也不动全局的 KeepContext。
 
 static class Program
 {
@@ -44,6 +51,7 @@ static class Program
             Test_EditorHelpers(dir);
             Test_FreeProbePrompt();
             Test_EndToEndFailover(dir).GetAwaiter().GetResult();
+            Test_VisionLeavesContextAlone(dir).GetAwaiter().GetResult();
         }
         finally
         {
@@ -328,6 +336,107 @@ static class Program
         Check("拉模型：/models 与请求地址同一套规则", models.SequenceEqual(new[] { "m-a", "m-b" }), string.Join(",", models));
     }
 
+    const string HistoryMarker = "HISTORY-MARKER";
+
+    /// <summary>
+    /// 把 core 的历史换到临时库、灌一条记号：core 共享用户真实的聊天记录，
+    /// 这里的检查一旦失败，消息就会写进去。
+    /// </summary>
+    static HistoryManager RedirectHistory(ChatCoreBase core, string dbPath)
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var history = core.HistoryManager;
+        typeof(HistoryManager).GetField("_database", flags)!.SetValue(history, new ChatHistoryDatabase(dbPath));
+        typeof(HistoryManager).GetField("_history", flags)!.SetValue(history,
+            new List<Message> { new Message { Role = "user", Content = HistoryMarker } });
+        return history;
+    }
+
+    sealed class VisionUnderTest(Setting settings, string dbPath)
+        : PreprocessingMultimodal(settings, (global::VPetLLM.VPetLLM)RuntimeHelpers.GetUninitializedObject(typeof(global::VPetLLM.VPetLLM)))
+    {
+        public List<HistoryManager> Histories { get; } = new();
+
+        protected override ChatCoreBase? CreateCore(string providerType, VisionNodeIdentifier? node, Setting.ChannelNodeBase? channel)
+        {
+            var core = base.CreateCore(providerType, node, channel)!;
+            lock (Histories) Histories.Add(RedirectHistory(core, dbPath));
+            return core;
+        }
+    }
+
+    static async Task Test_VisionLeavesContextAlone(string dir)
+    {
+        Console.WriteLine("[7] 识图：不读不写主上下文，也不动全局 KeepContext");
+        using var server = new FakeServer();
+
+        var s = NewSettings(dir);
+        s.KeepContext = true;
+        s.OverflowMode = Setting.ContextOverflowMode.Compression;
+        s.Records.AutoDecrementWeights = false;
+        s.LLMRequestTimeoutSeconds = 10;
+        var node = Add(s, new Setting.OpenAINodeSetting
+        {
+            Name = "slow", Url = server.Url("slow"), ApiKey = "x", Model = "m", EnableVision = true
+        }, 1);
+
+        var path = "/slow/v1/chat/completions";
+        var image = new byte[] { 1, 2, 3 };
+        var db = Path.Combine(dir, "vision-history.db");
+        var vision = new VisionUnderTest(s, db);
+        var call = typeof(PreprocessingMultimodal).GetMethod("CallChatWithImageForDescription",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Task<string> Describe() => Task.Run(() =>
+            (Task<string>)call.Invoke(vision, new object?[] { "OpenAI", null, image, "describe", node })!);
+
+        // 两次识图重叠：旧做法 A 存 true、B 存 false，最后还原成 false
+        var everFalse = false;
+        using var stop = new CancellationTokenSource();
+        var watcher = Task.Run(() =>
+        {
+            while (!stop.IsCancellationRequested)
+                if (!s.KeepContext) everFalse = true;
+        });
+        var first = Describe();
+        await Task.Delay(100);
+        var second = Describe();
+        var replies = await Task.WhenAll(first, second);
+        stop.Cancel();
+        await watcher;
+
+        Check("两次识图都拿到描述", replies.All(r => r == "OK-slow"), string.Join(",", replies));
+        Check("识图途中全局 KeepContext 一直是 true（主聊天不受影响）", !everFalse);
+        Check("重叠识图之后 KeepContext 还是 true", s.KeepContext);
+        var body = JObject.Parse(server.Bodies[path]);
+        Check("识图请求只有 system + 这条提示词，不带主上下文",
+              body["messages"]!.Count() == 2 && !server.Bodies[path].Contains(HistoryMarker), server.Bodies[path]);
+        Check("识图不写历史", vision.Histories.Count == 2 && vision.Histories.All(h => h.GetHistory().Count == 1),
+              string.Join(",", vision.Histories.Select(h => h.GetHistory().Count)));
+
+        // 对照：普通 core 照常读写上下文，否则上面的断言什么也没证明
+        var plain = new OpenAIChatCore(node, s, null!, null!);
+        var plainHistory = RedirectHistory(plain, db);
+        await plain.ChatWithImage("describe", image);
+        Check("普通 core 带上主上下文", server.Bodies[path].Contains(HistoryMarker), server.Bodies[path]);
+        Check("普通 core 写历史", plainHistory.GetHistory().Count == 3, $"{plainHistory.GetHistory().Count}");
+
+        // 用户自己关掉保持上下文：普通 core 也要听
+        s.KeepContext = false;
+        var off = new OpenAIChatCore(node, s, null!, null!);
+        var offHistory = RedirectHistory(off, db);
+        await off.ChatWithImage("describe", image);
+        Check("用户关掉保持上下文后不带历史", !server.Bodies[path].Contains(HistoryMarker), server.Bodies[path]);
+        Check("用户关掉保持上下文后不写历史", offHistory.GetHistory().Count == 1, $"{offHistory.GetHistory().Count}");
+        s.KeepContext = true;
+
+        var root = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(root, "VPetLLM.csproj")))
+            root = Path.GetDirectoryName(root.TrimEnd(Path.DirectorySeparatorChar))!;
+        var direct = Directory.GetFiles(Path.Combine(root, "Core"), "*.cs", SearchOption.AllDirectories)
+            .Sum(f => Regex.Matches(File.ReadAllText(f), @"Settings\?\.KeepContext").Count);
+        Check("core 里只有一处直接读设置，其余都走 KeepContextEnabled", direct == 1, $"{direct} 处");
+    }
+
     /// <summary>
     /// Free 的连接测试：网关只放行 Prompt.json 里的提示词（freechat_prompt_not_allowed），
     /// 否则伪装成随机 5xx 拒掉。Free 响应必须是原生密钥加密的，假服务走不到这里，
@@ -395,6 +504,7 @@ static class Program
                 using (var reader = new StreamReader(ctx.Request.InputStream, Encoding.UTF8))
                     body = await reader.ReadToEndAsync();
                 lock (Paths) { Paths.Add(path); Bodies[path] = body; }
+                if (path.StartsWith("/slow/")) await Task.Delay(300);
 
                 int status = 200;
                 string reply;

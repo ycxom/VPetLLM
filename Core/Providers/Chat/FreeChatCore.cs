@@ -441,7 +441,7 @@ namespace VPetLLM.Core.Providers.Chat
                 }
 
                 // 保存历史记录（包含图像数据用于上下文编辑器显示）
-                if (Settings?.KeepContext ?? true)
+                if (KeepContextEnabled)
                 {
                     var userMessage = CreateUserMessage($"[图像] {prompt}");
                     if (userMessage is not null)
@@ -642,7 +642,7 @@ namespace VPetLLM.Core.Providers.Chat
                         }
 
                         // API调用成功后，才将用户消息和助手回复保存到历史记录
-                        if (Settings?.KeepContext ?? true)
+                        if (KeepContextEnabled)
                         {
                             if (tempUserMessage is not null)
                             {
@@ -715,7 +715,7 @@ namespace VPetLLM.Core.Providers.Chat
                         ResponseHandler?.Invoke(message);
 
                         // API调用成功后，才将用户消息和助手回复保存到历史记录
-                        if (Settings?.KeepContext ?? true)
+                        if (KeepContextEnabled)
                         {
                             if (tempUserMessage is not null)
                             {
@@ -1064,7 +1064,7 @@ namespace VPetLLM.Core.Providers.Chat
         private async Task PersistTurnAsync(
             Message? tempUserMessage, string message, Tools.NativeToolLoopResult? loop = null)
         {
-            if (!(Settings?.KeepContext ?? true)) return;
+            if (!KeepContextEnabled) return;
 
             if (tempUserMessage is not null)
             {

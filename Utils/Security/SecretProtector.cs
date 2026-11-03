@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -45,17 +46,41 @@ public static class SecretProtector
     /// </summary>
     public static bool SawPlaintext { get; set; }
 
+    // 明文 → 落盘的那份密文。DPAPI 每次加密结果都不同，不记的话同一个 key 每次保存都是"新值"，
+    // 保存时就比不出"没改动"，宿主每两分钟一次的保存都得把所有带密钥的行重写一遍。
+    // 解密时也记下库里那份，这样重启后第一次保存写出的密文和库里一字不差。
+    // 明文本来就在设置对象里常驻内存，这里不多暴露什么；只是防止无限增长，满了整个清掉。
+    private static readonly Dictionary<string, string> _stableCiphers = new();
+    private const int MaxStableCiphers = 64;
+
     public static bool IsProtected(string? value) =>
         !string.IsNullOrEmpty(value) && value.StartsWith(Prefix, StringComparison.Ordinal);
 
-    /// <summary>加密。空串原样返回；已是密文不重复加密</summary>
+    /// <summary>加密。空串原样返回；已是密文不重复加密；同一明文复用上次的密文</summary>
     public static string Protect(string? plaintext)
     {
         if (string.IsNullOrEmpty(plaintext) || IsProtected(plaintext))
             return plaintext ?? "";
 
-        var cipher = Transform(Encoding.UTF8.GetBytes(plaintext), protect: true);
-        return Prefix + Convert.ToBase64String(cipher);
+        lock (_stableCiphers)
+        {
+            if (_stableCiphers.TryGetValue(plaintext, out var known))
+                return known;
+        }
+
+        var cipher = Prefix + Convert.ToBase64String(Transform(Encoding.UTF8.GetBytes(plaintext), protect: true));
+        Remember(plaintext, cipher);
+        return cipher;
+    }
+
+    private static void Remember(string plaintext, string cipher)
+    {
+        lock (_stableCiphers)
+        {
+            if (_stableCiphers.Count >= MaxStableCiphers && !_stableCiphers.ContainsKey(plaintext))
+                _stableCiphers.Clear();
+            _stableCiphers[plaintext] = cipher;
+        }
     }
 
     /// <summary>
@@ -77,7 +102,10 @@ public static class SecretProtector
         try
         {
             var cipher = Convert.FromBase64String(stored.Substring(Prefix.Length));
-            return Encoding.UTF8.GetString(Transform(cipher, protect: false));
+            var plaintext = Encoding.UTF8.GetString(Transform(cipher, protect: false));
+            if (plaintext.Length > 0)
+                Remember(plaintext, stored);
+            return plaintext;
         }
         catch (Exception ex)
         {

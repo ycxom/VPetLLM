@@ -1,3 +1,4 @@
+using System.Numerics;
 using VPetLLM.Core.Data.Database;
 
 namespace VPetLLM.Core.Services.Embedding
@@ -168,14 +169,24 @@ namespace VPetLLM.Core.Services.Embedding
 
         /// <summary>
         /// 归一化向量的余弦相似度即点积。两侧都已归一化，这里不再除模长。
+        /// 全语料每条都要算一次，按 SIMD 宽度成批累加；展宽成 double 是为了不损失精度。
         /// </summary>
         public static double CosineSimilarity(float[] a, float[] b)
         {
             if (a.Length != b.Length)
                 return 0.0;   // 维度不一致（换过模型的脏缓存），当作不相关
 
-            double dot = 0;
-            for (int i = 0; i < a.Length; i++)
+            var sum = Vector<double>.Zero;
+            var i = 0;
+            for (; i <= a.Length - Vector<float>.Count; i += Vector<float>.Count)
+            {
+                Vector.Widen(new Vector<float>(a, i), out var aLow, out var aHigh);
+                Vector.Widen(new Vector<float>(b, i), out var bLow, out var bHigh);
+                sum += aLow * bLow + aHigh * bHigh;
+            }
+
+            var dot = Vector.Sum(sum);
+            for (; i < a.Length; i++)
                 dot += (double)a[i] * b[i];
             return dot;
         }

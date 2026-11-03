@@ -1,3 +1,4 @@
+using System.Buffers;
 using VPetLLM.Core.Data.Managers;
 
 namespace VPetLLM.Core.Services
@@ -136,7 +137,11 @@ namespace VPetLLM.Core.Services
         /// </summary>
         /// <param name="contextWindow">非 null 时，把每条入选的历史消息前后各扩展这么多条。</param>
         /// <param name="tokenBudget">非 null 时裁剪到该预算。</param>
-        private async Task<string> BuildRawResultsAsync(string userQuery, int? contextWindow, int? tokenBudget)
+        // 检索要算遍全语料，而调用方可能在 UI 线程上，那会让宠物动画卡住
+        private Task<string> BuildRawResultsAsync(string userQuery, int? contextWindow, int? tokenBudget)
+            => Task.Run(() => SearchAndFormatAsync(userQuery, contextWindow, tokenBudget));
+
+        private async Task<string> SearchAndFormatAsync(string userQuery, int? contextWindow, int? tokenBudget)
         {
             if (string.IsNullOrWhiteSpace(userQuery))
                 return string.Empty;
@@ -209,10 +214,10 @@ namespace VPetLLM.Core.Services
         private async Task<List<MemoryHit>> RankAndSelectAsync(
             List<MemoryHit> candidates, List<string> keywords, string userQuery)
         {
-            var docTokens = candidates.Select(c => (IReadOnlyList<string>)Tokenize(c.RawContent)).ToList();
+            var docs = candidates.Select(c => c.RawContent).ToList();
 
             // 路 1：BM25（IDF 在全语料上统计）
-            var bm25Scores = Bm25.Score(docTokens, keywords);
+            var bm25Scores = Bm25.Score(docs, keywords);
             var bm25Ranking = Enumerable.Range(0, candidates.Count)
                 .Where(i => bm25Scores[i] > 0)
                 .OrderByDescending(i => bm25Scores[i])
@@ -220,8 +225,9 @@ namespace VPetLLM.Core.Services
                 .ToList();
 
             // 路 2：覆盖率（命中了查询里多少个不同的词）
+            var coverage = CountCoverage(docs, keywords);
             for (int i = 0; i < candidates.Count; i++)
-                candidates[i].MatchedTerms = CountMatches(candidates[i].RawContent, keywords);
+                candidates[i].MatchedTerms = coverage[i];
 
             var coverageRanking = Enumerable.Range(0, candidates.Count)
                 .Where(i => candidates[i].MatchedTerms > 0)
@@ -230,7 +236,7 @@ namespace VPetLLM.Core.Services
                 .ToList();
 
             // 路 3：向量（语义）
-            var vectorRanking = await BuildVectorRankingAsync(candidates, userQuery);
+            var vectorRanking = await BuildVectorRankingAsync(docs, userQuery);
 
             var fused = RrfFusion.Fuse(RrfFusion.DefaultK, bm25Ranking, coverageRanking, vectorRanking);
             if (fused.Count == 0)
@@ -272,7 +278,7 @@ namespace VPetLLM.Core.Services
         /// 只对**已缓存向量**的文档打分，缺向量的文档本轮不参与，并被排进后台回填队列 ——
         /// 因此冷启动不阻塞、不会为上千条历史一次性打爆 API，常被检索到的文档最先获得向量。
         /// </summary>
-        private async Task<List<int>> BuildVectorRankingAsync(List<MemoryHit> candidates, string userQuery)
+        private async Task<List<int>> BuildVectorRankingAsync(List<string> docs, string userQuery)
         {
             var empty = new List<int>();
             if (_embeddingService is null || !_embeddingService.IsAvailable)
@@ -282,15 +288,14 @@ namespace VPetLLM.Core.Services
             if (queryVector is null)
                 return empty;
 
-            var texts = candidates.Select(c => c.RawContent).ToList();
-            var cached = _embeddingService.GetCachedVectors(texts);
+            var cached = _embeddingService.GetCachedVectors(docs);
 
             var scored = new List<(int Index, double Similarity)>();
             var missing = new List<string>();
 
-            for (int i = 0; i < candidates.Count; i++)
+            for (int i = 0; i < docs.Count; i++)
             {
-                var text = candidates[i].RawContent;
+                var text = docs[i];
                 if (string.IsNullOrWhiteSpace(text))
                     continue;
 
@@ -429,7 +434,7 @@ namespace VPetLLM.Core.Services
 
                 candidates.Add(new MemoryHit
                 {
-                    Content = $"[{msg.Role}]: {msg.Content}",
+                    Role = msg.Role,
                     RawContent = msg.Content,
                     Importance = ImportanceChat,
                     Timestamp = ToTimestamp(msg.UnixTime),
@@ -448,6 +453,22 @@ namespace VPetLLM.Core.Services
 
             try { return DateTimeOffset.FromUnixTimeSeconds(s); }
             catch (ArgumentOutOfRangeException) { return null; }
+        }
+
+        /// <summary>
+        /// 逐篇统计 <see cref="CountMatches"/>。绝大多数文档一个词都不含，
+        /// 先用一次多串搜索筛掉，只给剩下的逐词计数。
+        /// </summary>
+        private static int[] CountCoverage(IReadOnlyList<string> docs, List<string> keywords)
+        {
+            var anyKeyword = SearchValues.Create(keywords.ToArray(), StringComparison.OrdinalIgnoreCase);
+            var coverage = new int[docs.Count];
+            CorpusParallel.For(docs.Count, i =>
+            {
+                if (docs[i].AsSpan().ContainsAny(anyKeyword))
+                    coverage[i] = CountMatches(docs[i], keywords);
+            });
+            return coverage;
         }
 
         /// <summary>
@@ -514,111 +535,24 @@ namespace VPetLLM.Core.Services
         /// （"欢咖"）几乎不会命中任何文本，因此噪声代价很低。
         /// </summary>
         internal static List<string> ExtractKeywords(string query)
-            => Tokenize(query).Distinct(StringComparer.OrdinalIgnoreCase).Take(MaxQueryTerms).ToList();
+            => MemoryTokenizer.Tokenize(query).Distinct(StringComparer.OrdinalIgnoreCase).Take(MaxQueryTerms).ToList();
 
         /// <summary>bigram 比整词多得多，查询词上限相应放宽。</summary>
         private const int MaxQueryTerms = 24;
 
-        /// <summary>
-        /// 分词，<b>保留重复</b>。BM25 需要词频，因此不能在这里去重
-        /// （<see cref="ExtractKeywords"/> 是它的去重版本，用于查询侧）。
-        /// </summary>
-        internal static List<string> Tokenize(string query)
-        {
-            var terms = new List<string>();
-            if (string.IsNullOrWhiteSpace(query))
-                return terms;
-
-            var cjk = new StringBuilder();
-            var latin = new StringBuilder();
-
-            void AddTerm(string t)
-            {
-                if (t.Length > 0 && !StopWords.Contains(t))
-                    terms.Add(t);
-            }
-
-            void FlushCjk()
-            {
-                var s = cjk.ToString();
-                cjk.Clear();
-                if (s.Length == 0)
-                    return;
-
-                if (s.Length == 1)
-                {
-                    // 孤立单字（被标点隔开）本身就是一个词
-                    AddTerm(s);
-                    return;
-                }
-
-                for (int i = 0; i + 1 < s.Length; i++)
-                    AddTerm(s.Substring(i, 2));
-            }
-
-            void FlushLatin()
-            {
-                var s = latin.ToString();
-                latin.Clear();
-                if (s.Length >= 2)
-                    AddTerm(s);
-            }
-
-            foreach (var c in query)
-            {
-                if (IsCjk(c))
-                {
-                    FlushLatin();
-                    cjk.Append(c);
-                }
-                else if (char.IsLetterOrDigit(c))
-                {
-                    FlushCjk();
-                    latin.Append(char.ToLowerInvariant(c));
-                }
-                else
-                {
-                    FlushCjk();
-                    FlushLatin();
-                }
-            }
-            FlushCjk();
-            FlushLatin();
-
-            return terms;
-        }
-
-        private static bool IsCjk(char c) => c >= '一' && c <= '鿿';
-
-        private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
-        {
-            // 拉丁文虚词
-            "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-            "have", "has", "had", "do", "does", "did", "will", "would", "could",
-            "should", "may", "might", "can", "shall", "to", "of", "in", "for",
-            "on", "with", "at", "by", "from", "as", "into", "through", "during",
-            "before", "after", "above", "below", "between", "and", "but", "or",
-            "nor", "not", "so", "yet", "both", "either", "neither", "each", "every",
-            "all", "any", "few", "more", "most", "other", "some", "such", "no",
-            "only", "own", "same", "than", "too", "very", "just", "about", "now",
-
-            // 中文单字虚词（仅在被标点隔开成孤立单字时才会被切出来）
-            "的", "了", "在", "是", "我", "有", "和", "就", "不", "都", "一",
-            "个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着",
-            "看", "好", "这", "他", "她", "它", "那", "吗", "吧", "呢", "啊",
-            "哦", "嗯", "呀", "哈",
-
-            // 中文二字虚词 —— 正好是 bigram 的粒度，命中率高且无信息量
-            "没有", "自己", "们的", "什么", "怎么", "如何", "可以", "这个", "那个",
-            "我们", "你们", "他们", "她们", "记得", "还记", "知道", "觉得", "认为",
-            "因为", "所以", "但是", "然后", "还有", "或者", "如果", "就是", "这样",
-            "那样", "一个", "一下", "一些", "现在", "已经", "曾经", "以及", "而且",
-        };
-
         private sealed class MemoryHit
         {
+            private string? _content;
+
+            /// <summary>聊天消息的角色。万条候选里只有入选的几十条要展示，展示文本用到时才拼。</summary>
+            public string? Role { get; init; }
+
             /// <summary>带来源前缀的展示文本，最终注入 prompt 的就是它。</summary>
-            public string Content { get; set; } = string.Empty;
+            public string Content
+            {
+                get => _content ??= $"[{Role}]: {RawContent}";
+                set => _content = value;
+            }
 
             /// <summary>
             /// 不含来源前缀的原文，供 BM25 分词使用。前缀（"[记忆 #3] "、"[user]: "）

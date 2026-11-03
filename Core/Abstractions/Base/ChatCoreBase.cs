@@ -92,6 +92,16 @@ namespace VPetLLM.Core.Abstractions.Base
 
         protected bool ShowDetailedErrors => DetailedErrors || Utils.System.ErrorMessageHelper.IsDebugMode(Settings);
 
+        /// <summary>
+        /// 一次性调用（识图）打开：这个 core 不读也不写主上下文。
+        /// 必须是每个 core 自己的开关，不能临时改 Settings.KeepContext：那是全局设置，主聊天同时在跑
+        /// 会跟着丢上下文、不写历史；赶上保存会落盘；并发时 A 存 true、B 存 false，最后还原成 false，
+        /// 用户的设置就被永久改掉了。
+        /// </summary>
+        internal bool IgnoreContext { get; set; }
+
+        protected bool KeepContextEnabled => !IgnoreContext && (Settings?.KeepContext ?? true);
+
         /// <summary>工作 core 专用：共享宿主的全部服务，不新建、不注册。</summary>
         protected ChatCoreBase(ChatCoreBase host) : this()
         {
@@ -143,7 +153,7 @@ namespace VPetLLM.Core.Abstractions.Base
         protected async Task PersistToolCallTraceAsync(Core.Tools.NativeToolLoopResult? loop)
         {
             if (loop is null || loop.Transcript.Count == 0) return;
-            if (!(Settings?.KeepContext ?? true)) return;
+            if (!KeepContextEnabled) return;
 
             var stripThinking = !(Settings?.RecordThinkingInContext ?? true);
             foreach (var entry in loop.Transcript)
@@ -1159,7 +1169,7 @@ namespace VPetLLM.Core.Abstractions.Base
             // 由 AI 主动决定何时需要检索，不再自动匹配注入
 
             var systemContent = GetSystemMessage();
-            var keepContext = Settings?.KeepContext ?? true;
+            var keepContext = KeepContextEnabled;
             var overflowMode = Settings?.OverflowMode == Setting.ContextOverflowMode.Overflow;
 
             // 长上下文模式的总结**拼进这条 system**，而不是另起一条。

@@ -331,7 +331,11 @@ namespace VPetLLM.Utils.Plugin
                 }
             }
 
-            File.WriteAllText(configFile, JsonConvert.SerializeObject(pluginStates, Formatting.Indented));
+            var json = JsonConvert.SerializeObject(pluginStates, Formatting.Indented);
+            // 宿主约 2 分钟调一次保存，内容没变就不重写文件
+            if (File.Exists(configFile) && File.ReadAllText(configFile) == json)
+                return;
+            File.WriteAllText(configFile, json);
         }
 
         public static async Task<bool> UnloadAndTryDeletePlugin(IVPetLLMPlugin plugin, IChatCore chatCore)
