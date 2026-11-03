@@ -15,6 +15,9 @@ internal sealed class RecordedCall
     internal required int MessageCount { get; init; }
     internal bool Succeeded { get; set; }
 
+    /// <summary>是不是「合并旧条目」的请求，而不是总结一片新对话。</summary>
+    internal bool IsConsolidation => SystemPrompt.Contains("The entries below are in chronological order");
+
     /// <summary>整个请求的估算 token 数，用来验证没有超出上下文预算。</summary>
     internal int TotalTokens => TokenCounter.EstimateTokenCount(SystemPrompt)
                                 + TokenCounter.EstimateTokenCount(UserContent);
@@ -53,6 +56,12 @@ internal sealed class RecordingCore : ChatCoreBase
     /// <summary>第 N 次成功调用返回什么文本；默认返回一段可辨识的占位总结。</summary>
     internal Func<int, string> SummaryFactory { get; set; } = index => $"summary-{index}";
 
+    /// <summary>合并请求返回的文本；不经 SummaryFactory，也不占它的编号。</summary>
+    internal string ConsolidatedText { get; set; } = "- merged-old-facts";
+
+    /// <summary>合并请求一律失败，分段总结照常成功。</summary>
+    internal bool FailConsolidation { get; set; }
+
     public override Task<string> Chat(string prompt) => Task.FromResult("");
 
     public override Task<string> Chat(string prompt, bool isRetry) => Task.FromResult("");
@@ -68,6 +77,14 @@ internal sealed class RecordingCore : ChatCoreBase
             MessageCount = messageCount
         };
         Calls.Add(call);
+
+        if (call.IsConsolidation)
+        {
+            if (FailConsolidation)
+                throw new SummarizeFailedException("fake consolidation failure");
+            call.Succeeded = true;
+            return Task.FromResult(ConsolidatedText);
+        }
 
         if (FailAlwaysTransport)
         {
@@ -120,11 +137,33 @@ internal sealed class Harness : IDisposable
 
     internal Setting Settings { get; }
 
+    /// <summary>这次检查独占的临时目录，库和向量缓存都放这里。</summary>
+    internal string TempDirectory => _directory;
+
     internal RecordingCore Core { get; }
 
-    internal OverflowManager Manager { get; }
+    internal OverflowManager Manager { get; private set; }
 
     internal int Checkpoint => Manager.LastSummarizedIndex;
+
+    /// <summary>同一个库上换一个新的 OverflowManager，相当于重启插件。</summary>
+    internal void Reopen() => Manager = new OverflowManager(Settings, "Recording", Core, null, _databasePath);
+
+    /// <summary>按改版前的样子直接写一行，用来验证旧库升级。</summary>
+    internal void SeedSummary(string text, int start, int end, string kind)
+    {
+        using var database = new OverflowDatabase(_databasePath);
+        database.CreateSummary("", text, start, end, 0, 0, kind);
+    }
+
+    internal int ActiveRowCount
+    {
+        get
+        {
+            using var database = new OverflowDatabase(_databasePath);
+            return database.GetActiveSummaries("").Count;
+        }
+    }
 
     internal int SummaryRowCount
     {

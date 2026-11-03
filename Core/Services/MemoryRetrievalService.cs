@@ -157,11 +157,12 @@ namespace VPetLLM.Core.Services
                 //      每篇文档都至少含一个查询词，df 被系统性抬高，IDF 被压平。
                 //   2. 向量路要召回的正是零词法重叠的文档（"我爱喝拿铁" ↔ "用户偏好咖啡"），
                 //      它们本来就进不了词法命中的子集。
-                var candidates = CollectCandidates();
+                var graph = LoadGraphSnapshot();
+                var candidates = CollectCandidates(graph);
                 if (candidates.Count == 0)
                     return string.Empty;
 
-                var selected = await RankAndSelectAsync(candidates, keywords, userQuery);
+                var selected = await RankAndSelectAsync(candidates, keywords, userQuery, graph);
                 if (selected.Count == 0)
                     return string.Empty;
 
@@ -212,7 +213,7 @@ namespace VPetLLM.Core.Services
         /// 其余两路照常工作。
         /// </summary>
         private async Task<List<MemoryHit>> RankAndSelectAsync(
-            List<MemoryHit> candidates, List<string> keywords, string userQuery)
+            List<MemoryHit> candidates, List<string> keywords, string userQuery, MemoryGraph.MemoryGraphData? graph)
         {
             var docs = candidates.Select(c => c.RawContent).ToList();
 
@@ -238,7 +239,10 @@ namespace VPetLLM.Core.Services
             // 路 3：向量（语义）
             var vectorRanking = await BuildVectorRankingAsync(docs, userQuery);
 
-            var fused = RrfFusion.Fuse(RrfFusion.DefaultK, bm25Ranking, coverageRanking, vectorRanking);
+            // 路 4：图谱（问题里提到的人/话题 → 与它们相连的事实）
+            var graphRanking = BuildGraphRanking(candidates, userQuery, graph);
+
+            var fused = RrfFusion.Fuse(RrfFusion.DefaultK, bm25Ranking, coverageRanking, vectorRanking, graphRanking);
             if (fused.Count == 0)
                 return new List<MemoryHit>();
 
@@ -323,6 +327,90 @@ namespace VPetLLM.Core.Services
         }
 
         /// <summary>
+        /// 图谱路排序：从问题里认出已知的人和话题（用户、桌宠自己除外——几乎连着所有事实），
+        /// 连着这些实体的原子按命中实体数、再按衰减后的分数排。重要记录的原子映射回记录候选。
+        /// 图谱不可用或问题里没有已知实体时返回空列表，RRF 忽略它。
+        /// </summary>
+        private List<int> BuildGraphRanking(List<MemoryHit> candidates, string userQuery, MemoryGraph.MemoryGraphData? graph)
+        {
+            var empty = new List<int>();
+            if (graph is null || graph.Entities.Count == 0)
+                return empty;
+
+            try
+            {
+                var resolver = new MemoryGraph.MemoryEntityResolver(_settings.UserName, _settings.AiName, graph.Entities.Values);
+                var mentioned = resolver.Resolve(userQuery, null)
+                    .Where(e => e.Key != MemoryGraph.MemoryEntityResolver.UserKey && e.Key != MemoryGraph.MemoryEntityResolver.PetKey)
+                    .Select(e => e.Key)
+                    .ToHashSet(StringComparer.Ordinal);
+                if (mentioned.Count == 0)
+                    return empty;
+
+                var entityIds = graph.Entities.Values.Where(e => mentioned.Contains(e.Key)).Select(e => e.Id).ToHashSet();
+                if (entityIds.Count == 0)
+                    return empty;
+
+                var atomIndex = new Dictionary<long, int>();
+                var recordIndex = new Dictionary<int, int>();
+                for (var i = 0; i < candidates.Count; i++)
+                {
+                    if (candidates[i].AtomId is long atomId)
+                        atomIndex[atomId] = i;
+                    else if (candidates[i].RecordId is int recordId)
+                        recordIndex[recordId] = i;
+                }
+
+                var now = DateTime.UtcNow;
+                var scored = new Dictionary<int, (int Hits, double Score)>();
+                foreach (var atom in graph.Atoms)
+                {
+                    var hits = atom.EntityIds.Count(entityIds.Contains);
+                    if (hits == 0)
+                        continue;
+
+                    int index;
+                    if (atomIndex.TryGetValue(atom.Id, out var a))
+                        index = a;
+                    else if (atom.SourceKind == MemoryGraph.MemoryAtomSource.Record && recordIndex.TryGetValue((int)atom.SourceId, out var r))
+                        index = r;
+                    else
+                        continue;
+
+                    var score = MemoryGraph.MemoryAtomScoring.Decay(atom, now);
+                    if (!scored.TryGetValue(index, out var prev) || (hits, score).CompareTo(prev) > 0)
+                        scored[index] = (hits, score);
+                }
+
+                return scored
+                    .OrderByDescending(kv => kv.Value.Hits)
+                    .ThenByDescending(kv => kv.Value.Score)
+                    .ThenBy(kv => kv.Key)
+                    .Take(LexicalRouteTopK)
+                    .Select(kv => kv.Key)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MemoryRetrievalService: 图谱路检索失败，忽略该路: {ex.Message}");
+                return empty;
+            }
+        }
+
+        private MemoryGraph.MemoryGraphData? LoadGraphSnapshot()
+        {
+            try
+            {
+                return _overflowManager?.GetMemoryGraphSnapshot();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"MemoryRetrievalService: 读取记忆图谱失败: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// 为入选的历史消息补上前后各 <paramref name="window"/> 条邻居，让专家模型
         /// 读得懂对话。邻居本身没被检索命中，relevance 记 0，靠 importance/recency 垫底。
         /// </summary>
@@ -379,7 +467,7 @@ namespace VPetLLM.Core.Services
         /// 收集全部候选：重要记录 + 滚动总结 + 全部聊天历史。不做任何过滤 ——
         /// 过滤是排序阶段的事。
         /// </summary>
-        private List<MemoryHit> CollectCandidates()
+        private List<MemoryHit> CollectCandidates(MemoryGraph.MemoryGraphData? graph)
         {
             var candidates = new List<MemoryHit>();
 
@@ -405,8 +493,8 @@ namespace VPetLLM.Core.Services
             }
 
             // 2. 滚动总结。
-            // overflow_summaries 表里每一行都是前一行的超集（替换制滚动总结），
-            // 因此只看当前那一份。而且在 overflow 模式下它已经被 ChatCoreBase 作为
+            // overflow_summaries 表里是按时间排的分段条目，被合并掉的旧条目不再有效，
+            // LatestSummary 就是全部有效条目拼起来的那份。而且在 overflow 模式下它已经被 ChatCoreBase 作为
             // [Previous Conversation Summary] 注入进每次 prompt 了，再检索一遍纯属重复。
             var summaryAlreadyInPrompt =
                 _settings.KeepContext &&
@@ -422,6 +510,34 @@ namespace VPetLLM.Core.Services
                     // 滚动总结是替换制，始终反映最新状态，不做时间衰减
                     Timestamp = null
                 });
+            }
+
+            // 2b. 总结原子：只要来源条目已不在注入里的（多半是被合并压缩掉的旧分段——
+            // 合并会丢细节，原子把这些细节留了下来）。仍有效的条目要么已在 prompt 里、要么就是上面那份 LatestSummary。
+            // 重要度随衰减走：过期的不收，淡出中的排得靠后。
+            if (graph is not null)
+            {
+                var now = DateTime.UtcNow;
+                foreach (var atom in graph.Atoms)
+                {
+                    if (atom.SourceKind != MemoryGraph.MemoryAtomSource.Summary
+                        || graph.ActiveSummaryIds.Contains((int)atom.SourceId)
+                        || string.IsNullOrWhiteSpace(atom.Content))
+                        continue;
+
+                    var decay = MemoryGraph.MemoryAtomScoring.Decay(atom, now);
+                    if (MemoryGraph.MemoryAtomScoring.StatusOf(decay) == MemoryGraph.MemoryAtomStatus.Expired)
+                        continue;
+
+                    candidates.Add(new MemoryHit
+                    {
+                        Content = $"[旧摘要] {atom.Content}",
+                        RawContent = atom.Content,
+                        Importance = ImportanceSummary * decay,
+                        Timestamp = new DateTimeOffset(DateTime.SpecifyKind(atom.LastSeenAt, DateTimeKind.Utc)),
+                        AtomId = atom.Id
+                    });
+                }
             }
 
             // 3. 聊天历史
@@ -562,6 +678,9 @@ namespace VPetLLM.Core.Services
 
             /// <summary>命中了多少个不同的检索词。</summary>
             public int MatchedTerms { get; set; }
+
+            /// <summary>来自记忆图谱的总结原子时为原子 id。</summary>
+            public long? AtomId { get; init; }
 
             /// <summary>来源固有重要性，0..1。</summary>
             public double Importance { get; set; }

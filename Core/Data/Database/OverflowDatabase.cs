@@ -88,6 +88,9 @@ namespace VPetLLM.Core.Data.Database
                 AddColumn("threshold", "INTEGER NOT NULL DEFAULT 0");
                 // 旧数据 provider 为 ''，与"不按提供商分开聊天"模式的键一致
                 AddColumn("provider", "TEXT NOT NULL DEFAULT ''");
+                // 旧行都是替换制滚动总结（每行是前一行的超集），默认值正好把它们标成 rolling
+                AddColumn("kind", $"TEXT NOT NULL DEFAULT '{OverflowSummaryKind.Rolling}'");
+                AddColumn("superseded", "INTEGER NOT NULL DEFAULT 0");
 
                 // 步骤3：补列之后再建引用这些列的索引
                 using (var idxCmd = connection.CreateCommand())
@@ -109,33 +112,75 @@ namespace VPetLLM.Core.Data.Database
         /// <summary>
         /// Create an overflow summary record.
         /// </summary>
-        public int CreateSummary(string provider, string summaryText, int segmentStartIndex, int segmentEndIndex, int tokenCount, int threshold = 0)
+        public int CreateSummary(string provider, string summaryText, int segmentStartIndex, int segmentEndIndex, int tokenCount,
+            int threshold = 0, string kind = OverflowSummaryKind.Segment)
         {
             try
             {
                 using var connection = SQLiteHelper.OpenConnection(_dbPath);
-
-                var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    INSERT INTO overflow_summaries (provider, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at)
-                    VALUES (@provider, @text, @start, @end, @tokens, @threshold, @time);
-                    SELECT last_insert_rowid();
-                ";
-                cmd.Parameters.AddWithValue("@provider", provider ?? "");
-                cmd.Parameters.AddWithValue("@text", summaryText);
-                cmd.Parameters.AddWithValue("@start", segmentStartIndex);
-                cmd.Parameters.AddWithValue("@end", segmentEndIndex);
-                cmd.Parameters.AddWithValue("@tokens", tokenCount);
-                cmd.Parameters.AddWithValue("@threshold", threshold);
-                cmd.Parameters.AddWithValue("@time", DateTime.UtcNow);
-
-                var id = Convert.ToInt32(cmd.ExecuteScalar());
-                Logger.Log($"Created overflow summary #{id} covering messages [{segmentStartIndex}-{segmentEndIndex}], {tokenCount} tokens");
+                var id = InsertSummary(connection, provider, summaryText, segmentStartIndex, segmentEndIndex, tokenCount, threshold, kind);
+                Logger.Log($"Created overflow summary #{id} ({kind}) covering messages [{segmentStartIndex}-{segmentEndIndex}], {tokenCount} tokens");
                 return id;
             }
             catch (Exception ex)
             {
                 Logger.Log($"Failed to create overflow summary: {ex.Message}");
+                return -1;
+            }
+        }
+
+        private static int InsertSummary(SqliteConnection connection, string provider, string summaryText,
+            int segmentStartIndex, int segmentEndIndex, int tokenCount, int threshold, string kind)
+        {
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO overflow_summaries (provider, summary_text, segment_start_index, segment_end_index, token_count, threshold, kind, created_at)
+                VALUES (@provider, @text, @start, @end, @tokens, @threshold, @kind, @time);
+                SELECT last_insert_rowid();
+            ";
+            cmd.Parameters.AddWithValue("@provider", provider ?? "");
+            cmd.Parameters.AddWithValue("@text", summaryText);
+            cmd.Parameters.AddWithValue("@start", segmentStartIndex);
+            cmd.Parameters.AddWithValue("@end", segmentEndIndex);
+            cmd.Parameters.AddWithValue("@tokens", tokenCount);
+            cmd.Parameters.AddWithValue("@threshold", threshold);
+            cmd.Parameters.AddWithValue("@kind", kind);
+            cmd.Parameters.AddWithValue("@time", DateTime.UtcNow);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        /// <summary>
+        /// 把几条旧总结合并成一条 consolidated，并把被合并的行标成 superseded。
+        /// 同一事务内完成：不会出现「新行已写、旧行还算有效」导致内容注入两遍。
+        /// </summary>
+        public int ConsolidateSummaries(string provider, string summaryText, int segmentStartIndex, int segmentEndIndex,
+            int tokenCount, int threshold, IReadOnlyCollection<int> mergedIds)
+        {
+            try
+            {
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
+                using var transaction = connection.BeginTransaction();
+
+                var id = InsertSummary(connection, provider, summaryText, segmentStartIndex, segmentEndIndex,
+                    tokenCount, threshold, OverflowSummaryKind.Consolidated);
+
+                using var update = connection.CreateCommand();
+                update.CommandText = "UPDATE overflow_summaries SET superseded = 1 WHERE id = @id AND provider = @provider";
+                var idParam = update.Parameters.Add("@id", SqliteType.Integer);
+                update.Parameters.AddWithValue("@provider", provider ?? "");
+                foreach (var mergedId in mergedIds)
+                {
+                    idParam.Value = mergedId;
+                    update.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                Logger.Log($"Consolidated {mergedIds.Count} overflow summaries into #{id} covering [{segmentStartIndex}-{segmentEndIndex}]");
+                return id;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to consolidate overflow summaries: {ex.Message}");
                 return -1;
             }
         }
@@ -197,31 +242,24 @@ namespace VPetLLM.Core.Data.Database
 
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    SELECT id, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at
+                    SELECT id, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at, kind, superseded
                     FROM overflow_summaries
                     WHERE provider = @provider
                       AND summary_text LIKE @kw
+                      AND kind <> @empty
                       AND summary_text NOT LIKE '[threshold marker:%'
                     ORDER BY id DESC
                     LIMIT @limit
                 ";
                 cmd.Parameters.AddWithValue("@provider", provider ?? "");
+                cmd.Parameters.AddWithValue("@empty", OverflowSummaryKind.Empty);
                 cmd.Parameters.AddWithValue("@kw", $"%{keyword}%");
                 cmd.Parameters.AddWithValue("@limit", limit);
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    results.Add(new OverflowSummaryRecord
-                    {
-                        Id = reader.GetInt32(0),
-                        SummaryText = reader.GetString(1),
-                        SegmentStartIndex = reader.GetInt32(2),
-                        SegmentEndIndex = reader.GetInt32(3),
-                        TokenCount = reader.GetInt32(4),
-                        Threshold = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
-                        CreatedAt = reader.GetDateTime(6)
-                    });
+                    results.Add(ReadSummary(reader));
                 }
             }
             catch (Exception ex)
@@ -232,23 +270,47 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
+        /// 「有效条目」的 WHERE 条件：没被合并掉、不是空片、不是旧 marker，
+        /// rolling 只认最新一行。用到它的查询要带 @provider/@rolling/@empty 三个参数。
+        /// </summary>
+        private const string ActiveFilter = @"
+                      superseded = 0
+                      AND kind <> @empty
+                      AND summary_text NOT LIKE '[threshold marker:%'
+                      AND (kind <> @rolling OR id = (
+                          SELECT MAX(id) FROM overflow_summaries
+                          WHERE provider = @provider AND kind = @rolling
+                            AND summary_text NOT LIKE '[threshold marker:%'))";
+
+        /// <summary>编辑器「显示已合并/空片」打开时的条件：只滤掉旧 marker。</summary>
+        private const string AnyFilter = "summary_text NOT LIKE '[threshold marker:%'";
+
+        private static void AddFilterParameters(SqliteCommand cmd, string provider)
+        {
+            cmd.Parameters.AddWithValue("@provider", provider ?? "");
+            cmd.Parameters.AddWithValue("@rolling", OverflowSummaryKind.Rolling);
+            cmd.Parameters.AddWithValue("@empty", OverflowSummaryKind.Empty);
+        }
+
+        /// <summary>
         /// Count summaries for a provider. Excludes legacy threshold-marker rows,
         /// 与 <see cref="GetSummariesPage"/> 用同一套过滤条件，页数才算得准。
+        /// 默认只数有效条目（和注入 prompt 的是同一批）；includeInactive 时连已合并行、空片一起数。
         /// </summary>
-        public int GetSummaryCount(string provider)
+        public int GetSummaryCount(string provider, bool includeInactive = false)
         {
             try
             {
                 using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
+                cmd.CommandText = $@"
                     SELECT COUNT(*)
                     FROM overflow_summaries
                     WHERE provider = @provider
-                      AND summary_text NOT LIKE '[threshold marker:%'
+                      AND {(includeInactive ? AnyFilter : ActiveFilter)}
                 ";
-                cmd.Parameters.AddWithValue("@provider", provider ?? "");
+                AddFilterParameters(cmd, provider);
                 return Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
             }
             catch (Exception ex)
@@ -261,7 +323,7 @@ namespace VPetLLM.Core.Data.Database
         /// <summary>
         /// Get one page of summaries, newest first.
         /// </summary>
-        public List<OverflowSummaryRecord> GetSummariesPage(string provider, int offset, int limit)
+        public List<OverflowSummaryRecord> GetSummariesPage(string provider, int offset, int limit, bool includeInactive = false)
         {
             var results = new List<OverflowSummaryRecord>();
             if (limit <= 0) return results;
@@ -271,31 +333,22 @@ namespace VPetLLM.Core.Data.Database
                 using var connection = SQLiteHelper.OpenConnection(_dbPath);
 
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    SELECT id, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at
+                cmd.CommandText = $@"
+                    SELECT id, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at, kind, superseded
                     FROM overflow_summaries
                     WHERE provider = @provider
-                      AND summary_text NOT LIKE '[threshold marker:%'
+                      AND {(includeInactive ? AnyFilter : ActiveFilter)}
                     ORDER BY id DESC
                     LIMIT @limit OFFSET @offset
                 ";
-                cmd.Parameters.AddWithValue("@provider", provider ?? "");
+                AddFilterParameters(cmd, provider);
                 cmd.Parameters.AddWithValue("@limit", limit);
                 cmd.Parameters.AddWithValue("@offset", Math.Max(0, offset));
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    results.Add(new OverflowSummaryRecord
-                    {
-                        Id = reader.GetInt32(0),
-                        SummaryText = reader.GetString(1),
-                        SegmentStartIndex = reader.GetInt32(2),
-                        SegmentEndIndex = reader.GetInt32(3),
-                        TokenCount = reader.GetInt32(4),
-                        Threshold = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
-                        CreatedAt = reader.GetDateTime(6)
-                    });
+                    results.Add(ReadSummary(reader));
                 }
             }
             catch (Exception ex)
@@ -442,30 +495,78 @@ namespace VPetLLM.Core.Data.Database
         }
 
         /// <summary>
-        /// Get the latest summary text for a provider (for restoring the rolling summary).
-        /// Each summary row supersedes the previous ones, so only the newest is needed.
+        /// 已总结到哪里（不含）：恢复检查点用。
+        ///
+        /// segment_end_index 存的是**含**的末条下标，直接拿来当检查点会差一位——
+        /// 每次重启都把上一片最后一条再总结一遍，它同时还留在滑动窗口里。
+        /// 真实库 732 对相邻行里有 74 对因此重叠一条。
         /// </summary>
-        public string? GetLatestSummaryText(string provider)
+        public int GetSummarizedEndExclusive(string provider)
         {
             try
             {
                 using var connection = SQLiteHelper.OpenConnection(_dbPath);
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    SELECT summary_text FROM overflow_summaries
+                    SELECT COALESCE(MAX(segment_end_index) + 1, 0) FROM overflow_summaries
                     WHERE provider = @provider
-                      AND summary_text NOT LIKE '[threshold marker:%'
-                    ORDER BY id DESC
-                    LIMIT 1";
+                      AND summary_text NOT LIKE '[threshold marker:%'";
                 cmd.Parameters.AddWithValue("@provider", provider ?? "");
-                return cmd.ExecuteScalar() as string;
+                return Convert.ToInt32(cmd.ExecuteScalar());
             }
             catch (Exception ex)
             {
-                Logger.Log($"Failed to get latest summary text: {ex.Message}");
-                return null;
+                Logger.Log($"Failed to get summarized end index: {ex.Message}");
+                return 0;
             }
         }
+
+        /// <summary>
+        /// 当前有效的总结条目，按覆盖的消息先后排列。
+        ///
+        /// 有效 = 没被合并掉的 segment / consolidated，加上**最新一条** rolling。
+        /// rolling 是旧版替换制留下的行，每行都是前一行的超集，只有最新那条算数；
+        /// 把它当作最早的一条底稿，后面接新的分段。
+        /// </summary>
+        public List<OverflowSummaryRecord> GetActiveSummaries(string provider)
+        {
+            var results = new List<OverflowSummaryRecord>();
+            try
+            {
+                using var connection = SQLiteHelper.OpenConnection(_dbPath);
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = $@"
+                    SELECT id, summary_text, segment_start_index, segment_end_index, token_count, threshold, created_at, kind, superseded
+                    FROM overflow_summaries
+                    WHERE provider = @provider
+                      AND {ActiveFilter}
+                    ORDER BY segment_start_index ASC, id ASC";
+                AddFilterParameters(cmd, provider);
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    results.Add(ReadSummary(reader));
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to get active overflow summaries: {ex.Message}");
+            }
+            return results;
+        }
+
+        /// <summary>按 id, summary_text, start, end, tokens, threshold, created_at, kind, superseded 的列序读一行。</summary>
+        private static OverflowSummaryRecord ReadSummary(SqliteDataReader reader) => new()
+        {
+            Id = reader.GetInt32(0),
+            SummaryText = reader.GetString(1),
+            SegmentStartIndex = reader.GetInt32(2),
+            SegmentEndIndex = reader.GetInt32(3),
+            TokenCount = reader.GetInt32(4),
+            Threshold = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+            CreatedAt = reader.GetDateTime(6),
+            Kind = reader.IsDBNull(7) ? OverflowSummaryKind.Rolling : reader.GetString(7),
+            Superseded = !reader.IsDBNull(8) && reader.GetInt32(8) != 0
+        };
 
         /// <summary>
         /// Clear all overflow data for a provider.
@@ -521,6 +622,29 @@ namespace VPetLLM.Core.Data.Database
         public int TokenCount { get; set; }
         public int Threshold { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string Kind { get; set; } = OverflowSummaryKind.Rolling;
+
+        /// <summary>已被合并进某条 consolidated，不再注入 prompt（行留着供编辑器查看）。</summary>
+        public bool Superseded { get; set; }
+    }
+
+    /// <summary>overflow_summaries.kind 的取值。</summary>
+    public static class OverflowSummaryKind
+    {
+        /// <summary>旧版替换制：每行是前一行的超集，只有最新一行有效。</summary>
+        public const string Rolling = "rolling";
+
+        /// <summary>只总结了自己那一片消息，与其它分段互不包含。</summary>
+        public const string Segment = "segment";
+
+        /// <summary>若干条最旧的分段合并压缩而成。</summary>
+        public const string Consolidated = "consolidated";
+
+        /// <summary>
+        /// 这一片总结过了但没有新内容（历史全空、模型返回空、或全是已知事实）。
+        /// 文本为空、不注入，只用来让检查点在重启后也越过这一片——否则每次重启都要再总结它。
+        /// </summary>
+        public const string Empty = "empty";
     }
 
     /// <summary>

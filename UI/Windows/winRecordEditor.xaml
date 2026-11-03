@@ -273,6 +273,12 @@
                                    Text="上下文超出长度上限时，被压缩归档的旧对话。删除会连带回滚对应的检查点。"/>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <!-- 已合并的旧分段、什么都没总结出来的空片默认不列：它们不进提示词，
+                                 混在一起会让人以为那些内容还在生效 -->
+                            <CheckBox x:Name="CheckBox_Overflow_ShowInactive" Content="显示已合并/空片"
+                                      VerticalAlignment="Center" Margin="0,0,14,0"
+                                      Style="{StaticResource ModernCheckBox}"
+                                      Click="CheckBox_Overflow_ShowInactive_Click"/>
                             <Button x:Name="Button_Overflow_Delete" Content="删除选中"
                                     Click="Button_OverflowDelete_Click" Margin="0,0,8,0"
                                     Style="{StaticResource SecondaryButton}"/>
@@ -306,6 +312,9 @@
                                                         Binding="{Binding SummaryText}" Width="*"
                                                         ElementStyle="{StaticResource CellWrap}"
                                                         EditingElementStyle="{StaticResource CellEditor}"/>
+                                    <DataGridTextColumn x:Name="Column_Overflow_Status" Header="状态"
+                                                        Binding="{Binding KindDisplay}" Width="84" IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CellMuted}"/>
                                     <DataGridTextColumn x:Name="Column_Overflow_Range" Header="消息范围"
                                                         Binding="{Binding RangeDisplay}" Width="110" IsReadOnly="True"
                                                         ElementStyle="{StaticResource CellMuted}"/>
@@ -344,6 +353,101 @@
                             </Border>
                         </Grid>
                     </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ══ 关系星云 ══════════════════════════════════════════ -->
+            <TabItem x:Name="TabItem_Nebula">
+                <TabItem.Header>
+                    <TextBlock x:Name="Text_Tab_Nebula" Text="关系星云"
+                               Style="{StaticResource TabHeaderText}"/>
+                </TabItem.Header>
+
+                <Grid Margin="0,14,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" x:Name="Text_Nebula_Hint"
+                                   Style="{StaticResource PaneHint}" Margin="2,0,16,0"
+                                   Text="从溢出总结和重要记忆里拆出的人物、话题与事实。同色是一个社区；拖动平移、滚轮缩放、双击复位。"/>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <CheckBox x:Name="CheckBox_Nebula_ShowFacts" Content="显示事实"
+                                      IsChecked="True" VerticalAlignment="Center" Margin="0,0,14,0"
+                                      Style="{StaticResource ModernCheckBox}"
+                                      Click="CheckBox_Nebula_ShowFacts_Click"/>
+                            <Button x:Name="Button_Nebula_Relayout" Content="重新布局"
+                                    Click="Button_Nebula_Relayout_Click"
+                                    Style="{StaticResource SecondaryButton}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="280"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 星云控件在代码里建好塞进来：自定义控件在 XAML 里起名会被 VPetLLM.VPetLLM 截胡 -->
+                        <Grid Grid.Column="0">
+                            <Border x:Name="Border_NebulaHost" Background="#06080F"
+                                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"/>
+
+                            <TextBlock x:Name="Text_Nebula_Status" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       TextAlignment="Center" TextWrapping="Wrap" MaxWidth="420"
+                                       FontSize="13.5" Foreground="#B8C2E0" IsHitTestVisible="False"/>
+
+                            <TextBlock x:Name="Text_Nebula_Stats" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                       Margin="12,0,0,10" FontSize="12" Foreground="#8E9AC0" IsHitTestVisible="False"/>
+                        </Grid>
+
+                        <Border Grid.Column="1" Margin="12,0,0,0" Padding="14,12"
+                                Style="{StaticResource GridFrame}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" x:Name="Text_Nebula_Title" FontSize="15" FontWeight="SemiBold"
+                                           TextWrapping="Wrap" Foreground="{StaticResource PrimaryTextBrush}"/>
+                                <TextBlock Grid.Row="1" x:Name="Text_Nebula_Meta" Margin="0,4,0,0"
+                                           Style="{StaticResource PaneHint}"/>
+                                <TextBlock Grid.Row="2" x:Name="Text_Nebula_ListHeader" Margin="0,14,0,6"
+                                           FontSize="12.5" FontWeight="SemiBold"
+                                           Foreground="{StaticResource SecondaryTextBrush}"/>
+
+                                <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl x:Name="List_Nebula_Items">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+                                                        Padding="0,7">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="13"
+                                                                   Foreground="{StaticResource PrimaryTextBrush}"/>
+                                                        <TextBlock Text="{Binding Meta}" Margin="0,2,0,0" FontSize="11.5"
+                                                                   Foreground="{StaticResource SecondaryTextBrush}"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </Grid>
             </TabItem>
         </TabControl>

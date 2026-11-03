@@ -106,6 +106,59 @@ namespace VPetLLM.Core.Services.Embedding
         }
 
         /// <summary>
+        /// 取回这批文本的向量，没缓存的当场嵌入（最多 <paramref name="maxNew"/> 条）并存库。
+        /// 给落库前的语义去重用：它必须拿到新行的向量才能比，不能像检索那样等下次自暖。
+        /// 失败返回 null，调用方退回只做字面去重。超出 maxNew 的部分不嵌入、不出现在结果里。
+        /// </summary>
+        public async Task<Dictionary<string, float[]>?> GetOrEmbedAsync(IReadOnlyList<string> texts, int maxNew = 256)
+        {
+            if (!IsAvailable)
+                return null;
+
+            try
+            {
+                var result = GetCachedVectors(texts);
+                var missing = texts
+                    .Where(t => !string.IsNullOrWhiteSpace(t) && !result.ContainsKey(t))
+                    .Distinct(StringComparer.Ordinal)
+                    .Take(Math.Max(0, maxNew))
+                    .ToList();
+
+                for (int offset = 0; offset < missing.Count; offset += _maxBatchSize)
+                {
+                    var batch = missing.Skip(offset).Take(_maxBatchSize).ToList();
+
+                    using var cts = new CancellationTokenSource(_timeout);
+                    var vectors = await _provider.EmbedAsync(batch, cts.Token);
+
+                    var toStore = new List<(string, float[])>(batch.Count);
+                    for (int i = 0; i < batch.Count && i < vectors.Count; i++)
+                    {
+                        if (vectors[i] is float[] v && v.Length > 0)
+                        {
+                            // 先自己归一化：PutMany 打不开库时会吞掉异常，不能指望它顺手归一化
+                            EmbeddingStore.NormalizeInPlace(v);
+                            toStore.Add((EmbeddingStore.ComputeHash(batch[i]), v));
+                            result[batch[i]] = v;
+                        }
+                    }
+
+                    _store.PutMany(toStore, _provider.ModelKey);
+                }
+
+                if (missing.Count > 0)
+                    Interlocked.Exchange(ref _consecutiveFailures, 0);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                var failures = Interlocked.Increment(ref _consecutiveFailures);
+                Logger.Log($"EmbeddingService: 去重用的向量嵌入失败（连续 {failures} 次）: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// 火抛地为缺向量的文本补齐向量。有回填任务在跑时直接跳过本次
         /// （下次检索还会再排一遍，不必排队）。
         /// </summary>

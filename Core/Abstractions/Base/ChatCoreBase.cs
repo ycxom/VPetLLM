@@ -987,6 +987,11 @@ namespace VPetLLM.Core.Abstractions.Base
             try
             {
                 EmbeddingService = CreateEmbeddingService(settings);
+
+                // 溢出总结落库前的语义去重也用它；没启用向量检索时为 null，只做字面去重
+                if (OverflowManager is not null)
+                    OverflowManager.EmbeddingService = EmbeddingService;
+
                 var retrievalService = new MemoryRetrievalService(
                     settings, this, HistoryManager, OverflowManager, RecordManager,
                     EmbeddingService);
@@ -1185,7 +1190,11 @@ namespace VPetLLM.Core.Abstractions.Base
             // 落库的总结可能是在"还不知道上限"的时候生成的，早就长过头了。
             // 这里再卡一刀：它拼进 system，而 system 不参与后面的窗口裁剪 ——
             // 让一份陈年总结一直把 8192 的窗口占满，后面裁多少条历史都没用。
-                systemContent += $"\n\n[Previous Conversation Summary]\n{ClampSummaryForPrompt(summary)}\n[/Previous Conversation Summary]";
+            // 说明放在块里：没有它，模型会把这块当成"上一轮自己写到一半的东西"去续写
+                systemContent += "\n\n[Previous Conversation Summary]\n"
+                    + "(Past records of earlier conversation, oldest first; for the same matter the later entry wins. "
+                    + "They are not part of the current turn — do not continue, repeat or append to them.)\n"
+                    + $"{ClampSummaryForPrompt(summary)}\n[/Previous Conversation Summary]";
             }
 
             var history = new List<Message>

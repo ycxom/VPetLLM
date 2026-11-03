@@ -47,6 +47,7 @@ static class Program
             Test_ApplyChannel(dir);
             Test_ApplyVoice(dir);
             Test_Persistence(dir);
+            Test_NewUserDefaults(dir);
             Test_PluginCatalog();
             Test_PluginHashFailure(dir).GetAwaiter().GetResult();
             Test_PluginRoutes(dir).GetAwaiter().GetResult();
@@ -270,6 +271,60 @@ static class Program
             Check("OnboardingCompleted 往返", back.OnboardingCompleted);
             Check("UseSimpleSettings 往返", back.UseSimpleSettings);
             Check("ShowOnboardingOnStartup 往返", back.ShowOnboardingOnStartup);
+        }
+        finally
+        {
+            storage.Dispose();
+        }
+    }
+
+    // 云端向量只给新装用户默认打开：老用户无论库里存的是关、还是升级前根本没存过这一项，都保持关
+    static void Test_NewUserDefaults(string dir)
+    {
+        Console.WriteLine("\n[新用户默认开启云端向量]");
+
+        var sub = Path.Combine(dir, "new-user");
+        Directory.CreateDirectory(sub);
+        var db = Path.Combine(sub, "settings.db");
+        var storage = new SQLiteSettingStorage(sub);
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        typeof(SQLiteSettingStorage).GetField("_databasePath", flags)!.SetValue(storage, db);
+        typeof(SQLiteSettingStorage).GetField("_backupManager", flags)!.SetValue(storage, new BackupManager(db));
+        try
+        {
+            Check("确实用的是临时库", storage.GetStorageLocation() == db, storage.GetStorageLocation());
+            if (storage.GetStorageLocation() != db) return;
+            Check("临时库初始化成功", storage.Initialize());
+            Check("空库读不到任何设置（新装判据）", storage.LoadAsJson() is null);
+
+            var fresh = Fresh(dir);
+            fresh.Embedding.Enable = false;
+            fresh.Embedding.Source = Setting.EmbeddingSourceMode.Custom;
+            fresh.ApplyNewUserDefaults();
+            Check("新用户打开向量并走免费来源",
+                fresh.Embedding.Enable && fresh.Embedding.Source == Setting.EmbeddingSourceMode.Free);
+
+            var old = Fresh(dir);
+            old.Embedding.Enable = false;
+            storage.Save(old);
+            var json = storage.LoadAsJson();
+            Check("保存过的库不再算新装", json is not null);
+
+            var back = Fresh(dir);
+            back.Embedding.Enable = true;
+            JsonConvert.PopulateObject(json!, back);
+            Check("老用户存过的「关」保持关", !back.Embedding.Enable);
+
+            // 模拟升级前的版本：库里有别的设置，但没有 Embedding 这一行
+            using (var cmd = storage.GetConnection()!.CreateCommand())
+            {
+                cmd.CommandText = "DELETE FROM `settings` WHERE key = 'Embedding'";
+                cmd.ExecuteNonQuery();
+            }
+            json = storage.LoadAsJson();
+            Check("库里确实没有 Embedding 这一项",
+                json is not null && !JObject.Parse(json).ContainsKey(nameof(Setting.Embedding)));
+            Check("没存过这一项的老用户按属性默认值=关", !new Setting.EmbeddingSetting().Enable);
         }
         finally
         {

@@ -1,4 +1,6 @@
 ﻿using VPetLLM.Core.Data.Database;
+using VPetLLM.Core.Services.Embedding;
+using VPetLLM.Core.Services.MemoryGraph;
 using VPetLLM.Infrastructure.Exceptions;
 
 namespace VPetLLM.Core.Data.Managers
@@ -15,11 +17,15 @@ namespace VPetLLM.Core.Data.Managers
     ///     2x threshold total messages since the checkpoint), an incremental
     ///     summary is triggered and the checkpoint advances.
     ///
-    /// The summary is a single rolling text: each new summarization feeds the
-    /// current summary back to the LLM and stores the complete updated version,
-    /// which supersedes the previous one. It is injected into the prompt as a
-    /// [Previous Conversation Summary] system message, and the prompt only
-    /// contains messages after the checkpoint (sliding window).
+    /// 总结是分段制（参考 astrbot_plugin_livingmemory）：每片只总结检查点之后的
+    /// 新消息，各自落成一条，与已有条目逐行去重后再存；注入时按先后拼起来。
+    /// 超出预算时只把最旧的几条合并压缩成一条 consolidated，近期分段原样保留。
+    ///
+    /// 为什么不再用替换制滚动总结（把旧总结喂回去让模型「EXTEND」并输出完整版）：
+    /// 模型每次都把旧总结整段抄一遍再往后续写，真实库里相邻两版相似度 0.86~1.00，
+    /// 旧内容被一遍遍重复计入，表现就是在上次总结后面莫名其妙又「补充」一段。
+    ///
+    /// The prompt only contains messages after the checkpoint (sliding window).
     /// Messages are NEVER deleted from stored history.
     /// </summary>
     public class OverflowManager
@@ -37,10 +43,12 @@ namespace VPetLLM.Core.Data.Managers
         private int _lastSummarizedIndex;
 
         /// <summary>
-        /// Rolling summary text. Each summarization replaces it with the
-        /// complete updated version. Injected into prompt as context.
+        /// 有效条目按先后拼成的文本，注入 prompt 用。每次落库后从库里重算。
         /// </summary>
         private string? _currentSummary;
+
+        /// <summary>当前有效的总结条目（未被合并掉），按覆盖的消息先后排列。</summary>
+        private List<OverflowSummaryRecord> _activeEntries = new();
 
         /// <summary>
         /// Incremented on ClearAll so an in-flight summarization started before
@@ -49,6 +57,36 @@ namespace VPetLLM.Core.Data.Managers
         private int _generation;
 
         private volatile int _isTriggering;  // 0 = idle, 1 = running — 防止并发触发多个 Summarize
+
+        /// <summary>合并连续失败的次数，成功后清零。</summary>
+        private int _consolidationFailures;
+
+        /// <summary>
+        /// 合并失败后还要跳过几次合并机会。合并一直失败（上游拒绝、输出被过滤空）时，
+        /// 不退避的话每落一片新分段就再发一次注定失败的合并请求。
+        /// </summary>
+        private int _consolidationSkipsLeft;
+
+        /// <summary>
+        /// 落库前语义去重用的向量服务，由 ChatCoreBase 在建好检索服务后注入。
+        /// 为 null 或暂不可用时只做字面去重。
+        /// </summary>
+        public EmbeddingService? EmbeddingService { get; set; }
+
+        /// <summary>
+        /// 记忆图谱（事实原子 + 人物/话题实体），总结落库时顺带写入。
+        /// 建库失败时为 null，总结流程照常、只是不出图。
+        /// </summary>
+        public MemoryGraphService? MemoryGraph { get; }
+
+        /// <summary>
+        /// 余弦相似度达到这个值、且数字和否定词一致，才把一行当成已有事实的换个说法。
+        /// 0.92 是保守取值，还没有拿真实语料校准过。
+        /// </summary>
+        public const double SemanticDuplicateThreshold = 0.92;
+
+        /// <summary>当前注入 prompt 的条目 id。</summary>
+        public IReadOnlyCollection<int> ActiveSummaryIds => _activeEntries.Select(e => e.Id).ToHashSet();
 
         /// <summary>
         /// The current rolling summary, or null if no summary exists.
@@ -121,7 +159,18 @@ namespace VPetLLM.Core.Data.Managers
             _providerName = providerName;
             _chatCore = chatCore;
             _recordManager = recordManager;
-            _database = new OverflowDatabase(databasePath ?? GetDatabasePath());
+            var path = databasePath ?? GetDatabasePath();
+            _database = new OverflowDatabase(path);
+
+            try
+            {
+                MemoryGraph = new MemoryGraphService(new MemoryGraphDatabase(path),
+                    () => _settings?.UserName, () => _settings?.AiName);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"OverflowManager: 记忆图谱初始化失败，本次不建图: {ex.Message}");
+            }
 
             // 从数据库恢复上次的溢出状态，避免重启后重复处理全部历史
             RestoreFromDatabase();
@@ -135,11 +184,11 @@ namespace VPetLLM.Core.Data.Managers
             try
             {
                 var provider = EffectiveProvider;
-                var endIndex = _database.GetMaxSegmentEndIndex(provider);
+                var endIndex = _database.GetSummarizedEndExclusive(provider);
                 if (endIndex > 0)
                 {
                     _lastSummarizedIndex = endIndex;
-                    _currentSummary = _database.GetLatestSummaryText(provider);
+                    ReloadActiveEntries();
                     Logger.Log($"OverflowManager: 从数据库恢复状态 - provider='{provider}' lastSummarizedIndex={_lastSummarizedIndex} hasSummary={HasSummary}");
                 }
             }
@@ -271,9 +320,7 @@ namespace VPetLLM.Core.Data.Managers
         }
 
         /// <summary>
-        /// Triggers an incremental overflow summary. The LLM receives the current
-        /// rolling summary plus the newly overflowed messages, and returns the
-        /// complete updated summary which replaces the previous one.
+        /// 总结新溢出的消息：按预算切片，每片单独总结、单独落一条。
         /// </summary>
         private async Task TriggerSummaryAsync(List<Message> overflowedMessages, int segmentStart, int segmentEnd, int msgThreshold)
         {
@@ -423,8 +470,8 @@ namespace VPetLLM.Core.Data.Managers
         /// <summary>
         /// 单次总结请求能携带多少 token 的历史文本。
         ///
-        /// 从生效上下文预算里扣掉三块：滚动总结（它每片都会变长，所以每片都要重算）、
-        /// 提示词本身、以及留给模型写新总结的输出空间。
+        /// 从生效上下文预算里扣掉提示词本身和留给模型写总结的输出空间。
+        /// 分段制下请求里不带已有总结，不用再扣它。
         /// </summary>
         private int ResolveRequestTokenBudget()
         {
@@ -432,20 +479,16 @@ namespace VPetLLM.Core.Data.Managers
             if (context <= 0) context = _settings?.MaxContextTokens ?? 0;
             if (context <= 0) return FallbackRequestTokenBudget;
 
-            var rollingSummary = string.IsNullOrEmpty(_currentSummary)
-                ? 0
-                : TokenCounter.EstimateTokenCount(_currentSummary);
-
-            // 输出空间：新总结至多 SummaryTokenBudget，没配就按上下文的 15% 估
+            // 输出空间：至多 SummaryTokenBudget，没配就按上下文的 15% 估
             var output = SummaryTokenBudget;
             if (output <= 0) output = Math.Max(256, (int)(context * 0.15));
 
             // 提示词模板 + 估算误差的余量
             const int promptOverhead = 512;
 
-            var available = context - rollingSummary - output - promptOverhead;
+            var available = context - output - promptOverhead;
 
-            // 预算被滚动总结挤没了也要留一条能走的路：给一个下限，让流程继续推进，
+            // 上下文很小时也要留一条能走的路：给一个下限，让流程继续推进，
             // 真发不出去会由失败退让那条分支接住。
             return Math.Max(MinRequestTokenBudget, available);
         }
@@ -500,62 +543,109 @@ namespace VPetLLM.Core.Data.Managers
         }
 
         /// <summary>
-        /// 总结一片消息并提交。成功时替换滚动总结——下一片会拿它当
-        /// "Previous summary context"，分片之间正是靠这个串起来的。
+        /// 只追加在 Overflow_Summary_Prefix 后面：Free 网关按名单里提示词的首段放行，
+        /// 首段原样保留，追加的说明不影响匹配。
+        /// </summary>
+        private const string SegmentInstruction =
+            "Summarize ONLY the conversation segment below. It is a new part of an ongoing conversation; " +
+            "earlier parts are already recorded separately, so do not restate them, do not continue or append to " +
+            "any earlier summary, and do not add headings such as \"Supplement\" or \"Update\". " +
+            "Output one fact per line, each line starting with \"- \". Messages carry their send time; turn relative " +
+            "times (today, tomorrow, last week) into concrete dates. If nothing in the segment is worth remembering, output nothing.";
+
+        /// <summary>
+        /// 总结一片消息并提交。请求里只有这一片消息，不带已有总结——
+        /// 带了模型就会把旧总结抄一遍再续写，旧内容被重复计入。
         /// 失败抛 <see cref="SummarizeFailedException"/> 由调用方决定退让还是跳过。
         /// </summary>
         private async Task<SummarizeOutcome> SummarizeBatchAsync(
             List<Message> batch, int batchStart, int msgThreshold, int generation)
         {
+            var batchEnd = batchStart + batch.Count;
+            var tokenCount = TokenCounter.EstimateMessagesTokenCount(batch);
+
             var historyText = string.Join("\n", batch
                 .Where(m => !string.IsNullOrWhiteSpace(m.Content))
-                .Select(m => $"[{m.Role}]: {m.Content}"));
+                .Select(FormatForSummary));
 
             if (string.IsNullOrWhiteSpace(historyText))
+            {
+                CommitEmptySegment(batchStart, batchEnd, tokenCount, msgThreshold);
                 return SummarizeOutcome.Empty;
+            }
 
             var systemPrompt = PromptHelper.Get("Overflow_Summary_Prefix", _settings.PromptLanguage);
             if (systemPrompt.StartsWith("[Prompt Missing"))
                 systemPrompt = PromptHelper.Get("Context_Summary_Prefix", _settings.PromptLanguage);
 
-            // If we already have a prior summary, tell the LLM to extend it
-            if (!string.IsNullOrEmpty(_currentSummary))
-            {
-                systemPrompt += "\n\nPrevious summary context:\n" + _currentSummary;
-                systemPrompt += "\n\nThe above is the existing summary. Please EXTEND it with the new information below, keeping all prior facts. Output the COMPLETE updated summary.";
+            systemPrompt += "\n\n" + SegmentInstruction;
+            if (MemoryGraph is not null)
+                systemPrompt += "\n" + MemoryFactParser.MarkerInstruction;
 
-                // 没有上限时滚动总结会单调增长，最终成为 prompt 里最大的一块
-                var budget = SummaryTokenBudget;
-                if (budget > 0)
-                    systemPrompt += $"\nKeep the complete summary under roughly {budget} tokens. If it would exceed that, merge or drop the least important facts rather than growing.";
-            }
+            // 一片只是十几二十条消息，给它总预算的四分之一足够；分段多了由合并兜住
+            var budget = SummaryTokenBudget;
+            if (budget > 0)
+                systemPrompt += $"\nKeep it under roughly {Math.Max(128, budget / 4)} tokens.";
 
             if (_settings.EnableCompressionRecords && _recordManager is not null)
                 systemPrompt += "\n" + PromptHelper.Get("Context_Summary_RecordHint", _settings.PromptLanguage);
 
-            var summary = await _chatCore.Summarize(systemPrompt, historyText);
+            var raw = await _chatCore.Summarize(systemPrompt, historyText);
 
-            if (string.IsNullOrWhiteSpace(summary))
-                return SummarizeOutcome.Empty;
-
-            // 上下文在总结期间被清空 — 丢弃过期结果
+            // 先判过期再判空：清空之后回来的空结果也不能落空片，否则检查点又被它推回去
             if (generation != _generation)
             {
                 Logger.Log("OverflowManager: 总结期间上下文已被清空，丢弃本次结果");
                 return SummarizeOutcome.Stale;
             }
 
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                CommitEmptySegment(batchStart, batchEnd, tokenCount, msgThreshold);
+                return SummarizeOutcome.Empty;
+            }
+
+            // 实体标记只用来建图，落库、注入、去重用的都是去掉标记的文本
+            var markers = MemoryFactParser.IndexMarkers(raw);
+            var summary = MemoryFactParser.StripMarkers(raw);
+
             // Extract record commands
             if (_settings.EnableCompressionRecords && _recordManager is not null)
                 summary = ExtractAndExecuteRecordCommands(summary);
 
-            // 每片都压一次：滚动总结是下一片的输入，放任它涨会把后续预算吃光
-            summary = await CompactSummaryIfNeededAsync(summary);
+            // 模型仍可能复述早先说过的事实（名字、偏好之类每片都提一次），
+            // 和已有条目逐行比对，重复的不再存第二遍。先字面，再拿向量补一刀换了说法的
+            var known = _activeEntries.Select(e => e.SummaryText).ToList();
+            var filtered = FactSimilarity.Filter(summary, known);
+            if (filtered.Kept.Count > 0 && known.Count > 0)
+            {
+                var semantic = await FindSemanticDuplicatesAsync(filtered.Kept, known);
+                if (generation != _generation)
+                {
+                    Logger.Log("OverflowManager: 总结期间上下文已被清空，丢弃本次结果");
+                    return SummarizeOutcome.Stale;
+                }
+                if (semantic.Count > 0)
+                {
+                    filtered = FactSimilarity.Filter(summary, known,
+                        line => semantic.TryGetValue(line.Trim(), out var matched) ? matched : null);
+                    Logger.Log($"OverflowManager: [{batchStart}..{batchEnd}) 语义去重去掉 {semantic.Count} 行");
+                }
+            }
 
-            var batchEnd = batchStart + batch.Count;
-            var tokenCount = TokenCounter.EstimateMessagesTokenCount(batch);
+            if (string.IsNullOrWhiteSpace(filtered.Text) || filtered.Kept.Count == 0)
+            {
+                Logger.Log($"OverflowManager: [{batchStart}..{batchEnd}) 的总结全部与已有条目重复，不新增");
+                var emptyId = CommitEmptySegment(batchStart, batchEnd, tokenCount, msgThreshold);
+                // 复述也是信号：被重复提到的事实衰减得更慢
+                if (emptyId > 0 && filtered.Duplicates.Count > 0)
+                    MemoryGraph?.IngestSummary(EffectiveProvider, emptyId, Array.Empty<string>(), filtered.Duplicates, markers, DateTime.UtcNow);
+                return SummarizeOutcome.Empty;
+            }
+            summary = filtered.Text;
+
             var summaryId = _database.CreateSummary(
-                EffectiveProvider, summary, batchStart, batchEnd - 1, tokenCount, msgThreshold);
+                EffectiveProvider, summary, batchStart, batchEnd - 1, tokenCount, msgThreshold, OverflowSummaryKind.Segment);
 
             var segments = batch.Select((m, i) => new OverflowSegmentData
             {
@@ -567,11 +657,104 @@ namespace VPetLLM.Core.Data.Managers
             }).ToList();
 
             if (summaryId > 0)
+            {
                 _database.AddSegments(summaryId, segments);
+                MemoryGraph?.IngestSummary(EffectiveProvider, summaryId, filtered.Kept, filtered.Duplicates, markers, DateTime.UtcNow);
+            }
 
-            _currentSummary = summary;
+            ReloadActiveEntries();
             Logger.Log($"OverflowManager: 已提交分片 #{summaryId} 覆盖 [{batchStart}..{batchEnd})，{batch.Count} 条");
+
+            await ConsolidateIfNeededAsync(msgThreshold, generation);
             return SummarizeOutcome.Committed;
+        }
+
+        /// <summary>
+        /// 这一片没有可存的内容（全是空消息、模型没输出、全部重复）时也落一行 kind=empty：
+        /// 它不注入、不进编辑器默认列表，只为让检查点在重启后仍越过这一片，
+        /// 不然重启后会把同一片再总结一遍。
+        /// </summary>
+        private int CommitEmptySegment(int batchStart, int batchEnd, int tokenCount, int msgThreshold)
+            => _database.CreateSummary(EffectiveProvider, "", batchStart, batchEnd - 1, tokenCount, msgThreshold, OverflowSummaryKind.Empty);
+
+        /// <summary>
+        /// 找出 <paramref name="candidates"/> 里与已有条目意思相同、只是换了说法的行。
+        /// 返回「候选行 → 它重复的已有行」。向量服务没开、不可用或调用失败都返回空表，退回纯字面去重。
+        /// </summary>
+        private async Task<Dictionary<string, string>> FindSemanticDuplicatesAsync(
+            IReadOnlyList<string> candidates, IReadOnlyList<string> knownEntries)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            var embedding = EmbeddingService;
+            if (embedding is null || !embedding.IsAvailable)
+                return result;
+
+            static string? FactText(string line)
+            {
+                var text = FactSimilarity.StripListPrefix(line);
+                var key = FactSimilarity.Normalize(text);
+                return key.Length < 4 || FactSimilarity.IsLabelLine(line, key) ? null : text;
+            }
+
+            var knownLines = knownEntries
+                .SelectMany(e => e.Replace("\r\n", "\n").Split('\n'))
+                .Select(l => (Raw: l.Trim(), Text: FactText(l)))
+                .Where(x => x.Text is not null)
+                .ToList();
+            var candidateLines = candidates
+                .Select(l => (Raw: l.Trim(), Text: FactText(l)))
+                .Where(x => x.Text is not null)
+                .ToList();
+            if (knownLines.Count == 0 || candidateLines.Count == 0)
+                return result;
+
+            try
+            {
+                // 候选行在前：已有行大多已在缓存里，新行受 maxNew 限制时先保证候选行有向量
+                var texts = candidateLines.Select(x => x.Text!).Concat(knownLines.Select(x => x.Text!)).Distinct().ToList();
+                var vectors = await embedding.GetOrEmbedAsync(texts);
+                if (vectors is null)
+                    return result;
+
+                foreach (var (raw, text) in candidateLines)
+                {
+                    if (!vectors.TryGetValue(text!, out var v))
+                        continue;
+
+                    string? best = null;
+                    var bestScore = SemanticDuplicateThreshold;
+                    foreach (var known in knownLines)
+                    {
+                        if (!vectors.TryGetValue(known.Text!, out var kv))
+                            continue;
+                        var score = EmbeddingService.CosineSimilarity(v, kv);
+                        if (score >= bestScore && FactSimilarity.AllowsSemanticMatch(raw, known.Raw))
+                        {
+                            best = known.Raw;
+                            bestScore = score;
+                        }
+                    }
+                    if (best is not null)
+                        result[raw] = best;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"OverflowManager: 语义去重失败，只做字面去重: {ex.Message}");
+                result.Clear();
+            }
+            return result;
+        }
+
+        /// <summary>带上发送时间：模型要靠它把「明天」「上周」换成具体日期。</summary>
+        private static string FormatForSummary(Message message)
+        {
+            if (message.UnixTime is long seconds && seconds > 0)
+            {
+                var time = DateTimeOffset.FromUnixTimeSeconds(seconds).ToLocalTime();
+                return $"[{message.Role} {time:yyyy-MM-dd HH:mm}]: {message.Content}";
+            }
+            return $"[{message.Role}]: {message.Content}";
         }
 
         private const string CompactPromptFallback =
@@ -579,46 +762,114 @@ namespace VPetLLM.Core.Data.Managers
             "important details, and keep every fact that future conversations may need. Preserve the original " +
             "language. Output only the compacted summary.";
 
+        private const string ConsolidateInstruction =
+            "The entries below are in chronological order. When two entries disagree about the same matter, keep the " +
+            "later one. Output one fact per line, each line starting with \"- \", with no headings.";
+
         /// <summary>
-        /// 若滚动总结超出 token 预算，先请 LLM 压缩一次；压缩失败或仍然超标时按字符硬截断。
+        /// 有效条目总量超出预算时，把最旧的几条合并成一条 consolidated。
+        ///
+        /// 只动旧条目：从最新往回数，预算的一半留给近期分段原样保留，其余合并。
+        /// 合并请求里只有这些旧条目、没有新对话，模型无从「续写」。
+        /// 合并失败时什么都不改——分段都还在，注入时 ClampSummaryForPrompt 会从最旧的一头裁，
+        /// 下次落新分段时再试。
         /// </summary>
-        private async Task<string> CompactSummaryIfNeededAsync(string summary)
+        private async Task ConsolidateIfNeededAsync(int msgThreshold, int generation)
         {
             var budget = SummaryTokenBudget;
-            if (budget <= 0 || string.IsNullOrWhiteSpace(summary))
-                return summary;
+            var entries = _activeEntries;
+            if (budget <= 0 || entries.Count == 0)
+                return;
 
-            if (TokenCounter.EstimateTokenCount(summary) <= budget)
-                return summary;
+            var sizes = entries.Select(e => TokenCounter.EstimateTokenCount(e.SummaryText)).ToList();
+            var total = sizes.Sum();
+            if (total <= budget)
+                return;
 
-            var before = TokenCounter.EstimateTokenCount(summary);
-            Logger.Log($"OverflowManager: 滚动总结 {before} tokens 超出预算 {budget}，开始压缩");
+            if (_consolidationSkipsLeft > 0)
+            {
+                _consolidationSkipsLeft--;
+                Logger.Log($"OverflowManager: 合并已连续失败 {_consolidationFailures} 次，退避中，本次不合并（还要跳过 {_consolidationSkipsLeft} 次）");
+                return;
+            }
 
+            var kept = 0;
+            var splitAt = entries.Count;
+            for (var i = entries.Count - 1; i >= 0; i--)
+            {
+                if (kept + sizes[i] > budget / 2)
+                    break;
+                kept += sizes[i];
+                splitAt = i;
+            }
+
+            // 最新一条自己就超过一半预算时 splitAt 停在末尾，那就全部合并
+            var toMerge = entries.Take(splitAt == entries.Count ? entries.Count : splitAt).ToList();
+            if (toMerge.Count == 0)
+                return;
+
+            var mergeBudget = Math.Max(128, budget - kept);
+            Logger.Log($"OverflowManager: 有效总结 {total} tokens 超出预算 {budget}，合并最旧的 {toMerge.Count} 条（保留近期 {entries.Count - toMerge.Count} 条）");
+
+            string merged;
             try
             {
-                var compactPrompt = PromptHelper.Get("Overflow_Summary_Compact", _settings.PromptLanguage);
-                if (compactPrompt.StartsWith("[Prompt Missing"))
-                    compactPrompt = CompactPromptFallback;
-                compactPrompt += $"\nThe result must stay under roughly {budget} tokens.";
+                var prompt = PromptHelper.Get("Overflow_Summary_Compact", _settings.PromptLanguage);
+                if (prompt.StartsWith("[Prompt Missing"))
+                    prompt = CompactPromptFallback;
+                prompt += "\n" + ConsolidateInstruction + $"\nThe result must stay under roughly {mergeBudget} tokens.";
 
-                var compacted = await _chatCore.Summarize(compactPrompt, summary);
-                if (!string.IsNullOrWhiteSpace(compacted))
-                    summary = compacted;
+                merged = await _chatCore.Summarize(prompt, string.Join("\n\n", toMerge.Select(e => e.SummaryText.Trim())));
             }
-            // SummarizeFailedException 也走这里：压缩失败时保留未压缩的原总结，
-            // 交给下面的硬截断，绝不能用失败文案替换掉一份本来有效的总结。
+            // SummarizeFailedException 也走这里：绝不能用失败文案替换掉本来有效的条目
             catch (Exception ex)
             {
-                Logger.Log($"OverflowManager: 总结压缩失败，改用硬截断: {ex.Message}");
+                Logger.Log($"OverflowManager: 合并旧总结失败，保留原分段待下次再合: {ex.Message}");
+                BackOffConsolidation();
+                return;
             }
 
-            // 压缩后仍超标（或压缩失败）时硬截断。保留开头：近期事实本来就还在滑动窗口里
-            // 逐字保存着，总结的独有价值在于更早的那部分。
-            if (TokenCounter.EstimateTokenCount(summary) > budget)
-                summary = TruncateToTokenBudget(summary, budget);
+            if (generation != _generation)
+                return;
 
-            Logger.Log($"OverflowManager: 总结压缩完成 {before} → {TokenCounter.EstimateTokenCount(summary)} tokens");
-            return summary;
+            merged = string.IsNullOrWhiteSpace(merged) ? "" : FactSimilarity.Filter(merged, Array.Empty<string>()).Text;
+            if (string.IsNullOrWhiteSpace(merged))
+            {
+                Logger.Log("OverflowManager: 合并结果为空，保留原分段待下次再合");
+                BackOffConsolidation();
+                return;
+            }
+
+            _consolidationFailures = 0;
+            _consolidationSkipsLeft = 0;
+
+            // 仍超标时硬截断。保留开头：近期事实在后面的分段里，合并块的独有价值在更早的部分
+            if (TokenCounter.EstimateTokenCount(merged) > mergeBudget)
+                merged = TruncateToTokenBudget(merged, mergeBudget);
+
+            var id = _database.ConsolidateSummaries(EffectiveProvider, merged,
+                toMerge.Min(e => e.SegmentStartIndex), toMerge.Max(e => e.SegmentEndIndex),
+                toMerge.Sum(e => e.TokenCount), msgThreshold, toMerge.Select(e => e.Id).ToList());
+            if (id > 0)
+                ReloadActiveEntries();
+        }
+
+        /// <summary>
+        /// 失败一次跳过 2 次合并机会，之后 4、8、16 次封顶。
+        /// 分段照常落库，注入时 ClampSummaryForPrompt 从最旧的一头裁，超预算期间不会撑爆窗口。
+        /// </summary>
+        private void BackOffConsolidation()
+        {
+            _consolidationFailures++;
+            _consolidationSkipsLeft = Math.Min(16, 1 << Math.Min(_consolidationFailures, 5));
+        }
+
+        private void ReloadActiveEntries()
+        {
+            var entries = _database.GetActiveSummaries(EffectiveProvider);
+            _activeEntries = entries;
+            var text = string.Join("\n\n", entries.Select(e => e.SummaryText.Trim()).Where(t => t.Length > 0));
+            _currentSummary = text.Length == 0 ? null : text;
         }
 
         private const string TruncationMarker = "\n…[summary truncated]";
@@ -657,13 +908,63 @@ namespace VPetLLM.Core.Data.Managers
         /// <summary>
         /// Count summaries for the editor's pager.
         /// </summary>
-        public int GetSummaryCount() => _database.GetSummaryCount(EffectiveProvider);
+        /// <param name="includeInactive">连同已被合并掉的旧分段、空片、旧版滚动总结一起数。</param>
+        public int GetSummaryCount(bool includeInactive = false) => _database.GetSummaryCount(EffectiveProvider, includeInactive);
 
         /// <summary>
         /// Get one page of summaries, newest first.
         /// </summary>
-        public List<OverflowSummaryRecord> GetSummariesPage(int offset, int limit)
-            => _database.GetSummariesPage(EffectiveProvider, offset, limit);
+        public List<OverflowSummaryRecord> GetSummariesPage(int offset, int limit, bool includeInactive = false)
+            => _database.GetSummariesPage(EffectiveProvider, offset, limit, includeInactive);
+
+        /// <summary>
+        /// 检索用的只读快照：不同步记录、不回填，只读缓存。图谱不可用时返回 null。
+        /// </summary>
+        public MemoryGraphData? GetMemoryGraphSnapshot()
+        {
+            var graph = MemoryGraph;
+            if (graph is null)
+                return null;
+            var data = graph.Load(EffectiveProvider);
+            return new MemoryGraphData
+            {
+                Atoms = data.Atoms,
+                Entities = data.Entities,
+                ActiveSummaryIds = new HashSet<int>(_activeEntries.Select(e => e.Id))
+            };
+        }
+
+        /// <summary>
+        /// 给星云图准备数据：先把重要记录同步成原子、旧库没有原子时从有效条目回填，再整体读出。
+        /// 会读写数据库，调用方放在后台线程。
+        /// </summary>
+        public MemoryGraphData? LoadMemoryGraphData(RecordManager? records = null)
+        {
+            var graph = MemoryGraph;
+            if (graph is null)
+                return null;
+
+            var now = DateTime.UtcNow;
+            records ??= _recordManager;
+            if (records is not null)
+            {
+                try
+                {
+                    graph.SyncRecords(records.GetAllRecordsForEditing(), now);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"OverflowManager: 同步重要记录到图谱失败: {ex.Message}");
+                }
+            }
+
+            var entries = _activeEntries;
+            graph.BackfillIfEmpty(EffectiveProvider, entries, now);
+
+            var data = graph.Load(EffectiveProvider);
+            var active = new HashSet<int>(entries.Select(e => e.Id));
+            return new MemoryGraphData { Atoms = data.Atoms, Entities = data.Entities, ActiveSummaryIds = active };
+        }
 
         /// <summary>
         /// Get segments associated with a summary.
@@ -678,26 +979,29 @@ namespace VPetLLM.Core.Data.Managers
         public void UpdateSummaryText(int summaryId, string newText)
         {
             _database.UpdateSummaryText(summaryId, newText);
+            MemoryGraph?.ReplaceSummary(EffectiveProvider, summaryId, newText, DateTime.UtcNow);
             RefreshFromDatabase();
         }
 
         /// <summary>
-        /// Delete a summary and roll in-memory state back to what the database
-        /// still holds (deleting the latest row falls back to the previous version).
+        /// 删除一条总结并按库里剩下的重建内存状态。删的是哪一条，注入里就少哪一条；
+        /// 删掉合并块不会让被它合并的旧分段复活。
         /// </summary>
         public void DeleteSummary(int summaryId)
         {
             _database.DeleteSummary(summaryId);
+            MemoryGraph?.DeleteSummary(summaryId);
             RefreshFromDatabase();
         }
 
         /// <summary>
-        /// Re-derive the rolling summary and checkpoint from the database.
+        /// Re-derive the active summary entries and checkpoint from the database.
         /// </summary>
         private void RefreshFromDatabase()
         {
             _lastSummarizedIndex = 0;
             _currentSummary = null;
+            _activeEntries = new();
             RestoreFromDatabase();
         }
 
@@ -709,9 +1013,13 @@ namespace VPetLLM.Core.Data.Managers
             Interlocked.Increment(ref _generation);
             _lastSummarizedIndex = 0;
             _currentSummary = null;
+            _activeEntries = new();
             AccumulatedOverflowMessageCount = 0;
             AccumulatedOverflowTokens = 0;
+            _consolidationFailures = 0;
+            _consolidationSkipsLeft = 0;
             _database.ClearAll(EffectiveProvider);
+            MemoryGraph?.Clear(EffectiveProvider);
         }
 
         private string ExtractAndExecuteRecordCommands(string summary)

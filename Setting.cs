@@ -227,6 +227,23 @@ namespace VPetLLM
         private static ISettingStorage? _storage;
         private readonly string? _instanceId;
 
+        /// <summary>本次加载没读到任何已存设置。只在构造期间有意义。</summary>
+        private bool _freshInstall;
+
+        /// <summary>
+        /// 只给全新安装的用户打开的功能。属性默认值仍然是关：老用户库里没存过这一项时
+        /// 按「不写=关闭」处理，不会因为升级被悄悄打开；新用户这里显式写成开，随下一次保存落库，
+        /// 之后在设置里关掉就一直是关。
+        /// </summary>
+        public void ApplyNewUserDefaults()
+        {
+            // 云端免费向量：用于记忆检索的语义召回和长上下文总结的语义去重。
+            // 云端没下发配置时 CreateFreeEmbeddingProvider 返回 null，向量路自动缺席
+            Embedding ??= new EmbeddingSetting();
+            Embedding.Enable = true;
+            Embedding.Source = EmbeddingSourceMode.Free;
+        }
+
         public Setting(string path, string? instanceId = null)
         {
             _path = Path.Combine(path, "VPetLLM.json");
@@ -243,6 +260,9 @@ namespace VPetLLM
             
             // Ensure all properties have default values (legacy compatibility)
             EnsureDefaultValues();
+
+            if (_freshInstall)
+                ApplyNewUserDefaults();
 
             // 旧的"提供商 + 节点"选路规则折算成统一渠道（只做一次）
             try
@@ -457,6 +477,11 @@ namespace VPetLLM
                         // Load provider nodes from provider_nodes table
                         LoadProviderNodes(sqliteStorage);
                         LoadModelCache(sqliteStorage);
+                    }
+                    else
+                    {
+                        // 库里一条设置都没有：全新安装（旧 JSON 迁移会先写进库，不会走到这里）
+                        _freshInstall = true;
                     }
                 }
                 else
@@ -1774,7 +1799,10 @@ namespace VPetLLM
 
         public class EmbeddingSetting
         {
-            /// <summary>默认关闭：需要一个可用的 embedding 端点，且会产生 API 调用。</summary>
+            /// <summary>
+            /// 属性默认关闭：需要一个可用的 embedding 端点，且会产生 API 调用。
+            /// 全新安装由 <see cref="ApplyNewUserDefaults"/> 显式打开（走 Free 来源）。
+            /// </summary>
             public bool Enable { get; set; } = false;
 
             /// <summary>
