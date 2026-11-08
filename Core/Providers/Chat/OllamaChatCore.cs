@@ -97,7 +97,40 @@ namespace VPetLLM.Core.Providers.Chat
             var node = _ollamaSetting.OllamaNodes.Count >= 1
                 ? _ollamaSetting.OllamaNodes[0]
                 : _ollamaSetting.GetCurrentOllamaSetting();
-            return node?.ThinkingEffort ?? Setting.ThinkingEffort.Default;
+            if (node is null || NoThinkingModels.ContainsKey(ThinkingKey(node))) return Setting.ThinkingEffort.Default;
+            return node.ThinkingEffort;
+        }
+
+        // 节点设了思考强度、模型却换成了不支持思考的（如 qwen2.5），Ollama 会整个请求 400。
+        // 按 地址+模型 记住，本次运行内不再给它发 think；换模型就重新按设置发
+        private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, byte> NoThinkingModels =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private bool _thinkingRejected;
+
+        private static string ThinkingKey(Setting.OllamaNodeSetting node) => $"{node.Url?.TrimEnd('/')}|{node.Model?.Trim()}";
+
+        protected override void OnHttpError(int status, string? rawBody)
+        {
+            if (status != 400 || rawBody?.Contains("does not support thinking", StringComparison.OrdinalIgnoreCase) != true) return;
+            if (GetThinkingEffort() == Setting.ThinkingEffort.Default) return;
+
+            var node = _ollamaSetting.OllamaNodes.Count >= 1 ? _ollamaSetting.OllamaNodes[0] : _ollamaSetting.GetCurrentOllamaSetting();
+            if (node is null || !NoThinkingModels.TryAdd(ThinkingKey(node), 0)) return;
+
+            _thinkingRejected = true;
+            Logger.Log($"Ollama: 模型 {node.Model} 不支持思考，节点上的思考强度对它无效，去掉思考参数后重发");
+        }
+
+        /// <summary>刚学到"该去掉思考参数"或"该裁上下文"时返回 true，调用方把整个请求重发一遍。</summary>
+        private bool ShouldRetryRequest(string prompt)
+        {
+            if (_thinkingRejected)
+            {
+                _thinkingRejected = false;
+                return true;
+            }
+            return ShouldRetryAfterContextLimit(prompt);
         }
 
         public override Task<string> Chat(string prompt)
@@ -239,7 +272,8 @@ namespace VPetLLM.Core.Providers.Chat
                                 if (!roundResponse.IsSuccessStatusCode)
                                 {
                                     var errorMessage = await HandleHttpErrorAsync(roundResponse, "Ollama");
-                                    ReportFailure(errorMessage);
+                                    // 去掉思考参数就能重发的失败不报给用户
+                                    if (!_thinkingRejected) ReportFailure(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
@@ -247,7 +281,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!loop.Success)
                         {
-                            if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
+                            if (ShouldRetryRequest(prompt)) return await ChatWithImages(prompt, images);
                             return "";
                         }
                         toolLoop = loop;
@@ -270,7 +304,7 @@ namespace VPetLLM.Core.Providers.Chat
                             // 而"上下文超长"的窗口大小恰恰只写在响应体里
                             var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
-                            if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
+                            if (ShouldRetryRequest(prompt)) return await ChatWithImages(prompt, images);
                             ReportFailure(errorMessage);
                             return "";
                         }
@@ -328,7 +362,7 @@ namespace VPetLLM.Core.Providers.Chat
                         {
                             var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
                             // 上下文超长：已经从错误里学到真实窗口，裁剪后重发一次
-                            if (ShouldRetryAfterContextLimit(prompt)) return await ChatWithImages(prompt, images);
+                            if (ShouldRetryRequest(prompt)) return await ChatWithImages(prompt, images);
                             ReportFailure(errorMessage);
                             return "";
                         }
@@ -465,7 +499,8 @@ namespace VPetLLM.Core.Providers.Chat
                                 {
                                     var errorMessage = await HandleHttpErrorAsync(roundResponse, "Ollama");
                                     Logger.Log($"Ollama: 工具调用请求失败 {(int)roundResponse.StatusCode}");
-                                    ReportFailure(errorMessage);
+                                    // 去掉思考参数就能重发的失败不报给用户
+                                    if (!_thinkingRejected) ReportFailure(errorMessage);
                                     return null;
                                 }
                                 return JObject.Parse(await roundResponse.Content.ReadAsStringAsync());
@@ -473,7 +508,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                         if (!loop.Success)
                         {
-                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
+                            if (ShouldRetryRequest(prompt)) return await Chat(prompt, isRetry);
                             return "";
                         }
                         toolLoop = loop;
@@ -495,7 +530,7 @@ namespace VPetLLM.Core.Providers.Chat
                             // EnsureSuccessStatusCode 会把响应体连同错误一起丢掉，
                             // 而"上下文超长"的窗口大小恰恰只写在响应体里
                             var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
-                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
+                            if (ShouldRetryRequest(prompt)) return await Chat(prompt, isRetry);
                             ReportFailure(errorMessage);
                             return "";
                         }
@@ -552,7 +587,7 @@ namespace VPetLLM.Core.Providers.Chat
                         if (!response.IsSuccessStatusCode)
                         {
                             var errorMessage = await HandleHttpErrorAsync(response, "Ollama");
-                            if (ShouldRetryAfterContextLimit(prompt)) return await Chat(prompt, isRetry);
+                            if (ShouldRetryRequest(prompt)) return await Chat(prompt, isRetry);
                             ReportFailure(errorMessage);
                             return "";
                         }

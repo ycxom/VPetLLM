@@ -790,6 +790,7 @@ static class Program
         // 插件页的联网部分走一个连不上的本地代理：很快失败，也不碰用真实库的代理池
         settings.PluginStore.UseProxy = true;
         settings.PluginStore.ProxyUrl = "127.0.0.1:1";
+        settings.Records.EnableRecords = false;
 
         var host = (VPetLLM.VPetLLM)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(VPetLLM.VPetLLM));
         host.Settings = settings;
@@ -838,7 +839,7 @@ static class Program
             }
             void Tour()
             {
-                foreach (var name in new[] { "Tab_Profile", "Tab_Features", "Tab_Plugins", "Tab_Help", "Tab_Channel" })
+                foreach (var name in new[] { "Tab_Profile", "Tab_Features", "Tab_Plugins", "Tab_Memory", "Tab_Help", "Tab_Channel" })
                     Select(name);
             }
             void Click(System.Windows.Controls.Button button)
@@ -847,7 +848,16 @@ static class Program
                 win.UpdateLayout();
             }
 
-            Check("分成五页，打开时在 AI 服务", tabs.Items.Count == 5 && ReferenceEquals(tabs.SelectedItem, tabChannel), $"{tabs.Items.Count} {tabs.SelectedIndex}");
+            Check("分成六页，打开时在 AI 服务", tabs.Items.Count == 6 && ReferenceEquals(tabs.SelectedItem, tabChannel), $"{tabs.Items.Count} {tabs.SelectedIndex}");
+            Select("Tab_Memory");
+            Check("记忆页：有查看记忆、查看/清空聊天记录", Named<System.Windows.Controls.Button>("Btn_ViewMemory").IsVisible
+                  && Named<System.Windows.Controls.Button>("Btn_ViewHistory").IsVisible && Named<System.Windows.Controls.Button>("Btn_ClearHistory").IsVisible);
+            Check("记忆页：开关跟着设置走", Named<System.Windows.Controls.CheckBox>("Cb_EnableRecords").IsChecked == false);
+            Click(Named<System.Windows.Controls.Button>("Btn_ViewHistory"));
+            var memoryStatus = Named<System.Windows.Controls.TextBlock>("Tb_Status").Text;
+            Check("记忆页：AI 服务没准备好时查看聊天记录说明原因", memoryStatus.Contains("AI 服务"), memoryStatus);
+            Named<System.Windows.Controls.TextBlock>("Tb_Status").Text = "";
+            Select("Tab_Channel");
             Check("每页都有标题", tabs.Items.OfType<System.Windows.Controls.TabItem>().All(t => !string.IsNullOrEmpty(t.Header as string)));
             Check("别的页不占地方", !enableBuy.IsVisible && !aiName.IsVisible && !pluginRefresh.IsVisible);
             Check("主渠道能用时 AI 服务默认折叠", channelHost.Visibility == System.Windows.Visibility.Collapsed);

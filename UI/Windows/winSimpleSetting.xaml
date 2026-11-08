@@ -136,6 +136,54 @@
                 </ScrollViewer>
             </TabItem>
 
+            <TabItem x:Name="Tab_Memory" Header="{utils:Localize KeyPath=QuickSetup.TabMemory, Default=记忆}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
+                    <StackPanel>
+                        <Border Style="{StaticResource CardContainer}" Margin="0,12,8,10" VerticalAlignment="Top">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,12,0">
+                                        <TextBlock Style="{StaticResource QuickCardTitle}"
+                                                   Text="{utils:Localize KeyPath=QuickSetup.CardMemory, Default=桌宠的记忆}"/>
+                                        <TextBlock Style="{StaticResource QuickHint}"
+                                                   Text="{utils:Localize KeyPath=QuickSetup.MemoryDesc, Default=桌宠从聊天里记下的重要事情和人物关系，可以查看、修改或删除。}"/>
+                                    </StackPanel>
+                                    <Button x:Name="Btn_ViewMemory" Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
+                                            Click="ViewMemory_Click"
+                                            Content="{utils:Localize KeyPath=QuickSetup.ViewMemory, Default=查看记忆}"/>
+                                </Grid>
+                                <CheckBox x:Name="Cb_EnableRecords" Style="{StaticResource ModernCheckBox}" Margin="0,10,0,0"
+                                          Content="{utils:Localize KeyPath=QuickSetup.EnableRecords, Default=让桌宠记住聊天里的重要事情}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource CardContainer}" Margin="0,0,8,4" VerticalAlignment="Top">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource QuickCardTitle}"
+                                               Text="{utils:Localize KeyPath=QuickSetup.CardHistory, Default=聊天记录}"/>
+                                    <TextBlock Style="{StaticResource QuickHint}"
+                                               Text="{utils:Localize KeyPath=QuickSetup.HistoryDesc, Default=桌宠聊天时能看到的最近对话。}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="Btn_ClearHistory" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="ClearHistory_Click"
+                                            Content="{utils:Localize KeyPath=QuickSetup.ClearHistory, Default=清空}"/>
+                                    <Button x:Name="Btn_ViewHistory" Style="{StaticResource SecondaryButton}" Click="ViewHistory_Click"
+                                            Content="{utils:Localize KeyPath=QuickSetup.ViewHistory, Default=查看}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <TabItem x:Name="Tab_Help" Header="{utils:Localize KeyPath=QuickSetup.TabHelp, Default=帮助}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
                     <Border Style="{StaticResource CardContainer}" Margin="0,12,8,4" VerticalAlignment="Top">

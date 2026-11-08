@@ -44,6 +44,7 @@ namespace VPetLLM.UI.Windows
             Cb_ReadAloud.IsChecked = settings.TTS.IsEnabled;
             Cb_VoiceInput.IsChecked = settings.ASR.IsEnabled;
             Cb_ShowOnboardingOnStartup.IsChecked = settings.ShowOnboardingOnStartup;
+            Cb_EnableRecords.IsChecked = settings.Records?.EnableRecords ?? true;
 
             var ttsPlugin = _plugin.IsVPetTTSPluginDetected;
             Cb_ReadAloud.IsEnabled = !ttsPlugin;
@@ -102,6 +103,8 @@ namespace VPetLLM.UI.Windows
             settings.EnableAction = Cb_EnableAction.IsChecked == true;
             settings.EnableBuy = Cb_EnableBuy.IsChecked == true;
             settings.ShowOnboardingOnStartup = Cb_ShowOnboardingOnStartup.IsChecked == true;
+            settings.Records ??= new Setting.RecordSettings();
+            settings.Records.EnableRecords = Cb_EnableRecords.IsChecked == true;
             QuickSetupService.ApplyVoice(settings, Cb_ReadAloud.IsChecked == true, Cb_VoiceInput.IsChecked == true);
 
             _plugin.ApplyQuickSettings(oldProvider);
@@ -172,6 +175,40 @@ namespace VPetLLM.UI.Windows
             if (!SaveAll()) return;
             Close();
             _plugin.SwitchSettingsMode(simple: false);
+        }
+
+        // 记忆和聊天记录直接读写数据库，和设置里的保存无关，不用先保存
+        private void ViewMemory_Click(object sender, RoutedEventArgs e)
+        {
+            new winRecordEditor(_plugin).Show();
+        }
+
+        private void ViewHistory_Click(object sender, RoutedEventArgs e)
+        {
+            if (_plugin.ChatCore is null)
+            {
+                ShowStatus(T("QuickSetup.NoChatCore", "AI 服务还没准备好，先在“AI 服务”页选好并保存。"), false);
+                return;
+            }
+            new winContextEditor(_plugin).Show();
+        }
+
+        // 和完整设置的“清空上下文”一致：长上下文模式下总结和重要记忆跟着清
+        private void ClearHistory_Click(object sender, RoutedEventArgs e)
+        {
+            var confirm = MessageBox.Show(this,
+                T("LLM_Settings.ClearContextConfirm", "确认清空聊天上下文？这将同时清空所有聊天历史和溢出总结记忆。"),
+                T("LLM_Settings.ClearContext", "清空上下文"),
+                MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            _plugin.ChatCore?.ClearContext();
+            if (_plugin.Settings.OverflowMode == Setting.ContextOverflowMode.Overflow)
+            {
+                (_plugin.ChatCore as ChatCoreBase)?.OverflowManager?.ClearAll();
+                _plugin.ChatCore?.RecordManager?.ClearAllRecords();
+            }
+            ShowStatus(T("QuickSetup.HistoryCleared", "聊天记录已清空。"), true);
         }
 
         private void Onboarding_Click(object sender, RoutedEventArgs e)

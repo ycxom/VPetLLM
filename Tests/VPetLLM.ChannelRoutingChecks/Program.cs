@@ -52,6 +52,7 @@ static class Program
             Test_FreeProbePrompt();
             Test_EndToEndFailover(dir).GetAwaiter().GetResult();
             Test_VisionLeavesContextAlone(dir).GetAwaiter().GetResult();
+            Test_OllamaDropsUnsupportedThinking(dir).GetAwaiter().GetResult();
         }
         finally
         {
@@ -467,6 +468,134 @@ static class Program
         var allowed = JObject.Parse(File.ReadAllText(gateway)).Properties()
             .SelectMany(p => ((JObject)p.Value).Properties().Select(l => l.Value.ToString()));
         Check("Free 探测提示词在网关放行名单里，请求能到后端", allowed.Contains(free), free);
+    }
+
+    /// <summary>
+    /// 节点设了思考强度、模型却不支持思考（qwen2.5 等），Ollama 整个请求 400。
+    /// 要自动去掉 think 重发、不把这次失败报给用户，并且记住，后面不再白撞一次。
+    /// </summary>
+    static async Task Test_OllamaDropsUnsupportedThinking(string dir)
+    {
+        Console.WriteLine("[8] Ollama：模型不支持思考时去掉 think 重发");
+        using var server = new FakeOllama();
+        var s = NewSettings(dir);
+        s.LLMRequestTimeoutSeconds = 10;
+        var db = Path.Combine(dir, "ollama-history.db");
+
+        async Task<(string Reply, List<string> Errors)> Ask(string model, Setting.ThinkingEffort effort, bool streaming)
+        {
+            var node = new Setting.OllamaNodeSetting
+            {
+                Name = "local", Url = server.Url, Model = model, ThinkingEffort = effort, EnableStreaming = streaming
+            };
+            var core = new OllamaChatCore(node, s, null!, null!);
+            RedirectHistory(core, db);
+            var errors = new List<string>();
+            var replies = new List<string>();
+            core.SetErrorHandler(errors.Add);
+            // Chat 恒返回空串，非流式的回复走 ResponseHandler
+            core.SetResponseHandler(replies.Add);
+            await core.Chat("hi");
+            return (string.Concat(replies), errors);
+        }
+
+        var first = await Ask("qwen2.5:3b", Setting.ThinkingEffort.Medium, false);
+        var sent = server.Take();
+        Check("★★ 拒收后去掉 think 重发，拿到回复", sent.Count == 2 && sent[0].Think && !sent[1].Think && first.Reply.Contains("OK-ollama"),
+              $"{string.Join(",", sent.Select(r => r.Think))} reply={first.Reply}");
+        Check("★ 这次失败不报给用户", first.Errors.Count == 0, string.Join(" | ", first.Errors));
+
+        await Ask("qwen2.5:3b", Setting.ThinkingEffort.Medium, false);
+        sent = server.Take();
+        Check("★ 记住了：同一模型下次直接不带 think", sent.Count == 1 && !sent[0].Think, string.Join(",", sent.Select(r => r.Think)));
+
+        var stream = await Ask("llama3.2:1b", Setting.ThinkingEffort.High, true);
+        sent = server.Take();
+        Check("流式同样去掉 think 重发", sent.Count == 2 && sent[0].Think && !sent[1].Think && stream.Errors.Count == 0,
+              $"{string.Join(",", sent.Select(r => r.Think))} errors={stream.Errors.Count}");
+
+        await Ask("qwen3:4b", Setting.ThinkingEffort.Medium, false);
+        sent = server.Take();
+        Check("★ 支持思考的模型照常带 think（不是一刀切全关）", sent.Count == 1 && sent[0].Think, string.Join(",", sent.Select(r => r.Think)));
+
+        await Ask("gemma3:1b", Setting.ThinkingEffort.Default, false);
+        sent = server.Take();
+        Check("没设思考强度时本来就不带", sent.Count == 1 && !sent[0].Think, string.Join(",", sent.Select(r => r.Think)));
+    }
+
+    /// <summary>只认 /api/chat 的假 Ollama：除 qwen3 外的模型带 think 一律 400，和真 Ollama 的报错原文一致。</summary>
+    sealed class FakeOllama : IDisposable
+    {
+        private readonly HttpListener _listener = new();
+        private readonly List<(string Model, bool Think)> _requests = new();
+
+        public FakeOllama()
+        {
+            var probe = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+            Url = $"http://localhost:{port}";
+            _listener.Prefixes.Add(Url + "/");
+            _listener.Start();
+            _ = Task.Run(Loop);
+        }
+
+        public string Url { get; }
+
+        public List<(string Model, bool Think)> Take()
+        {
+            lock (_requests)
+            {
+                var taken = _requests.ToList();
+                _requests.Clear();
+                return taken;
+            }
+        }
+
+        private async Task Loop()
+        {
+            while (_listener.IsListening)
+            {
+                HttpListenerContext ctx;
+                try { ctx = await _listener.GetContextAsync(); }
+                catch { return; }
+
+                string body;
+                using (var reader = new StreamReader(ctx.Request.InputStream, Encoding.UTF8))
+                    body = await reader.ReadToEndAsync();
+                var json = JObject.Parse(body);
+                var model = json["model"]!.ToString();
+                var think = json["think"] is not null;
+                lock (_requests) _requests.Add((model, think));
+
+                string reply;
+                if (think && !model.StartsWith("qwen3"))
+                {
+                    ctx.Response.StatusCode = 400;
+                    reply = new JObject { ["error"] = $"\"{model}\" does not support thinking" }.ToString(Formatting.None);
+                }
+                else if (json["stream"]?.Value<bool>() == true)
+                {
+                    reply = "{\"message\":{\"role\":\"assistant\",\"content\":\"OK-ollama\"},\"done\":false}\n" +
+                            "{\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true}\n";
+                }
+                else
+                {
+                    reply = "{\"message\":{\"role\":\"assistant\",\"content\":\"OK-ollama\"},\"done\":true}";
+                }
+
+                var bytes = Encoding.UTF8.GetBytes(reply);
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.OutputStream.WriteAsync(bytes);
+                ctx.Response.Close();
+            }
+        }
+
+        public void Dispose()
+        {
+            try { _listener.Stop(); } catch { }
+        }
     }
 
     /// <summary>最小的 OpenAI 兼容假服务：/bad 一律 500，/good 走 Chat，/resp 走 Responses。</summary>

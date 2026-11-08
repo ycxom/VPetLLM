@@ -568,8 +568,14 @@ namespace VPetLLM.Core.Abstractions.Base
 
             Logger.Log($"{providerName} API 错误: {(int)statusCode} {statusCode} - {rawError}");
             LearnContextLimitFromError((int)statusCode, rawError);
+            OnHttpError((int)statusCode, rawError);
 
             return DescribeHttpFailure(statusCode, rawError, providerName);
+        }
+
+        /// <summary>各 Provider 从错误响应里学自家特有的东西（比如某模型不认某个参数），默认什么都不做。</summary>
+        protected virtual void OnHttpError(int status, string? rawBody)
+        {
         }
 
         /// <summary>

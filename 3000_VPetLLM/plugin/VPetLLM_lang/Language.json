@@ -6378,6 +6378,72 @@
       "zh-hant": "需要幫助？",
       "jp": "お困りですか？"
     },
+    "TabMemory": {
+      "en": "Memory",
+      "zh-hans": "记忆",
+      "zh-hant": "記憶",
+      "jp": "記憶"
+    },
+    "CardMemory": {
+      "en": "Your pet's memory",
+      "zh-hans": "桌宠的记忆",
+      "zh-hant": "桌寵的記憶",
+      "jp": "ペットの記憶"
+    },
+    "MemoryDesc": {
+      "en": "Important things and relationships your pet picked up from chats. You can view, edit or delete them.",
+      "zh-hans": "桌宠从聊天里记下的重要事情和人物关系，可以查看、修改或删除。",
+      "zh-hant": "桌寵從聊天裡記下的重要事情和人物關係，可以查看、修改或刪除。",
+      "jp": "ペットが会話から覚えた大事なことや人間関係です。表示・編集・削除できます。"
+    },
+    "ViewMemory": {
+      "en": "View memory",
+      "zh-hans": "查看记忆",
+      "zh-hant": "查看記憶",
+      "jp": "記憶を見る"
+    },
+    "EnableRecords": {
+      "en": "Let the pet remember important things from chats",
+      "zh-hans": "让桌宠记住聊天里的重要事情",
+      "zh-hant": "讓桌寵記住聊天裡的重要事情",
+      "jp": "会話の大事なことをペットに覚えさせる"
+    },
+    "CardHistory": {
+      "en": "Chat history",
+      "zh-hans": "聊天记录",
+      "zh-hant": "聊天記錄",
+      "jp": "会話履歴"
+    },
+    "HistoryDesc": {
+      "en": "The recent conversation your pet can see while chatting.",
+      "zh-hans": "桌宠聊天时能看到的最近对话。",
+      "zh-hant": "桌寵聊天時能看到的最近對話。",
+      "jp": "ペットが会話中に参照する最近のやり取りです。"
+    },
+    "ViewHistory": {
+      "en": "View",
+      "zh-hans": "查看",
+      "zh-hant": "查看",
+      "jp": "表示"
+    },
+    "ClearHistory": {
+      "en": "Clear",
+      "zh-hans": "清空",
+      "zh-hant": "清空",
+      "jp": "消去"
+    },
+    "HistoryCleared": {
+      "en": "Chat history cleared.",
+      "zh-hans": "聊天记录已清空。",
+      "zh-hant": "聊天記錄已清空。",
+      "jp": "会話履歴を消去しました。"
+    },
+    "NoChatCore": {
+      "en": "The AI service isn't ready yet. Choose one on the \"AI service\" tab and save first.",
+      "zh-hans": "AI 服务还没准备好，先在“AI 服务”页选好并保存。",
+      "zh-hant": "AI 服務還沒準備好，先在「AI 服務」頁選好並儲存。",
+      "jp": "AI サービスの準備ができていません。先に「AI サービス」タブで選んで保存してください。"
+    },
     "HelpDesc": {
       "en": "Go through the setup guide again and check your settings step by step.",
       "zh-hans": "重新走一遍新手引导，一步步检查设置。",
