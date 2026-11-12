@@ -578,6 +578,10 @@ namespace VPetLLM.Core.Abstractions.Base
         {
         }
 
+        /// <summary>系统提示词就塞不满窗口时，告诉用户该去动哪里。能在本渠道设置里调窗口的 Provider 覆盖它。</summary>
+        protected virtual string ContextWindowAdvice =>
+            "请关掉部分插件、缩短角色设定，或把服务端的上下文窗口调大。";
+
         /// <summary>
         /// 把一次 HTTP 失败翻译成给用户看的文案。
         ///
@@ -599,7 +603,7 @@ namespace VPetLLM.Core.Abstractions.Base
 
                 var message = "上下文装不下了：系统提示词本身就超过了模型的上下文窗口" +
                               (window > 0 ? $"（{sent} / {window} tokens）" : "") +
-                              "。删聊天记录没用，请关掉部分插件、缩短角色设定，或把服务端的上下文窗口调大。";
+                              "。删聊天记录没用，" + ContextWindowAdvice;
 
                 return debug ? $"{message}\n[{(int)statusCode} {statusCode}] {rawError}" : message;
             }

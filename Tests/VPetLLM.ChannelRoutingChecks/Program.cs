@@ -53,6 +53,7 @@ static class Program
             Test_EndToEndFailover(dir).GetAwaiter().GetResult();
             Test_VisionLeavesContextAlone(dir).GetAwaiter().GetResult();
             Test_OllamaDropsUnsupportedThinking(dir).GetAwaiter().GetResult();
+            Test_OllamaContextLength(dir).GetAwaiter().GetResult();
         }
         finally
         {
@@ -523,6 +524,102 @@ static class Program
         Check("没设思考强度时本来就不带", sent.Count == 1 && !sent[0].Think, string.Join(",", sent.Select(r => r.Think)));
     }
 
+    /// <summary>
+    /// 用户截图：Ollama 默认窗口 4096，光系统提示词就 6840 tokens，弹"上下文装不下"而 Ollama 渠道没地方调窗口。
+    /// 节点填了上下文窗口后，聊天和总结都要带 options.num_ctx；没填时不带（跟随 Ollama 默认）。
+    /// </summary>
+    static async Task Test_OllamaContextLength(string dir)
+    {
+        Console.WriteLine("[9] Ollama：上下文窗口随请求发送 num_ctx");
+        using var server = new FakeOllama();
+        var s = NewSettings(dir);
+        s.LLMRequestTimeoutSeconds = 10;
+        var db = Path.Combine(dir, "ollama-ctx-history.db");
+
+        async Task<(string Reply, List<string> Errors, OllamaChatCore Core)> Ask(string model, int contextLength, bool streaming = false, bool advanced = false)
+        {
+            var node = new Setting.OllamaNodeSetting
+            {
+                Name = "local", Url = server.Url, Model = model,
+                EnableStreaming = streaming, EnableAdvanced = advanced, Temperature = 0.3, MaxTokens = 321
+            };
+            // 窗口是那台 Ollama 的属性，在一键化本地部署里按地址设，不在渠道上
+            s.Ollama.SetContextLength(server.Url, contextLength);
+            var core = new OllamaChatCore(node, s, null!, null!);
+            RedirectHistory(core, db);
+            var errors = new List<string>();
+            var replies = new List<string>();
+            core.SetErrorHandler(errors.Add);
+            core.SetResponseHandler(replies.Add);
+            await core.Chat("hi");
+            return (string.Concat(replies), errors, core);
+        }
+
+        List<(string Path, JObject Json)> Sent() { lock (server.Bodies) return server.Bodies.ToList(); }
+        JObject? Opts((string Path, JObject Json) b) => b.Json["options"] as JObject;
+
+        var bare = await Ask("window-a", 0);
+        var bodies = Sent();
+        Check("★ 没填窗口：不带 num_ctx，复现截图那句“上下文装不下 6840 / 4096”",
+              bodies.Count >= 1 && bodies.All(b => Opts(b)?["num_ctx"] is null) &&
+              bare.Errors.Count == 1 && bare.Errors[0].Contains("上下文装不下") && bare.Errors[0].Contains("6840 / 4096"),
+              $"bodies={bodies.Count} errors={string.Join(" | ", bare.Errors)}");
+        Check("★ 报错指向一键化本地部署里的上下文窗口，而不是笼统的“服务端调大”",
+              bare.Errors.Count == 1 && bare.Errors[0].Contains("一键化本地部署") && bare.Errors[0].Contains("上下文窗口"),
+              string.Join(" | ", bare.Errors));
+        server.Take();
+
+        var fixedRun = await Ask("window-a", 8192);
+        bodies = Sent();
+        Check("★★ 填了 8192：请求带 num_ctx=8192，拿到回复且不报错",
+              bodies.Count == 1 && Opts(bodies[0])?["num_ctx"]?.Value<int>() == 8192 &&
+              fixedRun.Reply.Contains("OK-ollama") && fixedRun.Errors.Count == 0,
+              $"bodies={bodies.Count} opts={(bodies.Count > 0 ? Opts(bodies[0]) : null)} reply={fixedRun.Reply} errors={string.Join(" | ", fixedRun.Errors)}");
+        Check("没勾自定义生成参数时只带窗口，不夹带温度/最大输出",
+              bodies.Count == 1 && Opts(bodies[0])?["temperature"] is null && Opts(bodies[0])?["num_predict"] is null,
+              $"{(bodies.Count > 0 ? Opts(bodies[0]) : null)}");
+
+        var summary = await fixedRun.Core.Summarize("sys", "content");
+        bodies = Sent();
+        var gen = bodies.Where(b => b.Path == "/api/generate").Select(b => b.Json["options"] as JObject).LastOrDefault();
+        Check("★ 总结也带同一个 num_ctx（不一致的话 Ollama 每次切换都要重载模型）",
+              summary.Contains("OK-summary") && gen?["num_ctx"]?.Value<int>() == 8192,
+              $"summary={summary} opts={gen}");
+        server.Take();
+
+        await Ask("window-a", 16384, streaming: true, advanced: true);
+        bodies = Sent();
+        Check("流式 + 自定义生成参数：三个参数都在",
+              bodies.Count == 1 && Opts(bodies[0])?["num_ctx"]?.Value<int>() == 16384 &&
+              Opts(bodies[0])?["temperature"]?.Value<double>() == 0.3 && Opts(bodies[0])?["num_predict"]?.Value<int>() == 321,
+              $"{(bodies.Count > 0 ? Opts(bodies[0]) : null)}");
+        server.Take();
+
+        await Ask("plain", 0);
+        bodies = Sent();
+        Check("没填窗口也没勾生成参数：和以前一样不带 options",
+              bodies.Count == 1 && Opts(bodies[0]) is null,
+              $"{(bodies.Count > 0 ? Opts(bodies[0]) : null)}");
+        server.Take();
+
+        var ollama = new Setting.OllamaSetting();
+        Check("没设过的地址是 0（不发送，跟随 Ollama）", ollama.GetContextLength("http://localhost:11434") == 0);
+        ollama.SetContextLength("http://localhost:11434", 8192);
+        Check("★ 本机的几种写法算同一台 Ollama",
+              ollama.GetContextLength("http://127.0.0.1:11434/") == 8192 && ollama.GetContextLength("http://LOCALHOST:11434") == 8192,
+              string.Join(",", ollama.ContextLengths.Keys));
+        Check("别的端口/别的机器互不影响",
+              ollama.GetContextLength("http://localhost:11435") == 0 && ollama.GetContextLength("http://192.168.1.5:11434") == 0);
+
+        // 设置整份是按 JSON 存进库的：存能读回、重复加载不叠加
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(ollama);
+        var back = Newtonsoft.Json.JsonConvert.DeserializeObject<Setting.OllamaSetting>(json)!;
+        Newtonsoft.Json.JsonConvert.PopulateObject(json, back);
+        Check("窗口设置能存能读", back.GetContextLength("http://localhost:11434") == 8192 && back.ContextLengths.Count == 1, json);
+        back.SetContextLength("http://localhost:11434", 0);
+        Check("选回“跟随默认”就删掉这条", back.ContextLengths.Count == 0 && back.GetContextLength("http://localhost:11434") == 0);
+    }
+
     /// <summary>只认 /api/chat 的假 Ollama：除 qwen3 外的模型带 think 一律 400，和真 Ollama 的报错原文一致。</summary>
     sealed class FakeOllama : IDisposable
     {
@@ -543,12 +640,16 @@ static class Program
 
         public string Url { get; }
 
+        /// <summary>收到的原始请求（路径+JSON），Take 时一起清空。</summary>
+        public List<(string Path, JObject Json)> Bodies { get; } = new();
+
         public List<(string Model, bool Think)> Take()
         {
             lock (_requests)
             {
                 var taken = _requests.ToList();
                 _requests.Clear();
+                Bodies.Clear();
                 return taken;
             }
         }
@@ -567,10 +668,36 @@ static class Program
                 var json = JObject.Parse(body);
                 var model = json["model"]!.ToString();
                 var think = json["think"] is not null;
-                lock (_requests) _requests.Add((model, think));
+                lock (_requests)
+                {
+                    _requests.Add((model, think));
+                    Bodies.Add((ctx.Request.Url!.AbsolutePath, json));
+                }
+
+                // window-* 模型模拟"系统提示词就有 6840 tokens"：窗口取 num_ctx，没带就是 Ollama 默认 4096，报错原文同用户截图
+                var window = (json["options"] as JObject)?["num_ctx"]?.Value<int>() ?? 4096;
 
                 string reply;
-                if (think && !model.StartsWith("qwen3"))
+                if (model.StartsWith("window-") && window < 6840)
+                {
+                    ctx.Response.StatusCode = 400;
+                    reply = new JObject
+                    {
+                        ["error"] = new JObject
+                        {
+                            ["code"] = 400,
+                            ["message"] = $"request (6840 tokens) exceeds the available context size ({window} tokens), try increasing it",
+                            ["type"] = "exceed_context_size_error",
+                            ["n_prompt_tokens"] = 6840,
+                            ["n_ctx"] = window
+                        }
+                    }.ToString(Formatting.None);
+                }
+                else if (ctx.Request.Url!.AbsolutePath == "/api/generate")
+                {
+                    reply = new JObject { ["response"] = "OK-summary", ["done"] = true }.ToString(Formatting.None);
+                }
+                else if (think && !model.StartsWith("qwen3"))
                 {
                     ctx.Response.StatusCode = 400;
                     reply = new JObject { ["error"] = $"\"{model}\" does not support thinking" }.ToString(Formatting.None);

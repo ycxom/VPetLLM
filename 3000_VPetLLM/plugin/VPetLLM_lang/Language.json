@@ -5084,6 +5084,84 @@
     }
   },
   "OllamaManager": {
+    "ContextCustom": {
+      "en": "Custom…",
+      "zh-hans": "自定义…",
+      "zh-hant": "自訂…",
+      "jp": "カスタム…"
+    },
+    "ContextCustomPlaceholder": {
+      "en": "e.g. 12288",
+      "zh-hans": "比如 12288",
+      "zh-hant": "例如 12288",
+      "jp": "例：12288"
+    },
+    "ContextApply": {
+      "en": "Apply",
+      "zh-hans": "应用",
+      "zh-hant": "套用",
+      "jp": "適用"
+    },
+    "ContextCustomHint": {
+      "en": "Enter a whole number between {0} and {1}, then click \"Apply\".",
+      "zh-hans": "填 {0}～{1} 之间的整数，然后点「应用」。",
+      "zh-hant": "填 {0}～{1} 之間的整數，然後點「套用」。",
+      "jp": "{0}～{1} の整数を入力して「適用」を押してください。"
+    },
+    "ContextCustomInvalid": {
+      "en": "Please enter a whole number between {0} and {1}.",
+      "zh-hans": "请填 {0}～{1} 之间的整数。",
+      "zh-hant": "請填 {0}～{1} 之間的整數。",
+      "jp": "{0}～{1} の整数を入力してください。"
+    },
+    "ContextSmallWarning": {
+      "en": "Smaller than the recommended {0}; the pet's settings may still not fit.",
+      "zh-hans": "比推荐的 {0} 小，桌宠的设定可能还是装不下。",
+      "zh-hant": "比推薦的 {0} 小，桌寵的設定可能還是裝不下。",
+      "jp": "推奨の {0} より小さいため、ペットの設定が収まらない可能性があります。"
+    },
+    "ContextTitle": {
+      "en": "Context window",
+      "zh-hans": "上下文窗口",
+      "zh-hant": "上下文視窗",
+      "jp": "コンテキスト長"
+    },
+    "ContextDesc": {
+      "en": "How much text the model can see at once. The pet's character setting, plugin descriptions and memories all have to fit, or chats fail with \"context doesn't fit\".",
+      "zh-hans": "模型一次能看的文字长度。桌宠的角色设定、插件说明和记忆都要装进去，太小会报“上下文装不下”。",
+      "zh-hant": "模型一次能看的文字長度。桌寵的角色設定、插件說明和記憶都要裝進去，太小會報「上下文裝不下」。",
+      "jp": "モデルが一度に読める文章の長さです。ペットのキャラ設定・プラグイン説明・記憶がすべて収まる必要があり、小さすぎると「コンテキストに収まりません」と表示されます。"
+    },
+    "ContextDefault": {
+      "en": "Ollama default",
+      "zh-hans": "跟随 Ollama 默认",
+      "zh-hant": "跟隨 Ollama 預設",
+      "jp": "Ollama の既定値"
+    },
+    "ContextRecommended": {
+      "en": "{0} (recommended)",
+      "zh-hans": "{0}（推荐）",
+      "zh-hant": "{0}（推薦）",
+      "jp": "{0}（推奨）"
+    },
+    "ContextDefaultWarning": {
+      "en": "Ollama's default is usually only 4096, which can't hold the pet's character setting and plugin descriptions, so chats fail with \"context doesn't fit\". 8192 is recommended.",
+      "zh-hans": "Ollama 默认通常只有 4096，装不下桌宠的角色设定和插件说明，对话时会报“上下文装不下”。建议选 8192。",
+      "zh-hant": "Ollama 預設通常只有 4096，裝不下桌寵的角色設定和插件說明，對話時會報「上下文裝不下」。建議選 8192。",
+      "jp": "Ollama の既定値は多くの場合 4096 しかなく、ペットのキャラ設定やプラグイン説明が収まらず「コンテキストに収まりません」と表示されます。8192 を推奨します。"
+    },
+    "ContextNote": {
+      "en": "Larger values use more VRAM/RAM. This only affects the pet's requests and doesn't change Ollama's own settings.",
+      "zh-hans": "越大越占显存/内存。只影响桌宠发出的请求，不改 Ollama 本身的设置。",
+      "zh-hant": "越大越佔顯示記憶體/記憶體。只影響桌寵發出的請求，不改 Ollama 本身的設定。",
+      "jp": "大きいほど VRAM/メモリを使います。ペットからのリクエストにだけ適用され、Ollama 本体の設定は変更しません。"
+    },
+    "ContextSaved": {
+      "en": "Saved. Takes effect from the next chat (Ollama reloads the model once first).",
+      "zh-hans": "已保存，下次对话生效（Ollama 会先重新加载一次模型）。",
+      "zh-hant": "已儲存，下次對話生效（Ollama 會先重新載入一次模型）。",
+      "jp": "保存しました。次の会話から有効です（Ollama が先にモデルを一度再読み込みします）。"
+    },
     "Title": {
       "en": "One-Click Local Deployment",
       "zh-hans": "一键化本地部署",

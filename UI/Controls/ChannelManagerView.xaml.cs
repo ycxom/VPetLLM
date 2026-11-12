@@ -532,7 +532,6 @@ namespace VPetLLM.UI.Controls
                 Ed_Temperature.Value = d.Temperature;
                 Ed_TemperatureValue.Text = d.Temperature.ToString("0.00");
                 Ed_MaxTokens.Text = d.MaxTokens.ToString();
-
                 Ed_TestResult.Text = "";
             }
             finally

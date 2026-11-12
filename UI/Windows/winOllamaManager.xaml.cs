@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using VPetLLM.Utils.Localization;
@@ -139,6 +141,15 @@ namespace VPetLLM.UI.Windows
         private readonly Stopwatch _speedClock = new();
         private readonly Func<string, MessageBoxImage, bool> _confirm;
         private readonly LocalProxyDetector _proxyDetector;
+        private readonly Action? _saveSettings;
+        private bool _loadingContext;
+
+        /// <summary>上下文窗口的可选值。Ollama 默认 4096 装不下桌宠的系统提示词，所以从 8192 起。</summary>
+        private static readonly int[] ContextChoices = { 8192, 16384, 32768 };
+        /// <summary>下拉框里「自定义…」那一项的 Tag，不是真实窗口值</summary>
+        private const int CustomContextTag = -1;
+        internal const int MinContextLength = 2048;
+        internal const int MaxContextLength = 1048576;
 
         private OllamaManagerService _service;
         private Func<string, string, bool>? _onChosen;
@@ -193,7 +204,8 @@ namespace VPetLLM.UI.Windows
                 return;
             }
 
-            _instance = new winOllamaManager(settings, OllamaManagerService.Create(settings, url), currentModel, onChosen) { Owner = owner };
+            _instance = new winOllamaManager(settings, OllamaManagerService.Create(settings, url), currentModel, onChosen,
+                saveSettings: settings.Save) { Owner = owner };
             _instance.Show();
         }
 
@@ -219,7 +231,7 @@ namespace VPetLLM.UI.Windows
         /// <param name="confirm">升级、删除前的确认，返回 true 才继续。不传时弹系统确认框。</param>
         public winOllamaManager(Setting settings, OllamaManagerService service, string? currentModel, Func<string, string, bool> onChosen,
             Func<string, MessageBoxImage, bool>? confirm = null, OllamaLibrary? library = null, OllamaHardware? hardware = null,
-            LocalProxyDetector? proxyDetector = null)
+            LocalProxyDetector? proxyDetector = null, Action? saveSettings = null)
         {
             InitializeComponent();
             // 小屏幕上窗口不能比屏幕还大
@@ -235,6 +247,9 @@ namespace VPetLLM.UI.Windows
             _recommended = OllamaModelCatalog.Recommend(_hardware);
             _proxyDetector = proxyDetector ?? new LocalProxyDetector();
             _service.UseDownloadProxy(_downloadProxy);
+            // 不传就只改内存里的设置：测试不能碰真实的 settings.db
+            _saveSettings = saveSettings;
+            LoadContext();
             Loaded += Window_Loaded;
         }
 
@@ -256,7 +271,125 @@ namespace VPetLLM.UI.Windows
                 if (_latest is null) _ = LoadLatestVersionAsync();
                 if (_libraryModels is { } models) ShowLibrary(models);
             }
+            LoadContext();
             ApplyState();
+        }
+
+        /// <summary>按当前地址填上下文窗口下拉框。存的不是预设值（老版本或手改的）也原样列出来。</summary>
+        private void LoadContext()
+        {
+            var current = _settings.Ollama.GetContextLength(_service.Url);
+            _loadingContext = true;
+            try
+            {
+                Cb_Context.Items.Clear();
+                Cb_Context.Items.Add(new ComboBoxItem { Content = T("ContextDefault", "跟随 Ollama 默认"), Tag = 0 });
+                foreach (var tokens in ContextChoices.Union(current > 0 ? new[] { current } : Array.Empty<int>()).OrderBy(t => t))
+                {
+                    var text = tokens == ContextChoices[0]
+                        ? string.Format(T("ContextRecommended", "{0}（推荐）"), tokens)
+                        : tokens.ToString();
+                    Cb_Context.Items.Add(new ComboBoxItem { Content = text, Tag = tokens });
+                }
+                Cb_Context.Items.Add(new ComboBoxItem { Content = T("ContextCustom", "自定义…"), Tag = CustomContextTag });
+                Cb_Context.SelectedItem = Cb_Context.Items.OfType<ComboBoxItem>().First(i => (int)i.Tag == current);
+                Panel_ContextCustom.Visibility = Visibility.Collapsed;
+            }
+            finally
+            {
+                _loadingContext = false;
+            }
+            ShowContextState(current, saved: false);
+        }
+
+        private void Context_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loadingContext || Cb_Context.SelectedItem is not ComboBoxItem { Tag: int tokens }) return;
+            if (tokens == CustomContextTag)
+            {
+                // 只展开输入框，点了「应用」才算数
+                var current = _settings.Ollama.GetContextLength(_service.Url);
+                Tb_ContextCustom.Text = (current > 0 ? current : ContextChoices[0]).ToString();
+                Panel_ContextCustom.Visibility = Visibility.Visible;
+                Tb_ContextCustom.Focus();
+                Tb_ContextCustom.SelectAll();
+                ShowContextHint(string.Format(T("ContextCustomHint", "填 {0}～{1} 之间的整数，然后点「应用」。"), MinContextLength, MaxContextLength), warn: false);
+                return;
+            }
+            Panel_ContextCustom.Visibility = Visibility.Collapsed;
+            ApplyContext(tokens);
+        }
+
+        private void ContextApply_Click(object sender, RoutedEventArgs e) => ApplyCustomContext();
+
+        private void ContextCustom_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter) return;
+            e.Handled = true;
+            ApplyCustomContext();
+        }
+
+        private void ApplyCustomContext()
+        {
+            var raw = Tb_ContextCustom.Text.Trim().Replace(",", "").Replace("，", "");
+            if (!int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var tokens) ||
+                tokens < MinContextLength || tokens > MaxContextLength)
+            {
+                ShowContextHint(string.Format(T("ContextCustomInvalid", "请填 {0}～{1} 之间的整数。"), MinContextLength, MaxContextLength), warn: true);
+                return;
+            }
+            ApplyContext(tokens);
+            // 重新列一遍：自定义值进下拉框并选中，输入框收起
+            LoadContext();
+            ShowContextState(tokens, saved: true);
+        }
+
+        private void ApplyContext(int tokens)
+        {
+            if (tokens == _settings.Ollama.GetContextLength(_service.Url))
+            {
+                ShowContextState(tokens, saved: false);
+                return;
+            }
+
+            _settings.Ollama.SetContextLength(_service.Url, tokens);
+            try
+            {
+                _saveSettings?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                // 内存里已经改了，本次运行照样生效；只是重启后会丢
+                Logger.Log($"保存 Ollama 上下文窗口失败: {ex.Message}");
+            }
+            Logger.Log($"Ollama 上下文窗口 {_service.Url} → {(tokens > 0 ? tokens.ToString() : "默认")}");
+            ShowContextState(tokens, saved: true);
+        }
+
+        private void ShowContextState(int tokens, bool saved)
+        {
+            string text;
+            if (tokens <= 0)
+            {
+                text = T("ContextDefaultWarning", "Ollama 默认通常只有 4096，装不下桌宠的角色设定和插件说明，对话时会报“上下文装不下”。建议选 8192。");
+                Tb_ContextState.Foreground = (Brush)FindResource("WarningBrush");
+            }
+            else
+            {
+                text = T("ContextNote", "越大越占显存/内存。只影响桌宠发出的请求，不改 Ollama 本身的设置。");
+                if (tokens < ContextChoices[0])
+                    text = string.Format(T("ContextSmallWarning", "比推荐的 {0} 小，桌宠的设定可能还是装不下。"), ContextChoices[0]) + " " + text;
+                if (saved) text = T("ContextSaved", "已保存，下次对话生效（Ollama 会先重新加载一次模型）。") + " " + text;
+                ShowContextHint(text, warn: tokens < ContextChoices[0]);
+                return;
+            }
+            ShowContextHint(text, warn: true);
+        }
+
+        private void ShowContextHint(string text, bool warn)
+        {
+            Tb_ContextState.Foreground = (Brush)FindResource(warn ? "WarningBrush" : "SecondaryTextBrush");
+            Tb_ContextState.Text = text;
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)

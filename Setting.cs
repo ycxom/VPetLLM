@@ -1216,6 +1216,41 @@ namespace VPetLLM
             /// <summary>本节点的模型是否支持原生工具调用。需与全局 EnableNativeToolCall 同时开启。</summary>
             public bool EnableToolCall { get; set; } = false;
 
+            /// <summary>
+            /// 按 Ollama 地址（<see cref="ContextKey"/>）记的上下文窗口，随请求作为 options.num_ctx 发送；
+            /// 没记的地址不发送，用 Ollama 自己的默认值。在「一键化本地部署」里设。
+            ///
+            /// 为什么要有：Ollama 默认窗口常常只有 4096，而桌宠光系统提示词（角色设定+插件说明+记忆）
+            /// 就可能超过，每次对话都报"上下文装不下"。它不像 LM Studio 能在加载模型时设，只能随请求带。
+            /// 按地址而不是按渠道记：窗口是那台 Ollama 的属性，同一个 Ollama 下的渠道（含以后新建的）共用。
+            /// 不去改 Ollama 自己的 OLLAMA_CONTEXT_LENGTH：要重启服务、影响别的软件、还会和 Ollama 设置页的滑块打架。
+            ///
+            /// 写入时整张表换新（见 <see cref="SetContextLength"/>），对话线程读到的总是一张完整的表。
+            /// </summary>
+            public Dictionary<string, int> ContextLengths { get; set; } = new();
+
+            /// <summary>主机:端口，本机的几种写法算同一个。</summary>
+            public static string ContextKey(string? url)
+            {
+                var raw = (url ?? "").Trim();
+                if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri)) return raw.TrimEnd('/').ToLowerInvariant();
+                var host = uri.IsLoopback ? "localhost" : uri.Host.ToLowerInvariant();
+                return $"{host}:{uri.Port}";
+            }
+
+            /// <summary>该地址的上下文窗口，0 = 没设（不发送）。</summary>
+            public int GetContextLength(string? url)
+                => ContextLengths is { } map && map.TryGetValue(ContextKey(url), out var tokens) && tokens > 0 ? tokens : 0;
+
+            /// <summary><paramref name="tokens"/> &lt;= 0 表示恢复 Ollama 默认。</summary>
+            public void SetContextLength(string? url, int tokens)
+            {
+                var next = new Dictionary<string, int>(ContextLengths ?? new Dictionary<string, int>());
+                if (tokens > 0) next[ContextKey(url)] = tokens;
+                else next.Remove(ContextKey(url));
+                ContextLengths = next;
+            }
+
             public OllamaNodeSetting? GetCurrentOllamaSetting(string? purpose = null, HashSet<int>? excludeIndices = null)
             {
                 if (OllamaNodes.Count == 0)

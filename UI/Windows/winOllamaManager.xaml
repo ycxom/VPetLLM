@@ -226,6 +226,7 @@
                     ItemContainerStyle="{StaticResource ModernTabItem}" SelectionChanged="Tabs_SelectionChanged">
             <TabItem Header="{utils:Localize KeyPath=OllamaManager.TabDeploy, Default=部署}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" controls:SmoothWheelScroll.Enabled="True">
+                    <StackPanel VerticalAlignment="Top">
                     <Border Style="{StaticResource CardContainer}" Margin="0,12,8,4" VerticalAlignment="Top">
                         <StackPanel>
                             <TextBlock x:Name="Tb_State" Style="{StaticResource QuickCardTitle}"/>
@@ -244,6 +245,31 @@
                             </WrapPanel>
                         </StackPanel>
                     </Border>
+
+                    <Border Style="{StaticResource CardContainer}" Margin="0,8,8,4" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource QuickCardTitle}"
+                                       Text="{utils:Localize KeyPath=OllamaManager.ContextTitle, Default=上下文窗口}"/>
+                            <TextBlock Style="{StaticResource QuickHint}"
+                                       Text="{utils:Localize KeyPath=OllamaManager.ContextDesc, Default=模型一次能看的文字长度。桌宠的角色设定、插件说明和记忆都要装进去，太小会报“上下文装不下”。}"/>
+                            <ComboBox x:Name="Cb_Context" Style="{StaticResource OllamaComboBox}" Width="240" HorizontalAlignment="Left"
+                                      Margin="0,12,0,0" SelectionChanged="Context_SelectionChanged"/>
+                            <Grid x:Name="Panel_ContextCustom" Width="240" HorizontalAlignment="Left" Margin="0,8,0,0" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="Tb_ContextCustom" Style="{StaticResource OllamaTextBox}" KeyDown="ContextCustom_KeyDown"/>
+                                <TextBlock Style="{StaticResource OllamaPlaceholder}" Tag="{Binding ElementName=Tb_ContextCustom}"
+                                           Text="{utils:Localize KeyPath=OllamaManager.ContextCustomPlaceholder, Default=比如 12288}"/>
+                                <Button x:Name="Btn_ContextApply" Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                        Click="ContextApply_Click"
+                                        Content="{utils:Localize KeyPath=OllamaManager.ContextApply, Default=应用}"/>
+                            </Grid>
+                            <TextBlock x:Name="Tb_ContextState" Style="{StaticResource QuickHint}" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    </StackPanel>
                 </ScrollViewer>
             </TabItem>
 

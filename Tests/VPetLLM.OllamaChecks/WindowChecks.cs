@@ -27,7 +27,7 @@ internal static partial class Program
     {
         public ManagerWindow(FakeDeployInstaller installer, FakeApi api, string? model = null, string url = Url,
             Func<string, string, bool>? chosen = null, OllamaLibrary? library = null, OllamaHardware? hardware = null,
-            LocalProxyDetector? proxies = null)
+            LocalProxyDetector? proxies = null, Action? save = null)
         {
             var service = new OllamaManagerService(url, installer, api)
             {
@@ -45,7 +45,9 @@ internal static partial class Program
                 return Answer;
             }, library ?? new OllamaLibrary(new FakeOllamaCom { Offline = true }, NewLibraryCache()), hardware ?? StrongHardware,
                 // 不能去碰跑测试这台电脑上真开着的代理软件
-                proxies ?? new LocalProxyDetector { Candidates = Array.Empty<LocalProxyCandidate>(), SystemProxy = _ => null })
+                proxies ?? new LocalProxyDetector { Candidates = Array.Empty<LocalProxyCandidate>(), SystemProxy = _ => null },
+                // 不传就只改内存：测试绝不能落盘到真实的 settings.db
+                saveSettings: save)
             {
                 ShowActivated = false,
                 ShowInTaskbar = false,
@@ -266,6 +268,7 @@ internal static partial class Program
             CheckReadyState();
             CheckExistingModelDeploy();
             CheckRemote();
+            CheckContextWindow();
             CheckBusyAndCancel();
             CheckInstallPhase();
             CheckUpgradeConfirm();
@@ -607,6 +610,97 @@ internal static partial class Program
         window.Finish();
         Check("已有模型：直接选用不下载", api.Pulled.Count == 0 && window.Chosen.SequenceEqual(new[] { ("old-model:latest", Url) }), string.Join(",", window.Chosen));
         window.Close();
+    }
+
+    /// <summary>
+    /// 用户截图：Ollama 默认窗口 4096，桌宠的系统提示词就有 6840 tokens，每次对话“上下文装不下”。
+    /// 窗口是这台 Ollama 的属性，放在部署页设，按地址存，存完立即落盘。
+    /// </summary>
+    private static void CheckContextWindow()
+    {
+        var api = new FakeApi { Running = true, Models = { new OllamaLocalModel("qwen2.5:3b", 2 * GB, "qwen2") } };
+        var saves = 0;
+        var window = new ManagerWindow(new FakeDeployInstaller(new OllamaInstallation(@"C:\Ollama", "0.40.13")) { Api = api }, api,
+            "qwen2.5:3b", save: () => saves++);
+        var box = window.Find<ComboBox>("Cb_Context");
+        ComboBoxItem Item(int tokens) => box.Items.OfType<ComboBoxItem>().Single(i => (int)i.Tag == tokens);
+
+        try
+        {
+            Check("★ 没设过：选中“跟随 Ollama 默认”，并提醒默认 4096 装不下",
+                  box.SelectedItem == Item(0) && window.Text("Tb_ContextState").Contains("4096"), window.Text("Tb_ContextState"));
+            Check("推荐值标出来", ((string)Item(8192).Content).Contains("推荐"));
+            Check("打开窗口不落盘", saves == 0, $"saves={saves}");
+
+            box.SelectedItem = Item(8192);
+            Check("★★ 选 8192：按这台 Ollama 的地址记下并立即落盘",
+                  _settings!.Ollama.GetContextLength(Url) == 8192 && saves == 1, $"ctx={_settings!.Ollama.GetContextLength(Url)} saves={saves}");
+            Check("提示已保存、下次对话生效", window.Text("Tb_ContextState").Contains("已保存"), window.Text("Tb_ContextState"));
+            Check("渠道表单不受影响（没回调 onChosen）", window.Chosen.Count == 0);
+
+            box.SelectedItem = Item(0);
+            Check("选回默认：删掉这条、再提醒一次",
+                  _settings!.Ollama.GetContextLength(Url) == 0 && _settings!.Ollama.ContextLengths.Count == 0 && saves == 2 &&
+                  window.Text("Tb_ContextState").Contains("4096"), $"saves={saves}");
+
+            // 自定义：选「自定义…」只展开输入框，点了应用才算数
+            var input = window.Find<TextBox>("Tb_ContextCustom");
+            ComboBoxItem CustomItem() => box.Items.OfType<ComboBoxItem>().Single(i => (int)i.Tag == -1);
+            Check("下拉框最后一项是「自定义…」", box.Items[^1] == CustomItem() && !window.Shown("Panel_ContextCustom"));
+            box.SelectedItem = CustomItem();
+            Check("★ 选自定义：展开输入框、预填推荐值，不落盘",
+                  window.Shown("Panel_ContextCustom") && input.Text == "8192" && saves == 2 && _settings!.Ollama.GetContextLength(Url) == 0,
+                  $"text={input.Text} saves={saves}");
+
+            foreach (var bad in new[] { "abc", "1000", "2000000", "-8192", "8192.5", "" })
+            {
+                input.Text = bad;
+                window.Click("Btn_ContextApply");
+                Check($"非法值「{bad}」：报错、不保存、输入框还在",
+                      saves == 2 && _settings!.Ollama.GetContextLength(Url) == 0 && window.Shown("Panel_ContextCustom") &&
+                      window.Text("Tb_ContextState").Contains("2048"), $"saves={saves} {window.Text("Tb_ContextState")}");
+            }
+
+            input.Text = " 12,288 ";
+            window.Click("Btn_ContextApply");
+            Check("★★ 填 12,288 点应用：按地址存 12288 并落盘",
+                  _settings!.Ollama.GetContextLength(Url) == 12288 && saves == 3, $"ctx={_settings!.Ollama.GetContextLength(Url)} saves={saves}");
+            Check("应用后：下拉框列出并选中 12288、输入框收起",
+                  box.SelectedItem is ComboBoxItem { Tag: 12288 } && !window.Shown("Panel_ContextCustom") &&
+                  window.Text("Tb_ContextState").Contains("已保存"), window.Text("Tb_ContextState"));
+
+            box.SelectedItem = CustomItem();
+            Check("再选自定义：预填的是当前值", input.Text == "12288", input.Text);
+            input.Text = "4096";
+            window.Click("Btn_ContextApply");
+            Check("比推荐值小：照存，但提醒可能还是装不下",
+                  _settings!.Ollama.GetContextLength(Url) == 4096 && saves == 4 && window.Text("Tb_ContextState").Contains("装不下"),
+                  window.Text("Tb_ContextState"));
+            Check("旧的自定义值不残留在下拉框", box.Items.OfType<ComboBoxItem>().All(i => (int)i.Tag != 12288));
+            box.SelectedItem = Item(0);
+            Check("自定义后选回默认：删掉", _settings!.Ollama.ContextLengths.Count == 0 && saves == 5, $"saves={saves}");
+        }
+        finally
+        {
+            window.Window.Close();
+            _settings!.Ollama.SetContextLength(Url, 0);
+        }
+        var before = saves;
+
+        // 不是预设值（手改过/以后换了预设）也要原样显示，不能被悄悄改成别的
+        _settings!.Ollama.SetContextLength(Url, 12000);
+        var custom = new ManagerWindow(new FakeDeployInstaller(new OllamaInstallation(@"C:\Ollama", "0.40.13")) { Api = api }, api,
+            "qwen2.5:3b", save: () => saves++);
+        try
+        {
+            var selected = custom.Find<ComboBox>("Cb_Context").SelectedItem as ComboBoxItem;
+            Check("已有的非预设值原样选中", selected is { Tag: 12000 } && saves == before, $"{selected?.Content} saves={saves}");
+        }
+        finally
+        {
+            custom.Window.Close();
+            _settings!.Ollama.SetContextLength(Url, 0);
+        }
     }
 
     private static void CheckRemote()

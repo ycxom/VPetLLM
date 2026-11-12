@@ -122,6 +122,36 @@ namespace VPetLLM.Core.Providers.Chat
             Logger.Log($"Ollama: 模型 {node.Model} 不支持思考，节点上的思考强度对它无效，去掉思考参数后重发");
         }
 
+        /// <summary>这台 Ollama 的上下文窗口（在一键化本地部署里设），0 = 不发送。</summary>
+        private int ContextLength => _setting?.Ollama?.GetContextLength(Node.Url) ?? 0;
+
+        /// <summary>
+        /// 请求的 options 段：温度/最大输出跟"自定义生成参数"开关走，上下文窗口单独看 <see cref="ContextLength"/>。
+        /// 都没有时返回 null（不发 options）。
+        /// </summary>
+        private Dictionary<string, object>? BuildOptions(bool includeGeneration = true)
+        {
+            var options = new Dictionary<string, object>();
+            if (includeGeneration && Node.EnableAdvanced)
+            {
+                options["temperature"] = Node.Temperature;
+                options["num_predict"] = Node.MaxTokens;
+            }
+            if (ContextLength is var ctx and > 0)
+                options["num_ctx"] = ctx;
+            return options.Count > 0 ? options : null;
+        }
+
+        /// <summary>
+        /// 探明的上下文上限按这个键记。窗口大小也进键：用户把 4096 改成 16384 后，
+        /// 旧窗口下学到的小预算不能继续按着历史裁。
+        /// </summary>
+        private string MakeContextLimitKey() => Utils.Common.ContextLimitGuard.MakeKey(
+            "Ollama", Node.Url, ContextLength is var ctx and > 0 ? $"{Node.Model}#ctx{ctx}" : Node.Model);
+
+        protected override string ContextWindowAdvice =>
+            "请打开「一键化本地部署」，在「部署」页把上下文窗口调大（比如 8192），或关掉部分插件、缩短角色设定。";
+
         /// <summary>刚学到"该去掉思考参数"或"该裁上下文"时返回 true，调用方把整个请求重发一遍。</summary>
         private bool ShouldRetryRequest(string prompt)
         {
@@ -192,8 +222,7 @@ namespace VPetLLM.Core.Providers.Chat
 
                 // 构建历史记录
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
-                ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
-                    "Ollama", Node.Url, Node.Model);
+                ContextLimitKey = MakeContextLimitKey();
                 CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, Node.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
@@ -232,11 +261,7 @@ namespace VPetLLM.Core.Providers.Chat
                     model = Node.Model,
                     messages = messages,
                     stream = useStreaming,
-                    options = Node.EnableAdvanced ? new
-                    {
-                        temperature = Node.Temperature,
-                        num_predict = Node.MaxTokens
-                    } : null
+                    options = BuildOptions()
                 };
                 // 多模态同样挂工具。Ollama 认 OpenAI 那套 tools 声明，但响应是自己的格式
                 // （message.tool_calls，无 id），所以解析走 RunOllamaAsync。
@@ -443,8 +468,7 @@ namespace VPetLLM.Core.Providers.Chat
                 var tempUserMessage = CreateUserMessage(prompt);
 
                 // 提示词要说"本节点是否开启工具"，判断必须跟着这一轮的节点走
-                ContextLimitKey = Utils.Common.ContextLimitGuard.MakeKey(
-                    "Ollama", Node.Url, Node.Model);
+                ContextLimitKey = MakeContextLimitKey();
                 CurrentNodeToolsEnabled = global::VPetLLM.Core.Tools.NativeToolSession.WillAttachTools(Settings, Node.EnableToolCall);
                 List<Message> history = await GetCoreHistoryAsync(userQuery: prompt);
                 // 如果有临时用户消息，添加到历史末尾用于API请求
@@ -460,11 +484,7 @@ namespace VPetLLM.Core.Providers.Chat
                     model = Node.Model,
                     messages = history.Select(m => new { role = m.Role, content = m.DisplayContent }),
                     stream = Node.EnableStreaming,
-                    options = Node.EnableAdvanced ? new
-                    {
-                        temperature = Node.Temperature,
-                        num_predict = Node.MaxTokens
-                    } : null
+                    options = BuildOptions()
                 };
                 var toolSession = global::VPetLLM.Core.Tools.NativeToolSession.TryCreate(
                     Settings, Node.EnableToolCall);
@@ -665,7 +685,9 @@ namespace VPetLLM.Core.Providers.Chat
                 {
                     model = Node.Model,
                     prompt = combinedPrompt,
-                    stream = false
+                    stream = false,
+                    // 只带窗口不带温度：总结一直是服务端默认参数，但窗口和聊天不一致的话 Ollama 每次切换都要重载模型
+                    options = BuildOptions(includeGeneration: false)
                 };
                 var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
                 using (var client = GetClient())
