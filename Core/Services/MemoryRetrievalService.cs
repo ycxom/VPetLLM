@@ -627,8 +627,8 @@ namespace VPetLLM.Core.Services
                     systemPrompt = "You are a memory assistant. Summarize the following retrieved memories into a concise, useful context for an ongoing conversation. Only include information relevant to the current discussion. Be brief.";
                 }
 
-                // Use the main ChatCore's Summarize method (uses "Compression" purpose for node selection)
-                var summary = await _chatCore.Summarize(systemPrompt, rawMemories);
+                // 记忆专家总结走 "Memory" 用途：渠道设成「仅记忆」即可只接这类请求（与压缩/日记分开走便宜模型）
+                var summary = await _chatCore.Summarize(systemPrompt, rawMemories, "Memory");
 
                 if (!string.IsNullOrWhiteSpace(summary))
                     return WrapForInjection(summary);

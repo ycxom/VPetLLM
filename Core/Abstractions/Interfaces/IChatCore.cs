@@ -29,7 +29,22 @@
         /// 把一行报错当成 2151 条消息的总结提交，并推进检查点把原文永久丢掉。
         /// 成功时允许返回空串，调用方按「无内容」处理。
         /// </remarks>
+        /// <remarks>等价于 <see cref="Summarize(string, string, string)"/> 传 "Compression"。</remarks>
         Task<string> Summarize(string systemPrompt, string userContent);
+        /// <summary>
+        /// 生成总结（带路由用途）。失败时抛 <see cref="VPetLLM.Infrastructure.Exceptions.SummarizeFailedException"/>，
+        /// 异常消息是可直接展示的文案。
+        /// </summary>
+        /// <param name="purpose">
+        /// 用途标识，决定这次总结优先走哪类渠道："Compression"（上下文压缩/溢出总结）、
+        /// "Memory"（记忆检索的专家总结）、"Diary"（日记生成）。渠道可设成只接某一用途；
+        /// 没有匹配渠道时回退到「无限制」，再退回全部渠道。
+        /// </param>
+        /// <remarks>
+        /// 实现绝不能把错误文案当返回值：调用方无法与真总结区分。
+        /// 成功时允许返回空串，调用方按「无内容」处理。
+        /// </remarks>
+        Task<string> Summarize(string systemPrompt, string userContent, string purpose);
 
         /// <summary>
         /// 对单条文本取 L2 归一化向量，供插件做向量索引/检索。

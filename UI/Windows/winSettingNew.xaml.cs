@@ -2165,6 +2165,9 @@ namespace VPetLLM.UI.Windows
                     {
                         Logger.Log($"Warning: Failed to save plugin states: {ex.Message}");
                     }
+
+                    // 启停会改变插件注册的渠道用途，通知渠道管理等订阅方刷新
+                    PluginManager.RaisePluginsChanged();
                 }
                 catch (Exception ex)
                 {

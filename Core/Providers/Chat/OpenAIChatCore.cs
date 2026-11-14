@@ -929,7 +929,7 @@ namespace VPetLLM.Core.Providers.Chat
             return "";
         }
 
-        public override async Task<string> Summarize(string systemPrompt, string userContent)
+        public override async Task<string> Summarize(string systemPrompt, string userContent, string purpose)
         {
             try
             {
@@ -943,7 +943,7 @@ namespace VPetLLM.Core.Providers.Chat
                 ClearNodeContext();
 
                 // 获取当前节点和API Key
-                var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint("Compression");
+                var (apiUrl, apiKey, currentNode) = GetCurrentEndpoint(purpose);
 
                 // 检查是否有可用节点
                 if (currentNode is null || apiUrl is null)

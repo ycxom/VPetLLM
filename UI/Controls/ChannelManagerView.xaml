@@ -565,9 +565,15 @@
                             <TextBlock Style="{StaticResource FormHint}" Margin="112,-8,0,12"
                                        Text="{utils:Localize KeyPath=Channels.Hint.Priority, Default=优先级越大越先用，整层失败才轮到下一层；同一优先级内按权重随机分配，权重都为 0 时平均分配。}"/>
 
-                            <DockPanel Style="{StaticResource FormRow}">
+                            <DockPanel Style="{StaticResource FormRow}" LastChildFill="True">
                                 <TextBlock Style="{StaticResource FormLabel}" Text="{utils:Localize KeyPath=Channels.Field.Mode, Default=用途}"/>
-                                <ComboBox x:Name="Ed_Mode" Style="{StaticResource FormComboBox}"/>
+                                <StackPanel x:Name="Ed_PurposeArea" Margin="12,0,0,0">
+                                    <CheckBox x:Name="Ed_AllPurposes" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,4" FontSize="13"
+                                              Content="{utils:Localize KeyPath=Channels.Purpose.All, Default=无限制（聊天、总结和所有插件用途都用）}"
+                                              Click="Ed_AllPurposes_Click"/>
+                                    <StackPanel x:Name="Ed_PurposeList"/>
+                                    <TextBlock x:Name="Ed_PurposeHint" Style="{StaticResource FormHint}" Margin="0,2,0,0" Visibility="Collapsed"/>
+                                </StackPanel>
                             </DockPanel>
 
                             <DockPanel x:Name="Ed_ProxyRow" Style="{StaticResource FormRow}">

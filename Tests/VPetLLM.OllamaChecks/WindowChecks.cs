@@ -11,6 +11,11 @@ using VPetLLM.Core.Services;
 using VPetLLM.UI.Controls;
 using VPetLLM.UI.Windows;
 
+// 插件接口一律写全别名（VPetLLM.Core 下有同名旧接口残留，裸类型名会撞上）
+using ChannelModeDefinition = VPetLLM.Core.Abstractions.Interfaces.Plugin.ChannelModeDefinition;
+using IChannelModeProvider = VPetLLM.Core.Abstractions.Interfaces.Plugin.IChannelModeProvider;
+using PluginManager = VPetLLM.Utils.Plugin.PluginManager;
+
 namespace VPetLLM.OllamaChecks;
 
 internal static partial class Program
@@ -222,6 +227,8 @@ internal static partial class Program
 
     private static void Press(Button button) => button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
 
+    private static void Press(CheckBox box) => box.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+
     private static IEnumerable<DependencyObject> Descendants(DependencyObject parent)
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
@@ -288,6 +295,8 @@ internal static partial class Program
             CheckQuickDeploy();
             CheckChannelView();
             CheckChannelDeploy();
+            CheckChannelPluginRefresh();
+            CheckPurposeStyleConsistency();
         }
         finally
         {
@@ -299,12 +308,15 @@ internal static partial class Program
 
     private static Setting FreshSettings(string dir)
     {
+        // Setting 的库路径固定在 文档\VPetLLM\settings.db（构造参数被无视），这里读到的其实是真实库：
+        // 节点列表、上下文窗口都得显式清空，否则"没设过"的前置假设会随真实库的状态漂移
         var s = new Setting(Path.Combine(dir, Guid.NewGuid().ToString("N")));
         s.OpenAI.OpenAINodes.Clear();
         s.Gemini.GeminiNodes.Clear();
         s.Ollama.OllamaNodes.Clear();
         s.LMStudio.LMStudioNodes.Clear();
         s.Free.FreeNodes.Clear();
+        s.Ollama.ContextLengths.Clear();
         s.Ollama.OllamaNodes.Add(new Setting.OllamaNodeSetting { Model = "", Priority = 100 });
         s.Free.FreeNodes.Add(new Setting.FreeNodeSetting { Enabled = true });
         return s;
@@ -1211,6 +1223,160 @@ internal static partial class Program
         // 留空是走默认地址，真打开会连本机，这里只看判断本身
         var isDeployUrl = typeof(ChannelManagerView).GetMethod("IsDeployUrl", BindingFlags.Static | BindingFlags.NonPublic)!;
         Check("列表入口：地址留空算合法", isDeployUrl.Invoke(null, new object[] { "" }) is true);
+    }
+
+    /// <summary>用途编辑折叠：平时只露「无限制」一项，点主勾展开明细，全部取消勾选自动收回无限制。</summary>
+    private static void CheckPurposeStyleConsistency()
+    {
+        var settings = FreshSettings(Path.GetTempPath());
+        var node = settings.Ollama.OllamaNodes[0];
+        node.Url = "http://192.0.2.1:11434";
+        node.Model = "qwen3:4b";
+
+        var view = new ChannelManagerView();
+        view.Attach(settings, () => null, () => { });
+        var allPurposes = (CheckBox)view.FindName("Ed_AllPurposes");
+
+        // 前置：这个节点是旧数据无限制 → 打开编辑页应该是收起状态
+        Call(view, "OpenEditor", node, node.Kind);
+        var boxes = PurposeBoxes(view);
+        Check("用途复选框存在", boxes.Count >= 3);
+        Check("无限制载入：明细收起", !PurposeExpanded(view));
+        Check("主勾挂 ModernCheckBox 样式", allPurposes.Style is not null);
+        foreach (var b in boxes)
+            Check($"复选框「{b.Content}」样式与主勾一致", ReferenceEquals(b.Style, allPurposes.Style));
+
+        // 点主勾取消 → 展开明细
+        allPurposes.IsChecked = false;
+        Press(allPurposes);
+        Check("取消无限制：明细展开", PurposeExpanded(view));
+
+        // 逐项勾上再逐个取消 → 最后一个取消后自动收回无限制
+        foreach (var b in boxes) b.IsChecked = true;
+        foreach (var b in boxes)
+        {
+            b.IsChecked = false;
+            Press(b);
+        }
+        Check("全部取消：主勾自动亮", allPurposes.IsChecked == true);
+        Check("全部取消：明细自动收起", !PurposeExpanded(view));
+
+        // 勾一个非内置键再保存 → 落盘的是勾选键，收起状态下不误存无限制
+        Call(view, "OpenEditor", node, node.Kind);
+        Check("重开编辑页：仍无限制收起", allPurposes.IsChecked == true && !PurposeExpanded(view));
+        allPurposes.IsChecked = false;
+        Press(allPurposes);
+        var first = PurposeBoxes(view).First(b => b.IsEnabled);
+        first.IsChecked = true;
+        Press(first);
+        Check("勾单项：主勾取消", allPurposes.IsChecked != true);
+        var err = (string?)Call(view, "CollectForm", true);
+        Check("勾单项保存成功", err is null, err?.ToString() ?? "");
+        // CollectForm 写的是编辑草稿（原节点要等真正保存才写回），断言草稿
+        Check("勾单项落盘正确", Setting.GetNodePurposes(Field<Setting.ChannelNodeBase>(view, "_draft")!).Count == 1);
+        // 再点主勾选无限制并保存 → 清空
+        allPurposes.IsChecked = true;
+        Press(allPurposes);
+        Check("点主勾：明细收起", !PurposeExpanded(view));
+        err = (string?)Call(view, "CollectForm", true);
+        Check("无限制保存成功", err is null, err?.ToString() ?? "");
+        Check("无限制落盘为空", Setting.GetNodePurposes(Field<Setting.ChannelNodeBase>(view, "_draft")!).Count == 0);
+    }
+
+    /// <summary>MOD 启停/更新要刷新渠道管理：行徽标跟用途注册表现算，编辑页的用途复选框跟着插件出现/消失。</summary>
+    private static void CheckChannelPluginRefresh()
+    {
+        var settings = FreshSettings(Path.GetTempPath());
+        var node = settings.Ollama.OllamaNodes[0];
+        node.Url = "http://192.0.2.1:11434";
+        node.Model = "qwen3:4b";
+
+        var view = new ChannelManagerView();
+        view.Attach(settings, () => null, () => { });
+
+        // 节点把用途绑到插件注册的键上：插件启用时徽标显示插件给的显示名，
+        // 停用/卸载后注册表查不到，落回原始键
+        Setting.ApplyPurposes(node, ["Weather"]);
+
+        var fake = new FakePluginMode("测试用途插件", new[] { new ChannelModeDefinition { ModeId = "Weather", DisplayName = "天气", Description = "" } });
+        PluginManager.Plugins.Add(fake);
+        try
+        {
+            // 前置：插件还没启用，徽标落回原始键
+            Check("MOD 未启用：徽标显示原始键", GetRowModeText(view, node) == "Weather", GetRowModeText(view, node) ?? "null");
+
+            // MOD 启动（插件进注册表）→ 触发生命周期事件 → 防抖后刷新
+            fake.Enabled = true;
+            PluginManager.RaisePluginsChanged();
+            Pump(() => GetRowModeText(view, node) == "天气");
+
+            Check("MOD 启动：徽标换成插件显示名", GetRowModeText(view, node) == "天气");
+
+            // MOD 启用后打开编辑页：明细自动展开（该节点有勾选用途），复选框里出现插件用途且勾着
+            Call(view, "OpenEditor", node, node.Kind);
+            Pump(() => (view.FindName("Page_Editor") as FrameworkElement)?.Visibility == Visibility.Visible);
+            Check("有勾选用途载入：明细自动展开", PurposeExpanded(view));
+            var boxes = PurposeBoxes(view);
+            Check("MOD 启用：编辑页有插件用途复选框", boxes.Any(b => (string)b.Tag == "Weather" && b.Content as string == "天气" && b.IsChecked == true), string.Join(",", boxes.Select(b => b.Tag)));
+
+            // MOD 更新（卸了又装，中途 Enabled 翻转）→ 复选框落回"未启用"占位，徽标落回原始键
+            fake.Enabled = false;
+            PluginManager.RaisePluginsChanged();
+            Pump(() => GetRowModeText(view, node) == "Weather");
+            Check("MOD 停用：徽标落回原始键", GetRowModeText(view, node) == "Weather");
+            Pump(() => !PurposeBoxes(view).Any(b => (string)b.Tag == "Weather" && b.IsEnabled));
+            var stale = PurposeBoxes(view).FirstOrDefault(b => (string)b.Tag == "Weather");
+            Check("MOD 停用：旧键保留为置灰勾选", stale is not null && !stale.IsEnabled && stale.IsChecked == true,
+                stale is null ? "复选框被删了" : $"IsEnabled={stale.IsEnabled} IsChecked={stale.IsChecked}");
+            // 正在编辑的草稿没被冲掉：表单字段原样
+            Check("MOD 停用：编辑中草稿不被冲掉", Field<Setting.ChannelNodeBase?>(view, "_draft") is Setting.OllamaNodeSetting
+                && (view.FindName("Ed_Url") as TextBox)?.Text == "http://192.0.2.1:11434");
+        }
+        finally
+        {
+            PluginManager.Plugins.Remove(fake);
+            PluginManager.RaisePluginsChanged();
+        }
+
+        // 清理后徽标仍是原始键（提供它的插件已经不在了）
+        Pump(() => GetRowModeText(view, node) == "Weather");
+        Check("MOD 移除：徽标不再显示插件显示名", GetRowModeText(view, node) == "Weather");
+    }
+
+    private static List<CheckBox> PurposeBoxes(object view)
+    {
+        var list = (Panel?)((FrameworkElement)view).FindName("Ed_PurposeList");
+        return list is null ? new List<CheckBox>() : list.Children.OfType<CheckBox>().ToList();
+    }
+
+    /// <summary>测试用：用途明细区当前是否展开（Ed_PurposeList 可见 = 展开逐项选择）。</summary>
+    private static bool PurposeExpanded(object view)
+    {
+        var list = (Panel?)((FrameworkElement)view).FindName("Ed_PurposeList");
+        return list is not null && list.Visibility == Visibility.Visible;
+    }
+
+    /// <summary>测试用：读某行徽标文本（ChannelRow.ModeText 是公开 get，从行集合里按节点找）。</summary>
+    private static string? GetRowModeText(object view, Setting.ChannelNodeBase node)
+    {
+        var rows = (System.Collections.ObjectModel.ObservableCollection<ChannelRow>)view.GetType()
+            .GetField("_rows", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view)!;
+        return rows.FirstOrDefault(r => ReferenceEquals(r.Node, node))?.ModeText;
+    }
+
+    /// <summary>照 ChannelRoutingChecks 的假插件造一个，只为了给用途注册表供货。</summary>
+    private sealed class FakePluginMode(string name, ChannelModeDefinition[] modes) : IChannelModeProvider
+    {
+        public string Name { get; } = name;
+        public string Author { get; } = "test";
+        public string Description { get; } = "";
+        public string Parameters { get; } = "";
+        public string Examples { get; } = "";
+        public bool Enabled { get; set; }
+        public string FilePath { get; set; } = "";
+        public void Initialize(global::VPetLLM.VPetLLM plugin) { }
+        public void Unload() { }
+        public IReadOnlyList<ChannelModeDefinition> GetCustomModes() => modes;
     }
 
     private static void CheckLocalization()

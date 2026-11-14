@@ -825,7 +825,8 @@ namespace VPetLLM.Core.Providers.Chat
 
 
 
-        public override async Task<string> Summarize(string systemPrompt, string userContent)
+        // purpose：路由用途。Free 是单一网关端点，没有多节点选路，不参与按用途过滤。
+        public override async Task<string> Summarize(string systemPrompt, string userContent, string purpose)
         {
             try
             {

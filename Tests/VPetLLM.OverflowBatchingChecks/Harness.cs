@@ -66,7 +66,7 @@ internal sealed class RecordingCore : ChatCoreBase
 
     public override Task<string> Chat(string prompt, bool isRetry) => Task.FromResult("");
 
-    public override Task<string> Summarize(string systemPrompt, string userContent)
+    public override Task<string> Summarize(string systemPrompt, string userContent, string purpose)
     {
         // userContent 是 "[role]: content" 逐行拼出来的
         var messageCount = userContent.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;

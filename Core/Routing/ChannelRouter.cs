@@ -47,10 +47,10 @@ namespace VPetLLM.Core.Routing
             if (string.IsNullOrEmpty(purpose) || nodes.Count == 0)
                 return nodes;
 
-            var matching = nodes.Where(n => Setting.IsNodeMatchingPurpose(n.Mode, n.PluginModeId, purpose)).ToList();
+            var matching = nodes.Where(n => Setting.IsNodeMatchingPurposes(n, purpose)).ToList();
             if (matching.Count > 0) return matching;
 
-            var unrestricted = nodes.Where(n => n.Mode == Setting.ChannelMode.Unrestricted).ToList();
+            var unrestricted = nodes.Where(n => Setting.GetNodePurposes(n).Count == 0).ToList();
             return unrestricted.Count > 0 ? unrestricted : nodes;
         }
 

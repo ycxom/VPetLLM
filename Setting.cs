@@ -1282,9 +1282,9 @@ namespace VPetLLM
 
                 if (!string.IsNullOrEmpty(purpose))
                 {
-                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurpose(n.Mode, n.PluginModeId, purpose)).ToList();
+                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurposes(n, purpose)).ToList();
                     if (filtered.Count == 0)
-                        filtered = enabledNodes.Where(n => n.Mode == ChannelMode.Unrestricted).ToList();
+                        filtered = enabledNodes.Where(n => GetNodePurposes(n).Count == 0).ToList();
                     if (filtered.Count > 0)
                         enabledNodes = filtered;
                 }
@@ -1312,7 +1312,7 @@ namespace VPetLLM
                     if (OllamaNodes[i].Enabled && !triedIndices.Contains(i))
                     {
                         if (!string.IsNullOrEmpty(purpose) &&
-                            !IsNodeMatchingPurpose(OllamaNodes[i].Mode, OllamaNodes[i].PluginModeId, purpose))
+                            !IsNodeMatchingPurposes(OllamaNodes[i], purpose))
                             continue;
                         return OllamaNodes[i];
                     }
@@ -1434,9 +1434,9 @@ namespace VPetLLM
                 // Mode 过滤：三级回退策略
                 if (!string.IsNullOrEmpty(purpose))
                 {
-                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurpose(n.Mode, n.PluginModeId, purpose)).ToList();
+                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurposes(n, purpose)).ToList();
                     if (filtered.Count == 0)
-                        filtered = enabledNodes.Where(n => n.Mode == ChannelMode.Unrestricted).ToList();
+                        filtered = enabledNodes.Where(n => GetNodePurposes(n).Count == 0).ToList();
                     if (filtered.Count > 0)
                         enabledNodes = filtered;
                 }
@@ -1476,7 +1476,7 @@ namespace VPetLLM
                     if (OpenAINodes[i].Enabled && !triedIndices.Contains(i))
                     {
                         if (!string.IsNullOrEmpty(purpose) &&
-                            !IsNodeMatchingPurpose(OpenAINodes[i].Mode, OpenAINodes[i].PluginModeId, purpose))
+                            !IsNodeMatchingPurposes(OpenAINodes[i], purpose))
                             continue;
                         return OpenAINodes[i];
                     }
@@ -1572,9 +1572,9 @@ namespace VPetLLM
                 // Mode 过滤：三级回退策略
                 if (!string.IsNullOrEmpty(purpose))
                 {
-                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurpose(n.Mode, n.PluginModeId, purpose)).ToList();
+                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurposes(n, purpose)).ToList();
                     if (filtered.Count == 0)
-                        filtered = enabledNodes.Where(n => n.Mode == ChannelMode.Unrestricted).ToList();
+                        filtered = enabledNodes.Where(n => GetNodePurposes(n).Count == 0).ToList();
                     if (filtered.Count > 0)
                         enabledNodes = filtered;
                 }
@@ -1614,7 +1614,7 @@ namespace VPetLLM
                     if (GeminiNodes[i].Enabled && !triedIndices.Contains(i))
                     {
                         if (!string.IsNullOrEmpty(purpose) &&
-                            !IsNodeMatchingPurpose(GeminiNodes[i].Mode, GeminiNodes[i].PluginModeId, purpose))
+                            !IsNodeMatchingPurposes(GeminiNodes[i], purpose))
                             continue;
                         return GeminiNodes[i];
                     }
@@ -1729,9 +1729,9 @@ namespace VPetLLM
 
                 if (!string.IsNullOrEmpty(purpose))
                 {
-                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurpose(n.Mode, n.PluginModeId, purpose)).ToList();
+                    var filtered = enabledNodes.Where(n => IsNodeMatchingPurposes(n, purpose)).ToList();
                     if (filtered.Count == 0)
-                        filtered = enabledNodes.Where(n => n.Mode == ChannelMode.Unrestricted).ToList();
+                        filtered = enabledNodes.Where(n => GetNodePurposes(n).Count == 0).ToList();
                     if (filtered.Count > 0)
                         enabledNodes = filtered;
                 }
@@ -1759,7 +1759,7 @@ namespace VPetLLM
                     if (LMStudioNodes[i].Enabled && !triedIndices.Contains(i))
                     {
                         if (!string.IsNullOrEmpty(purpose) &&
-                            !IsNodeMatchingPurpose(LMStudioNodes[i].Mode, LMStudioNodes[i].PluginModeId, purpose))
+                            !IsNodeMatchingPurposes(LMStudioNodes[i], purpose))
                             continue;
                         return LMStudioNodes[i];
                     }
@@ -1901,6 +1901,8 @@ namespace VPetLLM
             Unrestricted = 0,      // 无限制（默认）
             ChatOnly = 1,          // 仅聊天
             CompressionOnly = 2,   // 仅聊天压缩
+            MemoryOnly = 3,        // 仅记忆（记忆整理等后台总结）
+            DiaryOnly = 4,         // 仅日记
             PluginDefined = 100    // 插件自定义（预留）
         }
 
@@ -1914,16 +1916,62 @@ namespace VPetLLM
             ForceProxy = 2        // 强制代理（前提：全局代理已启用）
         }
 
-        public static bool IsNodeMatchingPurpose(ChannelMode mode, string? pluginModeId, string purpose)
+        /// <summary>节点的生效用途集：显式 Purposes 优先，旧数据从 Mode 推导。</summary>
+        public static List<string> GetNodePurposes(ChannelNodeBase node)
+            => node.Purposes ?? PurposesFromMode(node.Mode, node.PluginModeId);
+
+        /// <summary>旧版单选用途折算成用途集。PluginModeId 为空的 PluginDefined 折算成空集（无限制）。</summary>
+        public static List<string> PurposesFromMode(ChannelMode mode, string? pluginModeId) => mode switch
         {
-            return mode switch
+            ChannelMode.ChatOnly => new List<string> { "Chat" },
+            ChannelMode.CompressionOnly => new List<string> { "Compression" },
+            ChannelMode.MemoryOnly => new List<string> { "Memory" },
+            ChannelMode.DiaryOnly => new List<string> { "Diary" },
+            ChannelMode.PluginDefined => string.IsNullOrEmpty(pluginModeId) ? new List<string>() : new List<string> { pluginModeId },
+            _ => new List<string>()
+        };
+
+        /// <summary>
+        /// 渠道是否服务给定用途：空集 = 无限制（服务一切）；非空 = 集合包含才服务。
+        /// "Overflow" 是 "Compression" 的别名（长上下文溢出总结与压缩同路）。
+        /// </summary>
+        public static bool IsNodeMatchingPurposes(ChannelNodeBase node, string? purpose)
+        {
+            if (string.IsNullOrEmpty(purpose)) return true;
+            if (purpose == "Overflow") purpose = "Compression";
+            var purposes = GetNodePurposes(node);
+            return purposes.Count == 0 || purposes.Contains(purpose);
+        }
+
+        /// <summary>
+        /// 写渠道的用途集，并同步 Mode/PluginModeId 影子 —— 旧宿主（不认识 Purposes）回滚时路由尽量不变：
+        /// 单个内置用途折算回对应枚举，单个插件用途折算成 PluginDefined+标识，多选用途旧宿主表示不了（退化成最后备选）。
+        /// </summary>
+        public static void ApplyPurposes(ChannelNodeBase node, IReadOnlyList<string> purposes)
+        {
+            node.Purposes = purposes.Distinct().ToList();
+            node.PluginModeId = null;
+            if (node.Purposes.Count == 0)
             {
-                ChannelMode.Unrestricted => true,
-                ChannelMode.ChatOnly => purpose == "Chat",
-                ChannelMode.CompressionOnly => purpose == "Compression" || purpose == "Overflow",
-                ChannelMode.PluginDefined => !string.IsNullOrEmpty(pluginModeId) && purpose == pluginModeId,
-                _ => true
+                node.Mode = ChannelMode.Unrestricted;
+                return;
+            }
+            if (node.Purposes.Count > 1)
+            {
+                node.Mode = ChannelMode.PluginDefined; // 多选：旧宿主推导成空集=无限制，只会当最后备选，可接受的降级
+                return;
+            }
+            var single = node.Purposes[0];
+            node.Mode = single switch
+            {
+                "Chat" => ChannelMode.ChatOnly,
+                "Compression" => ChannelMode.CompressionOnly,
+                "Memory" => ChannelMode.MemoryOnly,
+                "Diary" => ChannelMode.DiaryOnly,
+                _ => ChannelMode.PluginDefined
             };
+            if (node.Mode == ChannelMode.PluginDefined)
+                node.PluginModeId = single; // 单个插件用途：旧宿主靠 PluginModeId 匹配，影子必须带上
         }
         public class ProxySetting
         {

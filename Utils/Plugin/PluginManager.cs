@@ -23,6 +23,28 @@ namespace VPetLLM.Utils.Plugin
         // 这些没上锁的 List/Dictionary 会被写坏——轻则插件列表错乱，重则字典内部成环、查找时死循环。
         // 用异步闸串起来：等的时候不占线程，也就不会把 UI 线程堵死。
         private static readonly SemaphoreSlim _updateGate = new(1, 1);
+
+        /// <summary>
+        /// 插件集合或启用状态发生变化（加载/更新/卸载/启用切换）。
+        /// 事件可能在任意线程触发，订阅方（如渠道管理界面）自行调度到 UI 线程。
+        /// </summary>
+        public static event Action? PluginsChanged;
+
+        /// <summary>触发 PluginsChanged；订阅方异常不外泄，逐个调用互不影响。生命周期路径之外（设置窗口手动启停、测试）也可调用。</summary>
+        public static void RaisePluginsChanged()
+        {
+            var handlers = PluginsChanged;
+            if (handlers is null)
+                return;
+            foreach (var handler in handlers.GetInvocationList().Cast<Action>())
+            {
+                try { handler(); }
+                catch (Exception ex)
+                {
+                    VPetLLMUtils.Logger.Log($"PluginsChanged handler failed: {ex.Message}");
+                }
+            }
+        }
         public static string PluginPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VPetLLM", "Plugin");
 
         // 影子拷贝的落地目录。
@@ -311,6 +333,9 @@ namespace VPetLLM.Utils.Plugin
                     }
                 }
             });
+
+            // 启动加载完成后统一通知一次，不在循环里逐插件连发
+            RaisePluginsChanged();
         }
 
         private static int GetLoadParallelism(int pluginCount)
@@ -365,6 +390,7 @@ namespace VPetLLM.Utils.Plugin
             }
             await PluginLifecycleGuard.SafeUnloadAsync(plugin);
             Plugins.Remove(plugin);
+            RaisePluginsChanged();
 
             if (_pluginContexts.TryGetValue(filePath, out var context))
             {
@@ -506,6 +532,7 @@ namespace VPetLLM.Utils.Plugin
                 }
             }
             Plugins.Clear();
+            RaisePluginsChanged();
 
             // 卸载所有程序集上下�?
             var contextList = _pluginContexts.Values.ToList();
@@ -916,6 +943,7 @@ namespace VPetLLM.Utils.Plugin
                 await Task.Delay(300);
 
                 VPetLLMUtils.Logger.Log($"Successfully updated plugin: {pluginFilePath}");
+                RaisePluginsChanged();
                 return true;
             }
             catch (Exception ex)
@@ -1068,6 +1096,7 @@ namespace VPetLLM.Utils.Plugin
                         }
 
                         VPetLLMUtils.Logger.Log($"Plugin loaded: {plugin.Name} from {pluginFilePath}");
+                        RaisePluginsChanged();
                     }
                 }
 

@@ -62,9 +62,9 @@ namespace VPetLLM.Core.Providers.Chat
             return "";
         }
 
-        public override async Task<string> Summarize(string systemPrompt, string userContent)
+        public override async Task<string> Summarize(string systemPrompt, string userContent, string purpose)
         {
-            var plan = ChannelRouter.Plan(Settings!, "Compression");
+            var plan = ChannelRouter.Plan(Settings!, purpose);
             if (plan.Count == 0)
                 throw new SummarizeFailedException(NoChannelMessage(false));
 
@@ -75,7 +75,7 @@ namespace VPetLLM.Core.Providers.Chat
                 worker.OnBeforeRoutedCall();
                 try
                 {
-                    var result = await worker.Summarize(systemPrompt, userContent);
+                    var result = await worker.Summarize(systemPrompt, userContent, purpose);
                     ChannelStatsRecorder.Record(node, success: true, tokens: 0);
                     return result;
                 }

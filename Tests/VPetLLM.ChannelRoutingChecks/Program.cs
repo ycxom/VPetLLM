@@ -16,6 +16,11 @@ using VPetLLM.Infrastructure.Exceptions;
 using VPetLLM.Services;
 using VPetLLM.Configuration;
 
+// 插件接口一律写全别名（VPetLLM.Core 下有同名旧接口残留，裸类型名会撞上）
+using ChannelModeDefinition = VPetLLM.Core.Abstractions.Interfaces.Plugin.ChannelModeDefinition;
+using IChannelModeProvider = VPetLLM.Core.Abstractions.Interfaces.Plugin.IChannelModeProvider;
+using PluginManager = VPetLLM.Utils.Plugin.PluginManager;
+
 // 统一渠道路由的回归检查。
 //
 // 这次改动把"选一个提供商 → 在它的节点里轮询 → 降级列表（其实从没接上）"
@@ -45,6 +50,9 @@ static class Program
         try
         {
             Test_RouterTiersAndFilters(dir);
+            Test_PurposeRouting(dir);
+            Test_PurposeSets(dir);
+            Test_PurposeRegistry();
             Test_RouterWeights(dir);
             Test_Migration(dir);
             Test_OpenAIProtocols();
@@ -119,6 +127,215 @@ static class Program
 
         high.Enabled = low.Enabled = false;
         Check("没有匹配用途的渠道时退回全部可用的", ChannelRouter.Plan(s, "Chat").SequenceEqual(new Setting.ChannelNodeBase[] { summarizer }));
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    static void Test_PurposeRouting(string dir)
+    {
+        Console.WriteLine("[1.5] 选路：Memory / Diary 用途");
+        var s = NewSettings(dir);
+        var chat = Add(s, new Setting.OpenAINodeSetting { Name = "chat" }, 10);
+        var compressor = Add(s, new Setting.LMStudioNodeSetting { Name = "comp", Mode = Setting.ChannelMode.CompressionOnly }, 5);
+        var diary = Add(s, new Setting.GeminiNodeSetting { Name = "diary", Mode = Setting.ChannelMode.DiaryOnly }, 5);
+        var memory = Add(s, new Setting.OllamaNodeSetting { Name = "mem", Mode = Setting.ChannelMode.MemoryOnly }, 5);
+
+        var d = ChannelRouter.Plan(s, "Diary");
+        Check("日记走「无限制」+「仅日记」（无限制匹配一切用途）",
+              d.SequenceEqual(new Setting.ChannelNodeBase[] { chat, diary }), string.Join(",", d.Select(p => p.Name)));
+        Check("「仅总结」「仅记忆」不接日记", !d.Contains(compressor) && !d.Contains(memory));
+
+        var m = ChannelRouter.Plan(s, "Memory");
+        Check("记忆整理走「无限制」+「仅记忆」",
+              m.SequenceEqual(new Setting.ChannelNodeBase[] { chat, memory }), string.Join(",", m.Select(p => p.Name)));
+        Check("「仅总结」「仅日记」不接记忆", !m.Contains(compressor) && !m.Contains(diary));
+
+        var c = ChannelRouter.Plan(s, "Compression");
+        Check("压缩走「无限制」+「仅总结」",
+              c.SequenceEqual(new Setting.ChannelNodeBase[] { chat, compressor }), string.Join(",", c.Select(p => p.Name)));
+        Check("「仅记忆」「仅日记」不接压缩", !c.Contains(memory) && !c.Contains(diary));
+        var o = ChannelRouter.Plan(s, "Overflow");
+        Check("溢出总结与压缩同路（仅总结渠道接 Overflow）", o.SequenceEqual(c));
+
+        // 回退链：没有「仅日记」渠道时，日记回退到「无限制」，再退回全部
+        diary.Enabled = memory.Enabled = compressor.Enabled = false;
+        var fb = ChannelRouter.Plan(s, "Diary");
+        Check("没有专用渠道时日记回退到「无限制」", fb.SequenceEqual(new Setting.ChannelNodeBase[] { chat }),
+              string.Join(",", fb.Select(p => p.Name)));
+
+        // 连「无限制」都没有：ChatOnly / CompressionOnly 也兜底接日记（不过滤）
+        var chatOnly = Add(s, new Setting.OpenAINodeSetting { Name = "chatOnly", Mode = Setting.ChannelMode.ChatOnly }, 3);
+        var compOnly = Add(s, new Setting.LMStudioNodeSetting { Name = "compOnly", Mode = Setting.ChannelMode.CompressionOnly }, 2);
+        chat.Enabled = diary.Enabled = false;
+        var all = ChannelRouter.Plan(s, "Diary");
+        Check("连「无限制」都没有时日记不过滤（兜底全部）",
+              all.SequenceEqual(new Setting.ChannelNodeBase[] { chatOnly, compOnly }),
+              string.Join(",", all.Select(p => p.Name)));
+
+        diary.Enabled = true;
+        Check("专用渠道恢复后日记不再全量回退",
+              ChannelRouter.Plan(s, "Diary").SequenceEqual(new Setting.ChannelNodeBase[] { diary }));
+
+        // 枚举值不许变：已存库的渠道按数字反序列化，插队换值=静默换用途
+        Check("枚举数值稳定（Unrestricted=0 ChatOnly=1 CompressionOnly=2 MemoryOnly=3 DiaryOnly=4 PluginDefined=100）",
+              (int)Setting.ChannelMode.Unrestricted == 0 && (int)Setting.ChannelMode.ChatOnly == 1 &&
+              (int)Setting.ChannelMode.CompressionOnly == 2 && (int)Setting.ChannelMode.MemoryOnly == 3 &&
+              (int)Setting.ChannelMode.DiaryOnly == 4 && (int)Setting.ChannelMode.PluginDefined == 100);
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    static void Test_PurposeSets(string dir)
+    {
+        Console.WriteLine("[1.6] 用途：复选保存（ApplyPurposes）、多选路由、旧数据推导");
+        var s = NewSettings(dir);
+
+        // ApplyPurposes 同步矩阵：Purposes 是路由真值，Mode/PluginModeId 只为旧宿主回滚保留
+        var n = Add(s, new Setting.OpenAINodeSetting { Name = "n" }, 1);
+        Setting.ApplyPurposes(n, Array.Empty<string>());
+        Check("空列表 = 无限制（Mode 影子同步回 Unrestricted）",
+              n.Purposes is { Count: 0 } && n.Mode == Setting.ChannelMode.Unrestricted && n.PluginModeId is null,
+              $"{n.Purposes?.Count}/{n.Mode}/{n.PluginModeId}");
+
+        foreach (var (key, mode) in new[]
+        {
+            ("Chat", Setting.ChannelMode.ChatOnly),
+            ("Compression", Setting.ChannelMode.CompressionOnly),
+            ("Memory", Setting.ChannelMode.MemoryOnly),
+            ("Diary", Setting.ChannelMode.DiaryOnly)
+        })
+        {
+            Setting.ApplyPurposes(n, new[] { key });
+            Check($"单选 {key} → 影子 Mode 同步成 {mode}",
+                  n.Purposes is { Count: 1 } && n.Purposes[0] == key && n.Mode == mode && n.PluginModeId is null,
+                  $"{string.Join("+", n.Purposes ?? new List<string>())}/{n.Mode}/{n.PluginModeId}");
+        }
+
+        Setting.ApplyPurposes(n, new[] { "Weather" });
+        Check("单选插件用途 → PluginDefined + PluginModeId 记键（旧宿主靠它继续路由）",
+              n.Purposes![0] == "Weather" && n.Mode == Setting.ChannelMode.PluginDefined && n.PluginModeId == "Weather",
+              $"{n.Mode}/{n.PluginModeId}");
+
+        Setting.ApplyPurposes(n, new[] { "Chat", "Diary" });
+        Check("多选 → PluginDefined 且 PluginModeId 置空（旧宿主推导成无限制，降级为兜底可接受）",
+              n.Purposes is { Count: 2 } && n.Mode == Setting.ChannelMode.PluginDefined && n.PluginModeId is null,
+              $"{string.Join("+", n.Purposes ?? new List<string>())}/{n.Mode}/{n.PluginModeId}");
+
+        Setting.ApplyPurposes(n, new[] { "Diary", "Diary", "Chat", "Diary" });
+        Check("重复勾选去重且保序", n.Purposes is { Count: 2 } && n.Purposes.SequenceEqual(new[] { "Diary", "Chat" }),
+              string.Join("+", n.Purposes ?? new List<string>()));
+
+        // 多选路由：multi 接 Compression 和 Diary，不接 Chat（旁边放无限制渠道兜底，避免触发"全部兜底"分支）
+        var chatNode = Add(s, new Setting.OpenAINodeSetting { Name = "chatNode" }, 1);
+        var multi = Add(s, new Setting.OpenAINodeSetting { Name = "multi" }, 1);
+        Setting.ApplyPurposes(multi, new[] { "Compression", "Diary" });
+        Check("多选渠道接 Diary", ChannelRouter.Plan(s, "Diary").Contains(multi));
+        Check("多选渠道接 Compression", ChannelRouter.Plan(s, "Compression").Contains(multi));
+        Check("多选渠道不接 Chat", !ChannelRouter.Plan(s, "Chat").Contains(multi));
+
+        Setting.ApplyPurposes(multi, Array.Empty<string>());
+        Check("显式空列表 = 无限制，匹配一切用途",
+              ChannelRouter.Plan(s, "Chat").Contains(multi) && ChannelRouter.Plan(s, "Overflow").Contains(multi));
+
+        // Overflow 是 Compression 的别名
+        var other = Add(s, new Setting.OpenAINodeSetting { Name = "other" }, 1);
+        Setting.ApplyPurposes(other, new[] { "Diary" });
+        Setting.ApplyPurposes(multi, new[] { "Compression" });
+        Check("Overflow 别名命中 Purposes=[Compression]", ChannelRouter.Plan(s, "Overflow").Contains(multi));
+        Check("Overflow 别名不会命中别的用途", !ChannelRouter.Plan(s, "Overflow").Contains(other));
+
+        // 旧数据（Purposes=null）从 Mode 推导 —— 不做落盘迁移（构造期绝不 Save）
+        var legacy = new Setting.GeminiNodeSetting { Name = "legacy", Mode = Setting.ChannelMode.DiaryOnly };
+        Check("Purposes=null 时从 Mode 推导（DiaryOnly→[Diary]）",
+              Setting.GetNodePurposes(legacy).SequenceEqual(new[] { "Diary" }));
+        Check("推导不落盘（Purposes 仍是 null，构造期绝不 Save）", legacy.Purposes is null);
+        Check("Unrestricted 推导成空列表", Setting.PurposesFromMode(Setting.ChannelMode.Unrestricted, null).Count == 0);
+        var legacyPlugin = new Setting.OllamaNodeSetting { Name = "lp", Mode = Setting.ChannelMode.PluginDefined, PluginModeId = "Weather" };
+        Check("旧插件用途也能推导（PluginDefined+Weather→[Weather]）",
+              Setting.GetNodePurposes(legacyPlugin).SequenceEqual(new[] { "Weather" }));
+        Check("PluginDefined 但键为空 → 空列表=无限制",
+              Setting.GetNodePurposes(new Setting.OllamaNodeSetting { Name = "x", Mode = Setting.ChannelMode.PluginDefined }).Count == 0);
+
+        // 副本与类型转换都要带上 Purposes
+        var withPurposes = Add(s, new Setting.OpenAINodeSetting { Name = "wp" }, 1);
+        Setting.ApplyPurposes(withPurposes, new[] { "Diary", "Memory" });
+        var clone = (Setting.OpenAINodeSetting)Setting.CloneChannel(withPurposes);
+        Check("CloneChannel 保留 Purposes",
+              clone.Purposes is { Count: 2 } && clone.Purposes[0] == "Diary" && clone.Purposes[1] == "Memory",
+              string.Join("+", clone.Purposes ?? new List<string>()));
+        var cloneLegacy = (Setting.OpenAINodeSetting)Setting.CloneChannel(new Setting.OpenAINodeSetting { Name = "np", Mode = Setting.ChannelMode.DiaryOnly });
+        Check("旧数据副本 Purposes 仍为 null（推导不受副本影响）",
+              cloneLegacy.Purposes is null && Setting.GetNodePurposes(cloneLegacy).Count == 1);
+        var converted = Setting.ConvertChannel(withPurposes, Setting.ChannelKind.Gemini);
+        Check("ConvertChannel 换类型也带 Purposes",
+              converted.Purposes is { Count: 2 } && converted.Purposes.SequenceEqual(new[] { "Diary", "Memory" }),
+              string.Join("+", converted.Purposes ?? new List<string>()));
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    static void Test_PurposeRegistry()
+    {
+        Console.WriteLine("[1.7] 用途注册表：插件停用/卸载后用途消失");
+        var diary = new ChannelModeDefinition { ModeId = "Diary", DisplayName = "日记", Description = "d" };
+        var good = new FakeModePlugin("good", new[] { diary, new ChannelModeDefinition { ModeId = "Chat", DisplayName = "冒牌聊天" }, new ChannelModeDefinition { ModeId = "  " } }, throwInGet: false);
+        var bad = new FakeModePlugin("bad", new[] { new ChannelModeDefinition { ModeId = "Weather", DisplayName = "天气" } }, throwInGet: true);
+        Func<string, string, string> T = (_, fallback) => fallback;
+
+        try
+        {
+            PluginManager.Plugins.Add(good);
+            good.Enabled = true;
+            var purposes = ChannelPurposeRegistry.GetPurposes(T);
+            Check("内置三项在列且非插件来源",
+                  purposes.Where(p => !p.IsFromPlugin).Select(p => p.Key).SequenceEqual(new[] { "Chat", "Compression", "Memory" }),
+                  string.Join(",", purposes.Select(p => p.Key)));
+            Check("启用插件的用途在列（Diary，带插件给的显示名）",
+                  purposes.Any(p => p.Key == "Diary" && p.IsFromPlugin && p.DisplayName == "日记"),
+                  string.Join(",", purposes.Select(p => p.Key)));
+            Check("插件注册内置键被忽略（Chat 只有一个且是内置）",
+                  purposes.Count(p => p.Key == "Chat") == 1 && !purposes.First(p => p.Key == "Chat").IsFromPlugin);
+            Check("空白 ModeId 被忽略", purposes.All(p => !string.IsNullOrWhiteSpace(p.Key)));
+
+            good.Enabled = false;
+            Check("插件停用 → 它的用途从列表消失", !ChannelPurposeRegistry.GetPurposes(T).Any(p => p.Key == "Diary"));
+            Check("停用后 DescribeKey 落回原始键（已存配置里的键不丢、不误显示）",
+                  ChannelPurposeRegistry.DescribeKey("Diary", T) == "Diary");
+
+            good.Enabled = true;
+            PluginManager.Plugins.Add(bad);
+            bad.Enabled = true;
+            var mixed = ChannelPurposeRegistry.GetPurposes(T);
+            Check("一个插件 GetCustomModes 抛异常被吞掉，其它插件的用途不受影响",
+                  mixed.Any(p => p.Key == "Diary") && !mixed.Any(p => p.Key == "Weather"),
+                  string.Join(",", mixed.Select(p => p.Key)));
+
+            Check("DescribeKey：插件用途给插件显示名", ChannelPurposeRegistry.DescribeKey("Diary", T) == "日记");
+            Check("DescribeKey：内置走本地化词条", ChannelPurposeRegistry.DescribeKey("Chat", T) == "聊天");
+            Check("DescribeKey：未知键落回原始键", ChannelPurposeRegistry.DescribeKey("Ghost", T) == "Ghost");
+        }
+        finally
+        {
+            PluginManager.Plugins.Remove(good);
+            PluginManager.Plugins.Remove(bad);
+        }
+        Check("清理后注册表回到内置三项", ChannelPurposeRegistry.GetPurposes(T).Count == 3);
+    }
+
+    /// <summary>假的 IChannelModeProvider 插件：只给注册表用，不实现任何真实行为。</summary>
+    sealed class FakeModePlugin(string name, ChannelModeDefinition[] modes, bool throwInGet) : IChannelModeProvider
+    {
+        public string Name { get; } = name;
+        public string Author { get; } = "test";
+        public string Description { get; } = "";
+        public string Parameters { get; } = "";
+        public string Examples { get; } = "";
+        public bool Enabled { get; set; }
+        public string FilePath { get; set; } = "";
+        public void Initialize(global::VPetLLM.VPetLLM plugin) { }
+        public void Unload() { }
+        public IReadOnlyList<ChannelModeDefinition> GetCustomModes()
+        {
+            if (throwInGet) throw new InvalidOperationException("插件坏了");
+            return modes;
+        }
     }
 
     static void Test_RouterWeights(string dir)

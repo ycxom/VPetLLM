@@ -7,9 +7,11 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using VPetLLM.Core.Routing;
 using VPetLLM.UI.Windows;
 using VPetLLM.Utils.Data;
 using VPetLLM.Utils.Localization;
+using PluginManager = VPetLLM.Utils.Plugin.PluginManager;
 
 namespace VPetLLM.UI.Controls
 {
@@ -27,6 +29,11 @@ namespace VPetLLM.UI.Controls
         private ListCollectionView? _view;
         private DispatcherTimer? _clock;
         private bool _subscribed;
+
+        // MOD 启停/更新后刷新用途注册表用的防抖计时器：LoadPlugins 连着装 N 个插件、
+        // UpdatePlugin 卸了又装，短时间内会连发多次事件，合并成一次刷新
+        private DispatcherTimer? _pluginsRefreshTimer;
+        private Action? _onPluginsChanged;
 
         // ── 编辑页状态 ──
         private Setting.ChannelNodeBase? _original; // 编辑中的原节点；新增时为 null
@@ -85,6 +92,8 @@ namespace VPetLLM.UI.Controls
         {
             if (_subscribed || _settings is null) return;
             ChannelStatsRecorder.Changed += OnStatsChanged;
+            _onPluginsChanged = () => Dispatcher.BeginInvoke(QueuePluginsRefresh);
+            PluginManager.PluginsChanged += _onPluginsChanged;
             _clock ??= new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
             _clock.Tick += Clock_Tick;
             _clock.Start();
@@ -96,6 +105,7 @@ namespace VPetLLM.UI.Controls
             // 统计事件挂在静态类上，不摘掉就会把整个设置窗口留在内存里
             if (!_subscribed) return;
             ChannelStatsRecorder.Changed -= OnStatsChanged;
+            PluginManager.PluginsChanged -= _onPluginsChanged;
             if (_clock is not null)
             {
                 _clock.Tick -= Clock_Tick;
@@ -115,6 +125,35 @@ namespace VPetLLM.UI.Controls
             {
                 _rows.FirstOrDefault(r => ReferenceEquals(r.Node, node))?.RefreshAll();
             });
+        }
+
+        // ═══════════════════════ MOD 生命周期刷新 ═══════════════════════
+
+        /// <summary>MOD 启停/更新后短窗内多次触发 → 200ms 防抖合并成一次刷新。</summary>
+        private void QueuePluginsRefresh()
+        {
+            _pluginsRefreshTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            _pluginsRefreshTimer.Tick -= OnPluginsRefreshTick;
+            _pluginsRefreshTimer.Tick += OnPluginsRefreshTick;
+            _pluginsRefreshTimer.Stop();
+            _pluginsRefreshTimer.Start();
+        }
+
+        private void OnPluginsRefreshTick(object? sender, EventArgs e)
+        {
+            _pluginsRefreshTimer?.Stop();
+            RefreshForPluginsChanged();
+        }
+
+        /// <summary>
+        /// 插件集合/启停状态变了：列表页行徽标重算（ModeText 从注册表现算），
+        /// 编辑页只重建用途复选框——整个 LoadForm 会冲掉用户正在填、还没保存的内容。
+        /// </summary>
+        private void RefreshForPluginsChanged()
+        {
+            ReloadRows();
+            if (_draft is not null && Page_Editor.Visibility == Visibility.Visible)
+                RefreshPurposeChecks(Setting.GetNodePurposes(_draft));
         }
 
         // ═══════════════════════ 列表 ═══════════════════════
@@ -507,13 +546,7 @@ namespace VPetLLM.UI.Controls
                 Ed_Enabled.IsChecked = d.Enabled;
                 Ed_Priority.Text = d.Priority.ToString();
                 Ed_Weight.Text = d.Weight.ToString();
-                SelectByTag(Ed_Mode, d.Mode);
-                if (Ed_Mode.SelectedItem is null)
-                {
-                    // 插件自定义用途只能由插件设置，这里原样保留、只做显示
-                    Ed_Mode.Items.Add(new ComboBoxItem { Content = $"{T("Mode.Plugin", "插件")}: {d.PluginModeId}", Tag = d.Mode });
-                    SelectByTag(Ed_Mode, d.Mode);
-                }
+                RefreshPurposeChecks(Setting.GetNodePurposes(d));
                 Ed_ProxyRow.Visibility = isFree ? Visibility.Collapsed : Visibility.Visible;
                 SelectByTag(Ed_Proxy, d.ProxyMode);
 
@@ -577,7 +610,19 @@ namespace VPetLLM.UI.Controls
             if (int.TryParse(Ed_Weight.Text.Trim(), out var weight) && weight >= 0) d.Weight = weight;
             else if (validate) return T("Error.Weight", "权重必须是不小于 0 的整数");
 
-            if (Ed_Mode.SelectedItem is ComboBoxItem { Tag: Setting.ChannelMode mode }) d.Mode = mode;
+            if (Ed_AllPurposes.IsChecked == true)
+            {
+                Setting.ApplyPurposes(d, Array.Empty<string>());
+            }
+            else
+            {
+                // 置灰的旧用途键也算数（IsEnabled=false 只是不让改，不是没勾）
+                var selected = Ed_PurposeList.Children.OfType<CheckBox>()
+                    .Where(c => c.IsChecked == true).Select(c => (string)c.Tag!).ToList();
+                if (validate && selected.Count == 0)
+                    return T("Error.Purpose", "至少勾选一个用途，或选「无限制」");
+                Setting.ApplyPurposes(d, selected);
+            }
             if (Ed_Proxy.SelectedItem is ComboBoxItem { Tag: Setting.ChannelProxyMode proxy }) d.ProxyMode = proxy;
 
             d.EnableStreaming = Ed_Streaming.IsChecked == true;
@@ -966,12 +1011,6 @@ namespace VPetLLM.UI.Controls
                                                ?? ComboBox_TypeFilter.Items[0];
 
             Fill(Ed_Type, AllKinds.Select(k => (KindDisplayName(k), (object)k)));
-            Fill(Ed_Mode, new (string, object)[]
-            {
-                (T("Mode.UnrestrictedLong", "全部（聊天和总结都用）"), Setting.ChannelMode.Unrestricted),
-                (T("Mode.ChatOnlyLong", "仅聊天"), Setting.ChannelMode.ChatOnly),
-                (T("Mode.CompressionOnlyLong", "仅总结 / 上下文压缩"), Setting.ChannelMode.CompressionOnly)
-            });
             Fill(Ed_Proxy, new (string, object)[]
             {
                 (LanguageHelper.Get("ChannelProxyMode.FollowDefault", Lang, "跟随默认"), Setting.ChannelProxyMode.FollowDefault),
@@ -990,6 +1029,90 @@ namespace VPetLLM.UI.Controls
             foreach (var row in _rows) row.RefreshAll();
             UpdateSummary();
             if (_draft is not null) LoadForm();
+        }
+
+        /// <summary>
+        /// 按当前用途注册表重建复选框（内置 + 已启用插件注册的）。
+        /// 注册表外的旧键（插件刚被停用/卸载）保留为置灰勾选 —— 不让改，也不静默丢用户配置。
+        /// </summary>
+        private void RefreshPurposeChecks(IReadOnlyList<string> selected)
+        {
+            var purposes = ChannelPurposeRegistry.GetPurposes(T);
+            var known = new HashSet<string>(purposes.Select(p => p.Key));
+            Ed_AllPurposes.IsChecked = selected.Count == 0;
+            // 收起 ⇔ 无限制：界面平时只露「无限制」一项，有限定用途才展开明细
+            SetPurposeExpanded(selected.Count > 0);
+            Ed_PurposeList.Children.Clear();
+            foreach (var p in purposes)
+            {
+                var box = new CheckBox
+                {
+                    Content = p.DisplayName,
+                    Tag = p.Key,
+                    Style = TryFindResource("ModernCheckBox") as Style,
+                    FontSize = 13,
+                    Margin = new Thickness(0, 0, 0, 4),
+                    IsChecked = selected.Contains(p.Key),
+                    ToolTip = p.IsFromPlugin ? null : T("Purpose.BuiltInTip", "聊天、总结、记忆由宿主内置提供")
+                };
+                box.Click += Ed_PurposeCheck_Click;
+                Ed_PurposeList.Children.Add(box);
+            }
+            foreach (var key in selected.Where(k => !known.Contains(k)))
+            {
+                Ed_PurposeList.Children.Add(new CheckBox
+                {
+                    Content = $"{key}（{T("Purpose.Missing", "提供它的插件未启用")}）",
+                    Tag = key,
+                    Style = TryFindResource("ModernCheckBox") as Style,
+                    FontSize = 13,
+                    Margin = new Thickness(0, 0, 0, 4),
+                    IsChecked = true,
+                    IsEnabled = false
+                });
+            }
+            UpdatePurposeHint();
+        }
+
+        /// <summary>用途明细的展开/收起。收起时只露「无限制」一项，点主勾展开；全部取消勾选自动收回无限制。</summary>
+        private void SetPurposeExpanded(bool expanded)
+        {
+            Ed_PurposeList.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+            Ed_PurposeHint.Visibility = Visibility.Collapsed;
+        }
+
+        private void UpdatePurposeHint()
+        {
+            var anyChecked = Ed_PurposeList.Children.OfType<CheckBox>().Any(c => c.IsChecked == true);
+            if (Ed_AllPurposes.IsChecked != true && !anyChecked)
+            {
+                // 全部取消勾选：自动收回「无限制」，不用报错
+                Ed_AllPurposes.IsChecked = true;
+                SetPurposeExpanded(false);
+                return;
+            }
+            Ed_PurposeHint.Visibility = Visibility.Collapsed;
+        }
+
+        private void Ed_AllPurposes_Click(object sender, RoutedEventArgs e)
+        {
+            if (Ed_AllPurposes.IsChecked == true)
+            {
+                foreach (var box in Ed_PurposeList.Children.OfType<CheckBox>())
+                    if (box.IsEnabled) box.IsChecked = false;
+                SetPurposeExpanded(false);   // 选无限制就收起明细
+            }
+            else
+            {
+                SetPurposeExpanded(true);    // 取消无限制，展开逐项选择
+            }
+        }
+
+        private void Ed_PurposeCheck_Click(object sender, RoutedEventArgs e)
+        {
+            if (Ed_PurposeList.Children.OfType<CheckBox>().Any(c => c.IsEnabled && c.IsChecked == true))
+                Ed_AllPurposes.IsChecked = false;
+            UpdatePurposeHint();
         }
 
         private void Fill(ComboBox box, IEnumerable<(string Text, object Tag)> items)

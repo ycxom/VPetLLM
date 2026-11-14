@@ -369,6 +369,6 @@ static class Program
 
         public override Task<string> Chat(string prompt) => Task.FromResult("");
         public override Task<string> Chat(string prompt, bool isRetry) => Task.FromResult("");
-        public override Task<string> Summarize(string s, string u) => Task.FromResult("");
+        public override Task<string> Summarize(string s, string u, string purpose) => Task.FromResult("");
     }
 }

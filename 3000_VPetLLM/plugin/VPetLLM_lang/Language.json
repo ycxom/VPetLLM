@@ -521,6 +521,18 @@
       "zh-hans": "仅聊天压缩",
       "zh-hant": "僅聊天壓縮",
       "jp": "圧縮のみ"
+    },
+    "MemoryOnly": {
+      "en": "Memory Only",
+      "zh-hans": "仅记忆",
+      "zh-hant": "僅記憶",
+      "jp": "記憶のみ"
+    },
+    "DiaryOnly": {
+      "en": "Diary Only",
+      "zh-hans": "仅日记",
+      "zh-hant": "僅日記",
+      "jp": "日記のみ"
     }
   },
   "ThinkingEffort": {
@@ -4738,42 +4750,50 @@
         "zh-hans": "全部",
         "zh-hant": "全部",
         "jp": "すべて"
+      }
+    },
+    "Purpose": {
+      "All": {
+        "en": "Unrestricted (chat, summaries, and all plugin purposes)",
+        "zh-hans": "无限制（聊天、总结和所有插件用途都用）",
+        "zh-hant": "無限制（聊天、總結和所有外掛用途都用）",
+        "jp": "無制限（チャット・要約・すべてのプラグイン用途）"
       },
-      "ChatOnly": {
+      "Chat": {
         "en": "Chat",
-        "zh-hans": "仅聊天",
-        "zh-hant": "僅聊天",
+        "zh-hans": "聊天",
+        "zh-hant": "聊天",
         "jp": "チャット"
       },
-      "CompressionOnly": {
-        "en": "Summary",
-        "zh-hans": "仅总结",
-        "zh-hant": "僅總結",
-        "jp": "要約"
+      "Compression": {
+        "en": "Summaries / context compression",
+        "zh-hans": "总结 / 上下文压缩",
+        "zh-hant": "總結 / 上下文壓縮",
+        "jp": "要約・コンテキスト圧縮"
       },
-      "Plugin": {
-        "en": "Plugin",
-        "zh-hans": "插件",
-        "zh-hant": "外掛",
-        "jp": "プラグイン"
+      "Memory": {
+        "en": "Memory",
+        "zh-hans": "记忆整理",
+        "zh-hant": "記憶整理",
+        "jp": "記憶整理"
       },
-      "UnrestrictedLong": {
-        "en": "All (chat and summaries)",
-        "zh-hans": "全部（聊天和总结都用）",
-        "zh-hant": "全部（聊天和總結都用）",
-        "jp": "すべて（チャットと要約）"
+      "BuiltInTip": {
+        "en": "Chat, summaries, and memory are built into the host",
+        "zh-hans": "聊天、总结、记忆由宿主内置提供",
+        "zh-hant": "聊天、總結、記憶由宿主內建提供",
+        "jp": "チャット・要約・記憶はホスト内蔵です"
       },
-      "ChatOnlyLong": {
-        "en": "Chat only",
-        "zh-hans": "仅聊天",
-        "zh-hant": "僅聊天",
-        "jp": "チャットのみ"
+      "Missing": {
+        "en": "its plugin is disabled or missing",
+        "zh-hans": "提供它的插件未启用",
+        "zh-hant": "提供它的外掛未啟用",
+        "jp": "提供するプラグインが無効です"
       },
-      "CompressionOnlyLong": {
-        "en": "Summaries / context compression only",
-        "zh-hans": "仅总结 / 上下文压缩",
-        "zh-hant": "僅總結 / 上下文壓縮",
-        "jp": "要約・コンテキスト圧縮のみ"
+      "HintError": {
+        "en": "Check at least one purpose, or choose Unrestricted",
+        "zh-hans": "至少勾选一个用途，或选「无限制」",
+        "zh-hant": "至少勾選一個用途，或選「無限制」",
+        "jp": "用途を 1 つ以上選ぶか、「無制限」を選んでください"
       }
     },
     "Usage": {
@@ -4930,6 +4950,12 @@
         "zh-hans": "权重必须是不小于 0 的整数",
         "zh-hant": "權重必須是不小於 0 的整數",
         "jp": "重みは 0 以上の整数で入力してください"
+      },
+      "Purpose": {
+        "en": "Check at least one purpose, or choose Unrestricted",
+        "zh-hans": "至少勾选一个用途，或选「无限制」",
+        "zh-hant": "至少勾選一個用途，或選「無限制」",
+        "jp": "用途を 1 つ以上選ぶか、「無制限」を選んでください"
       },
       "MaxTokens": {
         "en": "Max output must be a positive integer",

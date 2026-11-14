@@ -676,7 +676,8 @@ namespace VPetLLM.Core.Providers.Chat
             }
         }
 
-        public override async Task<string> Summarize(string systemPrompt, string userContent)
+        // purpose：路由用途。Ollama 的 core 固定一个节点，不参与按用途过滤。
+        public override async Task<string> Summarize(string systemPrompt, string userContent, string purpose)
         {
             try
             {

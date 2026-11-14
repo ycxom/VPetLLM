@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using VPetLLM.Core.Routing;
 
 namespace VPetLLM.UI.Controls
 {
@@ -79,20 +80,36 @@ namespace VPetLLM.UI.Controls
         public string ToggleTip => Node.Enabled ? _t("Action.Disable", "停用") : _t("Action.Enable", "启用");
 
         // ───── 用途（对应 NewAPI 的分组）─────
-        public string ModeText => Node.Mode switch
+        // 显示名来自用途注册表：内置走本地化，插件用途问插件；插件停用后落回原始键
+        public string ModeText
         {
-            Setting.ChannelMode.ChatOnly => _t("Mode.ChatOnly", "仅聊天"),
-            Setting.ChannelMode.CompressionOnly => _t("Mode.CompressionOnly", "仅总结"),
-            Setting.ChannelMode.PluginDefined => string.IsNullOrEmpty(Node.PluginModeId) ? _t("Mode.Plugin", "插件") : Node.PluginModeId!,
-            _ => _t("Mode.Unrestricted", "全部")
-        };
-        public Brush ModeBrush => BrushOf(Node.Mode switch
+            get
+            {
+                var purposes = Setting.GetNodePurposes(Node);
+                if (purposes.Count == 0) return _t("Mode.Unrestricted", "全部");
+                return string.Join("+", purposes.Select(k => ChannelPurposeRegistry.DescribeKey(k, _t)));
+            }
+        }
+        public Brush ModeBrush
         {
-            Setting.ChannelMode.ChatOnly => "#8E44AD",
-            Setting.ChannelMode.CompressionOnly => "#C26A00",
-            Setting.ChannelMode.PluginDefined => "#605E5C",
-            _ => "#0078D4"
-        });
+            get
+            {
+                var purposes = Setting.GetNodePurposes(Node);
+                return BrushOf(purposes.Count switch
+                {
+                    0 => "#0078D4",
+                    1 => purposes[0] switch
+                    {
+                        "Chat" => "#8E44AD",
+                        "Compression" => "#C26A00",
+                        "Memory" => "#038387",
+                        "Diary" => "#C239B3",
+                        _ => "#605E5C"
+                    },
+                    _ => "#605E5C"
+                });
+            }
+        }
 
         // ───── 路由（可就地编辑）─────
         public int Priority => Node.Priority;

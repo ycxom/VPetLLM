@@ -39,8 +39,18 @@ namespace VPetLLM.Core.Abstractions.Base
         }
         public abstract Task<string> Chat(string prompt);
         public abstract Task<string> Chat(string prompt, bool isRetry);
-        /// <inheritdoc cref="VPetLLM.Core.Abstractions.Interfaces.IChatCore.Summarize"/>
-        public abstract Task<string> Summarize(string systemPrompt, string userContent);
+        /// <summary>
+        /// 无用途的总结入口，等价于 purpose="Compression"。
+        /// 保留两参签名：已发布的插件按这个签名编译，改签名会 MissingMethodException。
+        /// </summary>
+        public Task<string> Summarize(string systemPrompt, string userContent) => Summarize(systemPrompt, userContent, "Compression");
+        /// <summary>
+        /// 生成总结（带路由用途）。失败时抛 <see cref="VPetLLM.Infrastructure.Exceptions.SummarizeFailedException"/>，
+        /// 异常消息是可直接展示的文案；绝不能把错误文案当返回值。成功时允许返回空串。
+        /// purpose 决定优先走哪类渠道："Compression"（上下文压缩/溢出/技能专家）、
+        /// "Memory"（记忆检索专家总结）、"Diary"（日记生成）。
+        /// </summary>
+        public abstract Task<string> Summarize(string systemPrompt, string userContent, string purpose);
 
         /// <summary>
         /// 对单条文本取 L2 归一化向量，供插件做向量索引/检索。

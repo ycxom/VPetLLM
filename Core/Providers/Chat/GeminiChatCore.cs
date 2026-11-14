@@ -912,11 +912,11 @@ namespace VPetLLM.Core.Providers.Chat
             return "";
         }
 
-        public override async Task<string> Summarize(string systemPrompt, string userContent)
+        public override async Task<string> Summarize(string systemPrompt, string userContent, string purpose)
         {
             try
             {
-                var node = _geminiSetting.GetCurrentGeminiSetting("Compression");
+                var node = _geminiSetting.GetCurrentGeminiSetting(purpose);
                 if (node is null)
                 {
                     var noNodeError = "NoEnabledGeminiNodes".Translate();

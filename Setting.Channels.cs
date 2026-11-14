@@ -75,7 +75,15 @@ namespace VPetLLM
             public bool EnableToolCall { get; set; } = false;
             /// <summary>本节点的思考强度（reasoning effort）。Default = 不发送该参数。</summary>
             public ThinkingEffort ThinkingEffort { get; set; } = ThinkingEffort.Default;
+            /// <summary>
+            /// 本渠道服务的用途列表，是路由的真值：
+            /// null = 旧数据未迁移（由 <see cref="Mode"/> 推导，见 Setting.PurposesFromMode）；
+            /// 空列表 = 无限制（服务一切用途）；非空 = 只服务列出的用途。
+            /// </summary>
+            public List<string>? Purposes { get; set; }
+            /// <summary>旧版单选用途（枚举）。只为旧宿主回滚保留的影子，路由不读它；由 Setting.ApplyPurposes 与 Purposes 同步。</summary>
             public ChannelMode Mode { get; set; } = ChannelMode.Unrestricted;
+            /// <summary>旧版插件自定义用途标识。与 <see cref="Mode"/> 一样只是影子。</summary>
             public string? PluginModeId { get; set; }
             public ChannelProxyMode ProxyMode { get; set; } = ChannelProxyMode.FollowDefault;
 
@@ -219,6 +227,7 @@ namespace VPetLLM
             target.EnableVision = source.EnableVision;
             target.EnableToolCall = source.EnableToolCall;
             target.ThinkingEffort = source.ThinkingEffort;
+            target.Purposes = source.Purposes is { } src ? new List<string>(src) : null;
             target.Mode = source.Mode;
             target.PluginModeId = source.PluginModeId;
             target.ProxyMode = source.ProxyMode;
