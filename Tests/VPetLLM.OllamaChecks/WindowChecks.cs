@@ -1236,48 +1236,52 @@ internal static partial class Program
         var view = new ChannelManagerView();
         view.Attach(settings, () => null, () => { });
         var allPurposes = (CheckBox)view.FindName("Ed_AllPurposes");
+        var toggle = (CheckBox)view.FindName("Ed_PurposeToggle");
 
-        // 前置：这个节点是旧数据无限制 → 打开编辑页应该是收起状态
+        // 前置：这个节点是旧数据无限制 → 打开编辑页应该是「无限制」亮、「可选用途」关、明细收起
         Call(view, "OpenEditor", node, node.Kind);
         var boxes = PurposeBoxes(view);
         Check("用途复选框存在", boxes.Count >= 3);
         Check("无限制载入：明细收起", !PurposeExpanded(view));
+        Check("无限制载入：可选用途关着", toggle.IsChecked != true);
         Check("主勾挂 ModernCheckBox 样式", allPurposes.Style is not null);
         foreach (var b in boxes)
             Check($"复选框「{b.Content}」样式与主勾一致", ReferenceEquals(b.Style, allPurposes.Style));
 
-        // 点主勾取消 → 展开明细
-        allPurposes.IsChecked = false;
-        Press(allPurposes);
-        Check("取消无限制：明细展开", PurposeExpanded(view));
+        // 勾「可选用途」→ 展开；两项互斥，「无限制」自动取消
+        toggle.IsChecked = true;
+        Press(toggle);
+        Check("勾可选用途：明细展开", PurposeExpanded(view));
+        Check("勾可选用途：无限制自动取消", allPurposes.IsChecked != true);
 
-        // 逐项勾上再逐个取消 → 最后一个取消后自动收回无限制
+        // 逐项勾上再逐个取消 → 最后一个取消后自动收回「无限制」
         foreach (var b in boxes) b.IsChecked = true;
         foreach (var b in boxes)
         {
             b.IsChecked = false;
             Press(b);
         }
-        Check("全部取消：主勾自动亮", allPurposes.IsChecked == true);
+        Check("全部取消：无限制自动亮", allPurposes.IsChecked == true);
+        Check("全部取消：可选用途自动关", toggle.IsChecked != true);
         Check("全部取消：明细自动收起", !PurposeExpanded(view));
 
-        // 勾一个非内置键再保存 → 落盘的是勾选键，收起状态下不误存无限制
+        // 勾一个非内置键再保存 → 落盘的是勾选键，展开状态下能保存
         Call(view, "OpenEditor", node, node.Kind);
         Check("重开编辑页：仍无限制收起", allPurposes.IsChecked == true && !PurposeExpanded(view));
-        allPurposes.IsChecked = false;
-        Press(allPurposes);
+        toggle.IsChecked = true;
+        Press(toggle);
         var first = PurposeBoxes(view).First(b => b.IsEnabled);
         first.IsChecked = true;
         Press(first);
-        Check("勾单项：主勾取消", allPurposes.IsChecked != true);
+        Check("勾单项：无限制取消、可选用途亮", allPurposes.IsChecked != true && toggle.IsChecked == true);
         var err = (string?)Call(view, "CollectForm", true);
         Check("勾单项保存成功", err is null, err?.ToString() ?? "");
         // CollectForm 写的是编辑草稿（原节点要等真正保存才写回），断言草稿
         Check("勾单项落盘正确", Setting.GetNodePurposes(Field<Setting.ChannelNodeBase>(view, "_draft")!).Count == 1);
-        // 再点主勾选无限制并保存 → 清空
+        // 再点「无限制」并保存 → 清空、可选用途跟着关
         allPurposes.IsChecked = true;
         Press(allPurposes);
-        Check("点主勾：明细收起", !PurposeExpanded(view));
+        Check("点无限制：可选用途关、明细收起", toggle.IsChecked != true && !PurposeExpanded(view));
         err = (string?)Call(view, "CollectForm", true);
         Check("无限制保存成功", err is null, err?.ToString() ?? "");
         Check("无限制落盘为空", Setting.GetNodePurposes(Field<Setting.ChannelNodeBase>(view, "_draft")!).Count == 0);

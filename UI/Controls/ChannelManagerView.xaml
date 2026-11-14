@@ -571,7 +571,10 @@
                                     <CheckBox x:Name="Ed_AllPurposes" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,4" FontSize="13"
                                               Content="{utils:Localize KeyPath=Channels.Purpose.All, Default=无限制（聊天、总结和所有插件用途都用）}"
                                               Click="Ed_AllPurposes_Click"/>
-                                    <StackPanel x:Name="Ed_PurposeList"/>
+                                    <CheckBox x:Name="Ed_PurposeToggle" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,4" FontSize="13"
+                                              Content="{utils:Localize KeyPath=Channels.Purpose.Select, Default=可选用途（勾选后限定此渠道只给选中的用途用）}"
+                                              Click="Ed_PurposeToggle_Click"/>
+                                    <StackPanel x:Name="Ed_PurposeList" Margin="24,0,0,0"/>
                                     <TextBlock x:Name="Ed_PurposeHint" Style="{StaticResource FormHint}" Margin="0,2,0,0" Visibility="Collapsed"/>
                                 </StackPanel>
                             </DockPanel>

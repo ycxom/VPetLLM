@@ -4759,6 +4759,12 @@
         "zh-hant": "無限制（聊天、總結和所有外掛用途都用）",
         "jp": "無制限（チャット・要約・すべてのプラグイン用途）"
       },
+      "Select": {
+        "en": "Specific purposes (limit this channel to the selected ones)",
+        "zh-hans": "可选用途（勾选后限定此渠道只给选中的用途用）",
+        "zh-hant": "可選用途（勾選後限定此渠道只給選中的用途用）",
+        "jp": "特定の用途（選ぶとこのチャネルを選択した用途限定にします）"
+      },
       "Chat": {
         "en": "Chat",
         "zh-hans": "聊天",

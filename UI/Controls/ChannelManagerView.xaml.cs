@@ -1039,8 +1039,10 @@ namespace VPetLLM.UI.Controls
         {
             var purposes = ChannelPurposeRegistry.GetPurposes(T);
             var known = new HashSet<string>(purposes.Select(p => p.Key));
+            // 顶层两项并列：「无限制」= 空 Purposes；「可选用途」= 勾了至少一项。
+            // 收起 ⇔ 无限制：平时明细只跟着「可选用途」亮起展开，互不吓人。
             Ed_AllPurposes.IsChecked = selected.Count == 0;
-            // 收起 ⇔ 无限制：界面平时只露「无限制」一项，有限定用途才展开明细
+            Ed_PurposeToggle.IsChecked = selected.Count > 0;
             SetPurposeExpanded(selected.Count > 0);
             Ed_PurposeList.Children.Clear();
             foreach (var p in purposes)
@@ -1074,7 +1076,7 @@ namespace VPetLLM.UI.Controls
             UpdatePurposeHint();
         }
 
-        /// <summary>用途明细的展开/收起。收起时只露「无限制」一项，点主勾展开；全部取消勾选自动收回无限制。</summary>
+        /// <summary>用途明细的展开/收起。收起时明细藏起来，顶层只剩「无限制 / 可选用途」两项并列。</summary>
         private void SetPurposeExpanded(bool expanded)
         {
             Ed_PurposeList.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
@@ -1084,11 +1086,11 @@ namespace VPetLLM.UI.Controls
         private void UpdatePurposeHint()
         {
             var anyChecked = Ed_PurposeList.Children.OfType<CheckBox>().Any(c => c.IsChecked == true);
-            if (Ed_AllPurposes.IsChecked != true && !anyChecked)
+            if (Ed_PurposeToggle.IsChecked == true && !anyChecked && Ed_PurposeList.Visibility == Visibility.Visible)
             {
-                // 全部取消勾选：自动收回「无限制」，不用报错
-                Ed_AllPurposes.IsChecked = true;
-                SetPurposeExpanded(false);
+                // 「可选用途」开着但一个都没勾：提示去勾选，别急着收回——用户可能正要点
+                Ed_PurposeHint.Text = T("Purpose.HintError", "至少勾选一个用途，或选「无限制」");
+                Ed_PurposeHint.Visibility = Visibility.Visible;
                 return;
             }
             Ed_PurposeHint.Visibility = Visibility.Collapsed;
@@ -1098,20 +1100,53 @@ namespace VPetLLM.UI.Controls
         {
             if (Ed_AllPurposes.IsChecked == true)
             {
+                // 选「无限制」：关掉「可选用途」、清空各项、收起明细
+                Ed_PurposeToggle.IsChecked = false;
                 foreach (var box in Ed_PurposeList.Children.OfType<CheckBox>())
                     if (box.IsEnabled) box.IsChecked = false;
-                SetPurposeExpanded(false);   // 选无限制就收起明细
+                SetPurposeExpanded(false);
+            }
+            else if (Ed_PurposeToggle.IsChecked != true)
+            {
+                // 两项都不亮不合法，弹回「无限制」
+                Ed_AllPurposes.IsChecked = true;
+            }
+        }
+
+        private void Ed_PurposeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (Ed_PurposeToggle.IsChecked == true)
+            {
+                // 选「可选用途」：取消「无限制」、展开明细
+                Ed_AllPurposes.IsChecked = false;
+                SetPurposeExpanded(true);
+                UpdatePurposeHint();   // 展开时若一项都没勾会自动收回无限制
             }
             else
             {
-                SetPurposeExpanded(true);    // 取消无限制，展开逐项选择
+                // 关掉「可选用途」：清空各项、收起，回到「无限制」
+                foreach (var box in Ed_PurposeList.Children.OfType<CheckBox>())
+                    if (box.IsEnabled) box.IsChecked = false;
+                Ed_AllPurposes.IsChecked = true;
+                SetPurposeExpanded(false);
             }
         }
 
         private void Ed_PurposeCheck_Click(object sender, RoutedEventArgs e)
         {
             if (Ed_PurposeList.Children.OfType<CheckBox>().Any(c => c.IsEnabled && c.IsChecked == true))
+            {
+                // 勾了至少一项：可选用途亮着，无限制取消
                 Ed_AllPurposes.IsChecked = false;
+                Ed_PurposeToggle.IsChecked = true;
+            }
+            else if (Ed_PurposeToggle.IsChecked == true)
+            {
+                // 最后一项勾选被取消：按「全部取消勾选自动选中无限制」收回
+                Ed_PurposeToggle.IsChecked = false;
+                Ed_AllPurposes.IsChecked = true;
+                SetPurposeExpanded(false);
+            }
             UpdatePurposeHint();
         }
 
